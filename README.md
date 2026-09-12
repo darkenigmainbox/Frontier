@@ -4,7 +4,7 @@ A production-oriented vegetation generator that outputs **one closed, manifold q
 plant — no intersecting tubes, no "place a twig on a branch" merges. Branches grow *out of* their
 parent's surface through shared edge loops, forks are true Y-crotches, grass blades and culms grow
 out of a welded crown the same way, and every vertex carries wind data so the whole plant bends as
-a single skin. 30 tree species, 14 grasses and 12 desert plants ship as presets.
+a single skin. 30 tree species, 14 grasses and 20 desert plants ship as presets.
 
 ```
 npm install
@@ -22,7 +22,7 @@ npm run build      # static bundle in dist/
 | Validation | `src/tree/validate.ts` | Half-edge style audit: boundary edges, non-manifold edges, winding consistency, degenerate faces, isolated vertices, connected components, Euler characteristic / genus, valence histogram. |
 | Wind | `src/viewer/shaders.ts` | Three-tier vertex wind (trunk sway ∝ height², limb bending about a per-limb pivot with phase, twig/leaf flutter). Data is baked per vertex by the mesher. |
 | Grasses | `src/plant/grassMesher.ts`, `src/plant/grassParams.ts` | **Welded grass mesher** (below): crown dome, leaf blades, culms with nodes/sheaths/leaves and four inflorescence types, all one closed quad manifold. 14 species in three families (turf & meadow, tussock, cereals & reeds). |
-| Desert | `src/plant/desertMesher.ts`, `src/plant/desertParams.ts` | **Welded desert mesher** (below): five body plans (columnar and barrel cacti, prickly-pear pads and cholla segments, rosette succulents with an optional flower stalk, ocotillo cane colonies) sharing one window-and-collar engine — arms, pads, leaves, canes, areole cushions, spines, glochids, fruits and flowers all welded into one closed quad manifold. 12 species in four families (columnar & barrels, prickly pears, rosettes, ocotillo). |
+| Desert | `src/plant/desertMesher.ts`, `src/plant/desertParams.ts` | **Welded desert mesher** (below): five body plans (columnar and barrel cacti, prickly-pear pads and cholla segments, rosette succulents with an optional flower stalk, ocotillo cane colonies) sharing one window-and-collar engine — arms, pads, leaves, canes, areole cushions, spines, glochids, fruits and flowers all welded into one closed quad manifold. 20 species in four families (columnar & barrels, prickly pears, rosettes, ocotillo). |
 | Export | `src/tree/export.ts` | OBJ with **quads preserved** (for Blender/Maya/ZBrush), GLB (triangulated) with wind data in `COLOR_0` and level/junction flags in `TEXCOORD_1`. |
 | UI | `src/main.ts`, `src/ui/*` | Three floating cards in the SolidArc panel language: **Library** (species browser grouped by biome and plant family, search, census), **Viewport** (display modes shaded / clay / wire / levels / junctions / wind, pill toolbar, camera read-out, exact fit-to-view framing from 10 cm turf to 70 m redwoods, key hints), **Inspector** (hero card with height + mesh census, presence grid, tabs Botany · Roots · Mesh · View · Topology for trees, Grass · View · Topology for grasses and Desert · View · Topology for desert plants, with tick-track sliders, steppers, per-level tables with drag-to-scrub cells, and a command line: `seed 42`, `preset oak`, `mode wire`, `export glb`, `help`). Generation runs in a Web Worker. |
 
@@ -137,7 +137,7 @@ used to review the results in this repository; they require `puppeteer-core` and
 `npx vite-node scripts/desertProbe.ts "" 1`. `scripts/desertRender.ts` rasterises flat-shaded
 orthographic previews with a dependency-free software renderer (`renders/`).
 
-`npm test` covers every preset (30 trees + 14 grasses + 12 desert plants) × 3 seeds: closed, manifold, consistently
+`npm test` covers every preset (30 trees + 14 grasses + 20 desert plants) × 3 seeds: closed, manifold, consistently
 wound, one component, genus 0, quad ratio, drop budget, wind attribute ranges, determinism and
 the OBJ/GLB/GPU exporters.
 

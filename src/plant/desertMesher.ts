@@ -797,6 +797,12 @@ export class DesertMesher {
         const az = (k % 2) * Math.PI + this.fruitRng.uniform() * 0.3;
         children.push(this.fruitAttachment(s, az, 0.006));
       }
+    } else if (depth >= maxDepth && g.fruits > 0 && round) {
+      // Cholla: a single fruit at the very tip of the segment — the start of
+      // a hanging chain (successive years' fruit stack end to end on the
+      // segment that grows from this one, not side by side on this tip).
+      const s = clamp(L * 0.95, loC, hiC);
+      children.push(this.fruitAttachment(s, this.fruitRng.next() * TAU, 0.006));
     }
     const zones = this.zonesOf(children, spacing * 0.75 + 0.008);
     this.planPadAreoles(children, L, N, round, depth, zones, sStart);
