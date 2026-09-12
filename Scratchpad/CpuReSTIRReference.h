@@ -15,6 +15,7 @@
 #include "GeometricRaster/TraversalIndex.h"
 #include "DisplayPresentation/SkyConstantRecord.h"
 #include "DisplayPresentation/AtmosphereModel.h"
+#include "DisplayPresentation/VolumetricMedia.h"
 #include "DisplayPresentation/FidelityClassifier.h"
 
 #include <algorithm>
@@ -38,6 +39,7 @@ public:
         Traversal.BuildBottomLevel(Level.QueryFlatTriangles(), false);
         BuildLights();
         BuildAtmosphere();
+        BuildWeather();
     }
 
     // The camera and output convention are the same as VisibilityRaster::Render and RayGeneration.slang:
@@ -69,7 +71,7 @@ public:
                 Hit Primary{};
                 if (!Trace(Eye, Dir, Primary))
                 {
-                    SkyAlong(Dir, Linear);
+                    SkyAlong(Eye, Dir, Linear);
                 }
                 else
                 {
@@ -221,12 +223,73 @@ private:
 
     static float Luma(const float C[3]) noexcept { return C[0] * 0.2126f + C[1] * 0.7152f + C[2] * 0.0722f; }
 
-    void SkyAlong(const float Direction[3], float Out[3]) const noexcept
+    void BuildWeather() noexcept
+    {
+        constexpr uint32_t kCloudLayer = 1u << 0u;
+        constexpr uint32_t kLocalCloud = 1u << 1u;
+        constexpr uint32_t kLocalFog = 1u << 2u;
+        constexpr uint32_t kCloudWind = 1u << 3u;
+        constexpr uint32_t kLocalCloudWind = 1u << 4u;
+        constexpr uint32_t kLocalFogWind = 1u << 5u;
+        Cloud.Enabled = (SkyRecord.Control[2] & kCloudLayer) != 0u;
+        Cloud.Type = static_cast<CloudTypeCategory>(SkyRecord.Control[3]);
+        Cloud.Base = SkyRecord.CloudLayer[0]; Cloud.Thickness = SkyRecord.CloudLayer[1];
+        Cloud.Coverage = SkyRecord.CloudLayer[2]; Cloud.Density = SkyRecord.CloudLayer[3];
+        Cloud.Scale = SkyRecord.CloudShape[0]; Cloud.CeilingMetres = SkyRecord.CloudShape[1];
+        Cloud.Anvil = SkyRecord.CloudShape[2]; Cloud.Anisotropy = SkyRecord.CloudShape[3];
+        Cloud.FollowWind = (SkyRecord.Control[2] & kCloudWind) != 0u;
+        for (int C = 0; C < 3; ++C) Cloud.Albedo[C] = SkyRecord.CloudAlbedo[C];
+        Wind.Speed = SkyRecord.CloudWind[0]; Wind.Bearing = SkyRecord.CloudWind[1];
+        Wind.Shear = SkyRecord.CloudWind[2]; Wind.Veer = SkyRecord.CloudWind[3];
+        CloudTime = SkyRecord.CloudAlbedo[3];
+        LocalCloud.Enabled = (SkyRecord.Control[2] & kLocalCloud) != 0u;
+        LocalCloud.FollowWind = (SkyRecord.Control[2] & kLocalCloudWind) != 0u;
+        LocalFog.Enabled = (SkyRecord.Control[2] & kLocalFog) != 0u;
+        LocalFog.FollowWind = (SkyRecord.Control[2] & kLocalFogWind) != 0u;
+        for (int C = 0; C < 3; ++C)
+        {
+            LocalCloud.Centre[C] = SkyRecord.LocalCloudCentre[C];
+            LocalCloud.HalfSize[C] = SkyRecord.LocalCloudHalfSize[C];
+            LocalFog.Centre[C] = SkyRecord.LocalFogCentre[C];
+            LocalFog.HalfSize[C] = SkyRecord.LocalFogHalfSize[C];
+        }
+        LocalCloud.Density = SkyRecord.LocalCloudParams[0]; LocalCloud.Coverage = SkyRecord.LocalCloudParams[1];
+        LocalCloud.Scale = SkyRecord.LocalCloudParams[2]; LocalCloud.Anisotropy = SkyRecord.LocalCloudParams[3];
+        LocalFog.Density = SkyRecord.LocalFogParams[0]; LocalFog.Coverage = SkyRecord.LocalFogParams[1];
+        LocalFog.Scale = SkyRecord.LocalFogParams[2]; LocalFog.Anisotropy = SkyRecord.LocalFogParams[3];
+        Budget.CloudSteps = std::max(1u, SkyRecord.CloudControl[0]);
+        Budget.LocalSteps = std::max(1u, SkyRecord.CloudControl[1]);
+        Budget.LightTaps = std::max(1u, SkyRecord.CloudControl[2]);
+    }
+
+    void CloudComposite(const float Origin[3], const float Direction[3], float MaximumDistance,
+                        float Radiance[3]) const noexcept
+    {
+        if (!(Cloud.Enabled || LocalCloud.Enabled || LocalFog.Enabled)) return;
+        const float Day = Clamp01((SkyRecord.SunDirection[3] + 12.0f) / 12.0f);
+        const float SunRadiance[3] = { Sun.Colour[0] * Day, Sun.Colour[1] * Day, Sun.Colour[2] * Day };
+        const float Ambient[3] = { Radiance[0], Radiance[1], Radiance[2] };
+        const VolumetricSample Media = VolumetricMedia::March(Cloud, LocalCloud, LocalFog, Wind, Budget,
+            Origin, Direction, MaximumDistance, Sun.Direction, SunRadiance, Ambient, CloudTime);
+        for (int C = 0; C < 3; ++C) Radiance[C] = Radiance[C] * Media.Transmittance + Media.Scatter[C];
+    }
+
+    float CloudTransmittance(const float Origin[3], const float Direction[3]) const noexcept
+    {
+        if (!(Cloud.Enabled || LocalCloud.Enabled || LocalFog.Enabled)) return 1.0f;
+        const float Zero[3] = { 0.0f, 0.0f, 0.0f };
+        const VolumetricSample Media = VolumetricMedia::March(Cloud, LocalCloud, LocalFog, Wind, Budget,
+            Origin, Direction, 10000.0f, Sun.Direction, Sun.Colour, Zero, CloudTime);
+        return Media.Transmittance;
+    }
+
+    void SkyAlong(const float Origin[3], const float Direction[3], float Out[3]) const noexcept
     {
         const AtmosphereSample Sample = AtmosphereModel::Integrate(Medium, Sun, SkyRecord.Planet[2], Direction,
                                                                     std::max(1u, SkyRecord.Control[0]),
                                                                     std::max(1u, SkyRecord.Control[1]));
         for (int C = 0; C < 3; ++C) Out[C] = Sample.Radiance[C];
+        CloudComposite(Origin, Direction, 1.0e6f, Out);
     }
 
     void MaterialColour(uint32_t Slot, float Out[3]) const noexcept
@@ -264,7 +327,8 @@ private:
             C.Light = kSun; for (int I = 0; I < 3; ++I) { C.Emit[I] = SkyRecord.SunRadiance[I]; C.Point[I] = H.Position[I] + SkyRecord.SunDirection[I] * 10000.0f; }
             const float CosSurface = std::fmax(0.0f, Dot(H.Normal, SkyRecord.SunDirection));
             C.SourcePdf = HaveLights ? 0.5f : 1.0f;
-            C.TargetValue = CosSurface * Luma(C.Emit) * (Luma(C.Emit) > 0.0f ? 1.0f : 0.0f) * 0.11f;
+            C.TargetValue = CosSurface * Luma(C.Emit) * (Luma(C.Emit) > 0.0f ? 1.0f : 0.0f)
+                         * 0.11f * CloudTransmittance(H.Position, SkyRecord.SunDirection);
             C.Weight = C.TargetValue / C.SourcePdf;
             return C;
         }
@@ -332,6 +396,15 @@ private:
             if (Trace(Origin, Bounce, BounceHit) && BounceHit.Material < Records.size() && Records[BounceHit.Material].EmissiveR + Records[BounceHit.Material].EmissiveG + Records[BounceHit.Material].EmissiveB > 0.0f)
                 for (int C = 0; C < 3; ++C) Out[C] += Albedo[C] * Records[BounceHit.Material].EmissiveR;
         }
+        // The production kernel composites the camera segment after direct lighting, the bounce and the bow.
+        // Reapply the same packed cloud/local-volume state to the CPU radiance before its transfer curve.
+        float ToSurface[3] = { H.Position[0] - Eye[0], H.Position[1] - Eye[1], H.Position[2] - Eye[2] };
+        const float SurfaceDistance = Length(ToSurface);
+        if (SurfaceDistance > 0.0f)
+        {
+            ToSurface[0] /= SurfaceDistance; ToSurface[1] /= SurfaceDistance; ToSurface[2] /= SurfaceDistance;
+            CloudComposite(Eye, ToSurface, SurfaceDistance, Out);
+        }
         // A small environment floor is the kernel's ambient-floor-off sky miss contribution for closed Cornell hits.
         for (int C = 0; C < 3; ++C) Out[C] += Albedo[C] * 0.008f;
     }
@@ -348,6 +421,12 @@ private:
     std::vector<Light> Lights;
     AtmosphereMedium Medium{};
     AtmosphereLight Sun{};
+    CloudLayerSettings Cloud{};
+    LocalVolumeSettings LocalCloud{};
+    LocalVolumeSettings LocalFog{};
+    WindSettings Wind{};
+    VolumetricBudget Budget{};
+    float CloudTime = 0.0f;
     uint32_t Candidates = 4u;
     uint32_t ExtraCandidates = 2u;
     bool GlobalIllumination = true;
