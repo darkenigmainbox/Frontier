@@ -37,7 +37,7 @@ namespace Frontier {
 //                                                       THE ATLAS
 //------------------------------------------------------------------------------------------------------------------------
 
-// One body from the reference panel's MOON_ATLAS (Diagnostics/CelestialPanel.html). Size is the angular DIAMETER in
+// One body from the reference panel's MOON_ATLAS (the former browser reference). Size is the angular DIAMETER in
 //    degrees — art-directed, like the panel's: the real moon is ~0.5°, Luna's default is 0.9° so it reads. Position
 //    and phase are the true ephemeris for a linked Luna; every other slot is placed by hand.
 struct MoonAtlasPreset

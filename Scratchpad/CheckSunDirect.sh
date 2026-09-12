@@ -103,7 +103,7 @@ echo
 echo "[SunDirect] the panel's gain and the slider reach the record"
 grep -q 'kPanelDirectSunGain = 0.11f' Engine/DisplayPresentation/SkyConstantRecord.h
 Report $? "the packer carries the panel's 0.11 direct-sun gain"
-grep -q 'CelestialPanel.html:1162' Engine/DisplayPresentation/SkyConstantRecord.h
+grep -q 'the former browser reference:1162' Engine/DisplayPresentation/SkyConstantRecord.h
 Report $? "the gain cites the panel line it was transcribed from"
 grep -q 'float SunDirectGain = 1.0f' Engine/DisplayPresentation/SkyConstantRecord.h
 Report $? "the gain slider defaults to one (old call sites unchanged)"

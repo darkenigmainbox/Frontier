@@ -10,9 +10,12 @@ marches, wind advection, precipitation, rainbows, lens flare, height fog, aerial
 presentation state, and the editor write-back sheets. The same sky/weather record is sent to both the CPU visibility
 raster and the ReSTIR shader.
 
-The browser reference panel from SultanAladin/Frontier- is preserved at
-`Projects/Project-Zero/Content/Celestial/CelestialPanel.html`; its asset path points at the single native moon atlas
-under `EngineContent/CelestialTextures/`. See the adjacent `README.md` for a quick local preview command.
+The former browser reference is not a Project Zero deliverable. Project Zero is native C++: `CelestialSequence`
+owns the live state and feeds both `VisibilityRaster::AssignCelestial` and the production GPU upload calls in
+`GameExecution.cpp` (`RefreshSky`, `RefreshMoons`, and `RefreshPost`). The inspectable CPU proof is built and run by
+`bash Scratchpad/RenderProjectZeroShowcase.sh`; it decodes the shipping Cornell scene through `ContentCodec::Decode`
+and writes `Diagnostics/ProjectZero_Cornell_Celestial_*.png`. Those PNGs are CPU visibility-raster evidence only, not
+GPU ReSTIR output. GPU execution requires a Vulkan device and is intentionally reported separately.
 
 ## Checks
 

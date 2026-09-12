@@ -305,7 +305,7 @@ the sun switch is the record's direct row, so night, a hidden sun and a disabled
 and the outliner SUN row is the kill switch.
 
 **The direct scale is the reference panel's, not an invention.** The panel lights its previews with
-`trans·colour·intensity·0.11·ndl·sh` (`CelestialPanel.html:1162,1182`); the packer packs exactly that factor
+`trans·colour·intensity·0.11·ndl·sh` (`the former browser reference:1162,1182`); the packer packs exactly that factor
 (transmittance marched by the same `Integrate` the raster calls, zero below the horizon) and the kernel divides
 by Ω and multiplies back in the estimator — so the converged NEE EQUALS the panel's formula while sampling the
 real disc (soft shadows) and shadowing through the BVH (the panel's `sh`). Proven by value, not by reading: the

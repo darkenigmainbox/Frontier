@@ -579,7 +579,7 @@ vec3 SkyAlong(vec3 Direction, vec3 Origin)
     //    does. MoonAlong is declared by MoonRecords.slang, which ReSTIRViewport includes BEFORE this file.
     if (!HitGround) Radiance += MoonAlong(Direction, Transmittance);
     // The sun's body. The integral above is skylight only, so without this the sun is a Mie glow with no
-    //    source — the "blurred disc". Transcribed from the reference panel (Diagnostics/CelestialPanel.html on
+    //    source — the "blurred disc". Transcribed from the reference panel (the former browser reference on
     //    arena/01a08682-frontier): smoothstep-edged disc, limb-darkened, gated near the horizon, at the panel's
     //    own defaults (0.53 deg diameter, 0.25 softness, 12x disc radiance). Two deliberate differences: the
     //    reddening uses the integral's transmittance already in hand (the panel recomputes extinction from air

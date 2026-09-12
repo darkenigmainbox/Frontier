@@ -4,7 +4,7 @@
 // Round 9 deleted a CelestialSolver at the author's request (947b8b9). This is its replacement, written for the
 //    Celestial port, and it is deliberately NOT a transcription of the reference demo.
 //
-// ⚠️ WHY NOT THE DEMO'S MODEL. CelestialPanel.html computes the sun as
+// ⚠️ WHY NOT THE DEMO'S MODEL. the former browser reference computes the sun as
 //        sinE = cos(latitude) · cos(hourAngle)
 //    which is the correct expression only when the solar declination is zero — that is, at an equinox. It carries
 //    no date at all, so it cannot represent a season. Measured against NOAA at Benoni (−26.19°), local noon:

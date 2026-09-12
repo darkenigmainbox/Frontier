@@ -1,3 +1,5 @@
+> Historical planning note. The browser panel mentioned below is reference material only; HTML is no longer a deliverable. The implemented target is native Project Zero C++ and the current proof is `Scratchpad/ProjectZeroShowcase.cpp`.
+
 ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
   Porting the Celestial system — sky, clouds, wind, weather, and the panel UI
 ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -5,7 +7,7 @@
 Plan only. Nothing in this document has been implemented.
 
 **Source**: `SultanAladin/Frontier-` @ `arena/01a08682-frontier`, HEAD `6c8b1a8`.
-**Reference UI**: `Diagnostics/CelestialPanel.html` (identical to `docs/index.html`, the GitHub Pages demo) —
+**Reference UI**: `the former browser reference` (identical to `docs/index.html`, the GitHub Pages demo) —
 469 KB single-file WebGL app, 3,657 lines, of which a 498-line GLSL fragment shader is the entire simulation.
 **Target**: this repo, branch `arena/01a0881a-frontier`.
 

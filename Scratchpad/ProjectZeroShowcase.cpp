@@ -1,17 +1,16 @@
 //============================================================================================================================================
 //                                                 PROJECTZEROSHOWCASE.CPP
 //============================================================================================================================================
-// 🧩 Project Zero's sky, sun, moon and stars as the game itself renders them — five aimed frames.
+// 🧩 Project Zero's native Cornell frame proof — five inspectable CPU visibility-raster images plus one GPU feed record.
 //
-//    WHAT THIS IS: the project's own CelestialSequence (prepare → tick → ApplyTo) driven exactly as GameExecution
-//    drives it — same tier budget via CelestialTier::BudgetFor, same shipping star catalogue, same six moon
-//    albedos decoded through the real index, every entity shown (the project default) — rendered through the
-//    CPU raster the game's no-ray path reads through ApplyTo. The clock is the only input; the sun, the
-//    twilight, the moon and the wheeling stars all come out of the tick. Nothing is hand-set, nothing is mocked,
-//    except where this header says so.
+//    WHAT THIS IS: the project's own CelestialSequence (prepare → tick → ApplyTo) driven in GameExecution order,
+//    with the exact shipping CornellBox.gltf decoded through ContentCodec. The raster receives the same decoded
+//    SceneStructure and the same CelestialBudget/ApplyTo state as Project Zero's no-ray path. The companion frame
+//    record runs the production sky/moon/post packers and ReSTIRIntegrator::BuildDispatch for that live frame.
 //
-//    WHAT THIS IS NOT: the Vulkan window. This box has no GPU, no Vulkan driver and no display server, so
-//    Project-Zero.exe cannot execute here; these frames are the headless twin of its sky path, at 960x540.
+//    WHAT THIS IS NOT: a GPU render claim. The sandbox has no Vulkan device/display, so RefreshSky/RefreshMoons/
+//    RefreshPost and RecordAndPresent are not called here. The text proof says NOT CLAIMED; the PNGs are CPU
+//    VisibilityRaster evidence only. A Vulkan run of Project Zero is required before a GPU ReSTIR image can be named.
 //
 //    The day frames face the solved sun's azimuth the way a photographer would. The night frames need two dates,
 //    and the reason is honest astronomy, verified with the shipping solver: on the gates' date (10 Sep 2026) the
@@ -28,20 +27,26 @@
 
 #include "GeometricRaster/VisibilityRaster.h"
 #include "GeometricRaster/SceneStructure.h"
-#include "GeometricRaster/GeometryStructure.h"
+#include "ContentInterchange/ContentCodec.h"
 #include "DisplayPresentation/CelestialSolver.h"
 #include "DisplayPresentation/CelestialTier.h"
 #include "DisplayPresentation/FidelityClassifier.h"
 #include "DisplayPresentation/MoonConstantRecord.h"
+#include "DisplayPresentation/PostConstantRecord.h"
+#include "DisplayPresentation/ReSTIRIntegrator.h"
+#include "DisplayPresentation/SkyConstantRecord.h"
+#include "GeometricRaster/TraversalIndex.h"
+#include "Projects/Project-Zero/Source/FlyThroughSolver.h"
 #include "Projects/Project-Zero/Source/CelestialSequence.h"
 #include "PngWriteShim.h"
 
 #include <cmath>
 #include <cstdio>
+#include <fstream>
+#include <cstring>
 #include <cstdint>
 #include <string>
 #include <vector>
-#include <deque>
 
 using namespace Frontier;
 using namespace Frontier::ProjectZero;
@@ -51,71 +56,7 @@ namespace {
 constexpr uint32_t kWidth  = 960;
 constexpr uint32_t kHeight = 540;
 
-// A ground plane and a couple of blocks — enough that the sky has a silhouette to sit behind, which is what makes
-//    a wrong horizon obvious. Copied from CelestialSkyProof's scene so the showcase shares the gate's ground truth.
-// std::deque, not std::vector: GeometryStructure is not movable, so a vector cannot reallocate it.
-void BuildScene(SceneStructure& Level, std::deque<GeometryStructure>& Owned)
-{
-    auto Quad = [&](float ax, float ay, float az, float bx, float by, float bz,
-                    float cx, float cy, float cz, float dx, float dy, float dz)
-    {
-        Owned.emplace_back();
-        GeometryStructure& G = Owned.back();
-        VertexRecord V[4]{};
-        const float P[4][3] = { {ax,ay,az}, {bx,by,bz}, {cx,cy,cz}, {dx,dy,dz} };
-        float ux = bx-ax, uy = by-ay, uz = bz-az, vx = dx-ax, vy = dy-ay, vz = dz-az;
-        float nx = uy*vz-uz*vy, ny = uz*vx-ux*vz, nz = ux*vy-uy*vx;
-        const float nl = std::sqrt(nx*nx+ny*ny+nz*nz);
-        if (nl > 0.0f) { nx/=nl; ny/=nl; nz/=nl; }
-        for (int i = 0; i < 4; ++i)
-        {
-            V[i].SpatialLocation  = Vector3{ P[i][0], P[i][1], P[i][2] };
-            V[i].NormalDirection  = Vector3{ nx, ny, nz };
-            V[i].TangentDirection = Vector4{ 1.0f, 0.0f, 0.0f, 1.0f };
-            V[i].TextureCoordinateU = static_cast<float>(i == 1 || i == 2);
-            V[i].TextureCoordinateV = static_cast<float>(i >= 2);
-        }
-        G.AppendVertices(V, 4u);
-        const uint32_t Idx[6] = { 0u,1u,2u, 0u,2u,3u };
-        G.AppendIndices(Idx, 6u);
-        PolyhedralCluster C{};
-        C.BoundingRadius = 200.0f;
-        C.ConeCutoff     = 1.0f;
-        C.TriangleCount  = static_cast<uint32_t>(G.QueryIndices().size() / 3u);
-        G.RegisterCluster(C);
-    };
-
-    // Ground, tiled rather than one huge quad. VisibilityRaster is an unclipped rasteriser: kNear (0.05 m) makes
-    //    it SKIP any triangle with a vertex nearer than that, and it cannot split one. Tiles keep every triangle
-    //    wholly in front of the eye.
-    for (int Ty = 0; Ty < 8; ++Ty)
-    {
-        const float Y0 = -4.0f + static_cast<float>(Ty) * 6.0f;
-        const float Y1 = Y0 + 6.0f;
-        for (int Tx = -3; Tx < 3; ++Tx)
-        {
-            const float X0 = static_cast<float>(Tx) * 8.0f;
-            const float X1 = X0 + 8.0f;
-            Quad(X0, Y0, 0.0f,  X1, Y0, 0.0f,  X1, Y1, 0.0f,  X0, Y1, 0.0f);
-        }
-    }
-    // Two standing slabs, so there is a silhouette against the sky.
-    Quad(-3.0f, 6.0f, 0.0f,  -1.0f, 6.0f, 0.0f,  -1.0f, 6.0f, 3.5f,  -3.0f, 6.0f, 3.5f);
-    Quad( 1.5f, 9.0f, 0.0f,   4.0f, 9.0f, 0.0f,   4.0f, 9.0f, 2.2f,   1.5f, 9.0f, 2.2f);
-
-    MaterialDescriptor M;
-    M.Name = "Ground";
-    MaterialSlabDescriptor S{};
-    S.BaseColor[0] = 0.42f; S.BaseColor[1] = 0.40f; S.BaseColor[2] = 0.36f;
-    S.SpecularRoughness = 0.8f;
-    M.Slabs.push_back(S);
-    const uint32_t Slot = Level.RegisterMaterial(M);
-
-    const Matrix4x4 I = Matrix4x4::Identity();
-    for (GeometryStructure& G : Owned) Level.RegisterInstance(G, I, Slot, 0u);
-    Level.Finalise();
-}
-
+// The only scene in this proof is the shipping CornellBox.gltf decoded below. No geometry is constructed here.
 // When does the sun stand at the requested elevation inside [FromHour, ToHour]? Solved with the shipping solver,
 //    coarse pass plus fine pass — the same approach as the dawn stages in CelestialSkyProof.
 float SolveHourForElevation(float Elevation, float FromHour, float ToHour)
@@ -169,6 +110,82 @@ void AimAt(const float* Direction, float Forward[3], float Right[3], float Up[3]
     Up[2] = Right[0] * Forward[1] - Right[1] * Forward[0];
 }
 
+uint64_t Fnv1a(const void* Data, size_t Bytes) noexcept
+{
+    const auto* B = static_cast<const unsigned char*>(Data);
+    uint64_t H = 1469598103934665603ull;
+    for (size_t I = 0u; I < Bytes; ++I) { H ^= B[I]; H *= 1099511628211ull; }
+    return H;
+}
+
+// This is the CPU-side proof of the production GPU seam. It intentionally stops before Vulkan: the sandbox has no
+// device, so it does not pretend that RefreshSky/RefreshMoons/RefreshPost or the ReSTIR shader executed. It does
+// exercise the same live frame state through the production packers and ReSTIRIntegrator::BuildDispatch, then writes
+// the records' hashes and dimensions for inspection. GameExecution.cpp is the device-side continuation of these
+// exact values (Surface.Refresh* followed by Surface.RecordAndPresent).
+void WriteGpuFrameStateProof(const CelestialSequence& Sky, const SceneStructure& Level,
+                             const FidelityCriteria& Criteria, const float Eye[3], const float ViewForward[3])
+{
+    constexpr uint32_t Width = kWidth, Height = kHeight;
+    ProjectZero::FlyThroughSolver Camera;
+    Camera.AssignSpatialLocation(Vector3{ Eye[0], Eye[1], Eye[2] });
+    const float Pitch = std::asin(std::fmax(-1.0f, std::fmin(1.0f, ViewForward[2])));
+    const float Yaw = std::atan2(ViewForward[0], ViewForward[1]);
+    Camera.AssignOrientationEuler(Pitch, Yaw, 0.0f);
+    Camera.AssignFieldOfView(55.0f);
+    Camera.AssignAspectRatio(static_cast<float>(Width) / static_cast<float>(Height));
+
+    ReSTIRIntegratorConfiguration Configuration{};
+    Configuration.CandidatesPerPixel = Criteria.ReSTIRCandidateSampleCount;
+    Configuration.ExtraCandidateCount = Criteria.ReSTIRExtraCandidateCount;
+    Configuration.SpatialTapCount = Criteria.ReSTIRSpatialTapCount;
+    Configuration.DenoiseLevelCount = Criteria.DenoiseLevelCount;
+    Configuration.Exposure = 1.0f;
+    Configuration.AmbientStrength = 0.0f;
+    Configuration.GlobalIllumination = true;
+    Configuration.AntiAliasing = true;
+    ReSTIRIntegrator Integrator(Configuration);
+    Integrator.ObserveCamera(Camera, Width, Height);
+
+    TraversalIndex Traversal;
+    const bool TraversalReady = Traversal.BuildBottomLevel(Level.QueryFlatTriangles(), false);
+    float SunVisibility = 1.0f;
+    if (TraversalReady)
+    {
+        float Distance = 0.0f; uint32_t Primitive = 0u;
+        if (Traversal.TraceClosest(Eye, Sky.Frame().Sun.Direction, Distance, Primitive)) SunVisibility = 0.0f;
+    }
+    const float Forward[3] = { Camera.QueryForwardVector().x, Camera.QueryForwardVector().y, Camera.QueryForwardVector().z };
+    const float Right[3]   = { Camera.QueryRightVector().x, Camera.QueryRightVector().y, Camera.QueryRightVector().z };
+    const float Up[3]      = { Camera.QueryUpwardVector().x, Camera.QueryUpwardVector().y, Camera.QueryUpwardVector().z };
+    const float TanHalf = std::tan(Camera.QueryFieldOfViewRadians() * 0.5f);
+    const SkyConstantRecord SkyRecord = Sky.PackSkyRecord();
+    const MoonConstantRecord MoonRecord = Sky.PackMoonRecord();
+    const PostConstantRecord PostRecord = Sky.PackPostRecord(Forward, Right, Up, TanHalf,
+                                                              Camera.QueryAspectRatio(), Height, SunVisibility);
+    const DispatchConfiguration Dispatch = Integrator.BuildDispatch(
+        Camera, Width, Height, 0u, static_cast<uint32_t>(Level.QueryLuminaires().size()));
+
+    std::ofstream Out("Diagnostics/ProjectZero_Cornell_ReSTIR_FrameState.txt", std::ios::trunc);
+    Out << "Project Zero native frame-state proof\n"
+        << "scene=Projects/Project-Zero/Content/Scenes/CornellBox.gltf\n"
+        << "scene_decode=ContentCodec::Decode\n"
+        << "celestial=CelestialSequence::Prepare -> Tick -> ApplyTo\n"
+        << "gpu_execution=NOT CLAIMED (this environment has no Vulkan device/display)\n"
+        << "device_continuation=GameExecution.cpp: RefreshSky -> RefreshMoons -> RefreshPost -> RecordAndPresent\n"
+        << "reSTIR_dispatch=ReSTIRIntegrator::BuildDispatch\n"
+        << "triangles=" << Level.QueryTriangleCount() << "\n"
+        << "luminaires=" << Level.QueryLuminaires().size() << "\n"
+        << "sun_visibility=" << SunVisibility << "\n"
+        << "sky_bytes=" << sizeof(SkyRecord) << " sky_fnv1a=0x" << std::hex << Fnv1a(&SkyRecord, sizeof(SkyRecord)) << std::dec << "\n"
+        << "moon_bytes=" << sizeof(MoonRecord) << " moon_fnv1a=0x" << std::hex << Fnv1a(&MoonRecord, sizeof(MoonRecord)) << std::dec << "\n"
+        << "post_bytes=" << sizeof(PostRecord) << " post_fnv1a=0x" << std::hex << Fnv1a(&PostRecord, sizeof(PostRecord)) << std::dec << "\n"
+        << "dispatch_bytes=" << sizeof(Dispatch) << " dispatch_fnv1a=0x" << std::hex << Fnv1a(&Dispatch, sizeof(Dispatch)) << std::dec << "\n";
+    if (!Out) std::fprintf(stderr, "  could not write GPU frame-state proof\n");
+    std::printf("  packed GPU frame state: sky %zu B, moons %zu B, post %zu B, dispatch %zu B (execution not claimed)\n",
+                sizeof(SkyRecord), sizeof(MoonRecord), sizeof(PostRecord), sizeof(Dispatch));
+}
+
 } // namespace
 
 int main()
@@ -176,9 +193,23 @@ int main()
     std::printf("\nProject Zero showcase: the sky the game renders, five aimed frames\n");
     for (int I = 0; I < 70; ++I) std::putchar('='); std::printf("\n\n");
 
+    // Load the exact shipping CornellBox.gltf used by GameExecution. There is deliberately no hand-built proof
+    // geometry here: this is the same ContentCodec -> SceneStructure path as Project Zero itself.
     SceneStructure Level;
-    std::deque<GeometryStructure> Owned;
-    BuildScene(Level, Owned);
+    TextureIndex Textures;
+    SceneDecodeConfiguration Decode{};
+    Decode.UniformScale = 1.0f;
+    Decode.SlabLimit = 1u;
+    std::string DecodeError;
+    if (!ContentCodec::Decode("Projects/Project-Zero/Content/Scenes/CornellBox.gltf", Level,
+                              &Textures, Decode, &DecodeError))
+    {
+        std::fprintf(stderr, "  CornellBox.gltf decode failed: %s\n", DecodeError.c_str());
+        return 2;
+    }
+    Level.AssignName("CornellBox");
+    std::printf("  loaded shipping CornellBox.gltf: %u triangles, %zu instances, %zu placements\n",
+                Level.QueryTriangleCount(), Level.QueryInstances().size(), Level.QueryPlacements().size());
 
     FidelityClassifier Classifier;
     const FidelityCriteria Criteria = Classifier.ConstructCriteria(FidelityCategory::StandardFidelity);
@@ -187,7 +218,6 @@ int main()
     CelestialSequence Sky;
     Sky.Prepare();
     std::printf("  %u stars catalogued\n", Sky.Stars().QuerySourceCount());
-    TextureIndex Textures;
     uint32_t AtlasSlots[kMoonAtlasCount];
     for (uint32_t M = 0u; M < kMoonAtlasCount; ++M)
     {
@@ -201,7 +231,7 @@ int main()
     for (uint32_t E = 0u; E < kCelestialEntityCount; ++E) Sky.Shown[E] = true;
 
     const float TickOrigin[3] = { 0.0f, 0.0f, 2.0f };
-    const float Eye[3]        = { 0.0f, -6.0f, 1.7f };
+    const float Eye[3]        = { 0.0f, -3.30f, 1.55f };
     constexpr float kHalfFov  = 55.0f * 3.14159265f / 180.0f;
     constexpr float kDeg      = 3.14159265f / 180.0f;
 
@@ -224,6 +254,9 @@ int main()
         }
         float R[3], U[3];
         AimAt(F, F, R, U);
+        // This is the same celestial tick/camera as the morning raster below. The helper proves the native GPU
+        // pack/integrator seam and writes no GPU image because this environment has no Vulkan device.
+        WriteGpuFrameStateProof(Sky, Level, Criteria, Eye, F);
         VisibilityRaster Raster;
         Sky.ApplyTo(Raster, Budget);
         std::vector<unsigned char> Frame(static_cast<size_t>(kWidth) * kHeight * 4u, 0u);
@@ -232,7 +265,7 @@ int main()
         std::printf("  morning: sun el %+.2f az %.1f at %.2fh\n",
                     static_cast<double>(Sky.Frame().Sun.Elevation), static_cast<double>(Sky.Frame().Sun.Azimuth),
                     static_cast<double>(Sky.Observation.LocalHours));
-        WriteFrame("Diagnostics/ProjectZero_Showcase_Morning.png", Frame);
+        WriteFrame("Diagnostics/ProjectZero_Cornell_Celestial_Morning.png", Frame);
     }
 
     // ── 2. Sunset: the sun at +1.5 deg, faced ────────────────────────────────────────────────────
@@ -254,7 +287,7 @@ int main()
         std::printf("  sunset: sun el %+.2f az %.1f at %.2fh\n",
                     static_cast<double>(Sky.Frame().Sun.Elevation), static_cast<double>(Sky.Frame().Sun.Azimuth),
                     static_cast<double>(Sky.Observation.LocalHours));
-        WriteFrame("Diagnostics/ProjectZero_Showcase_Sunset.png", Frame);
+        WriteFrame("Diagnostics/ProjectZero_Cornell_Celestial_Sunset.png", Frame);
     }
 
     // ── 3. Night, linked: slot 0 as Prepare() leaves it — Luna following the solved lunar frame ──
@@ -272,7 +305,7 @@ int main()
                     static_cast<double>(Sky.Frame().Moon.Elevation),
                     static_cast<double>(Sky.Frame().Moon.Azimuth),
                     static_cast<double>(Sky.Frame().MoonIllumination));
-        WriteFrame("Diagnostics/ProjectZero_Showcase_NightLinked.png", Frame);
+        WriteFrame("Diagnostics/ProjectZero_Cornell_Celestial_NightLinked.png", Frame);
     }
 
     // ── 4. Night, placed: the roster driven the way the reference panel drives it ────────────────
@@ -299,7 +332,7 @@ int main()
         double MeanLuminance = 0.0;
         if (!Raster.Render(Level, Eye, F, R, U, kHalfFov, kWidth, kHeight, Frame.data(), MeanLuminance)) return 2;
         std::printf("  placed: Luna 2 deg full + Ember 3 deg gibbous at 22h on Sep 10 (stars on)\n");
-        WriteFrame("Diagnostics/ProjectZero_Showcase_NightPlaced.png", Frame);
+        WriteFrame("Diagnostics/ProjectZero_Cornell_Celestial_NightPlaced.png", Frame);
     }
 
     // ── 5. Morning, local: the parked volume with its enable flipped ────────────────────────────
@@ -323,7 +356,7 @@ int main()
         std::printf("  local: parked volume enabled at 11h on Sep 10 (box centre %.0f %.0f %.0f)\n",
                     (double)Sky.LocalCloud.Centre[0], (double)Sky.LocalCloud.Centre[1],
                     (double)Sky.LocalCloud.Centre[2]);
-        WriteFrame("Diagnostics/ProjectZero_Showcase_LocalCloud.png", Frame);
+        WriteFrame("Diagnostics/ProjectZero_Cornell_Celestial_LocalCloud.png", Frame);
     }
 
     std::printf("\n  showcase rendered\n");

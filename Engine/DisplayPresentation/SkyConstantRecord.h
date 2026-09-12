@@ -168,7 +168,7 @@ inline SkyConstantRecord PackSkyConstants(const AtmosphereMedium& Medium, const 
     //    one observer, not per ray — scene relief is metres against an 8 km scale height. The transmittance is
     //    marched by the same Integrate the raster calls: the view march only (the light march feeds the
     //    in-scatter this row discards, so it runs at 1 step). 0.11 is the panel's principal surface-lighting
-    //    gain (CelestialPanel.html:1162,1182 — alb·(trans·colour·intensity·.11·ndl·sh+amb)): the panel multiplies
+    //    gain (the former browser reference:1162,1182 — alb·(trans·colour·intensity·.11·ndl·sh+amb)): the panel multiplies
     //    it directly, while the kernel divides by the disc solid angle (SunEmission) and multiplies back in the
     //    estimator, so the converged NEE equals the panel's formula while sampling the real disc (soft shadows)
     //    and shadowing through the BVH (the panel's sh term). SunDirectGain is the panel's Direct slider.

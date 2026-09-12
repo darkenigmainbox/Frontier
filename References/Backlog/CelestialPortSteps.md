@@ -1,3 +1,5 @@
+> Historical planning note. The browser panel mentioned below is reference material only; HTML is no longer a deliverable. The implemented target is native Project Zero C++ and the current proof is `Scratchpad/ProjectZeroShowcase.cpp`.
+
 ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
   Celestial port — the step plan, with proofs
 ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════

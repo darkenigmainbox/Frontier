@@ -1,0 +1,14 @@
+Project Zero native frame-state proof
+scene=Projects/Project-Zero/Content/Scenes/CornellBox.gltf
+scene_decode=ContentCodec::Decode
+celestial=CelestialSequence::Prepare -> Tick -> ApplyTo
+gpu_execution=NOT CLAIMED (this environment has no Vulkan device/display)
+device_continuation=GameExecution.cpp: RefreshSky -> RefreshMoons -> RefreshPost -> RecordAndPresent
+reSTIR_dispatch=ReSTIRIntegrator::BuildDispatch
+triangles=2450
+luminaires=2
+sun_visibility=1
+sky_bytes=368 sky_fnv1a=0x20fbac9327c611ac
+moon_bytes=288 moon_fnv1a=0x2639b3380991d14f
+post_bytes=128 post_fnv1a=0x47b8af008f2f42b0
+dispatch_bytes=128 dispatch_fnv1a=0x7117641515f39272

@@ -1,7 +1,7 @@
 //============================================================================================================================================
 // 📦 Engine/Shaders/MoonRecords.slang — the moons as the ray-tracing kernel sees them
 //============================================================================================================================================
-// The Celestial port's moon seam: a transcription of the reference panel's moons() (Diagnostics/CelestialPanel.html
+// The Celestial port's moon seam: a transcription of the reference panel's moons() (the former browser reference
 //    on the arena/01a08682-frontier branch), and it must stay one. The CPU raster, the headless proofs and this
 //    kernel are three consumers of the same atlas, and the first time they disagree the night sky becomes two.
 //
