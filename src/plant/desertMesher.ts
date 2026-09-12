@@ -269,12 +269,18 @@ export class DesertMesher {
     const line = growLine({ x: 0, y: -(sink + depth), z: 0 }, dir0, right0, L, steps, (t0, t1) => ({
       gravity: g.curve * DEG2RAD * (t1 - t0),
     }));
-    // Squat barrel curve: buried base, widest just below the middle, flat woolly crown.
+    // Squat barrel curve: buried base, widest just below the middle, then a
+    // rounded, woolly crown (real barrels dome and narrow at the very top —
+    // a wide flat disc there reads as an unfinished/spineless cap).
     const radius = (s: number): number => {
       if (s < sGround) return R * (0.3 + 0.25 * (s / sGround));
       const t = clamp((s - sGround) / H, 0, 1);
-      const r = R * Math.pow(Math.sin(Math.PI * (0.1 + 0.8 * t)), 0.75);
-      return Math.max(0.28 * R, r);
+      let r = R * Math.pow(Math.sin(Math.PI * (0.1 + 0.8 * t)), 0.75);
+      if (t > 0.86) {
+        const u = clamp((t - 0.86) / 0.14, 0, 1);
+        r *= Math.cos(u * Math.PI * 0.5 * 0.82);
+      }
+      return Math.max(0.05 * R, r);
     };
     return this.finishStem(line, L, sGround, radius, {
       ribs: Math.max(8, Math.round(g.ribs)),
@@ -296,7 +302,7 @@ export class DesertMesher {
     // Areole stations along the stem, measured from the tip down.
     const zone = clamp(g.spineZone, 0, 1);
     const spacing = Math.max(0.008, g.areoleSpacing);
-    const tipMargin = o.isBarrel ? 0.015 : Math.max(0.02, o.domeLen * 0.25);
+    const tipMargin = o.isBarrel ? Math.max(0.004, spacing * 0.3) : Math.max(0.02, o.domeLen * 0.25);
     const sTop = L - tipMargin;
     const sBot = Math.max(sGround + 0.015, L - zone * Labove);
     const stations: number[] = [];
@@ -305,6 +311,7 @@ export class DesertMesher {
     // Arms / pups first (priority), then the fruit ring, then the areoles.
     this.planArms(children, line, L, sGround, radius, N, o);
     this.planStemFruits(children, line, L, sGround, radius, N, ribs, o);
+    this.planStemFlowers(children, L, ribs, o);
     const zones = this.zonesOf(children, spacing * 0.75 + 0.01);
     const openStations = stations.filter((st) => !this.inZones(st, zones));
     const openKeep = Math.ceil(openStations.length * ribs * clamp(g.spineDensity, 0, 1));
@@ -425,6 +432,18 @@ export class DesertMesher {
         const az = Math.round((k * GOLDEN + this.fruitRng.next()) / crest) * crest;
         children.push(this.fruitAttachment(s, az, 0.006));
       }
+    } else if (g.flowers) {
+      // A crown of flowers ringing the arm tip, same as the main stem apex.
+      const nf = Math.max(1, Math.round(g.flowersPerTip / 2));
+      for (let k = 0; k < nf; k++) {
+        const s = clamp(armL - domeLen * 0.25 - k * 0.01, sStart + 1.7 * 0.006, armL - 1.7 * 0.006);
+        const crest = TAU / armRibs;
+        const az = Math.round((k * GOLDEN + this.fruitRng.next()) / crest) * crest;
+        children.push({
+          s, az, w: 1, h: 2, hh: 0.005, pri: 0, spine: false, j0: 0, row0: 0, row1: 0,
+          make: (exit) => this.makeFruit(exit, true),
+        });
+      }
     }
     const zone = clamp(Math.max(g.spineZone, 0.18), 0, 1);
     const spacing = Math.max(0.008, g.areoleSpacing * 0.9);
@@ -483,6 +502,29 @@ export class DesertMesher {
       const az = Math.round(((k / count) * TAU + this.fruitRng.uniform() * 0.2) / crest) * crest;
       const s = sF - (k % 2) * 0.03;
       children.push(this.fruitAttachment(s, az, 0.008));
+    }
+  }
+
+  /** Flowers ringing the very crown (barrels) or apex (columnar stems and arm
+   *  tips): real barrel cacti bloom from a felted ring right at the top, and
+   *  columnar cacti (saguaro, cardon) flower at the tips of the stem and arms. */
+  private planStemFlowers(
+    children: Attachment[], L: number, ribs: number,
+    o: { domeLen: number; isBarrel: boolean },
+  ): void {
+    const g = this.g;
+    if (!g.flowers) return;
+    const count = Math.max(0, Math.round(g.flowersPerTip));
+    if (count === 0) return;
+    const sF = o.isBarrel ? L - 0.32 * o.domeLen : L - o.domeLen * 0.32;
+    const crest = TAU / ribs;
+    for (let k = 0; k < count; k++) {
+      const az = Math.round(((k / count) * TAU + this.fruitRng.uniform() * 0.25) / crest) * crest;
+      const s = sF - (k % 3) * 0.014;
+      children.push({
+        s, az, w: 1, h: 2, hh: 0.007, pri: 0, spine: false, j0: 0, row0: 0, row1: 0,
+        make: (exit) => this.makeFruit(exit, true),
+      });
     }
   }
 
@@ -1254,7 +1296,9 @@ export class DesertMesher {
         return Math.max(0.0008, 0.004 * (1 - u) + 0.0008);
       }
       const t = clamp(s / Lleaf, 0, 1);
-      return o.width * (0.3 + 0.7 * sstep(0, 0.25, t)) * (1 - Math.pow(sstep(0.35, 1, t), 1.2) * 0.965);
+      const taperStart = clamp(g.leafTaperStart, 0.05, 0.95);
+      const tipFill = clamp(g.leafTipFill, 0, 0.9);
+      return o.width * (0.3 + 0.7 * sstep(0, 0.25, t)) * (1 - Math.pow(sstep(taperStart, 1, t), 1.2) * (1 - tipFill));
     };
     const thickAt = (s: number): number => {
       if (s >= Lleaf) {

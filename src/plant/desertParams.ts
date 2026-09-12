@@ -106,6 +106,12 @@ export interface DesertParams {
   crownHeight: number;
   /** Lean of the outer leaves from the vertical. */
   rosetteSpread: number;
+  /** Fraction of the leaf length where the blade starts narrowing towards the tip
+   *  (later = the widest point sits further out, an obovate/spoon shape). */
+  leafTaperStart: number;
+  /** Width remaining at the very tip as a fraction of the max width
+   *  (near 0 = tapers to a sharp point, higher = a blunt, rounded spoon tip). */
+  leafTipFill: number;
 
   // ---- Flower stalk (agave) ---------------------------------------------------
   stalk: boolean;
@@ -185,6 +191,14 @@ export interface DesertParams {
   collarRings: number;
   /** Safety cap on spine-like organs (deterministic priority from the tips down). */
   spineBudget: number;
+
+  // ---- Colour ---------------------------------------------------------------------
+  /** Body / pad / leaf base colour, as a CSS hex string (e.g. '#5f7c3a'). */
+  bodyColor: string;
+  /** Spine / glochid / thorn colour. */
+  spineColor: string;
+  /** Flower petal colour (buds, torches, barrel crown flowers). */
+  flowerColor: string;
 }
 
 export const DEFAULT_DESERT: DesertParams = {
@@ -236,6 +250,8 @@ export const DEFAULT_DESERT: DesertParams = {
   crownRadius: 0.28,
   crownHeight: 0.12,
   rosetteSpread: 60,
+  leafTaperStart: 0.35,
+  leafTipFill: 0.035,
 
   stalk: false,
   stalkHeight: 5,
@@ -284,6 +300,10 @@ export const DEFAULT_DESERT: DesertParams = {
   spineRings: 2,
   collarRings: 1,
   spineBudget: 12000,
+
+  bodyColor: '#5f7c3a',
+  spineColor: '#d8c98a',
+  flowerColor: '#e0658a',
 };
 
 /** Approximate height of a desert plant (m), for the library metadata and framing. */
@@ -357,6 +377,11 @@ export const DESERT_PRESETS: { name: string; desert: Partial<DesertParams> }[] =
       fruits: 8,
       fruitLength: 0.06,
       fruitRadius: 0.02,
+      flowers: true,
+      flowersPerTip: 6,
+      flowerLength: 0.075,
+      flowerRadius: 0.026,
+      flowerColor: '#f5f2df',
       bodySides: 112,
       bodyRings: 90,
     },
@@ -392,6 +417,11 @@ export const DESERT_PRESETS: { name: string; desert: Partial<DesertParams> }[] =
       fruits: 10,
       fruitLength: 0.055,
       fruitRadius: 0.02,
+      flowers: true,
+      flowersPerTip: 6,
+      flowerLength: 0.08,
+      flowerRadius: 0.028,
+      flowerColor: '#f5f2df',
       bodySides: 126,
       bodyRings: 110,
     },
@@ -552,6 +582,13 @@ export const DESERT_PRESETS: { name: string; desert: Partial<DesertParams> }[] =
       spineAngle: 50,
       spineDensity: 0.9,
       areoleFelt: 0.003,
+      flowers: true,
+      flowersPerTip: 10,
+      flowerLength: 0.032,
+      flowerRadius: 0.012,
+      flowerColor: '#f2c94c',
+      bodyColor: '#4f8a4c',
+      spineColor: '#e8d27a',
       bodySides: 120,
       bodyRings: 48,
     },
@@ -587,6 +624,11 @@ export const DESERT_PRESETS: { name: string; desert: Partial<DesertParams> }[] =
       fruits: 10,
       fruitLength: 0.03,
       fruitRadius: 0.014,
+      flowers: true,
+      flowersPerTip: 8,
+      flowerLength: 0.026,
+      flowerRadius: 0.011,
+      flowerColor: '#e8703a',
       bodySides: 102,
       bodyRings: 56,
     },
@@ -617,6 +659,11 @@ export const DESERT_PRESETS: { name: string; desert: Partial<DesertParams> }[] =
       fruits: 12,
       fruitLength: 0.032,
       fruitRadius: 0.014,
+      flowers: true,
+      flowersPerTip: 8,
+      flowerLength: 0.028,
+      flowerRadius: 0.012,
+      flowerColor: '#f2b23a',
       bodySides: 132,
       bodyRings: 60,
     },
@@ -877,24 +924,30 @@ export const DESERT_PRESETS: { name: string; desert: Partial<DesertParams> }[] =
     },
   },
   {
+    // Echeveria elegans: plump obovate/spatulate leaves with a rounded (not
+    // pointed) apex and a tiny translucent mucro, tightly packed into a
+    // compact, cupped rosette — pale blue-green with a powdery bloom.
     name: 'Echeveria',
     desert: {
       habit: 'rosette',
-      leaves: 46,
-      leafLength: 0.085,
-      leafLengthV: 0.12,
-      leafWidth: 0.045,
-      leafThick: 0.018,
-      leafCurve: 28,
-      leafKeel: 0.3,
+      leaves: 68,
+      leafLength: 0.058,
+      leafLengthV: 0.1,
+      leafWidth: 0.03,
+      leafThick: 0.024,
+      leafCurve: 20,
+      leafKeel: 0.16,
       teeth: 0,
       teethPerSide: 0,
-      terminalSpine: 0.003,
-      crownRadius: 0.05,
-      crownHeight: 0.02,
-      rosetteSpread: 50,
-      leafSides: 10,
-      leafRings: 16,
+      terminalSpine: 0.0025,
+      leafTaperStart: 0.62,
+      leafTipFill: 0.5,
+      crownRadius: 0.014,
+      crownHeight: 0.006,
+      rosetteSpread: 40,
+      leafSides: 12,
+      leafRings: 14,
+      bodyColor: '#8fae8a',
     },
   },
 
