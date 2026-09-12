@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { PRESETS, TREE_PRESETS, cloneParams, DEFAULT_MESH, DEFAULT_BOTANY, DEFAULT_ROOTS, TreeParams, defaultEnvironment, isGrass } from '../src/tree/params';
+import { PRESETS, TREE_PRESETS, cloneParams, DEFAULT_MESH, DEFAULT_BOTANY, DEFAULT_ROOTS, TreeParams, defaultEnvironment, isGrass, isDesert } from '../src/tree/params';
 import { buildSkeleton } from '../src/tree/skeleton';
 import { buildMesh } from '../src/tree/mesher';
 import { validateTopology } from '../src/tree/validate';
 import { toOBJ, toGLB, toGpuBuffers } from '../src/tree/export';
 import { GrassMesher } from '../src/plant/grassMesher';
 import { DEFAULT_GRASS, GRASS_PRESETS } from '../src/plant/grassParams';
+import { DesertMesher } from '../src/plant/desertMesher';
+import { DEFAULT_DESERT, DESERT_PRESETS } from '../src/plant/desertParams';
 import { generateTree } from '../src/tree/generate';
 import { LeafMesh } from '../src/tree/mesh';
 
@@ -14,6 +16,13 @@ function build(params: TreeParams) {
   const { mesh, leaves, stats } = buildMesh(skel);
   const report = validateTopology(mesh);
   return { skel, mesh, leaves, stats, report };
+}
+
+function buildDesert(preset: { desert: Partial<(typeof DESERT_PRESETS)[number]['desert']> }, seed: number) {
+  const g = { ...DEFAULT_DESERT, ...preset.desert };
+  const built = new DesertMesher(g, seed).build();
+  const report = validateTopology(built.mesh);
+  return { ...built, report };
 }
 
 function buildGrass(preset: { grass: Partial<(typeof GRASS_PRESETS)[number]['grass']> }, seed: number) {
@@ -136,6 +145,94 @@ describe('welded grass plant is a single closed manifold', () => {
     expect(lines.filter((l) => l.startsWith('v ')).length).toBe(mesh.vertexCount);
     expect(lines.filter((l) => l.startsWith('f ') && l.trim().split(/\s+/).length === 5).length).toBe(mesh.quadCount);
     const glb = toGLB(mesh, leaves, 'grass');
+    const dv = new DataView(glb);
+    expect(dv.getUint32(0, true)).toBe(0x46546c67);
+    expect(dv.getUint32(8, true)).toBe(glb.byteLength);
+  });
+});
+
+
+describe('welded desert plant is a single closed manifold', () => {
+  for (const preset of DESERT_PRESETS) {
+    for (const seed of [1, 7, 42]) {
+      it(`${preset.name} seed ${seed}`, () => {
+        const { report, stats, mesh, height, groundDepth } = buildDesert(preset, seed);
+        expect(report.boundaryEdges, 'boundary edges').toBe(0);
+        expect(report.nonManifoldEdges, 'non-manifold edges').toBe(0);
+        expect(report.inconsistentEdges, 'inconsistent winding').toBe(0);
+        expect(report.degenerateFaces, 'degenerate faces').toBe(0);
+        expect(report.isolatedVertices, 'isolated vertices').toBe(0);
+        expect(report.components, 'connected components').toBe(1);
+        expect(report.eulerCharacteristic, 'Euler characteristic').toBe(2);
+        expect(report.genus).toBe(0);
+        // The desert mesher emits quads only; organs close with even rings.
+        expect(report.quadRatio).toBe(1);
+        expect(stats.dropped, 'dropped organs').toBe(0);
+        // Every organ but the body was welded through a window.
+        expect(stats.junctions).toBe(stats.organs - 1);
+        expect(stats.organs).toBeGreaterThan(10);
+        expect(height).toBeGreaterThan(0.03);
+        expect(groundDepth).toBeGreaterThan(0);
+        // Wind attributes: in range, sway weight reaches 1 at the top, no limb
+        // weight or flutter on the body.
+        const n = mesh.vertexCount;
+        let maxHeight = 0;
+        let outOfRange = 0;
+        let bodyMoving = 0;
+        for (let i = 0; i < n; i++) {
+          for (let k = 0; k < 4; k++) {
+            const v = mesh.wind[i * 4 + k];
+            if (!(v >= 0 && v <= 1)) outOfRange++;
+          }
+          if (mesh.wind[i * 4] > maxHeight) maxHeight = mesh.wind[i * 4];
+          if (mesh.levels[i] === 0 && (mesh.wind[i * 4 + 1] !== 0 || mesh.wind[i * 4 + 3] !== 0)) bodyMoving++;
+        }
+        expect(outOfRange, 'wind attributes out of [0, 1]').toBe(0);
+        expect(bodyMoving, 'body vertices with limb/flutter weight').toBe(0);
+        expect(maxHeight).toBeCloseTo(1, 5);
+      });
+    }
+  }
+
+  it('desert presets carry the desert kind and go through the shared pipeline', () => {
+    const deserts = PRESETS.filter(isDesert);
+    expect(deserts.length).toBe(DESERT_PRESETS.length);
+    const p = cloneParams(deserts.find((g) => g.name === 'Saguaro')!);
+    p.seed = 3;
+    const r = generateTree(p);
+    expect(r.skeleton).toBeNull();
+    expect(r.desert).toBeDefined();
+    expect(r.report.closed && r.report.manifold).toBe(true);
+    expect(r.report.genus).toBe(0);
+    expect(r.stats.stems).toBe(r.desert!.organs);
+    expect(r.summary.stemsPerLevel).toEqual(r.desert!.perLevel);
+    expect(r.summary.height).toBeGreaterThan(3);
+    expect(r.buffers.index.length).toBe(r.mesh.quadCount * 6 + r.mesh.triCount * 3);
+  });
+
+  it('is deterministic for a given seed and differs across seeds', () => {
+    const a = buildDesert(DESERT_PRESETS[0], 9);
+    const b = buildDesert(DESERT_PRESETS[0], 9);
+    const c = buildDesert(DESERT_PRESETS[0], 10);
+    expect(a.mesh.positions.length).toBe(b.mesh.positions.length);
+    expect(a.report.faces).toBe(b.report.faces);
+    const sum = (arr: ArrayLike<number>) => {
+      let t = 0;
+      for (let i = 0; i < arr.length; i++) t += arr[i] * ((i % 7) + 1);
+      return t;
+    };
+    expect(sum(a.mesh.positions)).toBe(sum(b.mesh.positions));
+    expect(sum(c.mesh.positions)).not.toBe(sum(a.mesh.positions));
+  });
+
+  it('exports a desert plant as quads to OBJ and GLB', () => {
+    const { mesh } = buildDesert(DESERT_PRESETS.find((g) => g.name === 'Prickly Pear')!, 1);
+    const leaves = new LeafMesh();
+    const obj = toOBJ(mesh, leaves, 'desert');
+    const lines = obj.split('\n');
+    expect(lines.filter((l) => l.startsWith('v ')).length).toBe(mesh.vertexCount);
+    expect(lines.filter((l) => l.startsWith('f ') && l.trim().split(/\s+/).length === 5).length).toBe(mesh.quadCount);
+    const glb = toGLB(mesh, leaves, 'desert');
     const dv = new DataView(glb);
     expect(dv.getUint32(0, true)).toBe(0x46546c67);
     expect(dv.getUint32(8, true)).toBe(glb.byteLength);

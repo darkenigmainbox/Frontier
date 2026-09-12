@@ -13,6 +13,7 @@
 
 import { EnvironmentParams, DEFAULT_SCATTER, scatterObstacles } from '../env/environment';
 import { GrassParams, DEFAULT_GRASS, GRASS_PRESETS, GRASS_GROUPS } from '../plant/grassParams';
+import { DesertParams, DEFAULT_DESERT, DESERT_PRESETS, DESERT_GROUPS } from '../plant/desertParams';
 
 export type Level4<T> = [T, T, T, T];
 
@@ -207,8 +208,8 @@ export const DEFAULT_ROOTS: RootParams = {
   dive: 0.75,
 };
 
-/** What kind of plant a parameter set describes. Trees go through the Weber-Penn skeleton, grasses through the grass mesher. */
-export type PlantKind = 'tree' | 'grass';
+/** What kind of plant a parameter set describes. Trees go through the Weber-Penn skeleton, grasses and desert plants through their own meshers. */
+export type PlantKind = 'tree' | 'grass' | 'desert';
 
 export interface TreeParams {
   name: string;
@@ -221,9 +222,12 @@ export interface TreeParams {
   environment: EnvironmentParams;
   /** Grass description (kind === 'grass'). */
   grass?: GrassParams;
+  /** Desert plant description (kind === 'desert'). */
+  desert?: DesertParams;
 }
 
 export const isGrass = (p: { kind?: PlantKind }): boolean => p.kind === 'grass';
+export const isDesert = (p: { kind?: PlantKind }): boolean => p.kind === 'desert';
 
 export const DEFAULT_MESH: MeshParams = {
   trunkRadialSegments: 24,
@@ -1411,8 +1415,26 @@ export const TREE_PRESETS: TreeParams[] = [
   }, {}, { count: 5, radius: 0.42, length: 0.26, laterals: 2, forks: 0.5 }),
 ];
 
-/** Every species: trees first, then the grasses. */
-export const PRESETS: TreeParams[] = [...TREE_PRESETS, ...GRASS_PRESETS.map((g) => grassPreset(g.name, g.grass))];
+function desertPreset(name: string, desert: Partial<DesertParams>): TreeParams {
+  const roots = { ...DEFAULT_ROOTS, enabled: false };
+  return {
+    name,
+    seed: 1,
+    kind: 'desert',
+    botany: { ...DEFAULT_BOTANY },
+    mesh: { ...DEFAULT_MESH },
+    roots,
+    environment: { enabled: false, scatter: { ...DEFAULT_SCATTER, count: 0 }, obstacles: [] },
+    desert: { ...DEFAULT_DESERT, ...desert },
+  };
+}
+
+/** Every species: trees first, then the grasses, then the desert plants. */
+export const PRESETS: TreeParams[] = [
+  ...TREE_PRESETS,
+  ...GRASS_PRESETS.map((g) => grassPreset(g.name, g.grass)),
+  ...DESERT_PRESETS.map((g) => desertPreset(g.name, g.desert)),
+];
 
 /** Grouping for the species list. Presets missing here are shown under "Other". */
 export const PRESET_GROUPS: { label: string; names: string[] }[] = [
@@ -1424,6 +1446,7 @@ export const PRESET_GROUPS: { label: string; names: string[] }[] = [
   { label: 'Desert', names: ['Joshua Tree', 'Desert Ironwood'] },
   { label: 'Rocky terrain', names: ['Bristlecone Pine', 'Rowan'] },
   ...GRASS_GROUPS,
+  ...DESERT_GROUPS,
 ];
 
 export function getPreset(name: string): TreeParams {

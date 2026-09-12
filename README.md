@@ -4,7 +4,7 @@ A production-oriented vegetation generator that outputs **one closed, manifold q
 plant — no intersecting tubes, no "place a twig on a branch" merges. Branches grow *out of* their
 parent's surface through shared edge loops, forks are true Y-crotches, grass blades and culms grow
 out of a welded crown the same way, and every vertex carries wind data so the whole plant bends as
-a single skin. 30 tree species and 14 grasses ship as presets.
+a single skin. 30 tree species, 14 grasses and 12 desert plants ship as presets.
 
 ```
 npm install
@@ -22,8 +22,9 @@ npm run build      # static bundle in dist/
 | Validation | `src/tree/validate.ts` | Half-edge style audit: boundary edges, non-manifold edges, winding consistency, degenerate faces, isolated vertices, connected components, Euler characteristic / genus, valence histogram. |
 | Wind | `src/viewer/shaders.ts` | Three-tier vertex wind (trunk sway ∝ height², limb bending about a per-limb pivot with phase, twig/leaf flutter). Data is baked per vertex by the mesher. |
 | Grasses | `src/plant/grassMesher.ts`, `src/plant/grassParams.ts` | **Welded grass mesher** (below): crown dome, leaf blades, culms with nodes/sheaths/leaves and four inflorescence types, all one closed quad manifold. 14 species in three families (turf & meadow, tussock, cereals & reeds). |
+| Desert | `src/plant/desertMesher.ts`, `src/plant/desertParams.ts` | **Welded desert mesher** (below): five body plans (columnar and barrel cacti, prickly-pear pads and cholla segments, rosette succulents with an optional flower stalk, ocotillo cane colonies) sharing one window-and-collar engine — arms, pads, leaves, canes, areole cushions, spines, glochids, fruits and flowers all welded into one closed quad manifold. 12 species in four families (columnar & barrels, prickly pears, rosettes, ocotillo). |
 | Export | `src/tree/export.ts` | OBJ with **quads preserved** (for Blender/Maya/ZBrush), GLB (triangulated) with wind data in `COLOR_0` and level/junction flags in `TEXCOORD_1`. |
-| UI | `src/main.ts`, `src/ui/*` | Three floating cards in the SolidArc panel language: **Library** (species browser grouped by biome and plant family, search, census), **Viewport** (display modes shaded / clay / wire / levels / junctions / wind, pill toolbar, camera read-out, exact fit-to-view framing from 10 cm turf to 70 m redwoods, key hints), **Inspector** (hero card with height + mesh census, presence grid, tabs Botany · Roots · Mesh · View · Topology for trees and Grass · View · Topology for grasses, with tick-track sliders, steppers, per-level tables with drag-to-scrub cells, and a command line: `seed 42`, `preset oak`, `mode wire`, `export glb`, `help`). Generation runs in a Web Worker. |
+| UI | `src/main.ts`, `src/ui/*` | Three floating cards in the SolidArc panel language: **Library** (species browser grouped by biome and plant family, search, census), **Viewport** (display modes shaded / clay / wire / levels / junctions / wind, pill toolbar, camera read-out, exact fit-to-view framing from 10 cm turf to 70 m redwoods, key hints), **Inspector** (hero card with height + mesh census, presence grid, tabs Botany · Roots · Mesh · View · Topology for trees, Grass · View · Topology for grasses and Desert · View · Topology for desert plants, with tick-track sliders, steppers, per-level tables with drag-to-scrub cells, and a command line: `seed 42`, `preset oak`, `mode wire`, `export glb`, `help`). Generation runs in a Web Worker. |
 
 ## The welded mesher
 
@@ -83,6 +84,35 @@ closed quad manifold** — the same guarantee as the trees, with no triangles at
 `Lawn Turf` (330 blades) is 14.5 k faces, `Wheat` 9 k, `Meadow Grass` 67 k, `Pampas Grass` (24 culms,
 plumes with secondaries) 305 k — all genus 0, zero dropped organs, on every seed in the test matrix.
 
+## The welded desert mesher
+
+Five body plans share one window-and-collar engine in `src/plant/desertMesher.ts`. Columnar and
+barrel cacti are ribbed stems (`ribs` ribs, `ribDepth` amplitude) grown from a buried base to a
+domed tip; prickly pears stack flat cladodes (or round cholla segments) into trunked, tiered
+crowns; rosettes (agave, aloe, echeveria) ring toothed, keeled, terminal-spined leaves around a
+grid-dome crown with an optional branched flower stalk; ocotillo bows thorny canes tipped with
+flower torches out of a basal cup. Every plant is **one closed quad manifold** with no triangles:
+
+* **Limbs.** Arms, pups, pads, leaves and canes are packed into disjoint spans along their parent
+  before meshing, so the planner never shifts them; the window matches the limb's constricted base
+  and the collar flare *is* the joint. Eight or more basal arms switch a columnar cactus into
+  organ-pipe mode: a grid dome with one welded column per arm.
+* **Areoles.** Cushions sit on rib crests, pad faces, cane spirals and column ribs through
+  1 × 2 / 2 × 2 windows with a uniform height per band so every window in a band shares its ring
+  rows exactly. Each cushion carries radial spines plus an optional central, glochids (prickly
+  pear), a papery sheath (cholla straw) and a felt mound; a `spineBudget` cap keeps the densest
+  organs from the tips down. Exclusion zones around limb windows keep areoles off skin the planner
+  has already promised to a limb.
+* **Fruits & flowers.** Barrel-apple rings below the stem tip, tunas on terminal pad rims, stalk
+  buds, ocotillo torches — all windowed organs, all quads.
+* **Wind.** The same four attributes as trees and grasses: `height` normalised by the real plant
+  height (8 cm echeveria to 9 m cardon), `limb` along each arm/pad/leaf/cane about its own pivot,
+  per-limb `phase`, `detail` flutter on cane tips.
+
+`Saguaro` (4 arms) is 136 k faces, `Cardon` (5 arms) 234 k, `Organ Pipe` (12 columns) 215 k,
+`Teddy-Bear Cholla` (40 segments, 3 k spines) 80 k — all genus 0, zero dropped organs, on every
+seed in the test matrix.
+
 ## Wind
 
 Per-vertex attributes baked by the mesher:
@@ -102,10 +132,12 @@ full tree, close-ups of specific junction types, display modes and the wind defo
 used to review the results in this repository; they require `puppeteer-core` and a Chromium binary
 (`CHROME_PATH`).
 
-`scripts/probe.ts` (trees) and `scripts/grassProbe.ts` (grasses) run the full pipeline headlessly
-and print the topology audit per preset × seed: `npx vite-node scripts/grassProbe.ts "" 1,2,3`.
+`scripts/probe.ts` (trees), `scripts/grassProbe.ts` (grasses) and `scripts/desertProbe.ts`
+(desert plants) run the full pipeline headlessly and print the topology audit per preset × seed:
+`npx vite-node scripts/desertProbe.ts "" 1`. `scripts/desertRender.ts` rasterises flat-shaded
+orthographic previews with a dependency-free software renderer (`renders/`).
 
-`npm test` covers every preset (30 trees + 14 grasses) × 3 seeds: closed, manifold, consistently
+`npm test` covers every preset (30 trees + 14 grasses + 12 desert plants) × 3 seeds: closed, manifold, consistently
 wound, one component, genus 0, quad ratio, drop budget, wind attribute ranges, determinism and
 the OBJ/GLB/GPU exporters.
 
