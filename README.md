@@ -14,8 +14,8 @@ The former browser reference is not a Project Zero deliverable. Project Zero is 
 owns the live state and feeds both `VisibilityRaster::AssignCelestial` and the production GPU upload calls in
 `GameExecution.cpp` (`RefreshSky`, `RefreshMoons`, and `RefreshPost`). The inspectable CPU proof is built and run by
 `bash Scratchpad/RenderProjectZeroShowcase.sh`; it decodes the shipping Cornell scene through `ContentCodec::Decode`
-and writes `Diagnostics/ProjectZero_Cornell_Celestial_*.png`. Those PNGs are CPU visibility-raster evidence only, not
-GPU ReSTIR output. GPU execution requires a Vulkan device and is intentionally reported separately.
+and writes `Diagnostics/ProjectZero_Cornell_ReSTIR_Cpu_*.png`. Those PNGs are CPU execution of the ReSTIR shader estimator against the production scene buffers; they are not
+GPU Vulkan output. GPU execution requires a Vulkan device and is intentionally reported separately.
 
 ## Checks
 

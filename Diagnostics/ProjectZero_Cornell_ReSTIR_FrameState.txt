@@ -3,6 +3,7 @@ scene=Projects/Project-Zero/Content/Scenes/CornellBox.gltf
 scene_decode=ContentCodec::Decode
 celestial=CelestialSequence::Prepare -> Tick -> ApplyTo
 gpu_execution=NOT CLAIMED (this environment has no Vulkan device/display)
+cpu_estimator=CpuReSTIRReference (initial RIS + unbiased W + shadow re-trace + one-bounce GI)
 device_continuation=GameExecution.cpp: RefreshSky -> RefreshMoons -> RefreshPost -> RecordAndPresent
 reSTIR_dispatch=ReSTIRIntegrator::BuildDispatch
 triangles=2450

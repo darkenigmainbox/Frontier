@@ -3,8 +3,8 @@
 # 📦 Scratchpad/RenderProjectZeroShowcase.sh — Project Zero's sky, sun, moon and stars as the game renders them
 #============================================================================================================================================
 # Headless, like the gates — no Vulkan, no GLFW, no window. Builds ProjectZeroShowcase.cpp, which loads the
-# shipping CornellBox.gltf through ContentCodec, drives CelestialSequence through ApplyTo, writes five CPU raster
-# images, and writes a separate native GPU-feed record. The GPU record is not a GPU execution claim.
+# shipping CornellBox.gltf through ContentCodec, drives CelestialSequence, executes the CPU ReSTIR estimator, writes
+# five ReSTIR reference images, and writes a separate native GPU-feed record. The GPU record is not a GPU execution claim.
 #
 # Dependency roots follow CheckCelestialSky so the showcase stays runnable in the same environment.
 set -u
@@ -20,13 +20,12 @@ Bvh="${TINYBVH:-/tmp/tinybvh}"; Vkh="${VKH:-/tmp/vkh/include}"
 [ -f "$FastObj/fast_obj.h" ] || git clone --depth 1 -q https://github.com/thisistherk/fast_obj.git "$FastObj"
 [ -f "$Bvh/tiny_bvh.h" ] || git clone --depth 1 -q https://github.com/jbikker/tinybvh.git "$Bvh"
 
-echo "[Showcase] Project Zero's sky through the game's own sequence"
+echo "[Showcase] Project Zero's ReSTIR estimator through the game's own frame state"
 Show="$(mktemp -u /tmp/ProjectZeroShowcase.XXXXXX)"
-if ! g++ -std=c++20 -O2 -msse4.2 -I . -I Engine -I Scratchpad \
+if ! g++ -std=c++20 -O2 -ffunction-sections -fdata-sections -Wl,--gc-sections -msse4.2 -I . -I Engine -I Scratchpad \
      -I "$Cg" -I "$Ufbx" -I "$Stb" -I "$FastObj" -I "$Bvh" -I "$Vkh" -o "$Show" \
      Scratchpad/ProjectZeroShowcase.cpp \
      Projects/Project-Zero/Source/CelestialSequence.cpp \
-     Engine/GeometricRaster/VisibilityRaster.cpp \
      Engine/GeometricRaster/StarCatalogueIndex.cpp \
      Engine/GeometricRaster/SceneStructure.cpp \
      Engine/GeometricRaster/GeometryStructure.cpp \
