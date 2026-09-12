@@ -28,6 +28,10 @@ export class QuadMesh {
   levels: number[] = [];
   /** Per-vertex junction flag (1 = belongs to a branch collar / crotch). */
   junction: number[] = [];
+  /** Per-vertex colour group: 0 = body/leaf, 1 = spine/thorn/glochid,
+   *  2 = flower, 3 = fruit. Lets one material tint different organs of the
+   *  same plant differently (desert plants only; trees/grasses stay 0). */
+  accent: number[] = [];
 
   quads: number[] = [];
   quadUVs: number[] = [];
@@ -44,13 +48,14 @@ export class QuadMesh {
     return this.tris.length / 3;
   }
 
-  addVertex(x: number, y: number, z: number, wind: VertexWind, pivot: { x: number; y: number; z: number }, level: number, junction = 0): number {
+  addVertex(x: number, y: number, z: number, wind: VertexWind, pivot: { x: number; y: number; z: number }, level: number, junction = 0, accent = 0): number {
     const idx = this.positions.length / 3;
     this.positions.push(x, y, z);
     this.wind.push(wind.height, wind.limb, wind.phase, wind.detail);
     this.pivots.push(pivot.x, pivot.y, pivot.z);
     this.levels.push(level);
     this.junction.push(junction);
+    this.accent.push(accent);
     return idx;
   }
 

@@ -67,6 +67,15 @@ export const DEFAULT_VIEW: ViewerSettings = {
 
 const BARK = new THREE.Color(0x6e6258);
 const LEAF = new THREE.Color(0x5f7c3a);
+
+/** Per-species flat colours for desert plants, keyed by the mesh's `accent` channel
+ *  (0 = body, 1 = spine/thorn, 2 = flower, 3 = fruit). Undefined fields fall back to BARK. */
+export interface PlantColors {
+  body?: string;
+  spine?: string;
+  flower?: string;
+  fruit?: string;
+}
 const ROCK = new THREE.Color(0x5b5c5e);
 const BLOCK = new THREE.Color(0x6b665c);
 const ROCK_HOVER = new THREE.Color(0x7d8390);
@@ -370,7 +379,7 @@ export class Viewer {
     }
   }
 
-  setTree(buffers: GpuBuffers, leaves: LeafMesh | null, height: number): void {
+  setTree(buffers: GpuBuffers, leaves: LeafMesh | null, height: number, colors?: PlantColors): void {
     this.clearTree();
     // Real height drives the framing (grasses can be a few centimetres tall);
     // the sway amplitude keeps a floor so small plants still visibly move.
@@ -385,9 +394,10 @@ export class Viewer {
     geo.setAttribute('aPivot', new THREE.BufferAttribute(buffers.pivot, 3));
     geo.setAttribute('aLevel', new THREE.BufferAttribute(buffers.level, 1));
     geo.setAttribute('aJunction', new THREE.BufferAttribute(buffers.junction, 1));
+    geo.setAttribute('aAccent', new THREE.BufferAttribute(buffers.accent, 1));
     geo.setIndex(new THREE.BufferAttribute(buffers.index, 1));
 
-    const mat = this.makeBarkMaterial();
+    const mat = this.makeBarkMaterial(colors);
     this.branchMesh = new THREE.Mesh(geo, mat);
     this.branchMesh.castShadow = true;
     this.branchMesh.receiveShadow = true;
@@ -549,21 +559,33 @@ export class Viewer {
       .replace('#include <begin_vertex>', `vec3 transformed = applyWind(vec3(position));`);
   }
 
-  private makeBarkMaterial(): THREE.MeshStandardMaterial {
+  private makeBarkMaterial(colors?: PlantColors): THREE.MeshStandardMaterial {
+    const hasAccentColors = !!colors && !!(colors.body || colors.spine || colors.flower || colors.fruit);
     const mat = new THREE.MeshStandardMaterial({ color: BARK, roughness: 0.92, metalness: 0.0, side: THREE.DoubleSide });
     const modeU = { value: 0 };
     mat.userData.mode = modeU;
+    // Species accent palette keyed by the mesh's aAccent channel (0 body,1 spine,2 flower,3 fruit).
+    const toLinear = (hex?: string) => new THREE.Color(hex ?? `#${BARK.getHexString()}`).convertSRGBToLinear();
+    const accentBody = toLinear(colors?.body);
+    const accentSpine = toLinear(colors?.spine ?? colors?.body);
+    const accentFlower = toLinear(colors?.flower ?? colors?.body);
+    const accentFruit = toLinear(colors?.fruit ?? colors?.body);
     mat.onBeforeCompile = (shader) => {
       this.injectWind(shader);
       shader.uniforms.uMode = modeU;
       shader.uniforms.uMatcap = { value: this.matcapTexture };
+      shader.uniforms.uUseAccent = { value: hasAccentColors ? 1 : 0 };
+      shader.uniforms.uAccentBody = { value: accentBody };
+      shader.uniforms.uAccentSpine = { value: accentSpine };
+      shader.uniforms.uAccentFlower = { value: accentFlower };
+      shader.uniforms.uAccentFruit = { value: accentFruit };
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', `#include <common>\nattribute float aLevel;\nattribute float aJunction;\nvarying vec4 vWindV;\nvarying float vLevel;\nvarying float vJunction;\nvarying vec3 vViewNrm;`)
-        .replace('#include <fog_vertex>', `#include <fog_vertex>\nvWindV = aWind;\nvLevel = aLevel;\nvJunction = aJunction;\nvViewNrm = normalize(normalMatrix * objectNormal);`);
+        .replace('#include <common>', `#include <common>\nattribute float aLevel;\nattribute float aJunction;\nattribute float aAccent;\nvarying vec4 vWindV;\nvarying float vLevel;\nvarying float vJunction;\nvarying float vAccent;\nvarying vec3 vViewNrm;`)
+        .replace('#include <fog_vertex>', `#include <fog_vertex>\nvWindV = aWind;\nvLevel = aLevel;\nvJunction = aJunction;\nvAccent = aAccent;\nvViewNrm = normalize(normalMatrix * objectNormal);`);
       shader.fragmentShader = shader.fragmentShader
         .replace(
           '#include <common>',
-          `#include <common>\nuniform float uMode;\nuniform sampler2D uMatcap;\nvarying vec4 vWindV;\nvarying float vLevel;\nvarying float vJunction;\nvarying vec3 vViewNrm;
+          `#include <common>\nuniform float uMode;\nuniform sampler2D uMatcap;\nuniform float uUseAccent;\nuniform vec3 uAccentBody;\nuniform vec3 uAccentSpine;\nuniform vec3 uAccentFlower;\nuniform vec3 uAccentFruit;\nvarying vec4 vWindV;\nvarying float vLevel;\nvarying float vJunction;\nvarying float vAccent;\nvarying vec3 vViewNrm;
           // Debug palettes are authored in sRGB; convert so they survive lighting + tone mapping.
           vec3 srgbIn(vec3 c) { return pow(c, vec3(2.2)); }
           vec3 levelColor(float l) {
@@ -576,6 +598,12 @@ export class Viewer {
           vec3 heat(float t) {
             t = clamp(t, 0.0, 1.0);
             return srgbIn(mix(mix(vec3(0.10, 0.20, 0.55), vec3(0.20, 0.75, 0.55), smoothstep(0.0, 0.5, t)), vec3(0.98, 0.85, 0.25), smoothstep(0.5, 1.0, t)));
+          }
+          vec3 accentColor(float a) {
+            if (a < 0.5) return uAccentBody;
+            if (a < 1.5) return uAccentSpine;
+            if (a < 2.5) return uAccentFlower;
+            return uAccentFruit;
           }`,
         )
         .replace(
@@ -584,7 +612,8 @@ export class Viewer {
           if (uMode > 0.5 && uMode < 1.5) diffuseColor.rgb = levelColor(vLevel);
           else if (uMode > 1.5 && uMode < 2.5) diffuseColor.rgb = heat(vWindV.y * 0.75 + vWindV.w * 0.25);
           else if (uMode > 2.5 && uMode < 3.5) diffuseColor.rgb = srgbIn(mix(vec3(0.62, 0.60, 0.58), vec3(0.95, 0.42, 0.18), vJunction));
-          else if (uMode > 5.5) diffuseColor.rgb = vec3(0.16, 0.17, 0.19);`,
+          else if (uMode > 5.5) diffuseColor.rgb = vec3(0.16, 0.17, 0.19);
+          else if (uUseAccent > 0.5) diffuseColor.rgb = accentColor(vAccent);`,
         )
         .replace(
           '#include <dithering_fragment>',
@@ -597,7 +626,7 @@ export class Viewer {
           }`,
         );
     };
-    mat.customProgramCacheKey = () => 'bark-wind-v4';
+    mat.customProgramCacheKey = () => `bark-wind-v5-${hasAccentColors ? 'accent' : 'plain'}`;
     return mat;
   }
 

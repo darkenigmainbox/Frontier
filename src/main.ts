@@ -2,7 +2,7 @@ import './ui/styles.css';
 import { PRESETS, PRESET_GROUPS, TreeParams, cloneParams, SHAPE_NAMES, Shape, scatterFor, trunkBaseRadius, rootReach, isGrass, isDesert } from './tree/params';
 import { GrassParams, Inflorescence, INFLORESCENCE_NAMES, HEAD_BRANCH_NAMES, grassHeight, grassHabit } from './plant/grassParams';
 import { DesertParams, DesertHabit, DESERT_HABIT_NAMES, desertHeight, desertHabitWord } from './plant/desertParams';
-import { Viewer, DEFAULT_VIEW, ViewerSettings, DisplayMode } from './viewer/scene';
+import { Viewer, DEFAULT_VIEW, ViewerSettings, DisplayMode, PlantColors } from './viewer/scene';
 import { el, icon, button, section, slider, select, check, stepper, levelsHeader, levelRow, fmtInt, fmtCompact } from './ui/controls';
 import type { WorkerRequest, WorkerResponse, GenerateResponse } from './worker/tree.worker';
 import { LeafMesh } from './tree/mesh';
@@ -458,7 +458,16 @@ worker.onmessage = (ev: MessageEvent<WorkerResponse>) => {
     leaves.pivots = Array.from(msg.leaves.pivots);
     leaves.indices = Array.from(msg.leaves.indices);
     const firstTree = !hasTree;
-    viewer.setTree(buffers, leaves, msg.summary.height);
+    const plantColors: PlantColors | undefined =
+      isDesert(params) && params.desert
+        ? {
+            body: params.desert.bodyColor,
+            spine: params.desert.spineColor,
+            flower: params.desert.flowerColor,
+            fruit: params.desert.fruitColor,
+          }
+        : undefined;
+    viewer.setTree(buffers, leaves, msg.summary.height, plantColors);
     viewer.setObstacles(msg.obstacles);
     if (firstTree || frameOnNext) viewer.frame();
     frameOnNext = false;

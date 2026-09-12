@@ -88,6 +88,8 @@ export interface GpuBuffers {
   pivot: Float32Array;
   level: Float32Array;
   junction: Float32Array;
+  /** Colour group (0 body/leaf, 1 spine, 2 flower, 3 fruit) — desert plants only. */
+  accent: Float32Array;
   index: Uint32Array;
   /** Quad edges only (for wireframe display of the quad topology). */
   edgeIndex: Uint32Array;
@@ -105,6 +107,7 @@ export function toGpuBuffers(mesh: QuadMesh): GpuBuffers {
   const pivot: number[] = Array.from(mesh.pivots);
   const level: number[] = Array.from(mesh.levels);
   const junction: number[] = Array.from(mesh.junction);
+  const accent: number[] = Array.from(mesh.accent.length === baseCount ? mesh.accent : new Array(baseCount).fill(0));
   const alias = new Map<string, number>();
 
   const resolve = (v: number, u: number, w: number): number => {
@@ -126,6 +129,7 @@ export function toGpuBuffers(mesh: QuadMesh): GpuBuffers {
     pivot.push(mesh.pivots[v * 3], mesh.pivots[v * 3 + 1], mesh.pivots[v * 3 + 2]);
     level.push(mesh.levels[v]);
     junction.push(mesh.junction[v]);
+    accent.push(mesh.accent[v] ?? 0);
     alias.set(key, ni);
     return ni;
   };
@@ -165,6 +169,7 @@ export function toGpuBuffers(mesh: QuadMesh): GpuBuffers {
     pivot: new Float32Array(pivot),
     level: new Float32Array(level),
     junction: new Float32Array(junction),
+    accent: new Float32Array(accent),
     index: new Uint32Array(index),
     edgeIndex: new Uint32Array(edges),
   };

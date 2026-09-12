@@ -15,7 +15,12 @@ import type { QuadMesh } from '../src/tree/mesh';
 const W = 420;
 const H = 560;
 
-function render(mesh: QuadMesh, camAz: number): Uint8Array {
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+function render(mesh: QuadMesh, camAz: number, accentCols?: [number, number, number][]): Uint8Array {
   const p = mesh.positions;
   const n = mesh.vertexCount;
   // Bounds (above ground only for framing).
@@ -76,6 +81,7 @@ function render(mesh: QuadMesh, camAz: number): Uint8Array {
     [74, 148, 74],
     [216, 196, 110],
   ];
+  const accent = mesh.accent;
   const tri = (a: number, b: number, c: number, lvl: number): void => {
     // Face normal in world space.
     const ax = p[a * 3];
@@ -97,7 +103,8 @@ function render(mesh: QuadMesh, camAz: number): Uint8Array {
     if (cnz <= 0) return; // backface
     const nl = Math.hypot(cnx, cny, cnz) || 1;
     const shade = 0.32 + 0.68 * Math.max(0, (cnx * lx + cny * ly + cnz * lz) / nl);
-    const base = cols[Math.min(2, lvl)] ?? cols[0];
+    const acc = accentCols ? accentCols[accent[a] ?? 0] ?? accentCols[0] : undefined;
+    const base = acc ?? cols[Math.min(2, lvl)] ?? cols[0];
     const R = Math.min(255, Math.round(base[0] * shade));
     const G = Math.min(255, Math.round(base[1] * shade));
     const B = Math.min(255, Math.round(base[2] * shade));
@@ -180,7 +187,13 @@ for (const preset of DESERT_PRESETS) {
   const g = { ...DEFAULT_DESERT, ...preset.desert };
   const t0 = Date.now();
   const built = new DesertMesher(g, seed).build();
-  const buf = render(built.mesh, Math.PI * 0.12);
+  const accentCols: [number, number, number][] = [
+    hexToRgb(g.bodyColor),
+    hexToRgb(g.spineColor),
+    hexToRgb(g.flowerColor),
+    hexToRgb(g.fruitColor),
+  ];
+  const buf = render(built.mesh, Math.PI * 0.12, accentCols);
   const file = `renders/${preset.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_s${seed}.bmp`;
   writeFileSync(file, buf);
   console.log(`${preset.name}: ${file} (${Date.now() - t0} ms)`);

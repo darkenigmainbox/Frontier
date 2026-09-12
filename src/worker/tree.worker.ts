@@ -35,6 +35,7 @@ export interface GenerateResponse {
     pivot: Float32Array;
     level: Float32Array;
     junction: Float32Array;
+    accent: Float32Array;
     index: Uint32Array;
     edgeIndex: Uint32Array;
   };
@@ -122,6 +123,7 @@ ctx.onmessage = (ev: MessageEvent<WorkerRequest>) => {
         r.buffers.pivot.buffer,
         r.buffers.level.buffer,
         r.buffers.junction.buffer,
+        r.buffers.accent.buffer,
         r.buffers.index.buffer,
         r.buffers.edgeIndex.buffer,
         leaves.positions.buffer,

@@ -199,6 +199,8 @@ export interface DesertParams {
   spineColor: string;
   /** Flower petal colour (buds, torches, barrel crown flowers). */
   flowerColor: string;
+  /** Fruit / seed-pod colour. */
+  fruitColor: string;
 }
 
 export const DEFAULT_DESERT: DesertParams = {
@@ -304,6 +306,7 @@ export const DEFAULT_DESERT: DesertParams = {
   bodyColor: '#5f7c3a',
   spineColor: '#d8c98a',
   flowerColor: '#e0658a',
+  fruitColor: '#b5432f',
 };
 
 /** Approximate height of a desert plant (m), for the library metadata and framing. */
@@ -701,6 +704,12 @@ export const DESERT_PRESETS: { name: string; desert: Partial<DesertParams> }[] =
       fruits: 3,
       fruitLength: 0.06,
       fruitRadius: 0.02,
+      flowers: true,
+      flowersPerTip: 3,
+      flowerLength: 0.05,
+      flowerRadius: 0.032,
+      flowerColor: '#f2c927',
+      fruitColor: '#a13a5a',
       padSides: 28,
     },
   },
@@ -924,6 +933,75 @@ export const DESERT_PRESETS: { name: string; desert: Partial<DesertParams> }[] =
     },
   },
   {
+    // Aloe striata (coral aloe): stemless, broad lance-triangular leaves,
+    // spineless and toothless with pale pink-red margins, pale blue-grey-green
+    // colour, spreading in a wide flat rosette. Coral-orange flower spikes.
+    name: 'Coral Aloe',
+    desert: {
+      habit: 'rosette',
+      leaves: 26,
+      leafLength: 0.42,
+      leafLengthV: 0.14,
+      leafWidth: 0.16,
+      leafThick: 0.028,
+      leafCurve: 30,
+      leafKeel: 0.3,
+      teeth: 0,
+      teethPerSide: 0,
+      terminalSpine: 0.004,
+      leafTaperStart: 0.2,
+      leafTipFill: 0.1,
+      crownRadius: 0.1,
+      crownHeight: 0.04,
+      rosetteSpread: 68,
+      leafSides: 12,
+      leafRings: 26,
+      bodyColor: '#93a88f',
+      stalk: true,
+      stalkHeight: 0.68,
+      stalkRadius: 0.014,
+      stalkBranches: 3,
+      stalkBranchLength: 0.055,
+      stalkBuds: 6,
+      budSize: 0.014,
+      flowerColor: '#e8623a',
+    },
+  },
+  {
+    // Aloe arborescens (torch aloe): shrubby, multi-branched, each stem
+    // topped by a rosette of narrow grey-green recurving leaves with small
+    // pale marginal teeth, crowned by a dense unbranched spike of
+    // orange-scarlet tubular flowers.
+    name: 'Torch Aloe',
+    desert: {
+      habit: 'rosette',
+      leaves: 46,
+      leafLength: 0.48,
+      leafLengthV: 0.16,
+      leafWidth: 0.055,
+      leafThick: 0.02,
+      leafCurve: 60,
+      leafKeel: 0.28,
+      teeth: 0.003,
+      teethPerSide: 16,
+      terminalSpine: 0.006,
+      crownRadius: 0.1,
+      crownHeight: 0.06,
+      rosetteSpread: 62,
+      leafSides: 10,
+      leafRings: 26,
+      bodyColor: '#78956e',
+      stalk: true,
+      stalkHeight: 0.75,
+      stalkRadius: 0.02,
+      stalkBranches: 24,
+      stalkBranchLength: 0.02,
+      stalkBuds: 2,
+      budSize: 0.017,
+      flowerColor: '#e8451f',
+    },
+  },
+  {
     // Echeveria elegans: plump obovate/spatulate leaves with a rounded (not
     // pointed) apex and a tiny translucent mucro, tightly packed into a
     // compact, cupped rosette — pale blue-green with a powdery bloom.
@@ -993,6 +1071,6 @@ export const DESERT_GROUPS: { label: string; names: string[] }[] = [
     ],
   },
   { label: 'Cacti · prickly pears', names: ['Prickly Pear', 'Beavertail Prickly Pear', 'Teddy-Bear Cholla', 'Chain-Fruit Cholla'] },
-  { label: 'Succulents · rosettes', names: ['Century Plant', 'Agave in Bloom', 'Blue Agave', 'Desert Spoon', 'Aloe Vera', 'Echeveria'] },
+  { label: 'Succulents · rosettes', names: ['Century Plant', 'Agave in Bloom', 'Blue Agave', 'Desert Spoon', 'Aloe Vera', 'Coral Aloe', 'Torch Aloe', 'Echeveria'] },
   { label: 'Succulents · ocotillo', names: ['Ocotillo'] },
 ];

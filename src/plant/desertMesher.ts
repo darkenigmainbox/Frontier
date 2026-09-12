@@ -105,6 +105,9 @@ interface Organ {
   pivot: V3;
   /** Nominal radius for the collar fillet clamp. */
   r0: number;
+  /** Colour group for this organ's vertices: 0 = body/leaf (default), 1 = spine/
+   *  thorn/glochid, 2 = flower, 3 = fruit. */
+  accent?: number;
 }
 
 interface Ring {
@@ -424,16 +427,9 @@ export class DesertMesher {
     };
     const sStart = Math.min(0.3 * armL, Math.max(0.45 * exit.size, this.collarLen(armR)));
     const children: Attachment[] = [];
-    if (g.fruits > 0) {
-      const nf = Math.max(1, Math.round(g.fruits / 3));
-      for (let k = 0; k < nf; k++) {
-        const s = clamp(armL - domeLen * 0.9 - 0.04 - k * 0.035, sStart + 1.7 * 0.006, armL - 1.7 * 0.006);
-        const crest = TAU / armRibs;
-        const az = Math.round((k * GOLDEN + this.fruitRng.next()) / crest) * crest;
-        children.push(this.fruitAttachment(s, az, 0.006));
-      }
-    } else if (g.flowers) {
-      // A crown of flowers ringing the arm tip, same as the main stem apex.
+    // Flowers ring the very tip (like the main stem apex); fruit sits a little further back,
+    // since real columnar cacti (saguaro/cardon) carry both at once near the arm crown.
+    if (g.flowers) {
       const nf = Math.max(1, Math.round(g.flowersPerTip / 2));
       for (let k = 0; k < nf; k++) {
         const s = clamp(armL - domeLen * 0.25 - k * 0.01, sStart + 1.7 * 0.006, armL - 1.7 * 0.006);
@@ -443,6 +439,15 @@ export class DesertMesher {
           s, az, w: 1, h: 2, hh: 0.005, pri: 0, spine: false, j0: 0, row0: 0, row1: 0,
           make: (exit) => this.makeFruit(exit, true),
         });
+      }
+    }
+    if (g.fruits > 0) {
+      const nf = Math.max(1, Math.round(g.fruits / (g.flowers ? 5 : 3)));
+      for (let k = 0; k < nf; k++) {
+        const s = clamp(armL - domeLen * 0.9 - 0.04 - k * 0.035, sStart + 1.7 * 0.006, armL - 1.7 * 0.006);
+        const crest = TAU / armRibs;
+        const az = Math.round((k * GOLDEN + this.fruitRng.next()) / crest) * crest;
+        children.push(this.fruitAttachment(s, az, 0.006));
       }
     }
     const zone = clamp(Math.max(g.spineZone, 0.18), 0, 1);
@@ -690,6 +695,7 @@ export class DesertMesher {
       wind: (_s, y) => ({ height: clamp(y / this.plantH, 0, 1), limb: 0, phase: 0, detail: 0 }),
       pivot,
       r0: R,
+      accent: 1,
     };
   }
 
@@ -733,6 +739,7 @@ export class DesertMesher {
       wind: (_s, y) => ({ height: clamp(y / this.plantH, 0, 1), limb: 0, phase: 0, detail: 0 }),
       pivot,
       r0: R,
+      accent: flower ? 2 : 3,
     };
   }
 
@@ -831,12 +838,25 @@ export class DesertMesher {
           : (k % 2) * Math.PI + this.padRng.uniform() * 0.45;
         children.push(this.padChildAttachment(s, az, N, round, depth + 1, 0));
       }
-    } else if (depth >= maxDepth && g.fruits > 0 && !round) {
-      // Tunas on the rim of the terminal pads.
+    } else if (depth >= maxDepth && (g.fruits > 0 || g.flowers) && !round) {
+      // Prickly-pear rim: showy flowers right at the pad's edge, with a few
+      // ripening tunas (fruit) set back from the rim on the same terminal pad —
+      // both appear together in season but keep separate, non-overlapping bands.
+      if (g.flowers) {
+        const nfl = Math.max(1, Math.round(g.flowersPerTip));
+        for (let k = 0; k < nfl; k++) {
+          const s = L * (0.8 + 0.16 * ((k + 0.5) / Math.max(1, nfl)));
+          const az = k * GOLDEN + this.fruitRng.next() * 0.3;
+          children.push({
+            s, az, w: 1, h: 2, hh: 0.005, pri: 0, spine: false, j0: 0, row0: 0, row1: 0,
+            make: (exit) => this.makeFruit(exit, true),
+          });
+        }
+      }
       const nf = Math.max(0, Math.round(g.fruits));
       for (let k = 0; k < nf; k++) {
-        const s = L * (0.72 + 0.16 * ((k + 0.5) / Math.max(1, nf)));
-        const az = (k % 2) * Math.PI + this.fruitRng.uniform() * 0.3;
+        const s = L * (0.55 + 0.2 * ((k + 0.5) / Math.max(1, nf)));
+        const az = k * GOLDEN + this.fruitRng.next() * 0.3 + Math.PI;
         children.push(this.fruitAttachment(s, az, 0.006));
       }
     } else if (depth >= maxDepth && g.fruits > 0 && round) {
@@ -1468,6 +1488,7 @@ export class DesertMesher {
       wind: (_s, y) => ({ height: clamp(y / this.plantH, 0, 1), limb: 0.65, phase: 0.5, detail: 0 }),
       pivot,
       r0: budR,
+      accent: 2,
     };
   }
 
@@ -1633,6 +1654,7 @@ export class DesertMesher {
       wind: (_s, y) => ({ height: clamp(y / this.plantH, 0, 1), limb: 0, phase: 0, detail: 0 }),
       pivot,
       r0: R,
+      accent: 1,
     };
   }
 
@@ -1964,7 +1986,7 @@ export class DesertMesher {
         off.z += f.dir.z * lambda;
       }
       const p = add(f.pos, off);
-      idx[j] = this.mesh.addVertex(p.x, p.y, p.z, o.wind(s, p.y), o.pivot, o.level, 0);
+      idx[j] = this.mesh.addVertex(p.x, p.y, p.z, o.wind(s, p.y), o.pivot, o.level, 0, o.accent ?? 0);
     }
     return { idx, s, f };
   }
@@ -2027,7 +2049,7 @@ export class DesertMesher {
         const w2 = k * k;
         const bez = { x: a.x * w0 + c.x * w1 + b.x * w2, y: a.y * w0 + c.y * w1 + b.y * w2, z: a.z * w0 + c.z * w1 + b.z * w2 };
         const p = lerp(chord, bez, fillet);
-        mid.push(mesh.addVertex(p.x, p.y, p.z, o.wind(first.s * k, p.y), o.pivot, o.level, 1));
+        mid.push(mesh.addVertex(p.x, p.y, p.z, o.wind(first.s * k, p.y), o.pivot, o.level, 1, o.accent ?? 0));
       }
       this.bridge(prev, mid);
       prev = mid;
