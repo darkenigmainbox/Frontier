@@ -810,8 +810,16 @@ export class VegMesher {
     // plant that has a dozen of these leaves.
     const pairs = clamp(Math.round(g.leafLobes), 1, 8);
     const finery = clamp(g.leafLobe, 0, 1); // 0 = few broad leaflets, 1 = many fine ones (carrot-like)
-    const zoneLo = 0.14;
-    const zoneHi = 0.82; // pairs occupy this middle stretch of the rachis
+    // zoneLo used to be 0.14, leaving a long bare stretch of naked rachis
+    // between the crown and the first leaflet pair -- clearly visible as an
+    // empty "handle" on the petiole in close-up renders. Real pinnate
+    // leaves carry leaflets almost from the base of the petiole.
+    const zoneLo = 0.06;
+    // zoneHi must leave enough of the rachis past the last pair for the
+    // terminal leaflet's own window to clear it without overlapping
+    // (raising this too close to 1 caused "window conflict" drops on short
+    // leaves where there isn't enough absolute length left for that gap).
+    const zoneHi = 0.8; // pairs occupy this middle stretch of the rachis
     // Leaflet length used to be derived purely from the leaf's overall
     // width, with no relation at all to how far apart the leaflet pairs sit
     // along the rachis. For a leaf like the carrot's (7 lobes over a 0.24m
@@ -836,7 +844,26 @@ export class VegMesher {
     const slot = ((zoneHi - zoneLo) * L) / Math.max(1, pairs);
     const hhPair = clamp(slot * 0.28, 0.0018, 0.05 * L);
     const termHH = clamp(hhPair * 1.25, 0.0018, 0.05 * L);
-    const sTerm = Math.min(L - 0.62 * termHH, (zoneHi + 0.5 * (1 - zoneHi)) * L);
+    // The last leaflet pair sits at s = zoneHi*L (or the zone midpoint when
+    // there's only one pair) — the terminal leaflet must clear it with a
+    // real gap or the two windows collide ("window conflict", silently
+    // dropping the terminal leaflet and leaving a bare rachis tip, which is
+    // exactly the thin spiky "antenna" seen poking out above the leaf
+    // clump). Previously the terminal leaflet was pinned close to
+    // placeWindow's hard end-of-rachis limit regardless of where the last
+    // pair actually landed, which could put them almost on top of each
+    // other once zoneHi was raised. Anchor it relative to the last pair
+    // instead, then clamp to the rachis end.
+    // placeWindow rejects any window whose far edge (s + hh) exceeds
+    // `L - 0.6*hh`, i.e. it actually requires `s <= L - 1.6*hh` — capping
+    // sTerm at `L - 0.62*hh` (as a previous version of this line did) put
+    // the requested window's far edge past the end of the rachis, so it
+    // always needed one of the OFFSETS fallbacks to rescue it; once zoneHi
+    // was raised that fallback margin ran out and the terminal leaflet
+    // started silently failing ("window conflict"), leaving a bare rachis
+    // tip. Use the real limit with a safety margin.
+    const sLastPair = pairs > 1 ? zoneHi * L : 0.5 * (zoneLo + zoneHi) * L;
+    const sTerm = Math.min(L - 1.8 * termHH, sLastPair + 1.5 * (hhPair + termHH));
     const termLen = Math.max(0.008, leafletLen * lerp1(1.3, 0.9, finery));
     const termAspect = lerp1(1.9, 1.4, finery);
     const termWidth = Math.max(0.004, Math.min(o.width * 0.65, termLen / termAspect));
@@ -905,17 +932,43 @@ export class VegMesher {
     let right0 = cross(exit.dir, exit.normal);
     right0 = lengthSq(right0) < 1e-10 ? { x: 1, y: 0, z: 0 } : normalize(right0);
     const droop = (18 + 8 * this.leafRng.uniform()) * DEG2RAD;
-    const steps = Math.max(4, Math.round(g.leafRings * 0.4));
+    // Leaflets used to be built with only ~4-6 length segments (leafRings *
+    // 0.4, and leafRings itself is often 12-16), which is far too coarse
+    // for the shape below: with a sharp sin(pi*t^0.6) belly curve sampled
+    // at just a handful of stations, every leaflet rasterised as a hard
+    // faceted diamond/kite instead of a smooth ovate blade (very visible
+    // up close on Carrot/Tomato). Leaflets are small, but they are also the
+    // dominant visual element of a compound leaf, so they need enough
+    // stations to actually read as curved.
+    const steps = Math.max(8, Math.round(g.leafRings * 0.6));
     const line = growLine(exit.pos, dir0, right0, L, steps, (t0, t1) => ({
       gravity: droop * (Math.pow(t1, 1.5) - Math.pow(t0, 1.5)),
     }));
     const tooth = clamp(g.leafLobe, 0, 1);
     const N = exit.N;
     const m = N / 2;
+    // A real carrot/tomato leaflet isn't a smooth solid ovate blade — its
+    // margin is cut into distinct lobes/teeth along its whole length (carrot
+    // in particular reads as almost fern-like/lacy, tomato as a coarser
+    // serrated blade). The previous version only nudged the outline near
+    // the tip corners, which is why close-up renders still showed plain
+    // smooth kite/oval leaflets instead of the dissected margin real
+    // reference photos show. `lobeWave` now pinches the whole-width
+    // envelope periodically along the length so the silhouette itself gets
+    // distinct lobes, not just a wobble at the edge.
+    const lobeFreq = lerp1(2.5, 5, tooth);
+    const lobeAmt = lerp1(0.08, 0.5, tooth);
     const widthAt = (s: number): number => {
       const t = clamp(s / L, 0, 1);
-      const belly = Math.sin(Math.PI * Math.pow(t, 0.6));
-      return o.width * belly * (0.55 + 0.45 * sstep(0, 0.15, t));
+      // A smoother ovate silhouette: elliptical fill-out near the base
+      // (rather than a sudden sin() rise) and a gentler power-law taper to
+      // the tip, so the outline reads as a curved leaflet rather than a
+      // sharp-shouldered kite.
+      const belly = Math.sin(Math.PI * Math.pow(t, 0.82));
+      const envelope = belly * (0.62 + 0.38 * sstep(0, 0.22, t));
+      const lobeEnv = sstep(0, 0.1, t) * (1 - sstep(0.9, 1, t));
+      const lobe = 1 - lobeAmt * lobeEnv * (0.5 + 0.5 * Math.cos(t * lobeFreq * TAU));
+      return o.width * envelope * lobe;
     };
     const thickAt = (s: number): number => {
       const t = clamp(s / L, 0, 1);
@@ -924,9 +977,9 @@ export class VegMesher {
     const toothAt = (s: number, u: number): number => {
       if (tooth <= 0.02) return 0;
       const t = s / L;
-      const env = sstep(0.15, 0.3, t) * (1 - sstep(0.8, 0.95, t));
-      const wave = 0.5 + 0.5 * Math.sin((t * 5 + Math.abs(u) * 0.5) * TAU);
-      return tooth * 0.14 * env * wave;
+      const env = sstep(0.1, 0.22, t) * (1 - sstep(0.85, 0.97, t));
+      const wave = 0.5 + 0.5 * Math.sin((t * lobeFreq * 1.7 + Math.abs(u) * 0.5) * TAU);
+      return tooth * 0.1 * env * wave;
     };
     const profile = (s: number, j: number, n: number): { x: number; y: number } => {
       const w = widthAt(s);
@@ -945,7 +998,7 @@ export class VegMesher {
       profile,
       radius: (s) => 0.5 * widthAt(s),
       round: false, extra: [L - 0.0006],
-      spacing: Math.max(1e-4, L / Math.max(4, Math.round(g.leafRings * 0.4))),
+      spacing: Math.max(1e-4, L / Math.max(8, Math.round(g.leafRings * 0.6))),
       children: [],
       wind: (s, y) => ({
         height: clamp(y / this.plantH, 0, 1),

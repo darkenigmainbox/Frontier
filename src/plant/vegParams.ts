@@ -336,26 +336,26 @@ export const VEG_PRESETS: { name: string; veg: Partial<VegParams> }[] = [
     stemHeight: 0.1,
     stemRadius: 0.016,
     stemColor: '#5c7a4a',
-    crownRadius: 0.06,
-    leaves: 12,
-    leafLength: 0.24,
+    crownRadius: 0.05,
+    leaves: 13,
+    // The blade was nearly as wide as it was long (0.17/0.24 ~ 0.7 ratio),
+    // so instead of an elongated curly-kale frond it rendered as a fat
+    // paddle/egg shape; curled droop then made that read as a solid rounded
+    // pod rather than a flat leaf. Real kale leaves are longer and
+    // narrower, widening only near the tip (obovate/spoon shaped), and
+    // fairly stiff/flat rather than drooping into a "C".
+    leafLength: 0.27,
     leafLengthV: 0.16,
-    leafWidth: 0.17,
-    leafThick: 0.0032,
-    // leafCurve is how much the blade droops/curls along its own length —
-    // at 24-32deg (plus up to +10deg jitter) each broad kale leaf arced
-    // over into a tight "C", and from directly above a rosette of those
-    // reads as overlapping curled balls with hard rib-like shading rather
-    // than flat leaves. Kale leaves are fairly stiff and fan outward more
-    // than they droop, so cut curl and push spread further.
-    leafCurve: 12,
-    leafKeel: 0.08,
-    leafRuffle: 0.32,
-    leafRufflePeriod: 8,
-    leafTipRound: 0.3,
-    leafSpread: 62,
+    leafWidth: 0.1,
+    leafThick: 0.003,
+    leafCurve: 10,
+    leafKeel: 0.05,
+    leafRuffle: 0.28,
+    leafRufflePeriod: 7,
+    leafTipRound: 0.45,
+    leafSpread: 58,
     leafColor: '#3d5f3a',
-    leafSides: 14,
+    leafSides: 16,
     leafRings: 20,
     bodySides: 20,
     bodyRings: 12,
