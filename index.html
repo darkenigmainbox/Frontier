@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080d12" />
+    <title>Frontier — SDF Terrain Lab</title>
+  </head>
+  <body>
+    <svg class="svg-sprite" aria-hidden="true" width="0" height="0" viewBox="0 0 24 24">
+      <defs>
+        <symbol id="i-mark" viewBox="0 0 32 32">
+          <path d="M6 6h18v4H11v5h10v4H11v7H6V6Z" fill="currentColor" />
+          <path d="M22 19h4v7h-4z" fill="#b9f84b" />
+        </symbol>
+        <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+        <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h9M17 18h3"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="15" cy="18" r="2"/></symbol>
+        <symbol id="i-brush" viewBox="0 0 24 24"><path d="m14 5 5 5M4 20c2.5.2 4.6-.3 6-1.7l8.3-8.3a2.1 2.1 0 0 0 0-3l-1.3-1.3a2.1 2.1 0 0 0-3 0L5.7 14A8.7 8.7 0 0 0 4 20Z"/><path d="M4 20c.8-2.3 2.5-3.1 4.6-2.5"/></symbol>
+        <symbol id="i-wind" viewBox="0 0 24 24"><path d="M3 8h11.5a2.5 2.5 0 1 0-2.1-3.8M3 12h16a2 2 0 1 1-1.8 2.9M3 16h11a2.5 2.5 0 1 1-2.1 3.8"/></symbol>
+        <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12s3.4-5 9.5-5 9.5 5 9.5 5-3.4 5-9.5 5-9.5-5-9.5-5Z"/><circle cx="12" cy="12" r="2.2"/></symbol>
+        <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"/></symbol>
+        <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z" fill="currentColor" stroke="none"/></symbol>
+        <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+        <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14-4L4 9M4 5v4h4M4 13a8 8 0 0 0 14 4l2-2M20 19v-4h-4"/></symbol>
+        <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></symbol>
+        <symbol id="i-caret" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+        <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3S6.5 9.4 6.5 13.7a5.5 5.5 0 1 0 11 0C17.5 9.4 12 3 12 3Z"/></symbol>
+        <symbol id="i-mountain" viewBox="0 0 24 24"><path d="m3 19 6.2-9 3.1 4.4 2.9-5.1L21 19H3Z"/><path d="m9.2 10 1.8 2.4 1.3-1.7"/></symbol>
+        <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 1.5 6.5L20 12l-6.5 1.5L12 20l-1.5-6.5L4 12l6.5-2.5L12 3Z"/></symbol>
+        <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m4 12 8 4.5 8-4.5M4 16l8 5 8-5"/></symbol>
+        <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
+        <symbol id="i-cube" viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4.5 7.8 7.5 4.3 7.5-4.3M12 12.1V21"/></symbol>
+        <symbol id="i-crosshair" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
+      </defs>
+    </svg>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark"><svg><use href="#i-mark" /></svg></div>
+          <div class="brand-name">FRONTIER</div>
+          <div class="brand-divider"></div>
+          <div class="product-name">SDF TERRAIN LAB</div>
+        </div>
+        <div class="workspace-switcher">
+          <span class="workspace-kicker">WORLD</span>
+          <span class="workspace-name">01 / KALEIDOSCOPE RANGE</span>
+          <svg class="icon icon-10"><use href="#i-chevron" /></svg>
+        </div>
+        <div class="top-actions">
+          <div class="save-state"><span class="save-dot"></span><span id="saveState">Saved 2s ago</span></div>
+          <button class="top-icon-button" title="View controls" aria-label="View controls"><svg class="icon"><use href="#i-sliders" /></svg></button>
+          <button class="top-icon-button" title="More options" aria-label="More options"><svg class="icon"><use href="#i-more" /></svg></button>
+          <div class="avatar">AK</div>
+        </div>
+      </header>
+
+      <div class="app-body">
+        <aside class="tool-rail">
+          <div class="rail-section rail-tools">
+            <button class="rail-button active" data-tool="select" title="Select / orbit"><svg class="icon"><use href="#i-crosshair" /></svg><span>Orbit</span></button>
+            <button class="rail-button" data-tool="rain" title="Paint rainfall"><svg class="icon"><use href="#i-drop" /></svg><span>Rain</span></button>
+            <button class="rail-button" data-tool="wind" title="Paint wind field"><svg class="icon"><use href="#i-wind" /></svg><span>Wind</span></button>
+            <button class="rail-button" data-tool="inspect" title="Inspect field"><svg class="icon"><use href="#i-eye" /></svg><span>Inspect</span></button>
+          </div>
+          <div class="rail-spacer"></div>
+          <div class="rail-section rail-bottom">
+            <button class="rail-button" title="Field layers"><svg class="icon"><use href="#i-layers" /></svg><span>Layers</span></button>
+            <button class="rail-button" title="Preferences"><svg class="icon"><use href="#i-sliders" /></svg><span>Prefs</span></button>
+            <div class="rail-version">v0.9.6<br><span>LAB</span></div>
+          </div>
+        </aside>
+
+        <main class="workspace">
+          <section class="viewport-section">
+            <div class="viewport-card" id="viewportCard">
+              <canvas id="terrainCanvas" aria-label="Procedural signed distance terrain preview"></canvas>
+              <canvas id="fxCanvas" aria-hidden="true"></canvas>
+              <div class="viewport-grid-overlay"></div>
+              <div class="viewport-header overlay-panel">
+                <div class="viewport-title-group">
+                  <div class="eyebrow"><span class="live-dot"></span>VOLUME PREVIEW <span class="eyebrow-separator">/</span> <span id="fieldStatus">SIGNED DISTANCE FIELD</span></div>
+                  <h1>KALEIDOSCOPE RANGE <span class="lock-glyph">·</span> <span class="muted-title">SDF.01</span></h1>
+                </div>
+                <div class="viewport-actions">
+                  <button class="chip-button" id="viewModeButton"><svg class="icon icon-12"><use href="#i-eye" /></svg><span id="viewModeText">ALBEDO</span><svg class="icon icon-10"><use href="#i-chevron" /></svg></button>
+                  <button class="chip-button" id="cameraButton"><svg class="icon icon-12"><use href="#i-cube" /></svg><span id="cameraText">PERSP</span></button>
+                </div>
+              </div>
+
+              <div class="viewport-meta top-left-meta">
+                <span class="meta-label">FIELD TYPE</span>
+                <strong>32-BIT SDF</strong>
+                <span class="meta-rule"></span>
+                <span class="meta-label">RESOLUTION</span>
+                <strong>1024³ <span class="meta-muted">VIRTUAL</span></strong>
+                <span class="meta-rule"></span>
+                <span class="meta-label">SHADING</span>
+                <strong>AO · CURVATURE</strong>
+              </div>
+
+              <div class="viewport-meta top-right-meta">
+                <div class="frame-rate"><span class="frame-bar b1"></span><span class="frame-bar b2"></span><span class="frame-bar b3"></span><span class="frame-bar b4"></span><b id="fpsLabel">60</b> FPS</div>
+                <div class="gpu-label"><span class="gpu-dot"></span>GPU RAYMARCH</div>
+              </div>
+
+              <div class="brush-cursor" id="brushCursor"><span></span></div>
+              <div class="paint-hint" id="paintHint"><svg class="icon icon-12"><use href="#i-drop" /></svg>Drag to paint rainfall</div>
+
+              <div class="viewport-footer overlay-panel">
+                <div class="legend">
+                  <div class="legend-item"><span class="legend-swatch sat-swatch"></span><span>SATELLITE ALBEDO</span></div>
+                  <div class="legend-item"><span class="legend-swatch erosion-swatch"></span><span>EROSION MASK</span></div>
+                  <div class="legend-item"><span class="legend-swatch sediment-swatch"></span><span>SEDIMENT LOAD</span></div>
+                </div>
+                <div class="camera-readout"><span id="cursorReadout">X 000.00&nbsp;&nbsp;Y +1.42&nbsp;&nbsp;Z 000.00</span><span class="readout-separator"></span><span>ORBIT LOCKED</span></div>
+              </div>
+              <div class="gizmo"><div class="gizmo-axis gizmo-y">Y</div><div class="gizmo-axis gizmo-x">X</div><div class="gizmo-axis gizmo-z">Z</div><div class="gizmo-core"></div></div>
+              <div class="sim-toast" id="simToast"><span class="toast-pulse"></span><span id="toastText">Solver ready</span></div>
+            </div>
+          </section>
+
+          <section class="graph-section">
+            <div class="graph-toolbar">
+              <div class="graph-title-wrap"><span class="section-kicker">OPERATOR GRAPH</span><span class="graph-path">WORLD_01.sdf</span><span class="unsaved-mark">●</span></div>
+              <div class="graph-toolbar-actions">
+                <span class="graph-hint"><svg class="icon icon-12"><use href="#i-cube" /></svg> Scroll to pan&nbsp;&nbsp;·&nbsp;&nbsp;⌘ + drag to connect</span>
+                <button class="mini-tool-button" title="Fit graph"><svg class="icon icon-13"><use href="#i-cube" /></svg></button>
+                <button class="mini-tool-button" title="More graph options"><svg class="icon icon-13"><use href="#i-more" /></svg></button>
+              </div>
+            </div>
+            <div class="graph-canvas" id="graphCanvas">
+              <svg class="graph-connections" viewBox="0 0 1260 205" preserveAspectRatio="none" aria-hidden="true">
+                <defs>
+                  <linearGradient id="wireGradient" x1="0" x2="1"><stop offset="0" stop-color="#50605d"/><stop offset="0.5" stop-color="#b9f84b"/><stop offset="1" stop-color="#83d7d1"/></linearGradient>
+                  <filter id="wireGlow"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                </defs>
+                <path class="wire wire-dim" d="M208 106 C218 106, 218 106, 227 106" />
+                <path class="wire" d="M410 106 C426 106, 426 70, 441 70" />
+                <path class="wire" d="M410 106 C426 106, 426 142, 441 142" />
+                <path class="wire wire-active" d="M624 70 C640 70, 640 106, 655 106" />
+                <path class="wire wire-active" d="M624 142 C640 142, 640 106, 655 106" />
+                <path class="wire wire-output" d="M838 106 C852 106, 852 106, 869 106" />
+                <path class="wire wire-active" d="M838 174 C854 174, 850 137, 869 137" />
+                <path class="wire wire-output" d="M1052 106 C1060 106, 1060 106, 1071 106" />
+                <circle class="wire-dot" cx="441" cy="70" r="3"/><circle class="wire-dot" cx="441" cy="142" r="3"/><circle class="wire-dot active" cx="655" cy="106" r="4"/>
+              </svg>
+              <div class="graph-node node-base" data-node="base">
+                <div class="node-port port-right"></div><div class="node-icon icon-green"><svg class="icon"><use href="#i-mountain" /></svg></div>
+                <div class="node-copy"><div class="node-label">BASE FIELD</div><div class="node-name">Continental Mass</div><div class="node-detail"><span class="tiny-dot green"></span>Signed primitive</div></div>
+                <div class="node-menu"><svg class="icon icon-12"><use href="#i-more" /></svg></div>
+              </div>
+              <div class="graph-node node-noise" data-node="noise">
+                <div class="node-port port-left"></div><div class="node-port port-right"></div><div class="node-icon icon-violet"><svg class="icon"><use href="#i-spark" /></svg></div>
+                <div class="node-copy"><div class="node-label">RIDGED MULTIFRACTAL</div><div class="node-name">Mountain Signal</div><div class="node-detail"><span class="tiny-dot violet"></span>5 octaves&nbsp; · &nbsp;Gain 0.62</div></div>
+                <div class="node-menu"><svg class="icon icon-12"><use href="#i-more" /></svg></div>
+              </div>
+              <div class="graph-node node-rain selected" data-node="rain">
+                <div class="node-port port-left"></div><div class="node-port port-right"></div><div class="node-icon icon-amber"><svg class="icon"><use href="#i-drop" /></svg></div>
+                <div class="node-copy"><div class="node-label">RAINFALL</div><div class="node-name">Droplet Solver</div><div class="node-detail"><span class="tiny-dot amber"></span><span id="nodeRainRate">38.4k</span> droplets / sec</div></div>
+                <div class="node-menu"><svg class="icon icon-12"><use href="#i-more" /></svg></div>
+              </div>
+              <div class="graph-node node-sediment" data-node="sediment">
+                <div class="node-port port-left"></div><div class="node-port port-right"></div><div class="node-icon icon-cyan"><svg class="icon"><use href="#i-layers" /></svg></div>
+                <div class="node-copy"><div class="node-label">SEDIMENTATION</div><div class="node-name">Strata Deposit</div><div class="node-detail"><span class="tiny-dot cyan"></span>Capacity 0.72</div></div>
+                <div class="node-menu"><svg class="icon icon-12"><use href="#i-more" /></svg></div>
+              </div>
+              <div class="graph-node node-wind" data-node="wind">
+                <div class="node-port port-left"></div><div class="node-port port-right"></div><div class="node-icon icon-blue"><svg class="icon"><use href="#i-wind" /></svg></div>
+                <div class="node-copy"><div class="node-label">WIND ABRASION</div><div class="node-name">Vector Erosion</div><div class="node-detail"><span class="tiny-dot blue"></span>8.4 m/s&nbsp; · &nbsp;120°</div></div>
+                <div class="node-menu"><svg class="icon icon-12"><use href="#i-more" /></svg></div>
+              </div>
+              <div class="graph-node node-chemical" data-node="chemical">
+                <div class="node-port port-left"></div><div class="node-port port-right"></div><div class="node-icon icon-violet"><svg class="icon"><use href="#i-spark" /></svg></div>
+                <div class="node-copy"><div class="node-label">CHEMICAL WEATHERING</div><div class="node-name">Mineral Dissolve</div><div class="node-detail"><span class="tiny-dot violet"></span>pH 5.8&nbsp; · &nbsp;0.24</div></div>
+              </div>
+              <div class="graph-node node-material" data-node="material">
+                <div class="node-port port-left"></div><div class="node-port port-right"></div><div class="node-icon icon-sand"><svg class="icon"><use href="#i-sun" /></svg></div>
+                <div class="node-copy"><div class="node-label">MATERIAL COMPOSITE</div><div class="node-name">Satmap Albedo</div><div class="node-detail"><span class="tiny-dot sand"></span>4 strata layers&nbsp; · &nbsp;AO</div></div>
+                <div class="node-menu"><svg class="icon icon-12"><use href="#i-more" /></svg></div>
+              </div>
+              <div class="graph-node node-output" data-node="output">
+                <div class="node-port port-left"></div><div class="node-icon icon-output"><svg class="icon"><use href="#i-cube" /></svg></div>
+                <div class="node-copy"><div class="node-label">WORLD SDF</div><div class="node-name">Export Volume</div><div class="node-detail"><span class="tiny-dot output"></span>32-bit signed field</div></div>
+              </div>
+            </div>
+            <div class="graph-statusbar">
+              <div class="graph-stats"><span><span class="status-dot ready"></span>ALL OPERATORS LIVE</span><span class="status-divider"></span><span>7 NODES</span><span class="status-divider"></span><span>NO HEIGHTFIELD</span></div>
+              <div class="zoom-control"><button id="zoomOut">−</button><span id="zoomLabel">100%</span><button id="zoomIn">+</button></div>
+            </div>
+          </section>
+        </main>
+
+        <aside class="inspector" id="inspector">
+          <div class="inspector-header">
+            <div><div class="section-kicker">INSPECTOR</div><div class="inspector-breadcrumb"><span id="inspectorCategory">OPERATOR</span><span>/</span><span id="inspectorPath">RAINFALL</span></div></div>
+            <button class="mini-tool-button"><svg class="icon icon-14"><use href="#i-more" /></svg></button>
+          </div>
+          <div class="inspector-scroll">
+            <div class="selected-node-card" id="selectedNodeCard">
+              <div class="selected-node-icon icon-amber"><svg class="icon"><use href="#i-drop" /></svg></div>
+              <div class="selected-node-copy"><div class="selected-node-kicker">SELECTED OPERATOR</div><h2 id="selectedNodeTitle">Droplet Solver</h2><p id="selectedNodeDescription">Physically advected rainfall carving the signed field.</p></div>
+              <span class="node-live-badge">LIVE</span>
+            </div>
+
+            <div class="inspector-section solver-section" id="rainInspector">
+              <div class="section-heading"><span>SIMULATION</span><button class="section-collapse"><svg class="icon icon-12"><use href="#i-chevron" /></svg></button></div>
+              <div class="toggle-row"><div><div class="control-label">Live solver</div><div class="control-sub">Evaluate on every frame</div></div><button class="toggle on" id="liveToggle" aria-label="Toggle live solver"><span></span></button></div>
+              <div class="control-row range-row"><div class="control-top"><label for="rainRate">Droplet rate</label><output id="rainRateValue">38.4k / s</output></div><input id="rainRate" type="range" min="4" max="100" step="0.4" value="38.4" /></div>
+              <div class="control-row range-row"><div class="control-top"><label for="impactRadius">Impact radius</label><output id="impactRadiusValue">0.047 m</output></div><input id="impactRadius" type="range" min="0.01" max="0.12" step="0.001" value="0.047" /></div>
+              <div class="control-row range-row"><div class="control-top"><label for="gravity">Gravity</label><output id="gravityValue">9.81 m/s²</output></div><input id="gravity" type="range" min="1" max="20" step="0.01" value="9.81" /></div>
+              <div class="control-row range-row"><div class="control-top"><label for="carryCapacity">Carry capacity</label><output id="carryCapacityValue">0.72</output></div><input id="carryCapacity" type="range" min="0" max="1" step="0.01" value="0.72" /></div>
+              <div class="control-row range-row"><div class="control-top"><label for="poolThreshold">Pool threshold</label><output id="poolThresholdValue">0.18 m</output></div><input id="poolThreshold" type="range" min="0" max="0.6" step="0.01" value="0.18" /></div>
+              <div class="select-row"><div><div class="control-label">Sediment route</div><div class="control-sub">Material response after impact</div></div><button class="select-button" id="sedimentRoute"><span id="sedimentRouteText">Deposit</span> <svg class="icon icon-11"><use href="#i-chevron" /></svg></button></div>
+            </div>
+
+            <div class="inspector-section erosion-section">
+              <div class="section-heading"><span>FIELD RESPONSE</span><span class="section-tag">SDF OPERATION</span></div>
+              <label class="check-row"><span class="custom-check checked"><svg class="icon icon-11"><use href="#i-check" /></svg></span><span><b>Cut signed field</b><small>Subtract impact volume from surface</small></span></label>
+              <label class="check-row"><span class="custom-check checked"><svg class="icon icon-11"><use href="#i-check" /></svg></span><span><b>Spawn on exposed surface</b><small>Collision from the continuous SDF</small></span></label>
+              <label class="check-row"><span class="custom-check"><svg class="icon icon-11"><use href="#i-check" /></svg></span><span><b>Preserve strata</b><small>Keep material boundaries through cuts</small></span></label>
+            </div>
+
+            <div class="inspector-section mask-section">
+              <div class="section-heading"><span>OUTPUT MASKS</span><button class="section-collapse"><svg class="icon icon-12"><use href="#i-chevron" /></svg></button></div>
+              <div class="mask-row"><span class="mask-color mask-erosion"></span><span>Erosion depth</span><strong id="erosionMaskValue">18%</strong><svg class="icon icon-12 dim-icon"><use href="#i-caret" /></svg></div>
+              <div class="mask-row"><span class="mask-color mask-flow"></span><span>Flow accumulation</span><strong>32%</strong><svg class="icon icon-12 dim-icon"><use href="#i-caret" /></svg></div>
+              <div class="mask-row"><span class="mask-color mask-sediment"></span><span>Sediment load</span><strong id="sedimentMaskValue">08%</strong><svg class="icon icon-12 dim-icon"><use href="#i-caret" /></svg></div>
+            </div>
+
+            <div class="inspector-section quality-section">
+              <div class="section-heading"><span>QUALITY</span><span class="quality-value">ULTRA</span></div>
+              <div class="quality-meter"><span style="width: 86%"></span></div>
+              <div class="quality-footer"><span>Adaptive step budget</span><strong>86 / 100</strong></div>
+            </div>
+
+            <div class="sim-stats">
+              <div class="sim-stat"><span class="stat-kicker">SOLVER TIME</span><strong id="solverTime">00:00:00</strong><small>wall clock</small></div>
+              <div class="sim-stat"><span class="stat-kicker">DROPLETS</span><strong id="dropletCount">0</strong><small>impacted this pass</small></div>
+            </div>
+          </div>
+          <div class="inspector-footer"><button class="secondary-button" id="resetButton"><svg class="icon icon-13"><use href="#i-refresh" /></svg>Reset pass</button><button class="primary-button" id="bakeButton"><svg class="icon icon-13"><use href="#i-cube" /></svg>Bake cache</button></div>
+        </aside>
+      </div>
+    </div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
