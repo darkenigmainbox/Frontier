@@ -4,7 +4,7 @@
  * Used by the worker, the tests and the CLI.
  */
 
-import { TreeParams, DEFAULT_ROOTS, isGrass, isDesert } from './params';
+import { TreeParams, DEFAULT_ROOTS, isGrass, isDesert, isVegetable } from './params';
 import { buildSkeleton, Skeleton } from './skeleton';
 import { buildMesh, MesherStats } from './mesher';
 import { validateTopology, TopologyReport } from './validate';
@@ -16,6 +16,8 @@ import { GrassMesher, GrassStats } from '../plant/grassMesher';
 import { DEFAULT_GRASS } from '../plant/grassParams';
 import { DesertMesher, DesertStats } from '../plant/desertMesher';
 import { DEFAULT_DESERT } from '../plant/desertParams';
+import { VegMesher, VegStats } from '../plant/vegMesher';
+import { DEFAULT_VEG } from '../plant/vegParams';
 
 export interface Timings {
   skeleton: number;
@@ -56,6 +58,8 @@ export interface GenerateResult {
   grass?: GrassStats;
   /** Desert mesher statistics (desert plants only). */
   desert?: DesertStats;
+  /** Vegetable mesher statistics (garden vegetables only). */
+  veg?: VegStats;
 }
 
 const now = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -73,6 +77,7 @@ export function generateTree(params: TreeParams, options: { validate?: boolean; 
   completeParams(params);
   if (isGrass(params)) return generateGrass(params, options);
   if (isDesert(params)) return generateDesert(params, options);
+  if (isVegetable(params)) return generateVegetable(params, options);
   const t0 = now();
   const skeleton = buildSkeleton(params);
   const t1 = now();
@@ -213,6 +218,59 @@ function generateDesert(params: TreeParams, options: { validate?: boolean; obsta
     },
     groundDepth: built.groundDepth,
     desert: ds,
+  };
+}
+
+/**
+ * Vegetable pipeline: crown/body/stem + leaves (+ branches, flowers, fruit
+ * for vine habits) welded by the vegetable mesher → validation → GPU
+ * buffers. Same result shape as trees, grasses and desert plants.
+ */
+function generateVegetable(params: TreeParams, options: { validate?: boolean; obstacleMeshes?: boolean }): GenerateResult {
+  const g = params.veg ?? { ...DEFAULT_VEG };
+  params.veg = g;
+  const t0 = now();
+  const built = new VegMesher(g, params.seed).build();
+  const t1 = now();
+  const environment = new Environment(params.environment);
+  const report = options.validate === false ? emptyReport(built.mesh) : validateTopology(built.mesh);
+  const t2 = now();
+  const buffers = toGpuBuffers(built.mesh);
+  const obstacles = options.obstacleMeshes === false ? [] : environment.meshAll();
+  const t3 = now();
+  const vs = built.stats;
+  const stats: MesherStats = {
+    stems: vs.organs,
+    droppedStems: vs.dropped,
+    dropReasons: vs.dropReasons,
+    junctions: vs.junctions,
+    forks: 0,
+    maxDepth: 3,
+    rootStems: 0,
+    droppedRoots: 0,
+  };
+  return {
+    skeleton: null,
+    environment,
+    mesh: built.mesh,
+    leaves: new LeafMesh(),
+    obstacles,
+    report,
+    stats,
+    buffers,
+    timings: { skeleton: 0, roots: 0, mesh: t1 - t0, validate: t2 - t1, buffers: t3 - t2, total: t3 - t0 },
+    summary: {
+      stems: vs.organs,
+      stemsPerLevel: [...vs.perLevel],
+      leaves: 0,
+      height: built.height,
+      treeScale: built.height,
+      primaryRoots: 0,
+      rootStems: 0,
+      obstacles: environment.count,
+    },
+    groundDepth: built.groundDepth,
+    veg: vs,
   };
 }
 
