@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { PRESETS, TREE_PRESETS, cloneParams, DEFAULT_MESH, DEFAULT_BOTANY, DEFAULT_ROOTS, TreeParams, defaultEnvironment, isGrass, isDesert, isVegetable } from '../src/tree/params';
+import { PRESETS, TREE_PRESETS, cloneParams, DEFAULT_MESH, DEFAULT_BOTANY, DEFAULT_ROOTS, TreeParams, defaultEnvironment, isGrass, isDesert } from '../src/tree/params';
 import { buildSkeleton } from '../src/tree/skeleton';
 import { buildMesh } from '../src/tree/mesher';
 import { validateTopology } from '../src/tree/validate';
@@ -8,8 +8,6 @@ import { GrassMesher } from '../src/plant/grassMesher';
 import { DEFAULT_GRASS, GRASS_PRESETS } from '../src/plant/grassParams';
 import { DesertMesher } from '../src/plant/desertMesher';
 import { DEFAULT_DESERT, DESERT_PRESETS } from '../src/plant/desertParams';
-import { VegMesher } from '../src/plant/vegMesher';
-import { DEFAULT_VEG, VEG_PRESETS } from '../src/plant/vegParams';
 import { generateTree } from '../src/tree/generate';
 import { LeafMesh } from '../src/tree/mesh';
 
@@ -33,18 +31,6 @@ function buildGrass(preset: { grass: Partial<(typeof GRASS_PRESETS)[number]['gra
   const report = validateTopology(built.mesh);
   return { ...built, report };
 }
-
-function buildVegetable(preset: { veg: Partial<(typeof VEG_PRESETS)[number]['veg']> }, seed: number) {
-  const g = { ...DEFAULT_VEG, ...preset.veg };
-  const built = new VegMesher(g, seed).build();
-  const report = validateTopology(built.mesh);
-  return { ...built, report };
-}
-
-// A handful of decorative root hairs can legitimately be dropped when their
-// tiny windows don't line up on the crown grid; it's cosmetic and doesn't
-// affect manifoldness. Everything else must weld cleanly.
-const VEG_DROP_TOLERANCE: Record<string, number> = { Onion: 1 };
 
 // Each test is a long, fully synchronous mesh build. Between tests vitest only
 // yields microtasks, so the worker never gets to drain its message port; once a
@@ -400,86 +386,3 @@ describe('exporters', () => {
   });
 });
 
-describe('welded vegetable is a single closed manifold', () => {
-  for (const preset of VEG_PRESETS) {
-    for (const seed of [1, 7, 42]) {
-      it(`${preset.name} seed ${seed}`, () => {
-        const { report, stats, mesh, height, groundDepth } = buildVegetable(preset, seed);
-        expect(report.boundaryEdges, 'boundary edges').toBe(0);
-        expect(report.nonManifoldEdges, 'non-manifold edges').toBe(0);
-        expect(report.inconsistentEdges, 'inconsistent winding').toBe(0);
-        expect(report.degenerateFaces, 'degenerate faces').toBe(0);
-        expect(report.isolatedVertices, 'isolated vertices').toBe(0);
-        expect(report.components, 'connected components').toBe(1);
-        expect(report.eulerCharacteristic, 'Euler characteristic').toBe(2);
-        expect(report.genus).toBe(0);
-        // The veg mesher emits quads only; organs close with even rings.
-        expect(report.quadRatio).toBe(1);
-        const tolerance = VEG_DROP_TOLERANCE[preset.name] ?? 0;
-        expect(stats.dropped, 'dropped organs').toBeLessThanOrEqual(tolerance);
-        // Every organ but the crown was welded through a window.
-        expect(stats.junctions).toBe(stats.organs - 1);
-        expect(stats.organs).toBeGreaterThan(5);
-        expect(height).toBeGreaterThan(0.02);
-        expect(groundDepth).toBeGreaterThanOrEqual(0);
-        // Wind attributes: in range, sway weight reaches 1 at the top.
-        const n = mesh.vertexCount;
-        let maxHeight = 0;
-        let outOfRange = 0;
-        for (let i = 0; i < n; i++) {
-          for (let k = 0; k < 4; k++) {
-            const v = mesh.wind[i * 4 + k];
-            if (!(v >= 0 && v <= 1)) outOfRange++;
-          }
-          if (mesh.wind[i * 4] > maxHeight) maxHeight = mesh.wind[i * 4];
-        }
-        expect(outOfRange, 'wind attributes out of [0, 1]').toBe(0);
-        expect(maxHeight).toBeCloseTo(1, 5);
-      });
-    }
-  }
-
-  it('vegetable presets carry the vegetable kind and go through the shared pipeline', () => {
-    const vegs = PRESETS.filter(isVegetable);
-    expect(vegs.length).toBe(VEG_PRESETS.length);
-    const p = cloneParams(vegs.find((g) => g.name === 'Carrot')!);
-    p.seed = 3;
-    const r = generateTree(p);
-    expect(r.skeleton).toBeNull();
-    expect(r.veg).toBeDefined();
-    expect(r.report.closed && r.report.manifold).toBe(true);
-    expect(r.report.genus).toBe(0);
-    expect(r.stats.stems).toBe(r.veg!.organs);
-    expect(r.summary.stemsPerLevel).toEqual(r.veg!.perLevel);
-    expect(r.summary.height).toBeGreaterThan(0.02);
-    expect(r.buffers.index.length).toBe(r.mesh.quadCount * 6 + r.mesh.triCount * 3);
-  });
-
-  it('is deterministic for a given seed and differs across seeds', () => {
-    const a = buildVegetable(VEG_PRESETS[0], 9);
-    const b = buildVegetable(VEG_PRESETS[0], 9);
-    const c = buildVegetable(VEG_PRESETS[0], 10);
-    expect(a.mesh.positions.length).toBe(b.mesh.positions.length);
-    expect(a.report.faces).toBe(b.report.faces);
-    const sum = (arr: ArrayLike<number>) => {
-      let t = 0;
-      for (let i = 0; i < arr.length; i++) t += arr[i] * ((i % 7) + 1);
-      return t;
-    };
-    expect(sum(a.mesh.positions)).toBe(sum(b.mesh.positions));
-    expect(sum(c.mesh.positions)).not.toBe(sum(a.mesh.positions));
-  });
-
-  it('exports a vegetable as quads to OBJ and GLB', () => {
-    const { mesh } = buildVegetable(VEG_PRESETS.find((g) => g.name === 'Beetroot')!, 1);
-    const leaves = new LeafMesh();
-    const obj = toOBJ(mesh, leaves, 'veg');
-    const lines = obj.split('\n');
-    expect(lines.filter((l) => l.startsWith('v ')).length).toBe(mesh.vertexCount);
-    expect(lines.filter((l) => l.startsWith('f ') && l.trim().split(/\s+/).length === 5).length).toBe(mesh.quadCount);
-    const glb = toGLB(mesh, leaves, 'veg');
-    const dv = new DataView(glb);
-    expect(dv.getUint32(0, true)).toBe(0x46546c67);
-    expect(dv.getUint32(8, true)).toBe(glb.byteLength);
-  });
-});

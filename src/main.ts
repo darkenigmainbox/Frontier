@@ -1,8 +1,7 @@
 import './ui/styles.css';
-import { PRESETS, PRESET_GROUPS, TreeParams, cloneParams, SHAPE_NAMES, Shape, scatterFor, trunkBaseRadius, rootReach, isGrass, isDesert, isVegetable } from './tree/params';
+import { PRESETS, PRESET_GROUPS, TreeParams, cloneParams, SHAPE_NAMES, Shape, scatterFor, trunkBaseRadius, rootReach, isGrass, isDesert } from './tree/params';
 import { GrassParams, Inflorescence, INFLORESCENCE_NAMES, HEAD_BRANCH_NAMES, grassHeight, grassHabit } from './plant/grassParams';
 import { DesertParams, DesertHabit, DESERT_HABIT_NAMES, desertHeight, desertHabitWord } from './plant/desertParams';
-import { VegParams, VegHabit, VEG_HABIT_NAMES, vegHeight, vegHabitWord } from './plant/vegParams';
 import { Viewer, DEFAULT_VIEW, ViewerSettings, DisplayMode, PlantColors } from './viewer/scene';
 import { el, icon, button, section, slider, select, check, stepper, levelsHeader, levelRow, fmtInt, fmtCompact } from './ui/controls';
 import type { WorkerRequest, WorkerResponse, GenerateResponse } from './worker/tree.worker';
@@ -190,12 +189,11 @@ const tabs = el('div', 'tabs');
 const tabBotany = el('button', 'on', 'Botany');
 const tabGrass = el('button', '', 'Grass');
 const tabDesert = el('button', '', 'Desert');
-const tabVeg = el('button', '', 'Vegetable');
 const tabRoots = el('button', '', 'Roots');
 const tabMesh = el('button', '', 'Mesh');
 const tabView = el('button', '', 'View');
 const tabReport = el('button', '', 'Topology');
-tabs.append(tabBotany, tabGrass, tabDesert, tabVeg, tabRoots, tabMesh, tabView, tabReport);
+tabs.append(tabBotany, tabGrass, tabDesert, tabRoots, tabMesh, tabView, tabReport);
 const scroll = el('div', 'insp');
 panel.append(tabs, scroll);
 
@@ -203,18 +201,16 @@ const pages = {
   botany: el('div'),
   grass: el('div'),
   desert: el('div'),
-  veg: el('div'),
   roots: el('div'),
   mesh: el('div'),
   view: el('div'),
   report: el('div'),
 };
-scroll.append(pages.botany, pages.grass, pages.desert, pages.veg, pages.roots, pages.mesh, pages.view, pages.report);
+scroll.append(pages.botany, pages.grass, pages.desert, pages.roots, pages.mesh, pages.view, pages.report);
 const tabMap: [HTMLButtonElement, HTMLElement][] = [
   [tabBotany, pages.botany],
   [tabGrass, pages.grass],
   [tabDesert, pages.desert],
-  [tabVeg, pages.veg],
   [tabRoots, pages.roots],
   [tabMesh, pages.mesh],
   [tabView, pages.view],
@@ -224,7 +220,6 @@ const tabMap: [HTMLButtonElement, HTMLElement][] = [
 const treeTabs = new Set<HTMLButtonElement>([tabBotany, tabRoots, tabMesh]);
 const grassTabs = new Set<HTMLButtonElement>([tabGrass]);
 const desertTabs = new Set<HTMLButtonElement>([tabDesert]);
-const vegTabs = new Set<HTMLButtonElement>([tabVeg]);
 function showTab(btn: HTMLButtonElement): void {
   for (const [b, p] of tabMap) {
     b.classList.toggle('on', b === btn);
@@ -237,16 +232,15 @@ for (const [btn] of tabMap) btn.addEventListener('click', () => showTab(btn));
 function syncTabs(): void {
   const grass = isGrass(params);
   const desert = isDesert(params);
-  const veg = isVegetable(params);
   for (const [b] of tabMap) {
-    const kindSpecific = grassTabs.has(b) || desertTabs.has(b) || vegTabs.has(b);
-    const mine = grass ? grassTabs.has(b) : desert ? desertTabs.has(b) : veg ? vegTabs.has(b) : false;
-    const hide = grass || desert || veg ? treeTabs.has(b) || (kindSpecific && !mine) : kindSpecific;
+    const kindSpecific = grassTabs.has(b) || desertTabs.has(b);
+    const mine = grass ? grassTabs.has(b) : desert ? desertTabs.has(b) : false;
+    const hide = grass || desert ? treeTabs.has(b) || (kindSpecific && !mine) : kindSpecific;
     b.style.display = hide ? 'none' : '';
   }
   const active = tabMap.find(([b]) => b.classList.contains('on'))?.[0];
-  if (!active || active.style.display === 'none') showTab(grass ? tabGrass : desert ? tabDesert : veg ? tabVeg : tabBotany);
-  inspectorBadge.textContent = grass ? 'grass · welded' : desert ? 'desert · welded' : veg ? 'vegetable · welded' : 'tree · welded';
+  if (!active || active.style.display === 'none') showTab(grass ? tabGrass : desert ? tabDesert : tabBotany);
+  inspectorBadge.textContent = grass ? 'grass · welded' : desert ? 'desert · welded' : 'tree · welded';
 }
 showTab(tabBotany);
 
@@ -317,7 +311,7 @@ viewer.onPlacement((ev) => {
   scheduleGenerate(true);
 });
 
-/** Radius of interest around the base: root reach for trees, the crown for grasses, the body spread for desert plants, the crown for vegetables. */
+/** Radius of interest around the base: root reach for trees, the crown for grasses, the body spread for desert plants. */
 function baseReach(): number {
   if (isGrass(params) && params.grass) return Math.max(0.2, params.grass.crownRadius * 3);
   if (isDesert(params) && params.desert) {
@@ -331,11 +325,6 @@ function baseReach(): number {
             ? g.caneHeight * 0.45
             : Math.max(0.35, g.bodyRadius * 5 + g.armLength * 0.3);
     return Math.max(0.2, r);
-  }
-  if (isVegetable(params) && params.veg) {
-    const g = params.veg;
-    const r = g.habit === 'vine' ? g.stemHeight * 0.4 : g.crownRadius * 2.5 + g.leafLength * 0.4;
-    return Math.max(0.15, r);
   }
   return rootReach(params);
 }
@@ -479,17 +468,7 @@ worker.onmessage = (ev: MessageEvent<WorkerResponse>) => {
             flower: params.desert.flowerColor,
             fruit: params.desert.fruitColor,
           }
-        : isVegetable(params) && params.veg
-          ? {
-              // Vegetable accent channel: 0 = leaf/stem, 1 = skin (root/bulb
-              // body), 2 = flower, 3 = fruit — same slots the shader already
-              // reads for desert plants (body/spine/flower/fruit).
-              body: params.veg.leafColor,
-              spine: params.veg.skinColor,
-              flower: params.veg.flowerColor,
-              fruit: params.veg.fruitColor,
-            }
-          : undefined;
+        : undefined;
     viewer.setTree(buffers, leaves, msg.summary.height, plantColors);
     viewer.setObstacles(msg.obstacles);
     if (firstTree || frameOnNext) viewer.frame();
@@ -534,7 +513,6 @@ function groupOf(name: string): string {
 function groupIcon(name: string): string {
   const g = groupOf(name);
   if (g.startsWith('Grasses')) return GROUP_ICON[g] ?? 'grass';
-  if (g.startsWith('Vegetables')) return GROUP_ICON[g] ?? 'carrot';
   if (g.includes('conifer') || g.includes('Rocky')) return 'conifer';
   if (g === 'Jungle') return 'palm';
   if (g === 'Savanna') return 'acacia';
@@ -599,8 +577,7 @@ function updateReport(r: GenerateResponse): void {
   cTop.append(ico, heroText);
   const grass = isGrass(params);
   const desert = isDesert(params);
-  const veg = isVegetable(params);
-  const nonTree = grass || desert || veg;
+  const nonTree = grass || desert;
   const big = el('div', 'big');
   const hSmall = r.summary.height < 1;
   big.append(el('span', 'v', hSmall ? (r.summary.height * 100).toFixed(0) : r.summary.height.toFixed(nonTree ? 2 : 1)), el('span', 'u', hSmall ? 'cm' : 'm'), el('span', 'lab', 'height'));
@@ -621,11 +598,6 @@ function updateReport(r: GenerateResponse): void {
     cell('limbs', fmtInt(d.arms + d.pads + d.leaves + d.canes));
     cell('spines', fmtCompact(d.spines));
     cell('organs', fmtCompact(d.organs));
-  } else if (veg && r.veg) {
-    const v = r.veg;
-    cell('leaves', fmtInt(v.leaves));
-    cell('fruit', fmtInt(v.fruits));
-    cell('organs', fmtCompact(v.organs));
   } else {
     cell('stems', fmtInt(r.summary.stems));
     cell('roots', `${r.summary.primaryRoots} / ${r.summary.rootStems}`);
@@ -636,7 +608,6 @@ function updateReport(r: GenerateResponse): void {
   hero.append(cTop, big, side, spark);
   if (grass) drawSpark(spark, r.summary.stemsPerLevel.slice(0, 4), 0, ['crown', 'culm', 'leaf', 'head']);
   else if (desert) drawSpark(spark, r.summary.stemsPerLevel.slice(0, 3), 0, ['body', 'limbs', 'details']);
-  else if (veg) drawSpark(spark, r.summary.stemsPerLevel.slice(0, 3), 0, ['body', 'leaves', 'flower/fruit']);
   else drawSpark(spark, r.summary.stemsPerLevel.slice(0, 4), r.summary.rootStems);
 
   // Presence grid: the four toggles that decide what the viewport shows.
@@ -674,7 +645,7 @@ function updateReport(r: GenerateResponse): void {
   tileFaces.append(el('span', 'l', 'Faces'), el('span', 's', ok ? 'genus 0' : `${rep.boundaryEdges + rep.nonManifoldEdges} bad edges`), el('b', '', fmtCompact(rep.faces)));
   libFoot.innerHTML = '';
   const census = el('div', 'census');
-  const parts = grass || desert || veg ? r.summary.stemsPerLevel.slice(0, grass ? 4 : 3) : [...r.summary.stemsPerLevel.slice(0, 4), r.summary.rootStems];
+  const parts = grass || desert ? r.summary.stemsPerLevel.slice(0, grass ? 4 : 3) : [...r.summary.stemsPerLevel.slice(0, 4), r.summary.rootStems];
   const total = Math.max(1, parts.reduce((a, b) => a + b, 0));
   const colours = ['#8a5a3c', '#c98b4b', '#6fa16b', '#5aa1c9', '#b86b5c'];
   parts.forEach((n, i) => {
@@ -686,7 +657,6 @@ function updateReport(r: GenerateResponse): void {
   const footRow = el('div', 'foot-row');
   if (grass) footRow.append(kvSpan('grass', 'organs', fmtInt(r.summary.stems)), kvSpan('layers', 'junctions', fmtInt(r.stats.junctions)), el('span', 'sp'), kvSpan('check', ok ? 'clean' : 'issues', '', ok ? 'ok' : 'warn'));
   else if (desert) footRow.append(kvSpan('cactus', 'organs', fmtInt(r.summary.stems)), kvSpan('layers', 'junctions', fmtInt(r.stats.junctions)), el('span', 'sp'), kvSpan('check', ok ? 'clean' : 'issues', '', ok ? 'ok' : 'warn'));
-  else if (veg) footRow.append(kvSpan('carrot', 'organs', fmtInt(r.summary.stems)), kvSpan('layers', 'junctions', fmtInt(r.stats.junctions)), el('span', 'sp'), kvSpan('check', ok ? 'clean' : 'issues', '', ok ? 'ok' : 'warn'));
   else footRow.append(kvSpan('tree', 'stems', fmtInt(r.summary.stems)), kvSpan('layers', 'levels', String(params.botany.levels)), el('span', 'sp'), kvSpan('check', ok ? 'clean' : 'issues', '', ok ? 'ok' : 'warn'));
   libFoot.append(census, footRow);
 
@@ -741,12 +711,6 @@ function updateReport(r: GenerateResponse): void {
     if (limbs) add('Limbs', limbs);
     add('Spines · fruits', `${fmtInt(d.spines)} · ${fmtInt(d.fruits)}`);
     add('Organs dropped', fmtInt(d.dropped), d.dropped ? 'warn' : 'ok');
-  } else if (veg && r.veg) {
-    const v = r.veg;
-    add('Organs welded', `${fmtInt(v.organs)}  (${v.junctions} windows)`);
-    add('Leaves · branches', `${fmtInt(v.leaves)} · ${fmtInt(v.branches)}`);
-    add('Flowers · fruit', `${fmtInt(v.flowers)} · ${fmtInt(v.fruits)}`);
-    add('Organs dropped', fmtInt(v.dropped), v.dropped ? 'warn' : 'ok');
   } else {
     add('Junctions welded', fmtInt(r.stats.junctions));
     add('Forks (Y crotches)', fmtInt(r.stats.forks));
@@ -792,7 +756,7 @@ function updateReport(r: GenerateResponse): void {
     const s5 = section('Dropped stems', page, { collapsed: true, hint: String(r.stats.droppedStems) });
     const dg = el('div', 'kvgrid');
     for (const [k, v] of Object.entries(r.stats.dropReasons)) dg.append(el('span', '', k), el('b', '', fmtInt(v)));
-    s5.append(dg, el('p', 'note', grass ? 'An organ is dropped when no window can be opened for it on its parent without overlapping another one: a shorter head or culm, or more sides, makes room.' : desert ? 'An organ is dropped when no window can be opened for it on its parent without overlapping another one: fewer limbs, wider areole spacing, or more body sides make room.' : veg ? 'An organ is dropped when no window can be opened for it on its parent without overlapping another one: fewer leaves, fewer branches, or more sides make room.' : 'A stem is dropped when no window can be opened for it on the parent without overlapping another junction. Increase trunk radial segments or rings per segment to make room.'));
+    s5.append(dg, el('p', 'note', grass ? 'An organ is dropped when no window can be opened for it on its parent without overlapping another one: a shorter head or culm, or more sides, makes room.' : desert ? 'An organ is dropped when no window can be opened for it on its parent without overlapping another one: fewer limbs, wider areole spacing, or more body sides make room.' : 'A stem is dropped when no window can be opened for it on the parent without overlapping another junction. Increase trunk radial segments or rings per segment to make room.'));
   }
 }
 
@@ -815,9 +779,6 @@ const GROUP_ICON: Record<string, string> = {
   'Cacti · prickly pears': 'cactus',
   'Succulents · rosettes': 'yucca',
   'Succulents · ocotillo': 'cactus',
-  'Vegetables · root & bulb': 'carrot',
-  'Vegetables · leafy': 'cabbage',
-  'Vegetables · fruiting': 'tomato',
 };
 const GROUP_ACCENT: Record<string, string> = {
   Oaks: '#c98b4b',
@@ -834,9 +795,6 @@ const GROUP_ACCENT: Record<string, string> = {
   'Cacti · prickly pears': '#a3e635',
   'Succulents · rosettes': '#5eead4',
   'Succulents · ocotillo': '#f0abfc',
-  'Vegetables · root & bulb': '#f0883e',
-  'Vegetables · leafy': '#7ec850',
-  'Vegetables · fruiting': '#ef5350',
 };
 const closedGroups = new Set<string>();
 
@@ -860,12 +818,6 @@ function speciesMeta(name: string): string {
             ? `${g.leaves} leaves`
             : `${g.canes} canes`;
     return `${desertHabitWord(g)} · ${h < 1 ? `${Math.round(h * 100)} cm` : `${h.toFixed(1)} m`} · ${detail}`;
-  }
-  if (isVegetable(p) && p.veg) {
-    const g = p.veg;
-    const h = vegHeight(g);
-    const detail = g.habit === 'root' ? `${Math.round(g.exposure * 100)}% exposed` : g.habit === 'vine' ? `${g.branches} branches` : `${g.leaves} leaves`;
-    return `${vegHabitWord(g)} · ${h < 1 ? `${Math.round(h * 100)} cm` : `${h.toFixed(1)} m`} · ${detail}`;
   }
   const b = p.botany;
   return `${SHAPE_NAMES[b.shape].toLowerCase()} · ${b.scale} m · L${b.levels}`;
@@ -1399,149 +1351,6 @@ function buildDesertPage(): void {
   );
 }
 
-function buildVegPage(): void {
-  const page = pages.veg;
-  page.innerHTML = '';
-  if (!isVegetable(params) || !params.veg) return;
-  const G = (): VegParams => params.veg!;
-  const g = G();
-  const rebuild = (): void => {
-    onChange();
-    buildVegPage();
-  };
-
-  const sSeed = section('Seed', page, { hint: groupOf(params.name).toLowerCase() });
-  const seedRow = el('div', 'ctl rowctl seed');
-  seedRow.append(el('span', 'lab', 'Seed'));
-  const stp = el('div', 'stp');
-  const seedInput = el('input', 'n');
-  seedInput.type = 'text';
-  seedInput.spellcheck = false;
-  seedInput.value = String(params.seed);
-  seedInput.addEventListener('change', () => {
-    const v = parseInt(seedInput.value, 10);
-    if (!Number.isNaN(v)) {
-      params.seed = v;
-      scheduleGenerate(true);
-    }
-  });
-  seedInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') seedInput.blur();
-  });
-  const seedDec = el('button', 'b', '\u2212');
-  seedDec.addEventListener('click', () => setSeed(params.seed - 1));
-  const seedInc = el('button', 'b', '+');
-  seedInc.addEventListener('click', () => setSeed(params.seed + 1));
-  stp.append(seedDec, seedInput, seedInc);
-  seedRow.append(stp, button('Randomise', () => randomSeed(), { icon: 'dice', kbd: 'R', cls: 'slim' }));
-  sSeed.append(seedRow);
-  const resetRow = el('div', 'actions');
-  resetRow.append(
-    button('Reset species', () => {
-      const seed = params.seed;
-      params = cloneParams(PRESETS.find((p) => p.name === params.name) ?? PRESETS[0]);
-      params.seed = seed;
-      rebuildPages();
-      scheduleGenerate(true);
-    }, { icon: 'reset', title: 'Restore the preset values of the current species' }),
-  );
-  sSeed.append(resetRow);
-  refreshers.push(() => {
-    seedInput.value = String(params.seed);
-  });
-
-  const cm = { format: (v: number) => (v * 100).toFixed(v < 0.1 ? 1 : 0), unit: 'cm' };
-  const mm = { format: (v: number) => (v * 1000).toFixed(v < 0.01 ? 1 : 0), unit: 'mm' };
-
-  const sPlan = section('Body plan', page, { hint: VEG_HABIT_NAMES[g.habit].toLowerCase() });
-  select(
-    sPlan,
-    'Habit',
-    (Object.keys(VEG_HABIT_NAMES) as VegHabit[]).map((k) => ({ value: k, label: VEG_HABIT_NAMES[k] })),
-    () => G().habit,
-    (v) => (G().habit = v),
-    rebuild,
-  );
-
-  if (g.habit === 'root') {
-    const sBody = section('Root / bulb', page, { hint: `${Math.round(g.exposure * 100)}% exposed` });
-    slider(sBody, 'Body length', () => G().bodyLength, (v) => (G().bodyLength = v), { min: 0.02, max: 0.4, step: 0.005, ...cm }, onChange);
-    slider(sBody, 'Body radius', () => G().bodyRadius, (v) => (G().bodyRadius = v), { min: 0.008, max: 0.1, step: 0.001, ...cm }, onChange);
-    slider(sBody, 'Taper', () => G().bodyTaper, (v) => (G().bodyTaper = v), { min: 0, max: 1, step: 0.02, title: '0 = blunt round tip · 1 = sharp tapered point' }, onChange);
-    slider(sBody, 'Bulb bulge', () => G().bulbBulge, (v) => (G().bulbBulge = v), { min: 0, max: 1, step: 0.02, title: '0 = tapered spindle (carrot) · 1 = round bulge near the top (beetroot, onion)' }, onChange);
-    slider(sBody, 'Ribs', () => G().ribCount, (v) => (G().ribCount = Math.round(v)), { min: 0, max: 24, step: 1 }, onChange);
-    slider(sBody, 'Rib depth', () => G().ribDepth, (v) => (G().ribDepth = v), { min: 0, max: 0.1, step: 0.002, title: 'Rib amplitude as a fraction of the radius' }, onChange);
-    slider(sBody, 'Neck length', () => G().neckLength, (v) => (G().neckLength = v), { min: 0, max: 0.08, step: 0.002, ...cm }, onChange);
-    slider(sBody, 'Neck radius', () => G().neckRadius, (v) => (G().neckRadius = v), { min: 0.1, max: 0.9, step: 0.02, unit: '\u00d7', title: 'Relative to the body radius' }, onChange);
-    slider(sBody, 'Exposure', () => G().exposure, (v) => (G().exposure = v), { min: 0, max: 1, step: 0.02, title: 'Fraction of the body above the soil, 0 = fully buried shoulder, 1 = fully exposed' }, onChange);
-    slider(sBody, 'Root hairs', () => G().rootHairs, (v) => (G().rootHairs = Math.round(v)), { min: 0, max: 40, step: 1, title: 'Thin trailing root hairs near the buried tip' }, onChange);
-    slider(sBody, 'Root hair length', () => G().rootHairLength, (v) => (G().rootHairLength = v), { min: 0, max: 0.06, step: 0.002, ...cm }, onChange);
-  }
-
-  if (g.habit === 'leafy' || g.habit === 'vine') {
-    const sStem = section('Stem', page, { hint: `${(G().stemHeight * 100).toFixed(0)} cm` });
-    slider(sStem, 'Stem height', () => G().stemHeight, (v) => (G().stemHeight = v), { min: 0.02, max: 0.8, step: 0.01, ...cm }, onChange);
-    slider(sStem, 'Stem radius', () => G().stemRadius, (v) => (G().stemRadius = v), { min: 0.004, max: 0.03, step: 0.0005, ...cm }, onChange);
-    slider(sStem, 'Lean', () => G().stemLean, (v) => (G().stemLean = v), { min: 0, max: 25, step: 0.5, unit: '\u00b0' }, onChange);
-  }
-
-  const sCrown = section('Leaf crown', page, { hint: `${g.leaves} leaves` });
-  slider(sCrown, 'Crown radius', () => G().crownRadius, (v) => (G().crownRadius = v), { min: 0.005, max: 0.08, step: 0.001, ...cm }, onChange);
-  slider(sCrown, 'Crown height', () => G().crownHeight, (v) => (G().crownHeight = v), { min: 0, max: 0.04, step: 0.001, ...cm }, onChange);
-  slider(sCrown, 'Leaves', () => G().leaves, (v) => (G().leaves = Math.round(v)), { min: 2, max: 40, step: 1 }, onChange);
-  slider(sCrown, 'Leaf length', () => G().leafLength, (v) => (G().leafLength = v), { min: 0.02, max: 0.5, step: 0.005, ...cm }, onChange);
-  slider(sCrown, 'Length variation', () => G().leafLengthV, (v) => (G().leafLengthV = v), { min: 0, max: 0.5, step: 0.01, unit: '\u00b1' }, onChange);
-  slider(sCrown, 'Leaf width', () => G().leafWidth, (v) => (G().leafWidth = v), { min: 0.005, max: 0.2, step: 0.002, ...cm }, onChange);
-  slider(sCrown, 'Leaf thickness', () => G().leafThick, (v) => (G().leafThick = v), { min: 0.001, max: 0.01, step: 0.0002, ...cm }, onChange);
-  slider(sCrown, 'Arch', () => G().leafCurve, (v) => (G().leafCurve = v), { min: 0, max: 90, step: 1, unit: '\u00b0', title: 'Arch of the leaf from base to tip' }, onChange);
-  slider(sCrown, 'Keel', () => G().leafKeel, (v) => (G().leafKeel = v), { min: 0, max: 1, step: 0.05, title: 'V-fold along the midrib' }, onChange);
-  slider(sCrown, 'Ruffle', () => G().leafRuffle, (v) => (G().leafRuffle = v), { min: 0, max: 0.5, step: 0.01, title: 'Wavy / crinkled margin amplitude, 0 = smooth' }, onChange);
-  if (g.leafRuffle > 0) slider(sCrown, 'Ruffle period', () => G().leafRufflePeriod, (v) => (G().leafRufflePeriod = Math.round(v)), { min: 2, max: 16, step: 1, title: 'Waves per leaf edge' }, onChange);
-  slider(sCrown, 'Tip roundness', () => G().leafTipRound, (v) => (G().leafTipRound = v), { min: 0, max: 1, step: 0.02, title: '0 = pointed tip · 1 = blunt, head-forming tip (cabbage / lettuce)' }, onChange);
-  slider(sCrown, 'Compound', () => G().leafCompound, (v) => (G().leafCompound = v), { min: 0, max: 1, step: 1, title: 'Above 0.5: a true compound leaf with a petiole and separate leaflets (carrot / radish / tomato), instead of one single blade' }, onChange);
-  slider(sCrown, 'Lobe', () => G().leafLobe, (v) => (G().leafLobe = v), { min: 0, max: 1, step: 0.02, title: g.leafCompound > 0.5 ? 'Leaflet finery: 0 = few broad leaflets · 1 = many fine leaflets (carrot-like)' : 'Lobe / serration depth for compound-looking leaves, 0 = smooth margin' }, onChange);
-  if (g.leafCompound > 0.5) slider(sCrown, 'Leaflet pairs', () => G().leafLobes, (v) => (G().leafLobes = Math.round(v)), { min: 1, max: 6, step: 1, title: 'Pairs of leaflets along the petiole, plus one terminal leaflet' }, onChange);
-  else if (g.leafLobe > 0) slider(sCrown, 'Lobes per side', () => G().leafLobes, (v) => (G().leafLobes = Math.round(v)), { min: 1, max: 12, step: 1 }, onChange);
-  slider(sCrown, 'Hollow', () => G().leafHollow, (v) => (G().leafHollow = v), { min: 0, max: 1, step: 0.05, title: '0 = flat blade · 1 = round hollow tube (onion / scallion leaves)' }, onChange);
-  slider(sCrown, 'Spread', () => G().leafSpread, (v) => (G().leafSpread = v), { min: 0, max: 90, step: 1, unit: '\u00b0', title: 'Lean of the leaves from the vertical' }, onChange);
-
-  if (g.habit === 'vine') {
-    const sBr = section('Branches', page, { hint: `${g.branches} branches` });
-    slider(sBr, 'Branches', () => G().branches, (v) => (G().branches = Math.round(v)), { min: 0, max: 20, step: 1 }, onChange);
-    slider(sBr, 'Attach from', () => G().branchFrom, (v) => (G().branchFrom = v), { min: 0, max: 0.9, step: 0.01, title: 'Bottom of the attach zone, as a fraction of the stem height' }, onChange);
-    slider(sBr, 'Attach to', () => G().branchTo, (v) => (G().branchTo = v), { min: 0.05, max: 0.98, step: 0.01, title: 'Top of the attach zone, as a fraction of the stem height' }, onChange);
-    slider(sBr, 'Branch length', () => G().branchLength, (v) => (G().branchLength = v), { min: 0.02, max: 0.6, step: 0.01, ...cm }, onChange);
-    slider(sBr, 'Length variation', () => G().branchLengthV, (v) => (G().branchLengthV = v), { min: 0, max: 0.6, step: 0.02, unit: '\u00b1' }, onChange);
-    slider(sBr, 'Branch angle', () => G().branchAngle, (v) => (G().branchAngle = v), { min: 5, max: 90, step: 1, unit: '\u00b0' }, onChange);
-    slider(sBr, 'Branch droop', () => G().branchDroop, (v) => (G().branchDroop = v), { min: 0, max: 90, step: 1, unit: '\u00b0' }, onChange);
-
-    const sFl = section('Flowers & fruit', page, { hint: g.flowers ? `${g.fruitsPerBranch} per branch` : 'none' });
-    check(sFl, 'Flowers & fruit', () => G().flowers, (v) => (G().flowers = v), rebuild);
-    if (g.flowers) {
-      slider(sFl, 'Flowers per branch', () => G().flowersPerBranch, (v) => (G().flowersPerBranch = Math.round(v)), { min: 0, max: 8, step: 1 }, onChange);
-      slider(sFl, 'Flower length', () => G().flowerLength, (v) => (G().flowerLength = v), { min: 0.003, max: 0.03, step: 0.001, ...mm }, onChange);
-      slider(sFl, 'Flower radius', () => G().flowerRadius, (v) => (G().flowerRadius = v), { min: 0.002, max: 0.02, step: 0.0005, ...mm }, onChange);
-      slider(sFl, 'Fruit per branch', () => G().fruitsPerBranch, (v) => (G().fruitsPerBranch = Math.round(v)), { min: 0, max: 8, step: 1 }, onChange);
-      slider(sFl, 'Fruit length', () => G().fruitLength, (v) => (G().fruitLength = v), { min: 0.01, max: 0.12, step: 0.002, ...cm }, onChange);
-      slider(sFl, 'Fruit radius', () => G().fruitRadius, (v) => (G().fruitRadius = v), { min: 0.005, max: 0.06, step: 0.001, ...cm }, onChange);
-      slider(sFl, 'Fruit taper', () => G().fruitTaper, (v) => (G().fruitTaper = v), { min: 0, max: 1, step: 0.02, title: '0 = smooth round fruit (tomato) · 1 = tapered pod (chilli pepper)' }, onChange);
-    }
-  }
-
-  const sRes = section('Resolution', page, { collapsed: true });
-  stepper(sRes, 'Body sides', () => G().bodySides, (v) => (G().bodySides = v), { min: 8, max: 48, step: 2, integer: true }, onChange);
-  stepper(sRes, 'Body rings', () => G().bodyRings, (v) => (G().bodyRings = v), { min: 6, max: 60, integer: true }, onChange);
-  stepper(sRes, 'Leaf sides', () => G().leafSides, (v) => (G().leafSides = v), { min: 6, max: 20, integer: true }, onChange);
-  stepper(sRes, 'Leaf rings', () => G().leafRings, (v) => (G().leafRings = v), { min: 4, max: 32, integer: true }, onChange);
-  if (g.habit === 'vine') stepper(sRes, 'Branch sides', () => G().branchSides, (v) => (G().branchSides = v), { min: 6, max: 20, integer: true }, onChange);
-
-  page.append(
-    Object.assign(el('p', 'note'), {
-      textContent:
-        'A vegetable is one closed quad surface, like the trees, grasses and desert plants. The leaf crown, stem, branches, leaves, flowers and fruit each leave their parent through a window cut into the parent\'s ring grid and are welded to it with collar loops. Root and bulb vegetables grow their body straight down from the crown, mostly buried, with the exposure slider controlling how much of the shoulder shows above the soil.',
-    }),
-  );
-}
 
 // -----------------------------------------------------------------------------
 // Roots & site page
@@ -1739,7 +1548,6 @@ function rebuildPages(): void {
   buildBotanyPage();
   buildGrassPage();
   buildDesertPage();
-  buildVegPage();
   buildRootsPage();
   buildMeshPage();
   buildLibrary();
@@ -1804,7 +1612,6 @@ function slug(s: string): string {
 buildBotanyPage();
 buildGrassPage();
 buildDesertPage();
-buildVegPage();
 buildRootsPage();
 buildMeshPage();
 buildViewPage();
