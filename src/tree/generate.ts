@@ -4,7 +4,7 @@
  * Used by the worker, the tests and the CLI.
  */
 
-import { TreeParams, DEFAULT_ROOTS, isGrass, isDesert } from './params';
+import { TreeParams, DEFAULT_ROOTS, isGrass, isDesert, isJungle } from './params';
 import { buildSkeleton, Skeleton } from './skeleton';
 import { buildMesh, MesherStats } from './mesher';
 import { validateTopology, TopologyReport } from './validate';
@@ -16,6 +16,8 @@ import { GrassMesher, GrassStats } from '../plant/grassMesher';
 import { DEFAULT_GRASS } from '../plant/grassParams';
 import { DesertMesher, DesertStats } from '../plant/desertMesher';
 import { DEFAULT_DESERT } from '../plant/desertParams';
+import { JungleMesher, JungleStats } from '../plant/jungleMesher';
+import { DEFAULT_JUNGLE } from '../plant/jungleParams';
 
 export interface Timings {
   skeleton: number;
@@ -56,6 +58,8 @@ export interface GenerateResult {
   grass?: GrassStats;
   /** Desert mesher statistics (desert plants only). */
   desert?: DesertStats;
+  /** Jungle mesher statistics (palms, banana family, ferns only). */
+  jungle?: JungleStats;
 }
 
 const now = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -73,6 +77,7 @@ export function generateTree(params: TreeParams, options: { validate?: boolean; 
   completeParams(params);
   if (isGrass(params)) return generateGrass(params, options);
   if (isDesert(params)) return generateDesert(params, options);
+  if (isJungle(params)) return generateJungle(params, options);
   const t0 = now();
   const skeleton = buildSkeleton(params);
   const t1 = now();
@@ -213,6 +218,59 @@ function generateDesert(params: TreeParams, options: { validate?: boolean; obsta
     },
     groundDepth: built.groundDepth,
     desert: ds,
+  };
+}
+
+/**
+ * Jungle pipeline: trunk/pseudostem + fronds (leaflets, segments or one huge
+ * blade, depending on habit) welded by the jungle mesher → validation → GPU
+ * buffers. Same result shape as trees, grasses and desert plants.
+ */
+function generateJungle(params: TreeParams, options: { validate?: boolean; obstacleMeshes?: boolean }): GenerateResult {
+  const g = params.jungle ?? { ...DEFAULT_JUNGLE };
+  params.jungle = g;
+  const t0 = now();
+  const built = new JungleMesher(g, params.seed).build();
+  const t1 = now();
+  const environment = new Environment(params.environment);
+  const report = options.validate === false ? emptyReport(built.mesh) : validateTopology(built.mesh);
+  const t2 = now();
+  const buffers = toGpuBuffers(built.mesh);
+  const obstacles = options.obstacleMeshes === false ? [] : environment.meshAll();
+  const t3 = now();
+  const js = built.stats;
+  const stats: MesherStats = {
+    stems: js.organs,
+    droppedStems: js.dropped,
+    dropReasons: js.dropReasons,
+    junctions: js.junctions,
+    forks: 0,
+    maxDepth: 3,
+    rootStems: 0,
+    droppedRoots: 0,
+  };
+  return {
+    skeleton: null,
+    environment,
+    mesh: built.mesh,
+    leaves: new LeafMesh(),
+    obstacles,
+    report,
+    stats,
+    buffers,
+    timings: { skeleton: 0, roots: 0, mesh: t1 - t0, validate: t2 - t1, buffers: t3 - t2, total: t3 - t0 },
+    summary: {
+      stems: js.organs,
+      stemsPerLevel: [...js.perLevel],
+      leaves: 0,
+      height: built.height,
+      treeScale: built.height,
+      primaryRoots: 0,
+      rootStems: 0,
+      obstacles: environment.count,
+    },
+    groundDepth: built.groundDepth,
+    jungle: js,
   };
 }
 

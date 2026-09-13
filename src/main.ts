@@ -1,7 +1,8 @@
 import './ui/styles.css';
-import { PRESETS, PRESET_GROUPS, TreeParams, cloneParams, SHAPE_NAMES, Shape, scatterFor, trunkBaseRadius, rootReach, isGrass, isDesert } from './tree/params';
+import { PRESETS, PRESET_GROUPS, TreeParams, cloneParams, SHAPE_NAMES, Shape, scatterFor, trunkBaseRadius, rootReach, isGrass, isDesert, isJungle } from './tree/params';
 import { GrassParams, Inflorescence, INFLORESCENCE_NAMES, HEAD_BRANCH_NAMES, grassHeight, grassHabit } from './plant/grassParams';
 import { DesertParams, DesertHabit, DESERT_HABIT_NAMES, desertHeight, desertHabitWord } from './plant/desertParams';
+import { JungleParams, JungleHabit, JUNGLE_HABIT_NAMES, jungleHeight, jungleHabitWord } from './plant/jungleParams';
 import { Viewer, DEFAULT_VIEW, ViewerSettings, DisplayMode, PlantColors } from './viewer/scene';
 import { el, icon, button, section, slider, select, check, stepper, levelsHeader, levelRow, fmtInt, fmtCompact } from './ui/controls';
 import type { WorkerRequest, WorkerResponse, GenerateResponse } from './worker/tree.worker';
@@ -189,11 +190,12 @@ const tabs = el('div', 'tabs');
 const tabBotany = el('button', 'on', 'Botany');
 const tabGrass = el('button', '', 'Grass');
 const tabDesert = el('button', '', 'Desert');
+const tabJungle = el('button', '', 'Jungle');
 const tabRoots = el('button', '', 'Roots');
 const tabMesh = el('button', '', 'Mesh');
 const tabView = el('button', '', 'View');
 const tabReport = el('button', '', 'Topology');
-tabs.append(tabBotany, tabGrass, tabDesert, tabRoots, tabMesh, tabView, tabReport);
+tabs.append(tabBotany, tabGrass, tabDesert, tabJungle, tabRoots, tabMesh, tabView, tabReport);
 const scroll = el('div', 'insp');
 panel.append(tabs, scroll);
 
@@ -201,16 +203,18 @@ const pages = {
   botany: el('div'),
   grass: el('div'),
   desert: el('div'),
+  jungle: el('div'),
   roots: el('div'),
   mesh: el('div'),
   view: el('div'),
   report: el('div'),
 };
-scroll.append(pages.botany, pages.grass, pages.desert, pages.roots, pages.mesh, pages.view, pages.report);
+scroll.append(pages.botany, pages.grass, pages.desert, pages.jungle, pages.roots, pages.mesh, pages.view, pages.report);
 const tabMap: [HTMLButtonElement, HTMLElement][] = [
   [tabBotany, pages.botany],
   [tabGrass, pages.grass],
   [tabDesert, pages.desert],
+  [tabJungle, pages.jungle],
   [tabRoots, pages.roots],
   [tabMesh, pages.mesh],
   [tabView, pages.view],
@@ -220,6 +224,7 @@ const tabMap: [HTMLButtonElement, HTMLElement][] = [
 const treeTabs = new Set<HTMLButtonElement>([tabBotany, tabRoots, tabMesh]);
 const grassTabs = new Set<HTMLButtonElement>([tabGrass]);
 const desertTabs = new Set<HTMLButtonElement>([tabDesert]);
+const jungleTabs = new Set<HTMLButtonElement>([tabJungle]);
 function showTab(btn: HTMLButtonElement): void {
   for (const [b, p] of tabMap) {
     b.classList.toggle('on', b === btn);
@@ -232,15 +237,17 @@ for (const [btn] of tabMap) btn.addEventListener('click', () => showTab(btn));
 function syncTabs(): void {
   const grass = isGrass(params);
   const desert = isDesert(params);
+  const jungle = isJungle(params);
+  const special = grass || desert || jungle;
   for (const [b] of tabMap) {
-    const kindSpecific = grassTabs.has(b) || desertTabs.has(b);
-    const mine = grass ? grassTabs.has(b) : desert ? desertTabs.has(b) : false;
-    const hide = grass || desert ? treeTabs.has(b) || (kindSpecific && !mine) : kindSpecific;
+    const kindSpecific = grassTabs.has(b) || desertTabs.has(b) || jungleTabs.has(b);
+    const mine = grass ? grassTabs.has(b) : desert ? desertTabs.has(b) : jungle ? jungleTabs.has(b) : false;
+    const hide = special ? treeTabs.has(b) || (kindSpecific && !mine) : kindSpecific;
     b.style.display = hide ? 'none' : '';
   }
   const active = tabMap.find(([b]) => b.classList.contains('on'))?.[0];
-  if (!active || active.style.display === 'none') showTab(grass ? tabGrass : desert ? tabDesert : tabBotany);
-  inspectorBadge.textContent = grass ? 'grass · welded' : desert ? 'desert · welded' : 'tree · welded';
+  if (!active || active.style.display === 'none') showTab(grass ? tabGrass : desert ? tabDesert : jungle ? tabJungle : tabBotany);
+  inspectorBadge.textContent = grass ? 'grass · welded' : desert ? 'desert · welded' : jungle ? 'jungle · welded' : 'tree · welded';
 }
 showTab(tabBotany);
 
@@ -325,6 +332,10 @@ function baseReach(): number {
             ? g.caneHeight * 0.45
             : Math.max(0.35, g.bodyRadius * 5 + g.armLength * 0.3);
     return Math.max(0.2, r);
+  }
+  if (isJungle(params) && params.jungle) {
+    const g = params.jungle;
+    return Math.max(0.3, g.trunkRadius * 4 + g.frondLength * (g.frondReach + 0.3));
   }
   return rootReach(params);
 }
@@ -468,7 +479,14 @@ worker.onmessage = (ev: MessageEvent<WorkerResponse>) => {
             flower: params.desert.flowerColor,
             fruit: params.desert.fruitColor,
           }
-        : undefined;
+        : isJungle(params) && params.jungle
+          ? {
+              body: params.jungle.trunkColor,
+              spine: params.jungle.leafColor,
+              flower: params.jungle.flowerColor,
+              fruit: params.jungle.fruitColor,
+            }
+          : undefined;
     viewer.setTree(buffers, leaves, msg.summary.height, plantColors);
     viewer.setObstacles(msg.obstacles);
     if (firstTree || frameOnNext) viewer.frame();
@@ -515,6 +533,7 @@ function groupIcon(name: string): string {
   if (g.startsWith('Grasses')) return GROUP_ICON[g] ?? 'grass';
   if (g.includes('conifer') || g.includes('Rocky')) return 'conifer';
   if (g === 'Jungle') return 'palm';
+  if (g.startsWith('Palms') || g.startsWith('Jungle ·') || g === 'Ferns') return 'palm';
   if (g === 'Savanna') return 'acacia';
   if (g === 'Desert') return 'yucca';
   return 'tree';
@@ -577,7 +596,8 @@ function updateReport(r: GenerateResponse): void {
   cTop.append(ico, heroText);
   const grass = isGrass(params);
   const desert = isDesert(params);
-  const nonTree = grass || desert;
+  const jungle = isJungle(params);
+  const nonTree = grass || desert || jungle;
   const big = el('div', 'big');
   const hSmall = r.summary.height < 1;
   big.append(el('span', 'v', hSmall ? (r.summary.height * 100).toFixed(0) : r.summary.height.toFixed(nonTree ? 2 : 1)), el('span', 'u', hSmall ? 'cm' : 'm'), el('span', 'lab', 'height'));
@@ -598,6 +618,11 @@ function updateReport(r: GenerateResponse): void {
     cell('limbs', fmtInt(d.arms + d.pads + d.leaves + d.canes));
     cell('spines', fmtCompact(d.spines));
     cell('organs', fmtCompact(d.organs));
+  } else if (jungle && r.jungle) {
+    const j = r.jungle;
+    cell('fronds', fmtInt(j.fronds));
+    cell('leaflets', fmtCompact(j.leaflets));
+    cell('organs', fmtCompact(j.organs));
   } else {
     cell('stems', fmtInt(r.summary.stems));
     cell('roots', `${r.summary.primaryRoots} / ${r.summary.rootStems}`);
@@ -608,6 +633,7 @@ function updateReport(r: GenerateResponse): void {
   hero.append(cTop, big, side, spark);
   if (grass) drawSpark(spark, r.summary.stemsPerLevel.slice(0, 4), 0, ['crown', 'culm', 'leaf', 'head']);
   else if (desert) drawSpark(spark, r.summary.stemsPerLevel.slice(0, 3), 0, ['body', 'limbs', 'details']);
+  else if (jungle) drawSpark(spark, r.summary.stemsPerLevel.slice(0, 3), 0, ['trunk', 'fronds', 'details']);
   else drawSpark(spark, r.summary.stemsPerLevel.slice(0, 4), r.summary.rootStems);
 
   // Presence grid: the four toggles that decide what the viewport shows.
@@ -779,6 +805,10 @@ const GROUP_ICON: Record<string, string> = {
   'Cacti · prickly pears': 'cactus',
   'Succulents · rosettes': 'yucca',
   'Succulents · ocotillo': 'cactus',
+  'Palms · feather (pinnate)': 'palm',
+  'Palms · fan (palmate)': 'palm',
+  'Jungle · banana & relatives': 'palm',
+  Ferns: 'palm',
 };
 const GROUP_ACCENT: Record<string, string> = {
   Oaks: '#c98b4b',
@@ -795,6 +825,10 @@ const GROUP_ACCENT: Record<string, string> = {
   'Cacti · prickly pears': '#a3e635',
   'Succulents · rosettes': '#5eead4',
   'Succulents · ocotillo': '#f0abfc',
+  'Palms · feather (pinnate)': '#3ac96b',
+  'Palms · fan (palmate)': '#63c94a',
+  'Jungle · banana & relatives': '#2fae5a',
+  Ferns: '#57c46a',
 };
 const closedGroups = new Set<string>();
 
@@ -818,6 +852,11 @@ function speciesMeta(name: string): string {
             ? `${g.leaves} leaves`
             : `${g.canes} canes`;
     return `${desertHabitWord(g)} · ${h < 1 ? `${Math.round(h * 100)} cm` : `${h.toFixed(1)} m`} · ${detail}`;
+  }
+  if (isJungle(p) && p.jungle) {
+    const g = p.jungle;
+    const h = jungleHeight(g);
+    return `${jungleHabitWord(g)} · ${h < 1 ? `${Math.round(h * 100)} cm` : `${h.toFixed(1)} m`} · ${g.fronds} fronds`;
   }
   const b = p.botany;
   return `${SHAPE_NAMES[b.shape].toLowerCase()} · ${b.scale} m · L${b.levels}`;
@@ -1352,6 +1391,157 @@ function buildDesertPage(): void {
 }
 
 
+function buildJunglePage(): void {
+  const page = pages.jungle;
+  page.innerHTML = '';
+  if (!isJungle(params) || !params.jungle) return;
+  const G = (): JungleParams => params.jungle!;
+  const g = G();
+  const rebuild = (): void => {
+    onChange();
+    buildJunglePage();
+  };
+
+  const sSeed = section('Seed', page, { hint: groupOf(params.name).toLowerCase() });
+  const seedRow = el('div', 'ctl rowctl seed');
+  seedRow.append(el('span', 'lab', 'Seed'));
+  const stp = el('div', 'stp');
+  const seedInput = el('input', 'n');
+  seedInput.type = 'text';
+  seedInput.spellcheck = false;
+  seedInput.value = String(params.seed);
+  seedInput.addEventListener('change', () => {
+    const v = parseInt(seedInput.value, 10);
+    if (!Number.isNaN(v)) {
+      params.seed = v;
+      scheduleGenerate(true);
+    }
+  });
+  seedInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') seedInput.blur();
+  });
+  const seedDec = el('button', 'b', '\u2212');
+  seedDec.addEventListener('click', () => setSeed(params.seed - 1));
+  const seedInc = el('button', 'b', '+');
+  seedInc.addEventListener('click', () => setSeed(params.seed + 1));
+  stp.append(seedDec, seedInput, seedInc);
+  seedRow.append(stp, button('Randomise', () => randomSeed(), { icon: 'dice', kbd: 'R', cls: 'slim' }));
+  sSeed.append(seedRow);
+  const resetRow = el('div', 'actions');
+  resetRow.append(
+    button('Reset species', () => {
+      const seed = params.seed;
+      params = cloneParams(PRESETS.find((p) => p.name === params.name) ?? PRESETS[0]);
+      params.seed = seed;
+      rebuildPages();
+      scheduleGenerate(true);
+    }, { icon: 'reset', title: 'Restore the preset values of the current species' }),
+  );
+  sSeed.append(resetRow);
+  refreshers.push(() => {
+    seedInput.value = String(params.seed);
+  });
+
+  const cm = { format: (v: number) => (v * 100).toFixed(v < 0.1 ? 1 : 0), unit: 'cm' };
+  const mm = { format: (v: number) => (v * 1000).toFixed(v < 0.01 ? 1 : 0), unit: 'mm' };
+
+  const sPlan = section('Body plan', page, { hint: JUNGLE_HABIT_NAMES[g.habit].toLowerCase() });
+  select(
+    sPlan,
+    'Habit',
+    (Object.keys(JUNGLE_HABIT_NAMES) as JungleHabit[]).map((k) => ({ value: k, label: JUNGLE_HABIT_NAMES[k] })),
+    () => G().habit,
+    (v) => (G().habit = v),
+    rebuild,
+  );
+
+  const sTrunk = section(g.habit === 'banana' ? 'Pseudostem' : 'Trunk', page, { hint: `${g.trunkHeight.toFixed(1)} m` });
+  slider(sTrunk, 'Height', () => G().trunkHeight, (v) => (G().trunkHeight = v), { min: 0.02, max: 20, step: 0.05, unit: 'm' }, onChange);
+  slider(sTrunk, 'Radius', () => G().trunkRadius, (v) => (G().trunkRadius = v), { min: 0.02, max: 0.6, step: 0.005, ...cm }, onChange);
+  slider(sTrunk, 'Taper', () => G().trunkTaper, (v) => (G().trunkTaper = v), { min: 0, max: 0.85, step: 0.02, title: '0 = column · 1 = strong cone' }, onChange);
+  slider(sTrunk, 'Bulge', () => G().trunkBulge, (v) => (G().trunkBulge = v), { min: 0, max: 0.6, step: 0.02, title: 'Extra swell partway up the trunk (bottle palms), 0 = none' }, onChange);
+  if (g.trunkBulge > 0) slider(sTrunk, 'Bulge at', () => G().trunkBulgeAt, (v) => (G().trunkBulgeAt = v), { min: 0, max: 1, step: 0.02, title: 'Fraction of the trunk height' }, onChange);
+  slider(sTrunk, 'Lean', () => G().trunkLean, (v) => (G().trunkLean = v), { min: 0, max: 40, step: 1, unit: '\u00b0' }, onChange);
+  slider(sTrunk, 'Lean variation', () => G().trunkLeanV, (v) => (G().trunkLeanV = v), { min: 0, max: 20, step: 1, unit: '\u00b0' }, onChange);
+  slider(sTrunk, 'Curve', () => G().trunkCurve, (v) => (G().trunkCurve = v), { min: 0, max: 30, step: 1, unit: '\u00b0', title: 'S-bend along the trunk' }, onChange);
+  slider(sTrunk, 'Ring scars', () => G().ringScars, (v) => (G().ringScars = v), { min: 0, max: 0.3, step: 0.01, title: 'Leaf-scar / fibre ring groove amplitude, 0 = smooth' }, onChange);
+  if (g.ringScars > 0) slider(sTrunk, 'Ring spacing', () => G().ringSpacing, (v) => (G().ringSpacing = v), { min: 0.02, max: 0.4, step: 0.01, ...cm }, onChange);
+  slider(sTrunk, 'Sunk into soil', () => G().sink, (v) => (G().sink = v), { min: 0, max: 0.3, step: 0.005, ...cm }, onChange);
+
+  const sFrond = section(g.habit === 'palmate' ? 'Fronds' : g.habit === 'banana' ? 'Leaves' : 'Fronds', page, { hint: `${g.fronds}` });
+  slider(sFrond, g.habit === 'banana' ? 'Leaves' : 'Fronds', () => G().fronds, (v) => (G().fronds = Math.round(v)), { min: 1, max: 60, step: 1 }, onChange);
+  slider(sFrond, 'Attach from', () => G().frondFrom, (v) => (G().frondFrom = v), { min: 0, max: 0.97, step: 0.01, title: 'Bottom of the crown zone, as a fraction of the trunk height' }, onChange);
+  slider(sFrond, 'Attach to', () => G().frondTo, (v) => (G().frondTo = v), { min: 0.02, max: 0.995, step: 0.005, title: 'Top of the crown zone, as a fraction of the trunk height' }, onChange);
+  slider(sFrond, 'Length', () => G().frondLength, (v) => (G().frondLength = v), { min: 0.05, max: 6, step: 0.02, unit: 'm' }, onChange);
+  slider(sFrond, 'Length variation', () => G().frondLengthV, (v) => (G().frondLengthV = v), { min: 0, max: 0.5, step: 0.01, unit: '\u00b1' }, onChange);
+  slider(sFrond, 'Outward reach', () => G().frondReach, (v) => (G().frondReach = v), { min: 0, max: 0.92, step: 0.02, title: 'Fraction that stays straight before drooping under its own weight' }, onChange);
+  if (g.habit !== 'palmate') {
+    slider(sFrond, 'Droop', () => G().frondDroop, (v) => (G().frondDroop = v), { min: 0, max: 89, step: 1, unit: '\u00b0' }, onChange);
+    slider(sFrond, 'Droop variation', () => G().frondDroopV, (v) => (G().frondDroopV = v), { min: 0, max: 30, step: 1, unit: '\u00b0' }, onChange);
+  }
+  slider(sFrond, 'Emergence angle', () => G().frondLean, (v) => (G().frondLean = v), { min: 0, max: 89, step: 1, unit: '\u00b0', title: 'Angle from the trunk axis; 0 = straight up' }, onChange);
+  slider(sFrond, g.habit === 'palmate' ? 'Petiole radius' : 'Rachis radius', () => G().frondRadius, (v) => (G().frondRadius = v), { min: 0.002, max: 0.08, step: 0.001, ...mm }, onChange);
+  stepper(sFrond, 'Rib sides', () => G().frondRibs, (v) => (G().frondRibs = v), { min: 4, max: 16, step: 2, integer: true }, onChange);
+
+  if (g.habit === 'pinnate' || g.habit === 'fern') {
+    const sLeaflet = section('Leaflets', page, { hint: `${g.leaflets}` });
+    slider(sLeaflet, 'Leaflets', () => G().leaflets, (v) => (G().leaflets = Math.round(v)), { min: 4, max: 200, step: 2, title: 'Total leaflets, both sides of the rachis combined' }, onChange);
+    slider(sLeaflet, 'Length', () => G().leafletLength, (v) => (G().leafletLength = v), { min: 0.01, max: 1.2, step: 0.01, ...cm }, onChange);
+    slider(sLeaflet, 'Length variation', () => G().leafletLengthV, (v) => (G().leafletLengthV = v), { min: 0, max: 0.5, step: 0.02, unit: '\u00b1' }, onChange);
+    slider(sLeaflet, 'Width', () => G().leafletWidth, (v) => (G().leafletWidth = v), { min: 0.002, max: 0.1, step: 0.001, ...mm }, onChange);
+    slider(sLeaflet, 'Droop', () => G().leafletCurve, (v) => (G().leafletCurve = v), { min: 0, max: 60, step: 1, unit: '\u00b0', title: 'Droop of an individual leaflet from the rachis plane' }, onChange);
+    slider(sLeaflet, 'Splay angle', () => G().leafletAngle, (v) => (G().leafletAngle = v), { min: 10, max: 170, step: 1, unit: '\u00b0', title: 'Angle of a leaflet pair from the rachis' }, onChange);
+    slider(sLeaflet, 'Serration', () => G().leafletTeeth, (v) => (G().leafletTeeth = v), { min: 0, max: 1, step: 0.02, title: 'Marginal tooth amplitude (ferns), 0 = smooth' }, onChange);
+  }
+
+  if (g.habit === 'palmate') {
+    const sSeg = section('Fan segments', page, { hint: `${g.segments}` });
+    slider(sSeg, 'Segments', () => G().segments, (v) => (G().segments = Math.round(v)), { min: 4, max: 100, step: 2 }, onChange);
+    slider(sSeg, 'Droop', () => G().segmentDroop, (v) => (G().segmentDroop = v), { min: 0, max: 89, step: 1, unit: '\u00b0', title: 'Droop of each segment\'s outer third, past its hinge' }, onChange);
+    slider(sSeg, 'Fan spread', () => G().segmentSpread, (v) => (G().segmentSpread = v), { min: 30, max: 340, step: 5, unit: '\u00b0', title: 'Angular spread of the whole fan' }, onChange);
+    slider(sSeg, 'Segment width', () => G().leafletWidth, (v) => (G().leafletWidth = v), { min: 0.002, max: 0.1, step: 0.001, ...mm }, onChange);
+  }
+
+  if (g.habit === 'banana') {
+    const sBlade = section('Blade', page, { hint: `${(g.bladeWidth * 100).toFixed(0)} cm wide` });
+    slider(sBlade, 'Width', () => G().bladeWidth, (v) => (G().bladeWidth = v), { min: 0.05, max: 1.2, step: 0.01, ...cm }, onChange);
+    slider(sBlade, 'Keel', () => G().bladeKeel, (v) => (G().bladeKeel = v), { min: 0, max: 1, step: 0.05, title: 'Midrib channel prominence (V-fold depth)' }, onChange);
+    slider(sBlade, 'Wind tearing', () => G().bladeTearing, (v) => (G().bladeTearing = v), { min: 0, max: 1, step: 0.02, title: 'Notches cut into the margin from the midrib, 0 = smooth' }, onChange);
+  }
+
+  const sFruit = section('Fruit', page, { hint: g.fruitCluster ? `${g.fruits}` : 'none' });
+  check(sFruit, 'Grow fruit cluster', () => G().fruitCluster, (v) => (G().fruitCluster = v), rebuild);
+  if (g.fruitCluster) {
+    slider(sFruit, 'Fruits', () => G().fruits, (v) => (G().fruits = Math.round(v)), { min: 1, max: 40, step: 1 }, onChange);
+    slider(sFruit, 'Fruit length', () => G().fruitLength, (v) => (G().fruitLength = v), { min: 0.01, max: 0.4, step: 0.002, ...cm }, onChange);
+    slider(sFruit, 'Fruit radius', () => G().fruitRadius, (v) => (G().fruitRadius = v), { min: 0.005, max: 0.15, step: 0.002, ...cm }, onChange);
+    slider(sFruit, 'Curve', () => G().fruitCurve, (v) => (G().fruitCurve = v), { min: 0, max: 90, step: 1, unit: '\u00b0' }, onChange);
+  }
+
+  const sFlower = section('Flower', page, { hint: g.flower ? 'growing' : 'none' });
+  check(sFlower, 'Grow flower', () => G().flower, (v) => (G().flower = v), rebuild);
+  if (g.flower) {
+    slider(sFlower, 'Length', () => G().flowerLength, (v) => (G().flowerLength = v), { min: 0.02, max: 0.6, step: 0.005, ...cm }, onChange);
+    slider(sFlower, 'Radius', () => G().flowerRadius, (v) => (G().flowerRadius = v), { min: 0.005, max: 0.2, step: 0.002, ...cm }, onChange);
+    check(sFlower, 'Hangs down', () => G().flowerHang, (v) => (G().flowerHang = v), onChange);
+  }
+
+  const sRes = section('Resolution', page, { collapsed: true });
+  stepper(sRes, 'Trunk sides', () => G().trunkSides, (v) => (G().trunkSides = v), { min: 8, max: 64, step: 2, integer: true }, onChange);
+  stepper(sRes, 'Trunk rings', () => G().trunkRings, (v) => (G().trunkRings = v), { min: 8, max: 96, integer: true }, onChange);
+  stepper(sRes, 'Leaflet sides', () => G().leafletSides, (v) => (G().leafletSides = v), { min: 4, max: 16, step: 2, integer: true }, onChange);
+  stepper(sRes, 'Leaflet rings', () => G().leafletRings, (v) => (G().leafletRings = v), { min: 3, max: 24, integer: true }, onChange);
+  stepper(sRes, 'Collar rings', () => G().collarRings, (v) => (G().collarRings = v), { min: 0, max: 3, integer: true, title: 'Intermediate loops between a window and the first ring of the organ' }, onChange);
+
+  page.append(
+    Object.assign(el('p', 'note'), {
+      textContent:
+        'A jungle plant is one closed quad surface, like the trees, grasses and desert plants. Every frond, leaflet, blade segment, fruit and flower leaves its parent through a window cut into the parent\'s ring grid and is welded to it with collar loops, so the wind deformation runs continuously from the soil to the tip of every leaflet.',
+    }),
+  );
+}
+
+
 // -----------------------------------------------------------------------------
 // Roots & site page
 // -----------------------------------------------------------------------------
@@ -1548,6 +1738,7 @@ function rebuildPages(): void {
   buildBotanyPage();
   buildGrassPage();
   buildDesertPage();
+  buildJunglePage();
   buildRootsPage();
   buildMeshPage();
   buildLibrary();
@@ -1612,6 +1803,7 @@ function slug(s: string): string {
 buildBotanyPage();
 buildGrassPage();
 buildDesertPage();
+buildJunglePage();
 buildRootsPage();
 buildMeshPage();
 buildViewPage();

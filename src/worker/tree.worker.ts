@@ -55,6 +55,8 @@ export interface GenerateResponse {
   grass: import('../plant/grassMesher').GrassStats | null;
   /** Desert mesher statistics (desert plants only). */
   desert: import('../plant/desertMesher').DesertStats | null;
+  /** Jungle mesher statistics (palms, banana family, ferns only). */
+  jungle: import('../plant/jungleMesher').JungleStats | null;
   report: ReturnType<typeof generateTree>['report'];
   stats: ReturnType<typeof generateTree>['stats'];
   timings: ReturnType<typeof generateTree>['timings'];
@@ -109,6 +111,7 @@ ctx.onmessage = (ev: MessageEvent<WorkerRequest>) => {
         groundDepth: r.groundDepth,
         grass: r.grass ?? null,
         desert: r.desert ?? null,
+        jungle: r.jungle ?? null,
         report: r.report,
         stats: r.stats,
         timings: r.timings,
