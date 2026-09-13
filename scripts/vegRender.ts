@@ -1,10 +1,11 @@
 /**
  * Headless shape preview for garden vegetables: builds each preset with the
- * VegMesher and rasterises a flat-shaded orthographic side view with a tiny
+ * VegMesher and rasterises flat-shaded orthographic views with a tiny
  * software renderer (no browser / GL needed). Accent 0 = leaf/stem, accent 1
  * = skin (root/bulb body), accent 2 = flower, accent 3 = fruit.
  *
  * Usage: npx vite-node scripts/vegRender.ts [name-filter] [seed]
+ * Writes both a 3/4 side view (_s1.bmp) and a top-down view (_top.bmp).
  */
 // @ts-ignore - node:fs has no types in this repo by design; vite-node provides it at runtime.
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -12,8 +13,8 @@ import { VegMesher } from '../src/plant/vegMesher';
 import { VEG_PRESETS, DEFAULT_VEG } from '../src/plant/vegParams';
 import type { QuadMesh } from '../src/tree/mesh';
 
-const W = 420;
-const H = 560;
+const W = 480;
+const H = 620;
 
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '');
@@ -190,8 +191,10 @@ for (const preset of VEG_PRESETS) {
     hexToRgb(g.flowerColor),
     hexToRgb(g.fruitColor),
   ];
-  const buf = render(built.mesh, Math.PI * 0.22, accentCols, 0.34);
-  const file = `renders/${preset.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_s${seed}.bmp`;
-  writeFileSync(file, buf);
-  console.log(`${preset.name}: ${file} (${Date.now() - t0} ms) verts=${built.mesh.vertexCount} manifold-report-skipped`);
+  const slug = preset.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+  const buf34 = render(built.mesh, Math.PI * 0.22, accentCols, 0.34);
+  writeFileSync(`renders/${slug}_s${seed}.bmp`, buf34);
+  const bufTop = render(built.mesh, Math.PI * 0.15, accentCols, 1.5);
+  writeFileSync(`renders/${slug}_top.bmp`, bufTop);
+  console.log(`${preset.name}: (${Date.now() - t0} ms) verts=${built.mesh.vertexCount} dropped=${built.stats.dropped}`);
 }

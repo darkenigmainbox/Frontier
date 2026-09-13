@@ -1497,8 +1497,11 @@ function buildVegPage(): void {
   slider(sCrown, 'Keel', () => G().leafKeel, (v) => (G().leafKeel = v), { min: 0, max: 1, step: 0.05, title: 'V-fold along the midrib' }, onChange);
   slider(sCrown, 'Ruffle', () => G().leafRuffle, (v) => (G().leafRuffle = v), { min: 0, max: 0.5, step: 0.01, title: 'Wavy / crinkled margin amplitude, 0 = smooth' }, onChange);
   if (g.leafRuffle > 0) slider(sCrown, 'Ruffle period', () => G().leafRufflePeriod, (v) => (G().leafRufflePeriod = Math.round(v)), { min: 2, max: 16, step: 1, title: 'Waves per leaf edge' }, onChange);
-  slider(sCrown, 'Lobe', () => G().leafLobe, (v) => (G().leafLobe = v), { min: 0, max: 1, step: 0.02, title: 'Lobe / serration depth for compound-looking leaves, 0 = smooth margin' }, onChange);
-  if (g.leafLobe > 0) slider(sCrown, 'Lobes per side', () => G().leafLobes, (v) => (G().leafLobes = Math.round(v)), { min: 1, max: 12, step: 1 }, onChange);
+  slider(sCrown, 'Tip roundness', () => G().leafTipRound, (v) => (G().leafTipRound = v), { min: 0, max: 1, step: 0.02, title: '0 = pointed tip · 1 = blunt, head-forming tip (cabbage / lettuce)' }, onChange);
+  slider(sCrown, 'Compound', () => G().leafCompound, (v) => (G().leafCompound = v), { min: 0, max: 1, step: 1, title: 'Above 0.5: a true compound leaf with a petiole and separate leaflets (carrot / radish / tomato), instead of one single blade' }, onChange);
+  slider(sCrown, 'Lobe', () => G().leafLobe, (v) => (G().leafLobe = v), { min: 0, max: 1, step: 0.02, title: g.leafCompound > 0.5 ? 'Leaflet finery: 0 = few broad leaflets · 1 = many fine leaflets (carrot-like)' : 'Lobe / serration depth for compound-looking leaves, 0 = smooth margin' }, onChange);
+  if (g.leafCompound > 0.5) slider(sCrown, 'Leaflet pairs', () => G().leafLobes, (v) => (G().leafLobes = Math.round(v)), { min: 1, max: 6, step: 1, title: 'Pairs of leaflets along the petiole, plus one terminal leaflet' }, onChange);
+  else if (g.leafLobe > 0) slider(sCrown, 'Lobes per side', () => G().leafLobes, (v) => (G().leafLobes = Math.round(v)), { min: 1, max: 12, step: 1 }, onChange);
   slider(sCrown, 'Hollow', () => G().leafHollow, (v) => (G().leafHollow = v), { min: 0, max: 1, step: 0.05, title: '0 = flat blade · 1 = round hollow tube (onion / scallion leaves)' }, onChange);
   slider(sCrown, 'Spread', () => G().leafSpread, (v) => (G().leafSpread = v), { min: 0, max: 90, step: 1, unit: '\u00b0', title: 'Lean of the leaves from the vertical' }, onChange);
 

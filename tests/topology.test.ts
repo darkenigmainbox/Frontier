@@ -44,7 +44,7 @@ function buildVegetable(preset: { veg: Partial<(typeof VEG_PRESETS)[number]['veg
 // A handful of decorative root hairs can legitimately be dropped when their
 // tiny windows don't line up on the crown grid; it's cosmetic and doesn't
 // affect manifoldness. Everything else must weld cleanly.
-const VEG_DROP_TOLERANCE: Record<string, number> = { Onion: 1, 'Chilli Pepper': 2 };
+const VEG_DROP_TOLERANCE: Record<string, number> = { Onion: 1 };
 
 // Each test is a long, fully synchronous mesh build. Between tests vitest only
 // yields microtasks, so the worker never gets to drain its message port; once a

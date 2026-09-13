@@ -105,6 +105,8 @@ interface CrownWindow {
   make: (exit: Exit) => Organ;
 }
 
+const VEG_DEBUG = false;
+
 /** (rows, columns) offsets tried when a window does not fit where the child wants it, cheapest first. */
 const OFFSETS: [number, number][] = [
   [0, 0], [0, 1], [0, -1], [1, 0], [-1, 0],
@@ -150,11 +152,16 @@ export class VegMesher {
         // ground — this is the partial-exposure behaviour the carrot/
         // beetroot/onion presets rely on.
         const lift = Math.max(0, this.g.neckLength) + Math.max(0.02, this.g.bodyLength) * clamp(this.g.exposure, 0, 1);
-        this.meshRosetteCrown({ w: 2, h: 3, lift, make: (exit) => this.makeRootBody(exit) });
+        // The crown disc is the shoulder of the taproot/bulb itself, so it
+        // shares the skin colour (accent 1), not the leaf colour.
+        this.meshRosetteCrown({ w: 2, h: 3, lift, accent: 1, make: (exit) => this.makeRootBody(exit) });
         break;
       }
       case 'leafy':
-        this.meshRosetteCrown({ w: 2, h: 2, lift: 0, make: (exit) => this.makeLeafyStub(exit) });
+        // The crown disc here is just bare ground-level stem tissue between
+        // the leaf bases, so it shares the leaf/stem colour (accent 0) — using
+        // the (usually unset, orange) skin colour here was a visible bug.
+        this.meshRosetteCrown({ w: 2, h: 2, lift: 0, accent: 0, make: (exit) => this.makeLeafyStub(exit) });
         break;
       case 'vine':
         this.meshRoot(this.makeVineStem());
@@ -180,7 +187,7 @@ export class VegMesher {
    * leafy habit). Leaves and the centre organ share the exact same welded
    * grid, so packing is identical (and identically reliable) for both.
    */
-  private meshRosetteCrown(centre: { w: number; h: number; lift: number; make: (exit: Exit) => Organ }): void {
+  private meshRosetteCrown(centre: { w: number; h: number; lift: number; accent: number; make: (exit: Exit) => Organ }): void {
     const g = this.g;
     const mesh = this.mesh;
     const R = Math.max(0.012, g.crownRadius);
@@ -289,11 +296,12 @@ export class VegMesher {
     const vid = new Int32Array((K + 1) * (K + 1)).fill(-1);
     const still: VertexWind = { height: 0, limb: 0, phase: 0, detail: 0 };
     const origin = { x: 0, y: 0, z: 0 };
+    const crownAccent = centre.accent;
     for (let a = 0; a <= K; a++) {
       for (let b = 0; b <= K; b++) {
         if (interior(a, b)) continue;
         const p = domePoint(a / K, b / K);
-        vid[a * (K + 1) + b] = mesh.addVertex(p.x, p.y, p.z, still, origin, 0, 0, 1);
+        vid[a * (K + 1) + b] = mesh.addVertex(p.x, p.y, p.z, still, origin, 0, 0, crownAccent);
       }
     }
     const V = (a: number, b: number): number => vid[a * (K + 1) + b];
@@ -313,7 +321,7 @@ export class VegMesher {
     for (let a = K; a > 0; a--) rim.push(V(a, 0));
     for (let b = 0; b < K; b++) rim.push(V(0, b));
     const below: number[] = [];
-    for (const v of rim) below.push(mesh.addVertex(mesh.positions[v * 3] * 0.8, -sink - depth, mesh.positions[v * 3 + 2] * 0.8, still, origin, 0, 0, 1));
+    for (const v of rim) below.push(mesh.addVertex(mesh.positions[v * 3] * 0.8, -sink - depth, mesh.positions[v * 3 + 2] * 0.8, still, origin, 0, 0, crownAccent));
     const M = rim.length;
     for (let j = 0; j < M; j++) {
       const j1 = (j + 1) % M;
@@ -571,22 +579,31 @@ export class VegMesher {
     }
     // Flower/fruit truss: each family sits on its own ring (one row, many
     // azimuths) so up to `branchN` items per family fit side by side without
-    // fighting each other for space along the branch length.
-    const trussHi = branchLen - 1.7 * 0.009;
+    // fighting each other for space along the branch length. The two rings
+    // are given their own row (separated along `s` by at least both half-
+    // heights, with margin) so they never need to share window budget —
+    // each family's window width can be sized purely off its own count and
+    // off the branch's own resolution, which is what actually controls how
+    // round the flower/fruit sphere reads.
+    const flowerHH = 0.006;
+    const fruitHH = 0.009;
+    const trussHi = branchLen - 1.7 * fruitHH;
     const trussLo = Math.max(leafZoneEnd + 0.01, branchLen * 0.6);
-    const sFlowers = clamp(trussHi, trussLo, trussHi);
-    const sFruit = clamp(trussHi - (nfl > 0 ? 0.35 * (trussHi - trussLo) : 0), trussLo, trussHi);
+    const sFruit = clamp(trussHi, trussLo, trussHi);
+    const sFlowers = clamp(sFruit - (nfr > 0 ? 1.6 * (fruitHH + flowerHH) : 0), trussLo, trussHi);
+    const flowerW = Math.max(1, Math.min(4, Math.floor(branchN / 2) - 1, Math.floor(branchN / Math.max(1, nfl)) - 1));
     for (let k = 0; k < nfl; k++) {
       const az = ((k + 0.5) / Math.max(1, nfl)) * TAU + this.fruitRng.next() * 0.15;
       children.push({
-        s: sFlowers, az, w: 1, h: 1, hh: 0.006, pri: 2, j0: 0, row0: 0, row1: 0,
+        s: sFlowers, az, w: flowerW, h: flowerW, hh: flowerHH, pri: 2, j0: 0, row0: 0, row1: 0,
         make: (ex) => this.makeFlower(ex),
       });
     }
+    const fruitW = Math.max(1, Math.min(4, Math.floor(branchN / 2) - 1, Math.floor(branchN / Math.max(1, nfr)) - 1));
     for (let k = 0; k < nfr; k++) {
       const az = ((k + 0.5) / Math.max(1, nfr)) * TAU + Math.PI / Math.max(1, nfr) + this.fruitRng.next() * 0.15;
       children.push({
-        s: sFruit, az, w: 1, h: 1, hh: 0.009, pri: 2, j0: 0, row0: 0, row1: 0,
+        s: sFruit, az, w: fruitW, h: fruitW, hh: fruitHH, pri: 2, j0: 0, row0: 0, row1: 0,
         make: (ex) => this.makeVegFruit(ex),
       });
     }
@@ -672,6 +689,8 @@ export class VegMesher {
 
   private makeLeaf(exit: Exit, o: { az: number; lean: number; length: number; width: number; phase: number }): Organ {
     const g = this.g;
+    const compound = clamp(g.leafCompound, 0, 1);
+    if (compound > 0.5) return this.makeCompoundLeaf(exit, o);
     this.stats.leaves++;
     const L = o.length;
     const A = { x: Math.cos(o.az), y: 0, z: Math.sin(o.az) };
@@ -684,34 +703,50 @@ export class VegMesher {
     }));
     const keel = clamp(g.leafKeel, 0, 1);
     const hollow = clamp(g.leafHollow, 0, 1);
-    const lobe = clamp(g.leafLobe, 0, 1);
-    const nLobes = Math.max(1, Math.round(g.leafLobes));
+    const tooth = clamp(g.leafLobe, 0, 1);
+    const nTeeth = Math.max(1, Math.round(g.leafLobes));
     const ruffle = clamp(g.leafRuffle, 0, 1);
     const rufflePeriod = Math.max(1, g.leafRufflePeriod);
+    const tipRound = clamp(g.leafTipRound, 0, 1);
     const sStart = Math.min(0.3 * L, Math.max(1.4 * o.width * 0.3, 1.0 * exit.size, 0.0012));
     const N = exit.N;
     const m = N / 2;
+    // A simple ovate blade: rises from the petiole to full width around a
+    // third of the way up, then tapers to the tip. The taper is a
+    // superellipse, not a plain cone: at tipRound=0 the exponent is close to
+    // 1 (a gradual, gently concave taper to a sharp point — mustard/carrot-
+    // top style); as tipRound rises towards 1 the exponent grows, which
+    // keeps the blade near full width almost all the way to the end and
+    // only rounds off in the last stretch (cabbage/lettuce head leaves).
+    // (A plain `max(floor*(1-t), belly)` blend was tried first, but both
+    // terms decay to exactly 0 at t=1 at the same rate, so the "floor"
+    // could never actually win — the tip stayed sharp regardless of
+    // leafTipRound. This shape genuinely changes the tip silhouette.)
+    const peakT = 0.3;
+    const tipN = lerp1(1.25, 3.4, tipRound);
     const widthAt = (s: number): number => {
       const t = clamp(s / L, 0, 1);
-      // Broad leaves (low lobe) keep their belly width until close to the
-      // tip, like cabbage / kale / lettuce; deeply lobed leaves (carrot,
-      // tomato) narrow earlier so the compound-leaf silhouette still reads.
-      const onset = lerp1(0.68, 0.5, lobe);
-      const pw = lerp1(1.7, 1.2, lobe);
-      return o.width * (0.35 + 0.65 * sstep(0, 0.2, t)) * (1 - Math.pow(sstep(onset, 1, t), pw) * 0.92);
+      let shape: number;
+      if (t <= peakT) {
+        shape = Math.sin((Math.PI / 2) * (t / peakT));
+      } else {
+        const v = clamp((t - peakT) / (1 - peakT), 0, 1);
+        shape = Math.pow(Math.max(0, 1 - Math.pow(v, tipN)), 1 / tipN);
+      }
+      return o.width * shape;
     };
     const thickAt = (s: number): number => {
       const t = clamp(s / L, 0, 1);
       return g.leafThick * (0.5 + 0.5 * sstep(0, 0.2, t)) * (1 - sstep(0.4, 1, t) * 0.85);
     };
-    const lobeAt = (s: number, u: number): number => {
-      if (lobe <= 0.02) return 0;
+    // Gentle scalloped/serrated margin (kale, radish, cabbage outer leaves):
+    // small smooth waves along the edge, not deep triangular teeth.
+    const toothAt = (s: number, u: number): number => {
+      if (tooth <= 0.02) return 0;
       const t = s / L;
-      if (t < 0.08 || t > 0.94) return 0;
-      const ph = ((t - 0.08) / 0.86) * nLobes;
-      const tri = 1 - Math.abs((ph - Math.floor(ph)) * 2 - 1);
-      const env = sstep(0.08, 0.16, t) * (1 - sstep(0.82, 0.94, t));
-      return lobe * Math.pow(Math.max(0, tri), 0.6) * env * (0.6 + 0.4 * Math.abs(u));
+      const env = sstep(0.1, 0.22, t) * (1 - sstep(0.85, 0.97, t));
+      const wave = 0.5 + 0.5 * Math.sin((t * nTeeth + Math.abs(u) * 0.5) * TAU);
+      return tooth * 0.16 * env * wave;
     };
     const ruffleAt = (s: number, u: number): number => {
       if (ruffle <= 0.01) return 0;
@@ -720,24 +755,19 @@ export class VegMesher {
       return ruffle * Math.sin(u * Math.PI * rufflePeriod + t * 3) * env * widthAt(s) * 0.4;
     };
     const profile = (s: number, j: number, n: number): { x: number; y: number } => {
-      const q = bladePoint(n, j, widthAt(s), thickAt(s), keel, hollow);
+      const w = widthAt(s);
+      const q = bladePoint(n, j, w, thickAt(s), keel, hollow);
       let u = 0;
       if (j <= m) u = 1 - (2 * j) / m;
       else u = -1 + (2 * (j - m)) / m;
-      const lobeAmt = lobeAt(s, u);
       const ruffleAmt = ruffleAt(s, u);
-      if (Math.abs(lobeAmt) > 1e-5 && Math.abs(u) > 0.85) {
-        return { x: q.x - Math.sign(u) * lobeAmt * widthAt(s), y: q.y + ruffleAmt };
+      if (Math.abs(u) > 0.85) {
+        const toothAmt = toothAt(s, u) * w;
+        return { x: q.x + Math.sign(u) * toothAmt, y: q.y + ruffleAmt };
       }
       return { x: q.x, y: q.y + ruffleAmt };
     };
     const extra: number[] = [L - 0.001];
-    if (lobe > 0.02) {
-      for (let k = 0; k <= nLobes; k++) {
-        const t = 0.08 + (0.86 * k) / nLobes;
-        extra.push(t * L);
-      }
-    }
     const pivot = exit.pos;
     return {
       level: 1, line, sStart, profile,
@@ -749,6 +779,156 @@ export class VegMesher {
         height: clamp(y / this.plantH, 0, 1),
         limb: clamp(0.1 * (s / L), 0, 1), phase: o.phase,
         detail: clamp((s / L - 0.6) / 0.4, 0, 1) * 0.08,
+      }),
+      pivot, r0: o.width * 0.3,
+    };
+  }
+
+  /**
+   * A true compound leaf: a thin petiole (rachis) growing out to the tip,
+   * carrying small stalked leaflet blades in opposite pairs along its length
+   * plus one terminal leaflet — the real structure of a carrot top, radish
+   * leaf or tomato leaf, instead of faking serration on a single blade
+   * (which reads as jagged shark-teeth, not foliage).
+   */
+  private makeCompoundLeaf(exit: Exit, o: { az: number; lean: number; length: number; width: number; phase: number }): Organ {
+    const g = this.g;
+    this.stats.leaves++;
+    const L = o.length;
+    const A = { x: Math.cos(o.az), y: 0, z: Math.sin(o.az) };
+    const dir0 = normalize(add(scale(UP, Math.cos(o.lean)), scale(A, Math.sin(o.lean))));
+    const right0 = normalize(cross(UP, A));
+    const droop = (g.leafCurve + 10 * this.leafRng.uniform()) * DEG2RAD;
+    const steps = Math.max(10, Math.round(g.leafRings));
+    const line = growLine(exit.pos, dir0, right0, L, steps, (t0, t1) => ({
+      gravity: droop * (Math.pow(t1, 1.5) - Math.pow(t0, 1.5)),
+    }));
+    const rachisR = Math.max(0.0008, o.width * 0.1);
+    // Cap the leaflet-pair count: this is a small procedural leaf, not a
+    // botanical illustration — 3-6 pairs reads as a compound leaf without
+    // spamming hundreds of extra welded organs (and window conflicts) per
+    // plant that has a dozen of these leaves.
+    const pairs = clamp(Math.round(g.leafLobes), 1, 6);
+    const finery = clamp(g.leafLobe, 0, 1); // 0 = few broad leaflets, 1 = many fine ones (carrot-like)
+    const leafletLen = o.width * lerp1(2.4, 1.3, finery);
+    const zoneLo = 0.14;
+    const zoneHi = 0.82; // pairs occupy this middle stretch of the rachis
+    // Windows on the rachis are strung out along its length: the half-height
+    // (`hh`) of each one must fit inside the slot it is given, or adjacent
+    // ones collide and get dropped as a "window conflict". Crucially, `hh`
+    // is the size of the *hole in the rachis surface*, not the length of the
+    // (much longer) blade that grows out of it — the same principle
+    // makeBranch already follows for its own leaves (`hh: spacing*0.3`).
+    // Deriving it from `leafletLen`/`termLen` instead made the windows many
+    // times larger than the rachis, which is what produced the conflicts.
+    const slot = ((zoneHi - zoneLo) * L) / Math.max(1, pairs);
+    const hhPair = clamp(slot * 0.28, 0.0018, 0.05 * L);
+    const termHH = clamp(hhPair * 1.25, 0.0018, 0.05 * L);
+    const sTerm = Math.min(L - 0.62 * termHH, (zoneHi + 0.5 * (1 - zoneHi)) * L);
+    const termLen = Math.max(0.008, leafletLen * lerp1(1.3, 0.9, finery));
+    const termWidth = Math.max(0.004, o.width * lerp1(0.7, 0.4, finery));
+    const children: Attachment[] = [];
+    for (let k = 0; k < pairs; k++) {
+      const t = pairs > 1 ? zoneLo + (k / (pairs - 1)) * (zoneHi - zoneLo) : 0.5 * (zoneLo + zoneHi);
+      const s = t * L;
+      const shrink = 0.6 + 0.4 * Math.sin(Math.PI * clamp((t - zoneLo) / (zoneHi - zoneLo), 0, 1));
+      const len = Math.max(0.006, leafletLen * shrink * (1 + 0.1 * this.leafRng.uniform()));
+      const width = Math.max(0.003, o.width * lerp1(0.6, 0.3, finery) * shrink);
+      // Two leaflets, one each side of the rachis, at the same station (a
+      // half-turn apart in azimuth) so opposite pinnation never fights for
+      // the same window row.
+      for (const side of [-1, 1]) {
+        children.push({
+          s, az: side > 0 ? 0 : Math.PI, w: 1, h: 1, hh: hhPair, pri: 1,
+          j0: 0, row0: 0, row1: 0,
+          make: (ex) => this.makeLeaflet(ex, { len, width, phase: this.leafRng.next(), tip: false }),
+        });
+      }
+    }
+    // Terminal leaflet at the very tip of the rachis, usually a little larger.
+    children.push({
+      s: sTerm, az: 0, w: 1, h: 1, hh: termHH, pri: 3,
+      j0: 0, row0: 0, row1: 0,
+      make: (ex) => this.makeLeaflet(ex, { len: termLen, width: termWidth, phase: this.leafRng.next(), tip: true }),
+    });
+    const pivot = exit.pos;
+    return {
+      level: 1, line, sStart: Math.max(1.0 * exit.size, 0.0012),
+      profile: (s, j, n) => {
+        const t = clamp(s / L, 0, 1);
+        const r = rachisR * (1 - 0.6 * t);
+        const th = (TAU * j) / n;
+        return { x: r * Math.cos(th), y: r * Math.sin(th) };
+      },
+      radius: (s) => rachisR * (1 - 0.6 * clamp(s / L, 0, 1)),
+      round: true,
+      extra: [Math.max(1e-4, L - 3.2 * termHH)],
+      spacing: Math.max(1e-4, L / Math.max(8, Math.round(g.leafRings))),
+      children,
+      wind: (s, y) => ({
+        height: clamp(y / this.plantH, 0, 1),
+        limb: clamp(0.15 * (s / L), 0, 1), phase: o.phase,
+        detail: clamp((s / L - 0.5) / 0.5, 0, 1) * 0.1,
+      }),
+      pivot, r0: rachisR,
+    };
+  }
+
+  /** A single small leaflet blade of a compound leaf: a plain ovate shape
+   *  with a gently toothed margin, no lobing hacks. */
+  private makeLeaflet(exit: Exit, o: { len: number; width: number; phase: number; tip: boolean }): Organ {
+    const g = this.g;
+    const L = o.len;
+    const tilt = o.tip ? 8 * DEG2RAD : 35 * DEG2RAD;
+    const dir0 = normalize(add(scale(exit.normal, Math.cos(tilt)), scale(exit.dir, Math.sin(tilt) * (o.tip ? 1 : 0.3))));
+    let right0 = cross(exit.dir, exit.normal);
+    right0 = lengthSq(right0) < 1e-10 ? { x: 1, y: 0, z: 0 } : normalize(right0);
+    const droop = (18 + 8 * this.leafRng.uniform()) * DEG2RAD;
+    const steps = Math.max(4, Math.round(g.leafRings * 0.4));
+    const line = growLine(exit.pos, dir0, right0, L, steps, (t0, t1) => ({
+      gravity: droop * (Math.pow(t1, 1.5) - Math.pow(t0, 1.5)),
+    }));
+    const tooth = clamp(g.leafLobe, 0, 1);
+    const N = exit.N;
+    const m = N / 2;
+    const widthAt = (s: number): number => {
+      const t = clamp(s / L, 0, 1);
+      const belly = Math.sin(Math.PI * Math.pow(t, 0.6));
+      return o.width * belly * (0.55 + 0.45 * sstep(0, 0.15, t));
+    };
+    const thickAt = (s: number): number => {
+      const t = clamp(s / L, 0, 1);
+      return g.leafThick * 0.7 * (0.5 + 0.5 * sstep(0, 0.2, t)) * (1 - sstep(0.4, 1, t) * 0.85);
+    };
+    const toothAt = (s: number, u: number): number => {
+      if (tooth <= 0.02) return 0;
+      const t = s / L;
+      const env = sstep(0.15, 0.3, t) * (1 - sstep(0.8, 0.95, t));
+      const wave = 0.5 + 0.5 * Math.sin((t * 5 + Math.abs(u) * 0.5) * TAU);
+      return tooth * 0.14 * env * wave;
+    };
+    const profile = (s: number, j: number, n: number): { x: number; y: number } => {
+      const w = widthAt(s);
+      const q = bladePoint(n, j, w, thickAt(s), 0.12, 0);
+      let u = 0;
+      if (j <= m) u = 1 - (2 * j) / m;
+      else u = -1 + (2 * (j - m)) / m;
+      if (Math.abs(u) > 0.85) {
+        return { x: q.x + Math.sign(u) * toothAt(s, u) * w, y: q.y };
+      }
+      return q;
+    };
+    const pivot = exit.pos;
+    return {
+      level: 1, line, sStart: Math.min(0.3 * L, Math.max(0.9 * exit.size, 0.0008)),
+      profile,
+      radius: (s) => 0.5 * widthAt(s),
+      round: false, extra: [L - 0.0006],
+      spacing: Math.max(1e-4, L / Math.max(4, Math.round(g.leafRings * 0.4))),
+      children: [],
+      wind: (s, y) => ({
+        height: clamp(y / this.plantH, 0, 1),
+        limb: 0.2, phase: o.phase, detail: 0,
       }),
       pivot, r0: o.width * 0.3,
     };
@@ -937,6 +1117,10 @@ export class VegMesher {
       c.az = (j0 + c.w / 2) * colStep;
       accepted.push(c);
       return;
+    }
+    if (VEG_DEBUG) {
+      // eslint-disable-next-line no-console
+      console.error('window conflict', { s: c.s, hh: c.hh, w: c.w, h: c.h, N, L, sStart: o.sStart, acceptedN: accepted.length, pri: c.pri, accepted: accepted.map(a => ({ s: a.s, hh: a.hh, j0: a.j0, w: a.w })) });
     }
     this.drop(L - o.sStart < 2.4 * c.hh ? 'organ too short' : 'window conflict');
   }
