@@ -805,14 +805,26 @@ export class VegMesher {
     }));
     const rachisR = Math.max(0.0008, o.width * 0.1);
     // Cap the leaflet-pair count: this is a small procedural leaf, not a
-    // botanical illustration — 3-6 pairs reads as a compound leaf without
+    // botanical illustration — 3-8 pairs reads as a compound leaf without
     // spamming hundreds of extra welded organs (and window conflicts) per
     // plant that has a dozen of these leaves.
-    const pairs = clamp(Math.round(g.leafLobes), 1, 6);
+    const pairs = clamp(Math.round(g.leafLobes), 1, 8);
     const finery = clamp(g.leafLobe, 0, 1); // 0 = few broad leaflets, 1 = many fine ones (carrot-like)
-    const leafletLen = o.width * lerp1(2.4, 1.3, finery);
     const zoneLo = 0.14;
     const zoneHi = 0.82; // pairs occupy this middle stretch of the rachis
+    // Leaflet length used to be derived purely from the leaf's overall
+    // width, with no relation at all to how far apart the leaflet pairs sit
+    // along the rachis. For a leaf like the carrot's (7 lobes over a 0.24m
+    // rachis, pairs only ~0.033m apart) that produced leaflets ~0.13m long —
+    // four times longer than their own spacing — so every leaflet buried
+    // its neighbours and the whole compound leaf fused into one solid,
+    // jagged-edged mass (reads as a spiky palm frond, not ferny foliage).
+    // Real pinnate leaflets overlap their neighbours only a little; bound
+    // the length by the pair spacing so they comb out distinctly instead.
+    const pairSpacing = pairs > 1 ? ((zoneHi - zoneLo) * L) / (pairs - 1) : (zoneHi - zoneLo) * L;
+    const leafletLenFree = o.width * lerp1(2.4, 1.3, finery);
+    const leafletLenCap = pairSpacing * lerp1(2.2, 1.5, finery);
+    const leafletLen = Math.min(leafletLenFree, leafletLenCap);
     // Windows on the rachis are strung out along its length: the half-height
     // (`hh`) of each one must fit inside the slot it is given, or adjacent
     // ones collide and get dropped as a "window conflict". Crucially, `hh`
@@ -826,14 +838,23 @@ export class VegMesher {
     const termHH = clamp(hhPair * 1.25, 0.0018, 0.05 * L);
     const sTerm = Math.min(L - 0.62 * termHH, (zoneHi + 0.5 * (1 - zoneHi)) * L);
     const termLen = Math.max(0.008, leafletLen * lerp1(1.3, 0.9, finery));
-    const termWidth = Math.max(0.004, o.width * lerp1(0.7, 0.4, finery));
+    const termAspect = lerp1(1.9, 1.4, finery);
+    const termWidth = Math.max(0.004, Math.min(o.width * 0.65, termLen / termAspect));
     const children: Attachment[] = [];
     for (let k = 0; k < pairs; k++) {
       const t = pairs > 1 ? zoneLo + (k / (pairs - 1)) * (zoneHi - zoneLo) : 0.5 * (zoneLo + zoneHi);
       const s = t * L;
       const shrink = 0.6 + 0.4 * Math.sin(Math.PI * clamp((t - zoneLo) / (zoneHi - zoneLo), 0, 1));
       const len = Math.max(0.006, leafletLen * shrink * (1 + 0.1 * this.leafRng.uniform()));
-      const width = Math.max(0.003, o.width * lerp1(0.6, 0.3, finery) * shrink);
+      // Width used to be sized purely off the parent leaf's overall width,
+      // completely independent of the (now spacing-limited) leaflet length —
+      // that locked every leaflet at roughly the same needle-thin ~4:1
+      // length:width ratio no matter how short clamping made it, which is
+      // why leaflets read as pine needles rather than little ovate blades.
+      // Deriving width as a fraction of this leaflet's own length keeps a
+      // believable ~1.6-2.2:1 ovate proportion at any size.
+      const aspect = lerp1(2.2, 1.6, finery); // len/width: broader leaflets at finery=0, finer at finery=1
+      const width = Math.max(0.0035, Math.min(o.width * 0.55, len / aspect));
       // Two leaflets, one each side of the rachis, at the same station (a
       // half-turn apart in azimuth) so opposite pinnation never fights for
       // the same window row.
