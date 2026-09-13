@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frontier — SDF Terrain Lab</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header id="topbar">
+  <div class="brand"><span class="logo">◈</span> FRONTIER <span class="sub">SDF terrain lab · 2 km test island</span></div>
+  <div class="tools">
+    <select id="quality" title="Volume resolution">
+      <option value="draft">Draft 160³</option>
+      <option value="standard" selected>Standard 256³</option>
+    </select>
+    <button id="generate" class="primary">⛰ Generate</button>
+    <button id="simtoggle">⏸ Pause sim</button>
+    <button id="resetero" title="Regenerate + restart all erosion">⟲ Reset erosion</button>
+    <button id="remesh">▦ Remesh</button>
+    <button id="painttoggle" title="Hold B or toggle, then drag on island. Alt+drag erases.">🖌 Paint (B)</button>
+    <select id="viewmode" title="Shade mode (mirrors Satmap node)">
+      <option value="0">Satmap</option>
+      <option value="1">AO</option>
+      <option value="2">Curvature</option>
+      <option value="3">Moisture</option>
+      <option value="4">Flow</option>
+      <option value="5">Sediment</option>
+      <option value="6">Erosion</option>
+      <option value="7">Strata</option>
+      <option value="8">Normals</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="seashow" checked> sea</label>
+    <label class="chk"><input type="checkbox" id="rainshow" checked> rain</label>
+    <button id="export">⇩ OBJ</button>
+  </div>
+</header>
+<main>
+  <section id="left">
+    <canvas id="view"></canvas>
+    <div id="hint">drag&nbsp;·&nbsp;orbit&nbsp;&nbsp;|&nbsp;&nbsp;wheel&nbsp;·&nbsp;zoom&nbsp;&nbsp;|&nbsp;&nbsp;right-drag&nbsp;·&nbsp;pan&nbsp;&nbsp;|&nbsp;&nbsp;<b>B</b>&nbsp;·&nbsp;paint rain&nbsp;&nbsp;|&nbsp;&nbsp;space&nbsp;·&nbsp;pause</div>
+    <div id="progress"><div class="box"><div id="progress-label">generating…</div><div class="track"><div id="progress-bar"></div></div></div></div>
+  </section>
+  <section id="right">
+    <div id="nodes-wrap"><canvas id="nodes"></canvas></div>
+    <div id="params"></div>
+  </section>
+</main>
+<footer>
+  <span id="status">booting…</span>
+  <span id="simstats"></span>
+</footer>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
