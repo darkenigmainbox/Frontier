@@ -38,6 +38,7 @@ Functions="$(sed -n '/^AtmosphereParameters CelestialAtmosphereOf/,/^}$/p;
                      /^vec3 CelestialFlareStreak/,/^}$/p;
                      /^vec3 CelestialFlareGhosts/,/^}$/p;
                      /^vec3 CelestialFlareStarburst/,/^}$/p;
+                     /^vec3 CelestialFlareHalo/,/^}$/p;
                      /^vec3 CelestialLensFlare/,/^}$/p;
                      /^vec3 CelestialMoonDisc/,/^}$/p;
                      /^vec3 CelestialSky/,/^}$/p' "$Viewport")"

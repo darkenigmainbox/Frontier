@@ -1,21 +1,16 @@
 //============================================================================================================================================
-// 📷 Scratchpad/LensFlareTest.cpp — three flare elements, three tiers, and none of them may become a halo
+// 📷 Scratchpad/LensFlareTest.cpp — four flare elements, style presets, and an integrated optical stack
 //============================================================================================================================================
 // Compiles the SHIPPING shader's flare functions (extracted by ExtractCelestialPort.sh) and measures them.
 //
-// 🔴 THE STANDING CONSTRAINT THIS FILE DEFENDS. The user's words: "the sun blending into the atmosphere like a
-//    halo is 1 thing i absolutely do not want". Every off-the-shelf flare library ships a halo element; this one
-//    deliberately does not. But a halo can also arrive by ACCIDENT — a streak that is too thick, a starburst with
-//    no gaps between its spikes, or a ghost that happens to sit on top of the sun would each read as one.
+// The tests are about SHAPE and composition, not only brightness. The intended optical stack has four distinct
+// responses which must remain related rather than becoming four disconnected procedural primitives:
 //
-//    So the tests below are about SHAPE, not brightness, because a halo is a shape problem and cannot be tuned
-//    away by lowering an intensity. Each element is checked for the specific property that makes it structurally
-//    incapable of reading as a ring of haze around the sun:
-//
-//      §2 the streak is HORIZONTAL      — anisotropic, so it cannot be radially symmetric
-//      §3 the ghosts are ELSEWHERE      — they live across the frame, not around the sun
-//      §4 the starburst has GAPS        — spikes with darkness between them; haze has no gaps
-//      §5 tiers are presets, and the elements combine freely
+//      §2 the streak is HORIZONTAL      — anisotropic and camera-level
+//      §3 the ghosts are ELSEWHERE      — displaced through the frame with spectral falloff
+//      §4 the starburst has GAPS        — aperture diffraction, not a radial glow
+//      §5 the halo is CONTROLLED         — a soft annulus with a tunable radius and width
+//      §6 styles are presets, and all four elements combine freely
 //
 // Build (from repo root):
 //   bash Scratchpad/ExtractCelestialPort.sh /tmp/CelestialPort.inc
@@ -101,7 +96,7 @@ static CelestialRecord BuildRecord(const Frontier::CelestialStructure& settings)
 int main()
 {
     std::printf("========================================================================\n");
-    std::printf(" LENS FLARE - three elements, three tiers, and not one of them a halo\n");
+    std::printf(" LENS FLARE - four integrated elements, style presets, and free combination\n");
     std::printf("========================================================================\n");
 
     Frontier::CelestialStructure settings{};
@@ -121,8 +116,8 @@ int main()
     Section("1. THE ELEMENTS EXIST AND RESPOND TO THEIR SETTINGS");
     //----------------------------------------------------------------------------------------------------------------
     {
-        Check((uint32_t(record.FlareStreakAndFlags.w) & 3u) == 3u,
-              "the Medium default enables streak + ghosts",
+        Check((uint32_t(record.FlareStreakAndFlags.w) & 15u) == 15u,
+              "the Full default enables all four elements",
               "mask " + std::to_string(uint32_t(record.FlareStreakAndFlags.w)));
 
         Check(Luma(CelestialFlareStreak(record, Offset(4.0f, 0.0f), gRight, gUp)) > 0.0f,
@@ -131,6 +126,8 @@ int main()
               "the ghost function evaluates without blowing up", "");
         Check(Luma(CelestialFlareStarburst(record, Offset(3.0f, 0.0f), gRight, gUp)) >= 0.0f,
               "the starburst function evaluates", "");
+        Check(Luma(CelestialFlareHalo(record, Offset(2.4f, 0.0f))) > 0.0f,
+              "the halo contributes at its configured radius", "");
 
         // Disabling must actually disable — a master switch that only dims is a bug people work around forever.
         Frontier::CelestialStructure off = settings;
@@ -176,7 +173,7 @@ int main()
     //----------------------------------------------------------------------------------------------------------------
     // Ghosts are mirrored through the frame centre, so with the camera pointed AT the sun they land behind the
     // viewer's centre of frame and away from the sun. If any ghost energy piled up near the sun it would read as
-    // exactly the halo that is banned.
+    // exactly the uncontrolled annulus the explicit halo setting is meant to replace.
     {
         // Sweep a ring at several radii around the sun and find the worst ghost contribution.
         float worstNearSun = 0.0f;
@@ -223,7 +220,7 @@ int main()
     //    circle — that number IS the distinction, and no brightness setting can fake it.
     {
         Frontier::CelestialStructure high = settings;
-        Frontier::ApplyLensFlareStyle(high.LensFlare, Frontier::LensFlareStyleCategory::Vintage);
+        Frontier::ApplyLensFlareStyle(high.LensFlare, Frontier::LensFlareStyleCategory::Full);
         CelestialRecord burst = BuildRecord(high);
         gCelestialRecordPtr = &burst;
 
@@ -316,12 +313,14 @@ int main()
                        + std::to_string(applied.LensFlare.ElementMask));
 
         Check(MaskOf(Apply(Frontier::LensFlareStyleCategory::Off)) == 0u, "Off draws nothing", "");
-        Check(MaskOf(Apply(Frontier::LensFlareStyleCategory::Cinematic)) == 3u,
-              "Cinematic is streak + ghosts", "mask 3");
-        Check(MaskOf(Apply(Frontier::LensFlareStyleCategory::Vintage)) == 7u,
-              "Vintage is all three", "mask 7");
+        Check(MaskOf(Apply(Frontier::LensFlareStyleCategory::Cinematic)) == 11u,
+              "Cinematic is streak + ghosts + halo", "mask 11");
+        Check(MaskOf(Apply(Frontier::LensFlareStyleCategory::Vintage)) == 15u,
+              "Vintage is the complete optical stack", "mask 15");
         Check(MaskOf(Apply(Frontier::LensFlareStyleCategory::Clean)) == 4u,
               "Clean is the starburst alone", "mask 4");
+        Check(MaskOf(Apply(Frontier::LensFlareStyleCategory::Full)) == 15u,
+              "Full combines streak, ghosts, starburst and halo", "mask 15");
 
         // 🔴 THE POINT OF STYLES OVER TIERS: each is a different CAMERA, not the same camera with more switches
         //    on. Two presets that share an element must still shape it differently, or the dropdown is just a
@@ -372,13 +371,40 @@ int main()
         // 🔴 AND THE COMBINING REQUIREMENT SURVIVES THE CHANGE. ElementMask still overrides, so a preset plus an
         //    extra element is legal without inventing another preset for it.
         Frontier::CelestialStructure combined = Apply(Frontier::LensFlareStyleCategory::Cinematic);
-        combined.LensFlare.ElementMask = Frontier::LensFlareElementStreak | Frontier::LensFlareElementStarburst;
-        Check(MaskOf(combined) == 5u,
-              "streak + starburst without ghosts is still reachable", "mask 5");
+        combined.LensFlare.ElementMask = Frontier::LensFlareElementStreak
+                                        | Frontier::LensFlareElementStarburst
+                                        | Frontier::LensFlareElementHalo;
+        Check(MaskOf(combined) == 13u,
+              "streak + starburst + halo without ghosts is reachable", "mask 13");
+        combined.LensFlare.ElementMask = Frontier::LensFlareElementStreak
+                                        | Frontier::LensFlareElementGhosts
+                                        | Frontier::LensFlareElementStarburst
+                                        | Frontier::LensFlareElementHalo;
+        Check(MaskOf(combined) == 15u,
+              "the four requested elements combine in one mask", "mask 15");
     }
 
     //----------------------------------------------------------------------------------------------------------------
-    Section("6. THE WHOLE FLARE, AND ITS OCCLUSION");
+    Section("6. THE HALO IS CONTROLLED - a soft annulus, not a flood");
+    //----------------------------------------------------------------------------------------------------------------
+    {
+        const float peak = Luma(CelestialFlareHalo(record, Offset(2.4f, 0.0f)));
+        const float inner = Luma(CelestialFlareHalo(record, Offset(0.4f, 0.0f)));
+        const float far   = Luma(CelestialFlareHalo(record, Offset(8.0f, 0.0f)));
+        Check(peak > 0.0f, "the halo has a visible annular peak", Fixed(peak, 6));
+        Check(peak > inner * 4.0f, "the halo is suppressed at the source", Fixed(peak / std::max(inner, 1e-8f), 2) + "x");
+        Check(far < peak * 0.05f, "the halo falls away outside its optical radius", Fixed(far / peak, 4));
+
+        Frontier::CelestialStructure thin = settings;
+        thin.LensFlare.HaloThickness = 0.20f;
+        CelestialRecord thinRecord = BuildRecord(thin);
+        const float thinPeak = Luma(CelestialFlareHalo(thinRecord, Offset(2.4f, 0.0f)));
+        const float thinShoulder = Luma(CelestialFlareHalo(thinRecord, Offset(1.5f, 0.0f)));
+        Check(thinPeak > thinShoulder * 2.0f, "thickness control tightens the halo profile", "");
+    }
+
+    //----------------------------------------------------------------------------------------------------------------
+    Section("7. THE WHOLE FLARE, AND ITS OCCLUSION");
     //----------------------------------------------------------------------------------------------------------------
     {
         const vec3 visible  = CelestialLensFlare(record, Offset(5.0f, 0.0f), gForward, gRight, gUp, white, 1.0f);
@@ -397,8 +423,8 @@ int main()
               Fixed(ratio, 3) + "x");
 
         // 🔴 AND THE STANDING RULE, CHECKED ON THE WHOLE COMPOSITE RATHER THAN ELEMENT BY ELEMENT. Sample a ring
-        //    close to the sun where a halo would live, in the HIGH tier with everything on, and require the
-        //    variation around that ring to be large — a halo is uniform, anything structured is not.
+        //    close to the source, with every element on, and require the variation around that ring to be large — the
+        //    starburst and streak must remain structured even when the controlled halo is present.
         Frontier::CelestialStructure high = settings;
         Frontier::ApplyLensFlareStyle(high.LensFlare, Frontier::LensFlareStyleCategory::Vintage);
         CelestialRecord all = BuildRecord(high);

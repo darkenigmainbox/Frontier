@@ -195,53 +195,44 @@ struct CelestialStars
 //    behave differently: the atmosphere's aureole grows as the air thickens, while a flare's ghosts move when the
 //    CAMERA turns even though the air has not changed at all.
 //
-//    ⚠️ THERE IS NO HALO ELEMENT HERE, DELIBERATELY. Every off-the-shelf flare library ships one — Chapman's
-//    article, Froyok's UE implementation, and the commercial packs all list "halo" among the standard features.
-//    It is explicitly unwanted here: a ring of light hugging the sun is indistinguishable from the atmosphere's
-//    own aureole, and stacking one on top of the other is exactly the "sun blending into the atmosphere like a
-//    halo" that this project rejected. The three tiers below reach for ghosts, streaks and a starburst — all of
-//    which sit AWAY from the sun or have hard radial structure, so none of them can be mistaken for haze.
+//    A halo is included as a controlled, soft optical ring. It is not the atmosphere's Mie aureole: its radius,
+//    thickness and intensity are camera settings, and the full stack can be combined deliberately rather than
+//    appearing accidentally from an oversized streak or a collapsed ghost chain.
 // 🔴 A DROPDOWN OF LOOKS, NOT A QUALITY LADDER — AND THE LADDER WAS DISHONEST.
 //
 //    This was originally Off/Low/Medium/High, which implied each step cost more. Measured, it does not: the
 //    starburst ("High") is a handful of trig ops with no loop, while the ghosts ("Medium") run a loop over
-//    every ghost. The starburst is the CHEAPER of the two. The tiers were really ranking how elaborate each
-//    element looks and calling it performance — a label that quietly misleads whoever tunes it later.
-//
-//    So the selector now picks a STYLE. Each preset is a complete camera character: which elements are present
-//    AND how they are shaped, because "which starburst you get" is part of a look rather than a separate hidden
-//    knob. Applying a style overwrites the individual settings; Custom leaves them exactly as they are.
+//    every ghost. The starburst is the CHEAPER of the two. The selector therefore picks a STYLE, while the element
+//    mask remains freely combinable. Applying a style overwrites the shaping; Custom leaves it alone.
 enum class LensFlareStyleCategory : uint32_t
 {
     Off       = 0u,   // no flare at all: the sun is its disc and its tight glare, nothing more
-    Cinematic = 1u,   // wide blue anamorphic streak + a few ghosts — the modern film-lens look
-    Vintage   = 2u,   // many warm ghosts, soft 6-point burst, weak streak — older uncoated glass
-    Clean     = 3u,   // a crisp 14-point starburst alone — a stopped-down modern prime, no ghosting
-    Custom    = 4u,   // touch nothing; whatever the settings below say is what you get
+    Cinematic = 1u,   // cool anamorphic streak + ghosts + a restrained halo
+    Vintage   = 2u,   // warm ghosts + soft burst + halo + weak streak
+    Clean     = 3u,   // a crisp 14-point starburst alone — a stopped-down modern prime
+    Full      = 4u,   // complete optical stack: streak + ghosts + starburst + halo
+    Custom    = 5u,   // touch nothing; whatever the settings below say is what you get
 };
 
-// The three elements as independent bits, so a tier is a PRESET rather than a straitjacket. `--flare-elements`
-//    can switch any of them on or off individually; the tier simply chooses a sensible default combination.
+// The four elements are independent bits, so a style is a preset rather than a straitjacket. `--flare-elements`
+//    can switch any combination on or off, including all four together.
 enum LensFlareElementBits : uint32_t
 {
     LensFlareElementStreak    = 1u << 0,   // anamorphic horizontal smear
     LensFlareElementGhosts    = 1u << 1,   // internal reflections, mirrored through the centre
     LensFlareElementStarburst = 1u << 2,   // aperture diffraction spikes
+    LensFlareElementHalo      = 1u << 3,   // controlled soft optical ring
 };
 
 struct CelestialLensFlare
 {
     bool                   Enabled = true;
-    LensFlareStyleCategory Style   = LensFlareStyleCategory::Cinematic;
+    LensFlareStyleCategory Style   = LensFlareStyleCategory::Full;
 
-    // ⚠️ THIS DEFAULT MUST MATCH THE DEFAULT STYLE ABOVE, AND IT DID NOT. A default-constructed struct never
-    //    calls ApplyLensFlareStyle, so a mask of 0 meant the settings claimed "Cinematic" while rendering
-    //    nothing at all — caught by the composite test measuring 0.00000 where it expected light. The two
-    //    defaults are one statement of intent and have to agree; the gate now asserts they do.
-    //
-    //    Any value here overrides the style, which is how the three elements still combine freely on top of a
-    //    preset — Cinematic plus a starburst, say, without inventing a fourth preset for it.
-    uint32_t ElementMask = LensFlareElementStreak | LensFlareElementGhosts;   // = Cinematic
+    // The default is a visible, complete camera stack so Project Zero demonstrates the feature without an extra
+    // command-line override. Custom settings can still replace the mask or any shaping below.
+    uint32_t ElementMask = LensFlareElementStreak | LensFlareElementGhosts
+                         | LensFlareElementStarburst | LensFlareElementHalo;   // = Full
 
     // 🔴 CALIBRATED AGAINST THE TONE MAP, NOT GUESSED. The flare lives in the brightest part of frame, where
     //    ACES is nearly flat — near the sun at 17:00 the sky already sits at 0.93 ACES, so lifting it takes far
@@ -257,7 +248,7 @@ struct CelestialLensFlare
 
     // ── Anamorphic streak ───────────────────────────────────────────────────────────────────────────────────
     //    The horizontal blue smear of a cinema lens. Cheapest element and the most recognisable, which is why
-    //    it is the one the Low tier keeps.
+    //    it is the one the Cinematic look emphasises.
     float StreakIntensity = 0.55f;   // [x]
     float StreakLength    = 14.0f;   // [deg] half-length along the horizontal
     float StreakThickness = 0.55f;   // [deg] vertical falloff
@@ -285,6 +276,15 @@ struct CelestialLensFlare
     float StarburstIntensity = 6.0f;   // [x]
     float StarburstLength    = 7.0f;   // [deg]
     float StarburstSharpness = 24.0f;  // [-]  higher = thinner, harder spikes
+
+    // ── Halo ─────────────────────────────────────────────────────────────────────────────────────────────────
+    //    A broad, low-energy annulus around the source. Radius and thickness are explicit so the halo remains a
+    //    camera artefact rather than becoming an accidental second atmospheric sun. The shader uses the sun's
+    //    spectral radiance as its base colour, keeping the four elements optically related.
+    float HaloIntensity = 0.18f;  // [x]
+    float HaloRadius    = 2.40f;  // [deg] centre of the annulus from the source
+    float HaloThickness = 0.65f;  // [deg] soft radial width
+    float HaloFalloff   = 2.00f;  // [-] broad-to-tight profile exponent
 
     // ⚠️ Occlusion. A flare is formed in the lens, so it must vanish when the sun goes behind something — but
     //    SOFTLY, because the sun has angular size and is progressively hidden. A hard on/off pops.
@@ -325,6 +325,10 @@ inline void ApplyLensFlareStyle(CelestialLensFlare& Flare, LensFlareStyleCategor
     Flare.StarburstIntensity= 6.0f;
     Flare.StarburstLength   = 7.0f;
     Flare.StarburstSharpness= 24.0f;
+    Flare.HaloIntensity     = 0.18f;
+    Flare.HaloRadius        = 2.40f;
+    Flare.HaloThickness     = 0.65f;
+    Flare.HaloFalloff       = 2.00f;
 
     switch (Style)
     {
@@ -333,9 +337,8 @@ inline void ApplyLensFlareStyle(CelestialLensFlare& Flare, LensFlareStyleCategor
             break;
 
         case LensFlareStyleCategory::Cinematic:
-            // Modern coated anamorphic: a long, cool, hard-edged streak and a restrained ghost chain. No
-            //    starburst, because a wide-open cinema lens has a near-circular iris and barely spikes at all.
-            Flare.ElementMask     = LensFlareElementStreak | LensFlareElementGhosts;
+            // Modern coated anamorphic: a long, cool streak, restrained ghost chain, and a quiet source halo.
+            Flare.ElementMask     = LensFlareElementStreak | LensFlareElementGhosts | LensFlareElementHalo;
             Flare.StreakLength    = 18.0f;
             Flare.StreakThickness = 0.45f;
             Flare.StreakTintR     = 0.35f;
@@ -344,12 +347,17 @@ inline void ApplyLensFlareStyle(CelestialLensFlare& Flare, LensFlareStyleCategor
             Flare.GhostCount      = 4;
             Flare.GhostIntensity  = 0.20f;
             Flare.GhostChromatic  = 0.30f;
+            Flare.HaloIntensity   = 0.12f;
+            Flare.HaloRadius      = 2.20f;
+            Flare.HaloThickness   = 0.55f;
+            Flare.HaloFalloff     = 2.20f;
             break;
 
         case LensFlareStyleCategory::Vintage:
             // Uncoated glass scatters far more between elements, so: many ghosts, larger and warmer, a soft
             //    6-point burst from a simple iris, and only a faint streak because old primes are not anamorphic.
-            Flare.ElementMask        = LensFlareElementStreak | LensFlareElementGhosts | LensFlareElementStarburst;
+            Flare.ElementMask        = LensFlareElementStreak | LensFlareElementGhosts
+                                      | LensFlareElementStarburst | LensFlareElementHalo;
             Flare.StreakIntensity    = 0.20f;
             Flare.StreakLength       = 8.0f;
             Flare.StreakThickness    = 0.90f;
@@ -365,6 +373,10 @@ inline void ApplyLensFlareStyle(CelestialLensFlare& Flare, LensFlareStyleCategor
             Flare.StarburstSharpness = 10.0f;  // low sharpness = soft, blooming spikes
             Flare.StarburstLength    = 5.0f;
             Flare.StarburstIntensity = 3.5f;
+            Flare.HaloIntensity      = 0.26f;
+            Flare.HaloRadius         = 2.80f;
+            Flare.HaloThickness      = 0.85f;
+            Flare.HaloFalloff        = 1.70f;
             break;
 
         case LensFlareStyleCategory::Clean:
@@ -375,6 +387,29 @@ inline void ApplyLensFlareStyle(CelestialLensFlare& Flare, LensFlareStyleCategor
             Flare.StarburstSharpness = 40.0f;
             Flare.StarburstLength    = 11.0f;
             Flare.StarburstIntensity = 8.0f;
+            break;
+
+        case LensFlareStyleCategory::Full:
+            // The reference camera: every optical response is present, but each is kept below the sun disc so
+            // the composition reads as one lens rather than four equally loud mathematical primitives.
+            Flare.ElementMask        = LensFlareElementStreak | LensFlareElementGhosts
+                                      | LensFlareElementStarburst | LensFlareElementHalo;
+            Flare.StreakIntensity     = 0.38f;
+            Flare.StreakLength        = 14.0f;
+            Flare.StreakThickness     = 0.60f;
+            Flare.GhostCount          = 6;
+            Flare.GhostIntensity      = 0.25f;
+            Flare.GhostDispersal      = 0.43f;
+            Flare.GhostSize           = 2.20f;
+            Flare.GhostChromatic      = 0.42f;
+            Flare.StarburstBlades     = 7;
+            Flare.StarburstIntensity  = 4.2f;
+            Flare.StarburstLength     = 8.0f;
+            Flare.StarburstSharpness  = 28.0f;
+            Flare.HaloIntensity       = 0.20f;
+            Flare.HaloRadius          = 2.45f;
+            Flare.HaloThickness       = 0.70f;
+            Flare.HaloFalloff         = 2.00f;
             break;
 
         case LensFlareStyleCategory::Custom:
@@ -441,7 +476,7 @@ struct CelestialStructure
 //                                              THE PROPERTY TABLE (the "sliders")
 //------------------------------------------------------------------------------------------------------------------------
 
-// ⚠️ Integer was added for the lens flare (ghost count, aperture blades, quality tier). Storing those as floats
+// ⚠️ Integer was added for the lens flare (ghost count, aperture blades, style id). Storing those as floats
 //    and rounding at the edit site would let 6.5 blades exist in the file and silently become 6 or 7 depending on
 //    who rounded; an explicit kind means the codec refuses the bad value and says so by line number.
 enum class CelestialPropertyKind : uint8_t { Real = 0u, Switch = 1u, Integer = 2u };
@@ -540,12 +575,11 @@ inline constexpr CelestialProperty kCelestialProperties[] =
 
     FRONTIER_CELESTIAL_SWITCH("stars.enabled", Stars.Enabled, "draw the star field"),
     // ── Lens flare ───────────────────────────────────────────────────────────────────────────────────────────
-    //    ⚠️ No "halo" property exists and none should be added. See the note on CelestialLensFlare.
     FRONTIER_CELESTIAL_SWITCH("flare.enabled", LensFlare.Enabled, "lens flare master switch"),
-    FRONTIER_CELESTIAL_INTEGER("flare.style", "", LensFlare.Style, 0.0f, 4.0f,
-                               "0 off, 1 cinematic, 2 vintage, 3 clean, 4 custom"),
-    FRONTIER_CELESTIAL_INTEGER("flare.elements", "", LensFlare.ElementMask, 0.0f, 7.0f,
-                               "0 = use the style; else bits 1 streak, 2 ghosts, 4 starburst (combinable)"),
+    FRONTIER_CELESTIAL_INTEGER("flare.style", "", LensFlare.Style, 0.0f, 5.0f,
+                               "0 off, 1 cinematic, 2 vintage, 3 clean, 4 full, 5 custom"),
+    FRONTIER_CELESTIAL_INTEGER("flare.elements", "", LensFlare.ElementMask, 0.0f, 15.0f,
+                               "bits 1 streak, 2 ghosts, 4 starburst, 8 halo (combinable)"),
     FRONTIER_CELESTIAL_REAL("flare.intensity", "x", LensFlare.Intensity, 0.0f, 30.0f, "master flare multiplier"),
 
     FRONTIER_CELESTIAL_REAL("flare.streak.intensity", "x",   LensFlare.StreakIntensity, 0.0f, 4.0f, "anamorphic streak strength"),
@@ -565,6 +599,11 @@ inline constexpr CelestialProperty kCelestialProperties[] =
     FRONTIER_CELESTIAL_REAL("flare.starburst.intensity", "x",   LensFlare.StarburstIntensity, 0.0f, 30.0f, "starburst strength"),
     FRONTIER_CELESTIAL_REAL("flare.starburst.length",    "deg", LensFlare.StarburstLength,    0.0f, 40.0f, "spike length"),
     FRONTIER_CELESTIAL_REAL("flare.starburst.sharpness", "-",   LensFlare.StarburstSharpness, 1.0f, 96.0f, "higher = thinner spikes"),
+
+    FRONTIER_CELESTIAL_REAL("flare.halo.intensity", "x",   LensFlare.HaloIntensity, 0.0f, 4.0f, "soft annulus strength"),
+    FRONTIER_CELESTIAL_REAL("flare.halo.radius",    "deg", LensFlare.HaloRadius,    0.1f, 20.0f, "annulus centre radius"),
+    FRONTIER_CELESTIAL_REAL("flare.halo.thickness", "deg", LensFlare.HaloThickness, 0.05f, 8.0f, "annulus width"),
+    FRONTIER_CELESTIAL_REAL("flare.halo.falloff",   "-",   LensFlare.HaloFalloff,   0.5f, 8.0f, "annulus profile"),
 
     FRONTIER_CELESTIAL_REAL("flare.occlusionFade", "-", LensFlare.OcclusionFade, 0.0f, 1.0f, "how much occlusion kills the flare"),
 
@@ -609,7 +648,7 @@ inline void WriteCelestialReal(CelestialStructure& S, const CelestialProperty& P
 }
 
 // 🔴 INTEGER FIELDS NEED THEIR OWN ACCESSORS, AND THIS IS NOT A STYLE PREFERENCE. Every integer property in the
-//    table (the flare tier, the element mask, ghost count, aperture blades) is a 4-byte int or uint32_t, not a
+//    table (the flare style, the element mask, ghost count, aperture blades) is a 4-byte int or uint32_t, not a
 //    float. Writing through the float accessor would deposit an IEEE bit pattern into an integer field —
 //    `6.0f` becomes 1086324736 — so a blade count of 6 would read back as garbage. The property Kind exists
 //    precisely so the codec picks the right one, and the gate asserts every Integer property names a 4-byte field.

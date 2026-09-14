@@ -158,15 +158,15 @@ else
     Fail=1
 fi
 
-# 27 vec4s at 16 B = 432 B, asserted on the C++ side and hard-coded on the Vulkan side. All three must agree.
+# 28 vec4s at 16 B = 448 B, asserted on the C++ side and hard-coded on the Vulkan side. All three must agree.
 ShaderVec4Count="$(sed -n '/^struct CelestialRecord$/,/^};/p' "$Shader" | grep -cE '^\s*vec4 ')"
 ShaderBytes=$((ShaderVec4Count * 16))
-CheckConstant "C++ static_asserts 432 bytes"                 'sizeof\(CelestialUniform\) == 432' "$Uniform"
-CheckConstant "the Vulkan buffer is sized 432 bytes"         'kCelestialRecordBytes = 432u' "$SwapchainHeader"
-if [ "$ShaderBytes" -eq 432 ]; then
+CheckConstant "C++ static_asserts 448 bytes"                 'sizeof\(CelestialUniform\) == 448' "$Uniform"
+CheckConstant "the Vulkan buffer is sized 448 bytes"         'kCelestialRecordBytes = 448u' "$SwapchainHeader"
+if [ "$ShaderBytes" -eq 448 ]; then
     echo "  OK    the shader struct is $ShaderVec4Count vec4s = $ShaderBytes bytes"
 else
-    echo "  FAIL  the shader struct is $ShaderVec4Count vec4s = $ShaderBytes bytes, not 432"
+    echo "  FAIL  the shader struct is $ShaderVec4Count vec4s = $ShaderBytes bytes, not 448"
     Fail=1
 fi
 

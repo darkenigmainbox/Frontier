@@ -121,9 +121,9 @@ struct SwapchainExchange::VulkanRecord
     // A6b luminance reduction. One accumulator per cycle slot: the CPU reads slot N's result while the GPU is
     //    writing slot N+1, so nothing is ever read while it is being written and no extra fence is needed.
     //    Persistently mapped — mapping and unmapping every frame is a driver round trip for eight bytes.
-    // P1 celestial record — one host-visible, persistently mapped buffer holding CelestialUniform (336 B).
+    // P1 celestial record — one host-visible, persistently mapped buffer holding CelestialUniform (448 B).
     //    ONE, not one per cycle slot: it is written on the render thread immediately before the frame's dispatch
-    //    is recorded and read only by that dispatch, and 336 bytes of HOST_COHERENT write costs far less than the
+    //    is recorded and read only by that dispatch, and 448 bytes of HOST_COHERENT write costs far less than the
     //    fence bookkeeping multi-buffering would need. Revisit only if the celestial solve ever moves off-thread.
     VkBuffer                 CelestialBuffer = VK_NULL_HANDLE;
     VkDeviceMemory           CelestialMemory = VK_NULL_HANDLE;
@@ -2158,7 +2158,7 @@ bool SwapchainExchange::RefreshTraversal(const TraversalIndex& Traversal, const 
 //------------------------------------------------------------------------------------------------------------------------
 
 // Every frame, unconditionally. There is no dirty flag and there should not be one: the sun moves continuously, the
-//    wind advects continuously, and a 336-byte memcpy into already-mapped HOST_COHERENT memory is not a cost worth
+//    wind advects continuously, and a 448-byte memcpy into already-mapped HOST_COHERENT memory is not a cost worth
 //    a staleness bug. This is what "fully dynamic, nothing baked at load" (F4) means in practice.
 void SwapchainExchange::UploadCelestial(const void* Record, uint32_t ByteCount) noexcept
 {

@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-#  CheckLensFlare.sh — three flare elements, three tiers, freely combinable, and NOT ONE OF THEM A HALO
+#  CheckLensFlare.sh — four integrated flare elements, style presets, and free combination
 # ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-#  Standing user constraint: "the sun blending into the atmosphere like a halo is 1 thing i absolutely do not
-#  want". Every off-the-shelf flare library ships a halo element. This one deliberately does not, and this gate
-#  is what stops one arriving later — either as a named element, or by accident when some other element spreads.
-#
-#  The proof measures SHAPE, because a halo is a shape problem that cannot be tuned away with an intensity.
+#  The proof measures SHAPE and COMPOSITION. The requested result is one controlled optical stack: streak, ghosts,
+#  aperture diffraction and halo. The gate checks that the halo is explicit and bounded, that the other elements keep
+#  their characteristic shapes, and that the four bits can be combined without a hidden preset restriction.
 # ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 set -u
 
@@ -35,35 +33,32 @@ CheckConstant() {
     else echo "  FAIL  $Label — expected /$Pattern/ in $File"; Fail=1; fi
 }
 
-# ── 🔴 NO HALO ELEMENT, EVER ─────────────────────────────────────────────────────────────────────────────────────────────────────
+# ── The four-element optical stack ─────────────────────────────────────────────────────────────────────────────────────────────
 echo
-echo "[LensFlare] the halo stays banned"
-# ⚠️ SEARCH CODE, NOT COMMENTS. A first version of this check grepped for the word "halo" anywhere and duly
-#    failed on the three comments that EXPLAIN why there is no halo — the documentation tripping the gate that
-#    documents it. Strip comments first, then look for a halo as an actual identifier: a function, a field, an
-#    element bit or a setting. That is the only form in which one could actually be reintroduced.
-HaloCode="$(sed -E 's;//.*$;;' "$Viewport" "$Structure" | grep -niE '[A-Za-z_]*halo[A-Za-z_]*' || true)"
-if [ -n "$HaloCode" ]; then
-    echo "  FAIL  a halo identifier exists in code (not just comments):"
-    printf '%s\n' "$HaloCode" | sed 's/^/    /'
-    Fail=1
-else
-    echo "  OK    no halo identifier anywhere in the shader or the settings"
-fi
+echo "[LensFlare] the intended optical stack is present"
+# Search actual identifiers rather than comments: this gate must protect halo support now, not reject it.
+CheckConstant "the halo is a named element bit"    'LensFlareElementHalo[[:space:]]*=[[:space:]]*1u << 3' "$Structure"
+CheckConstant "the shader carries halo parameters"  'vec4 FlareHalo' "$Viewport"
+CheckConstant "the halo function is composited"     'CelestialFlareHalo' "$Viewport"
+CheckConstant "the shader tests the halo bit"       'kFlareElementHalo' "$Viewport"
+CheckConstant "halo intensity is exposed"           'flare.halo.intensity' "$Structure"
+CheckConstant "halo radius is exposed"              'flare.halo.radius' "$Structure"
+CheckConstant "halo thickness is exposed"           'flare.halo.thickness' "$Structure"
+CheckConstant "halo profile is exposed"             'flare.halo.falloff' "$Structure"
+CheckConstant "the four-element Full style exists"  'Full *= 4u' "$Structure"
+CheckConstant "the Project Zero CLI accepts halo"   'Item == "halo"' "Projects/Project-Zero/Source/GameExecution.cpp"
+CheckConstant "the CLI can select the Full style"   'V, "full"' "Projects/Project-Zero/Source/GameExecution.cpp"
+CheckConstant "the element mask has four bits"     'LensFlareElementHalo' "$Structure"
 
-CheckConstant "exactly three element bits exist"  'LensFlareElementStarburst = 1u << 2' "$Structure"
-if grep -qE 'LensFlareElement[A-Za-z]+ = 1u << 3' "$Structure"; then
-    echo "  FAIL  a fourth flare element was added; if it is a halo, it is banned"
-    Fail=1
-else
-    echo "  OK    no fourth element crept in"
-fi
+# The packed record must remain structurally tied to the shipping shader.
+CheckConstant "halo is packed on the CPU"           'Out\.FlareHalo\[0\]' "Engine/DisplayPresentation/CelestialUniform.h"
+CheckConstant "the extracted port includes halo"    'CelestialFlareHalo' "Scratchpad/ExtractCelestialPort.sh"
 
 # ── The degenerate case that WAS a halo ──────────────────────────────────────────────────────────────────────────────────────────
 echo
 echo "[LensFlare] the dead-centre ghost collapse stays fixed"
-# With the camera looking exactly at the sun, every ghost centre collapses onto the sun and the chain becomes a
-# ring around it. Measured at 0.147 before the fix. The guard must stay.
+# With the camera looking exactly at the sun there is no displacement axis for a ghost chain. The guard keeps the
+# reflections from collapsing into the source while the explicit halo owns the annular response.
 CheckConstant "ghosts bail out when the sun is dead centre" 'if \(offAxis < 1e-4\) return vec3\(0\.0\)' "$Viewport"
 CheckConstant "and ramp in rather than popping"             'centreFade' "$Viewport"
 
@@ -72,14 +67,13 @@ echo
 echo "[LensFlare] odd apertures still double their spikes"
 CheckConstant "odd blade counts double the spike count" 'mod\(blades, 2\.0\) < 0\.5 \? blades : blades \* 2\.0' "$Viewport"
 
-# ── Tiers and combining ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+# ── Styles and combining ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 echo
 echo "[LensFlare] styles and free combination"
 CheckConstant "the style enum exists"             'LensFlareStyleCategory' "$Structure"
 CheckConstant "styles are applied as whole looks"  'ApplyLensFlareStyle' "$Structure"
 CheckConstant "the mask overrides the style"      'ElementMask' "$Structure"
-# ⚠️ The quality ladder was removed deliberately: measured, the starburst ("High") is cheaper than the ghosts
-#    ("Medium"), so the tiers ranked elaborateness and called it performance. If they come back, so does the lie.
+# Styles describe complete camera looks; the element mask remains freely combinable.
 if grep -q 'LensFlareTierCategory' "$Structure" "$Viewport"; then
     echo "  FAIL  the quality tiers returned; they claimed a cost order the measurements contradict"
     Fail=1

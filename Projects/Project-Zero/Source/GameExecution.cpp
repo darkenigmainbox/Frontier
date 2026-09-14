@@ -72,8 +72,8 @@ void PrintUsage(const char* Program) noexcept
               << "  --exposure <float>         Manual-mode tone-map scalar\n"
               << "  --adaptive                 frame-metered exposure\n"
               << "  --sky-exposure             exposure from the sun's elevation (steady under camera motion)\n"
-              << "  --flare <style>            lens flare look: off, cinematic, vintage, clean, custom\n"
-              << "  --flare-elements <list>    comma-separated streak,ghosts,starburst - switches to custom\n"
+              << "  --flare <style>            lens flare look: off, cinematic, vintage, clean, full, custom\n"
+              << "  --flare-elements <list>    comma-separated streak,ghosts,starburst,halo - switches to custom\n"
               << "  --flare-intensity <x>      master flare multiplier\n"
               << "  --no-flare                 disable the lens flare entirely\n"
               << "  --clouds <0..1>            cloud coverage (0 clear, 1 overcast)\n"
@@ -169,13 +169,14 @@ int main(int argc, char** argv)
                 else if (std::strcmp(V, "cinematic") == 0) Frontier::ApplyLensFlareStyle(Celestial.LensFlare, Frontier::LensFlareStyleCategory::Cinematic);
                 else if (std::strcmp(V, "vintage")   == 0) Frontier::ApplyLensFlareStyle(Celestial.LensFlare, Frontier::LensFlareStyleCategory::Vintage);
                 else if (std::strcmp(V, "clean")     == 0) Frontier::ApplyLensFlareStyle(Celestial.LensFlare, Frontier::LensFlareStyleCategory::Clean);
+                else if (std::strcmp(V, "full")      == 0) Frontier::ApplyLensFlareStyle(Celestial.LensFlare, Frontier::LensFlareStyleCategory::Full);
                 else if (std::strcmp(V, "custom")    == 0) Celestial.LensFlare.Style = Frontier::LensFlareStyleCategory::Custom;
-                else std::cerr << "[Celestial] --flare wants off|cinematic|vintage|clean|custom, got '" << V << "'\n";
+                else std::cerr << "[Celestial] --flare wants off|cinematic|vintage|clean|full|custom, got '" << V << "'\n";
             }
         }
         else if (std::strcmp(Arg, "--flare-elements") == 0)
         {
-            // Comma-separated, freely combinable: "streak,starburst" is a legal set the tiers never produce.
+            // Comma-separated, freely combinable: any subset, including all four, is a legal custom set.
             if (const char* V = NeedValue(Arg))
             {
                 uint32_t Mask = 0u;
@@ -188,9 +189,10 @@ int main(int argc, char** argv)
                     if      (Item == "streak")    Mask |= Frontier::LensFlareElementStreak;
                     else if (Item == "ghosts")    Mask |= Frontier::LensFlareElementGhosts;
                     else if (Item == "starburst") Mask |= Frontier::LensFlareElementStarburst;
+                    else if (Item == "halo")      Mask |= Frontier::LensFlareElementHalo;
                     else if (!Item.empty())
                         std::cerr << "[Celestial] --flare-elements: unknown element '" << Item
-                                  << "' (want streak, ghosts or starburst)\n";
+                                  << "' (want streak, ghosts, starburst or halo)\n";
                     if (Comma == std::string::npos) break;
                     Start = Comma + 1u;
                 }

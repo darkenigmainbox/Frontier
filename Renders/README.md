@@ -2,7 +2,7 @@
 
 Every lighting value in these images is produced by the **shipping shader source**, evaluated on the CPU.
 `Scratchpad/ExtractCelestialPort.sh` lifts the real text of `CelestialRecord`, `CelestialAtmosphereOf`,
-`CelestialObserver`, `CelestialSunDisc`, `CelestialMoonDisc` and `CelestialSky` out of
+`CelestialObserver`, `CelestialSunDisc`, `CelestialMoonDisc`, the integrated lens-flare functions and `CelestialSky` out of
 `Engine/Shaders/ReSTIRViewport.slang` and compiles it as C++.
 
 `Scratchpad/CheckShowcaseTracksShader.sh` proves that by falsification: it breaks the shader and requires the
@@ -34,3 +34,11 @@ Regenerate:
     g++ -std=c++20 -O2 -I Scratchpad -I . Scratchpad/CelestialShowcase.cpp \
         Engine/DisplayPresentation/ExposureIntegrator.cpp -o /tmp/showcase
     /tmp/showcase 17.8 /tmp/out.ppm 900 540 96
+
+
+### Integrated lens-flare references
+
+`40_project_zero_full_flare.png` is the Project Zero scene with the default Full style (streak, ghosts, starburst and halo).
+`43_project_zero_full_flare_clear.png` is the same view with the cloud layer cleared so the optical stack can be inspected
+against a clean sunset. These are CPU references built from the extracted shipping shader and the exact 448-byte packed
+celestial record; they are not native Vulkan screenshots.

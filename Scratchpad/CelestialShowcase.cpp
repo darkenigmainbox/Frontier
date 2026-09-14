@@ -88,7 +88,7 @@ using Frontier::kCelestialFlagStars;
 //                                      FILLING THE RECORD, AND THE ONE LOCAL ADDITION
 //------------------------------------------------------------------------------------------------------------------------
 
-// PackCelestialUniform writes a flat float array; the shader reads a struct of vec4s. They are the same 368
+// PackCelestialUniform writes a flat float array; the shader reads a struct of vec4s. They are the same 448
 //    bytes, so the record is filled by a straight copy. If the two ever disagreed this would produce garbage —
 //    which is the point of doing it this way rather than assigning field by field.
 static CelestialRecord RecordFromUniform(const Frontier::CelestialUniform& Packed)
@@ -214,7 +214,7 @@ int main(int argc, char** argv)
     const int   width   = argc > 3 ? std::atoi(argv[3]) : 420;
     const int   height  = argc > 4 ? std::atoi(argv[4]) : 250;
     const int   samples = argc > 5 ? std::atoi(argv[5]) : 40;
-    const int   flareTier = argc > 6 ? std::atoi(argv[6]) : -1;   // -1 = leave the default
+    const int   flareStyle = argc > 6 ? std::atoi(argv[6]) : -1;   // -1 = leave the default
     const float cloudCover = argc > 7 ? float(std::atof(argv[7])) : -1.0f;   // -1 = leave the default
 
     //---------------------------------------------------------------------------------------------------------
@@ -223,9 +223,9 @@ int main(int argc, char** argv)
     Frontier::CelestialStructure settings{};          // defaults: Benoni, -26.19, +28.32, UTC+2, 2026-09-13
     settings.Observation.LocalHours = hours;
     if (cloudCover >= 0.0f) settings.Clouds.Coverage = cloudCover;
-    if (flareTier >= 0)
+    if (flareStyle >= 0)
         Frontier::ApplyLensFlareStyle(settings.LensFlare,
-                                      static_cast<Frontier::LensFlareStyleCategory>(flareTier));
+                                      static_cast<Frontier::LensFlareStyleCategory>(flareStyle));
 
     const Frontier::CelestialSolution solution = Frontier::SolveCelestial(settings);
 

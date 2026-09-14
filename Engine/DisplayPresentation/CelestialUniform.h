@@ -14,7 +14,7 @@
 //    stops four bytes per vector being wasted. Every static_assert below is load-bearing.
 //
 //    🔴 WHY A UNIFORM BUFFER AND NOT THE PUSH BLOCK. The push block has 7 spare uints — 28 bytes. The celestial
-//    state below is 432 bytes (27 vec4s) and will not shrink. Pushing it is not an option; this was checked rather than
+//    state below is 448 bytes (28 vec4s) and will not shrink. Pushing it is not an option; this was checked rather than
 //    assumed. The buffer is written every frame from the CPU solve (F4: nothing is baked).
 
 #pragma once
@@ -43,11 +43,14 @@ struct alignas(16) CelestialUniform
     float SunIrradianceAndScale[4];      // rgb = top-of-atmosphere IRRADIANCE [W/m2], w = sky scale
     float SunTransmittance[4];           // rgb = atmospheric transmittance to the sun at ground level, w unused
 
-    // ── Moon ──────────────────────────────────────────────────────────────────────────────────────────────────
+    // ── Lens flare ──────────────────────────────────────────────────────────────────────────────────────────────
     float FlareStreakAndFlags[4];        // rgb = streak tint x intensity, w = element bits as a float
     float FlareGhostAndCount[4];         // x intensity, y dispersal, z size [rad], w count
     float FlareBurstAndChroma[4];        // x intensity, y length [rad], z sharpness, w blades
     float FlareChromaAndFade[4];         // x ghost chromatic, y occlusion fade, z streak length, w streak thickness
+    float FlareHalo[4];                  // x intensity, y radius [rad], z thickness [rad], w profile exponent
+
+    // ── Moon ──────────────────────────────────────────────────────────────────────────────────────────────────
     float MoonDirectionAndCosRadius[4];  // xyz = unit direction TO the moon, w = cos(angular radius)
     float MoonRadianceAndEarthshine[4];  // rgb = radiance, w = earthshine
 
@@ -93,16 +96,17 @@ inline constexpr uint32_t kCelestialFlagStars      = 1u << 5u;
 //                                                  LAYOUT GUARANTEES
 //------------------------------------------------------------------------------------------------------------------------
 
-static_assert(sizeof(CelestialUniform) == 432, "the shader's CelestialRecord must be resized to match");
+static_assert(sizeof(CelestialUniform) == 448, "the shader's CelestialRecord must be resized to match");
 static_assert(alignof(CelestialUniform) == 16, "std140 requires 16-byte alignment");
 static_assert(sizeof(CelestialUniform) % 16 == 0, "std140 pads the block to a multiple of 16");
 static_assert(offsetof(CelestialUniform, SunRadianceAndLimb) == 16, "sun radiance moved");
-static_assert(offsetof(CelestialUniform, MoonDirectionAndCosRadius) == 128, "moon block moved");
-static_assert(offsetof(CelestialUniform, RayleighScatteringAndHeight) == 160, "atmosphere block moved");
-static_assert(offsetof(CelestialUniform, CloudLayer) == 240, "cloud block moved");
-static_assert(offsetof(CelestialUniform, LocalCloudCentreAndDensity) == 320, "local volume block moved");
-static_assert(offsetof(CelestialUniform, StarsAndRotation) == 384, "night sky block moved");
-static_assert(offsetof(CelestialUniform, ExposureAndFlags) == 400, "exposure moved");
+static_assert(offsetof(CelestialUniform, FlareHalo) == 128, "flare halo moved");
+static_assert(offsetof(CelestialUniform, MoonDirectionAndCosRadius) == 144, "moon block moved");
+static_assert(offsetof(CelestialUniform, RayleighScatteringAndHeight) == 176, "atmosphere block moved");
+static_assert(offsetof(CelestialUniform, CloudLayer) == 256, "cloud block moved");
+static_assert(offsetof(CelestialUniform, LocalCloudCentreAndDensity) == 336, "local volume block moved");
+static_assert(offsetof(CelestialUniform, StarsAndRotation) == 400, "night sky block moved");
+static_assert(offsetof(CelestialUniform, ExposureAndFlags) == 416, "exposure moved");
 
 //------------------------------------------------------------------------------------------------------------------------
 //                                              BLACK-BODY COLOUR
@@ -315,11 +319,10 @@ inline void PackCelestialUniform(
     for (int C = 0; C < 3; ++C) Out.LocalFogExtentAndG[C] = Settings.LocalFog.Extent[C];
     Out.LocalFogExtentAndG[3] = Settings.LocalFog.Anisotropy;
 
-    // ── Night sky ─────────────────────────────────────────────────────────────────────────────────────────────
     // ── Lens flare ──────────────────────────────────────────────────────────────────────────────────────────
-    // 🔴 THE TIER IS RESOLVED TO ELEMENT BITS HERE, ON THE CPU, ONCE PER FRAME. The shader never sees a "tier" —
-    //    it sees three independent bits and branches on them. That is what lets the tiers be presets rather than
-    //    a straitjacket: ElementMask overrides the tier completely, so "Low quality but with a starburst" is a
+    // 🔴 THE STYLE IS RESOLVED TO ELEMENT BITS HERE, ON THE CPU, ONCE PER FRAME. The shader never sees a "style" —
+    //    it sees four independent bits and branches on them. That is what lets styles be presets rather than
+    //    a straitjacket: ElementMask overrides the style completely, so "Cinematic plus a starburst" is a
     //    legal combination rather than a special case someone has to add later.
     {
         // ⚠️ THE STYLE IS ALREADY RESOLVED BY THE TIME WE GET HERE. ApplyLensFlareStyle writes the element mask
@@ -354,6 +357,11 @@ inline void PackCelestialUniform(
         Out.FlareBurstAndChroma[1] = Settings.LensFlare.StarburstLength * kDegreesToRadiansF;
         Out.FlareBurstAndChroma[2] = Settings.LensFlare.StarburstSharpness;
         Out.FlareBurstAndChroma[3] = static_cast<float>(Settings.LensFlare.StarburstBlades);
+
+        Out.FlareHalo[0] = Settings.LensFlare.HaloIntensity * Master;
+        Out.FlareHalo[1] = Settings.LensFlare.HaloRadius * kDegreesToRadiansF;
+        Out.FlareHalo[2] = Settings.LensFlare.HaloThickness * kDegreesToRadiansF;
+        Out.FlareHalo[3] = Settings.LensFlare.HaloFalloff;
     }
 
     Out.StarsAndRotation[0] = Settings.Stars.Enabled ? Settings.Stars.Brightness : 0.0f;

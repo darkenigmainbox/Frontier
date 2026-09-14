@@ -370,81 +370,45 @@ lengths, so it proved nothing. Final check compares the same direction with and 
 Gated in `SkyIntegrationTest` section 4c. **ALL 23 SUITES GREEN.**
 
 
-### LENS FLARE: three elements, three tiers, freely combinable — and no halo (2026-09-13)
+### LENS FLARE: an integrated four-element optical stack (2026-09-14)
 
-Requested: "add lensflare 3 types for 3 tiers (quality/graphics) + dynamic settings + allow combining".
+The flare is a camera artefact added after the sky and direct sun visibility are known. The production shader now
+composes four related responses from the same sun spectrum and transmittance: a camera-level anamorphic streak,
+displaced internal-reflection ghosts, an aperture/diffraction starburst, and a controlled soft halo annulus. The
+halo is intentionally parameterised rather than being an oversized streak or a collapsed ghost chain: radius,
+thickness, profile and intensity are all exposed as dynamic celestial settings.
 
-**The three elements, chosen so none of them CAN read as a halo.** Every reference implementation (Chapman,
-Froyok's UE port, the commercial packs) ships four: ghosts, streaks, starburst **and a halo**. The halo is
-deliberately absent — a ring of light hugging the sun is indistinguishable from the atmosphere's own Mie
-aureole, and stacking one on the other is exactly the artefact banned earlier. The three that remain are each
-structurally safe: the STREAK is horizontal (anisotropic), the GHOSTS sit across the frame from the sun, and the
-STARBURST is hard spikes with dark gaps.
+**The starburst is an aperture response, not a single asterisk primitive.** Blade count still follows photographic
+behaviour — N spikes for even blades and 2N for odd blades — but each spike has a narrow diffraction core and a
+broader shoulder inside a continuous radial envelope. A small central bloom relates it to the source, while the
+lobe still has genuine dark gaps between blade-edge maxima. The test harness counts maxima and checks the gaps,
+so increasing energy cannot silently turn it into a circular glow.
 
-**Tiers are presets, not a straitjacket.** `--flare off|low|medium|high` maps to strictly nested element sets
-(0 / streak / +ghosts / +starburst), and `--flare-elements streak,starburst` overrides the tier entirely — so
-combinations the tiers never produce are legal. Resolved to bits on the CPU, so the shader only ever sees three
-independent branches. 30 new TOML properties, live-reloadable like everything else.
+**Ghosts now read as a coherent optical chain.** Their centres are displaced through the frame opposite the off-axis
+source, with spacing proportional to the source displacement. Later reflections grow gently, fade through the lens
+stack, and drift through a restrained coating spectrum instead of becoming isolated red/green/blue discs. They ramp
+smoothly from the optical axis. Their centre guard remains important: when the sun is exactly centred there is no
+physical displacement axis, so the ghost chain contributes nothing and the explicit halo owns the annular response.
 
-🔴 **THE DEAD-CENTRE GHOST COLLAPSE — a halo I very nearly shipped.** Looking EXACTLY at the sun, `sunOffset`
-is the zero vector, every ghost centre collapses onto `forward` (= the sun), and the whole chain piles into a
-ring around it. Measured 0.147 of ghost energy within 4 degrees while the off-axis case read exactly zero. It
-only bites when the camera points straight at the sun — the single most likely thing a player does. Fixed by
-returning nothing when there is no displacement (physically correct: ghosts ARE displacement) with a 1-degree
-ramp so it cannot pop. Gated.
+**Presets are looks, not quality tiers.** `LensFlareStyleCategory` is now Off / Cinematic / Vintage / Clean / Full /
+Custom. Cinematic selects streak + ghosts + halo; Vintage selects the complete stack with warmer, softer settings;
+Clean is the hard 14-point starburst; Full is the reference composition of streak + ghosts + starburst + halo; and
+Custom preserves hand-tuned values. `ElementMask` and Project Zero's `--flare-elements` still permit any free
+combination, including all four. Project Zero defaults to Full so its visible path demonstrates the complete stack;
+`--flare full`, `--flare off`, and `--flare-elements streak,ghosts,starburst,halo` are explicit A/B controls.
 
-🔴 **ODD APERTURES MUST DOUBLE.** `cos(theta * blades * 0.5)` gave 7 spikes for a 7-bladed iris. Real optics
-give **2N for odd N** (14), because opposed spike pairs coincide only when N is even. Caught by counting maxima
-around a ring, not by eye. Now computed explicitly.
+The new controls are `flare.halo.intensity`, `flare.halo.radius`, `flare.halo.thickness`, and
+`flare.halo.falloff`. They are packed as one additional vec4 after the existing flare block. The C++ and shader
+records therefore agree at **448 B (28 vec4s)**, checked field-for-field by `CheckCelestialSolver.sh`.
+`CheckLensFlare.sh` now validates the presence, packing, composition, and bounded shape of the halo rather than
+rejecting its identifier. `LensFlareTest.cpp` covers the four-element default mask, annular falloff, occlusion,
+styles, odd-aperture counts, ghost spacing, and arbitrary mask combinations.
 
-**Intensity calibrated against the tone map rather than guessed.** The flare lives where ACES is nearly flat
-(sky already 0.93 near the sun), so the first defaults produced **38 changed pixels out of 128 000** — present
-in the numbers, invisible on screen. Measured lift sweep: 1x +0.039, 3x +0.062, **6x +0.070**, 18x +0.117,
-30x +0.137. 6x is the knee; past it ACES saturates. Starburst needed its own raise (its energy is in thin
-spikes, measuring 0.0002 against the streak's 0.064). Now 606 px differ.
-
-**Two gates caught my own mistakes:** the property table rejected defaults of 6 against a slider maximum of 4
-(ranges widened to 30), and the field-order diff caught the flare block at index 4 in the shader but 21 in C++ —
-exactly the silent-corruption bug that gate exists for. Also added a `CelestialPropertyKind::Integer` with typed
-accessors, because writing a float bit pattern into an `int` field turns 6 blades into 1086324736.
-
-Record 368 -> **432 B (27 vec4s)**. Gates: `Scratchpad/LensFlareTest.cpp` (26 checks, shape-based) +
-`Scratchpad/CheckLensFlare.sh`, which greps for a halo IDENTIFIER in code with comments stripped — verified by
-adding `CelestialFlareHalo` and watching it fail. Renders 28-31. **ALL 24 SUITES GREEN.**
-
-
-### LENS FLARE: quality tiers replaced by a STYLE dropdown (2026-09-13)
-
-User: "I think we should instead use a dropdown to change instead of quality tiers", and asked whether the
-starburst type was the tier.
-
-**Answering the question first: half right, and my naming caused the confusion.** Medium was indeed streak +
-ghosts. But the starburst TYPE was never the tier — the tiers only switched the starburst ON at High, while its
-shape came from a separate `flare.starburst.blades` setting that worked at any tier. Two unrelated knobs, named
-as though they were one.
-
-🔴 **THE TIERS WERE DISHONEST AND THE USER WAS RIGHT TO REJECT THEM.** Counted the expensive operations:
-streak 5, starburst 6, ghosts 6 **plus a loop over every ghost**. The starburst — labelled "High" — is the
-CHEAPER of the two. The ladder was ranking how elaborate each element looks and presenting it as performance.
-A dropdown of looks is what it always was.
-
-**Replaced with `LensFlareStyleCategory`: Off / Cinematic / Vintage / Clean / Custom.** Each preset is a whole
-camera, including its aperture — which is the part the tiers got wrong, since "which starburst you get" belongs
-to a look rather than a hidden separate setting:
-  · Cinematic — long cool anamorphic streak + 4 restrained ghosts, no burst (wide-open cinema lens)
-  · Vintage   — 8 warm ghosts, faint streak, soft **6-point** burst, sharpness 10 (uncoated glass)
-  · Clean     — starburst alone, **14-point**, sharpness 40 (stopped-down modern prime)
-  · Custom    — touches nothing, so hand-tuned values and live TOML survive
-Elements still combine freely: `ElementMask` overrides any preset, and `--flare-elements` switches to Custom.
-
-**A real bug my own test caught.** The default struct says `Style = Cinematic` but `ElementMask = 0`, and a
-default-constructed struct never calls `ApplyLensFlareStyle` — so the settings claimed a flare and rendered
-NOTHING. Measured 0.00000 where the composite test expected light. The two defaults are one statement of intent;
-they now agree and a gate asserts it.
-
-Also gated: presets must leave no residue when switched (apply Vintage then Clean = fresh Clean), Custom must
-preserve hand-tuned values, and `LensFlareTierCategory` must never reappear. 32 checks, 0 failures.
-Renders 32-35 show the four styles. **ALL 24 SUITES GREEN.**
+Rendered Project Zero-visible CPU references from the extracted shipping shader are kept in `Renders/40_project_zero_full_flare.png`
+and `Renders/43_project_zero_full_flare_clear.png`; the former uses the normal cloud setting and the latter isolates
+the optical response against a clear sunset sky. The CPU reference uses the exact shader text and packed record; a
+native Vulkan binary could not be launched in this Linux checkout because the Project Zero toolchain/driver is not
+present, so these are explicitly references rather than claims of a GPU screenshot.
 
 
 ### P5 PARTIAL: clouds and fog as one medium — working, but the shading is NOT finished (2026-09-13)
