@@ -40,5 +40,6 @@ Regenerate:
 
 `40_project_zero_full_flare.png` is the Project Zero scene with the default Full style (streak, ghosts, starburst and halo).
 `43_project_zero_full_flare_clear.png` is the same view with the cloud layer cleared so the optical stack can be inspected
-against a clean sunset. These are CPU references built from the extracted shipping shader and the exact 448-byte packed
-celestial record; they are not native Vulkan screenshots.
+against a clean sunset. `44_project_zero_full_flare_inspected.png` frames the sun against the clear blue sky so the halo,
+colored diffraction edge, horizontal streak and displaced ghost chain can be inspected at once. These are CPU references
+built from the extracted shipping shader and the exact 448-byte packed celestial record; they are not native Vulkan screenshots.

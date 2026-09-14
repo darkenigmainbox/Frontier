@@ -258,21 +258,22 @@ int main(int argc, char** argv)
     const float exposure = exposureIntegrator.QueryExposure() * kUnitReconciliation;
 
     //---------------------------------------------------------------------------------------------------------
-    // 🔴 AIM THE CAMERA AT THE SUN'S AZIMUTH, rather than at a fixed compass bearing.
+    // 🔴 AIM THE CAMERA AT THE SUN'S EPHEMERIS POSITION, rather than at a fixed compass bearing.
     //
-    //    The first version faced a fixed north-east. At noon that put the sun 63.7 degrees off-axis and at
-    //    sunset 275 degrees away — so the sun disc was never in shot, and a falsification test that ZEROED the
-    //    disc in the shader changed literally zero bytes of the render. The test was right to fire: an image
-    //    that cannot show the disc cannot be evidence the disc works.
-    //
-    //    Following the azimuth means every frame actually contains the thing being demonstrated. A slight
-    //    offset keeps the sun off dead-centre so the sky gradient either side of it stays visible.
-    const float sunAzimuth = solution.SunAzimuthDegrees * 3.14159265f / 180.0f;
-    const float viewAzimuth = sunAzimuth + 0.16f;
+    //    The first version faced a fixed north-east and kept a fixed horizon pitch. At noon that put the sun
+    //    outside the frame, so a falsification test that ZEROED the disc changed literally zero bytes of the
+    //    render. The camera now follows both azimuth and elevation, with a small horizontal offset and a fixed
+    //    vertical lead so the sun, halo, streaks and displaced ghost chain are all visible in one reference view.
+    const float sunAzimuth   = solution.SunAzimuthDegrees * 3.14159265f / 180.0f;
+    const float sunElevation = solution.SunElevationDegrees * 3.14159265f / 180.0f;
+    const float viewAzimuth  = sunAzimuth + 0.16f;
+    const float viewElevation= sunElevation - 0.08f;
 
     CameraBasis camera;
     camera.Origin     = vec3(0.0f, 0.0f, 1.75f);
-    camera.Forward    = normalize(vec3(std::sin(viewAzimuth), std::cos(viewAzimuth), -0.045f));
+    camera.Forward    = normalize(vec3(std::cos(viewElevation) * std::sin(viewAzimuth),
+                                       std::cos(viewElevation) * std::cos(viewAzimuth),
+                                       std::sin(viewElevation)));
     camera.Right      = normalize(cross(camera.Forward, vec3(0.0f, 0.0f, 1.0f)));
     camera.Up         = normalize(cross(camera.Right, camera.Forward));
     camera.TanHalfFov = std::tan(29.0f * 3.14159265f / 180.0f);

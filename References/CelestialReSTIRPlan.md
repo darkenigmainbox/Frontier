@@ -404,11 +404,12 @@ records therefore agree at **448 B (28 vec4s)**, checked field-for-field by `Che
 rejecting its identifier. `LensFlareTest.cpp` covers the four-element default mask, annular falloff, occlusion,
 styles, odd-aperture counts, ghost spacing, and arbitrary mask combinations.
 
-Rendered Project Zero-visible CPU references from the extracted shipping shader are kept in `Renders/40_project_zero_full_flare.png`
-and `Renders/43_project_zero_full_flare_clear.png`; the former uses the normal cloud setting and the latter isolates
-the optical response against a clear sunset sky. The CPU reference uses the exact shader text and packed record; a
-native Vulkan binary could not be launched in this Linux checkout because the Project Zero toolchain/driver is not
-present, so these are explicitly references rather than claims of a GPU screenshot.
+Rendered Project Zero-visible CPU references from the extracted shipping shader are kept in `Renders/40_project_zero_full_flare.png`,
+`Renders/43_project_zero_full_flare_clear.png`, and the sun-framed inspection view `Renders/44_project_zero_full_flare_inspected.png`;
+the first uses the normal cloud setting, the second isolates the optical response against a clear sunset sky, and the third makes
+the halo, colored diffraction edge, streak, and displaced ghost chain easy to inspect together. The CPU reference uses the exact
+shader text and packed record; a native Vulkan binary could not be launched in this Linux checkout because the Project Zero
+toolchain/driver is not present, so these are explicitly references rather than claims of a GPU screenshot.
 
 
 ### P5 PARTIAL: clouds and fog as one medium — working, but the shading is NOT finished (2026-09-13)

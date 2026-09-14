@@ -244,26 +244,26 @@ struct CelestialLensFlare
     //    The first defaults (1x) produced 38 changed pixels out of 128 000 — present in the numbers, invisible
     //    on screen. 6x is the knee: clearly readable, and past it the curve flattens so extra energy buys
     //    saturation rather than visibility.
-    float Intensity = 6.0f;    // [x]   master multiplier over every element
+    float Intensity = 5.0f;    // [x]   master multiplier over every element
 
     // ── Anamorphic streak ───────────────────────────────────────────────────────────────────────────────────
     //    The horizontal blue smear of a cinema lens. Cheapest element and the most recognisable, which is why
     //    it is the one the Cinematic look emphasises.
-    float StreakIntensity = 0.55f;   // [x]
-    float StreakLength    = 14.0f;   // [deg] half-length along the horizontal
-    float StreakThickness = 0.55f;   // [deg] vertical falloff
-    float StreakTintR     = 0.45f;   // [-]   anamorphic streaks are classically blue
-    float StreakTintG     = 0.62f;
+    float StreakIntensity = 0.30f;   // [x]
+    float StreakLength    = 15.0f;   // [deg] half-length along the horizontal
+    float StreakThickness = 0.72f;   // [deg] vertical falloff
+    float StreakTintR     = 0.68f;   // [-]   anamorphic streaks are classically blue
+    float StreakTintG     = 0.82f;
     float StreakTintB     = 1.00f;
 
     // ── Ghosts ──────────────────────────────────────────────────────────────────────────────────────────────
     //    Internal reflections. Each ghost sits at -i x (sun position) through the frame centre, so they sweep
     //    ACROSS the frame as the camera turns — the behaviour that reads unmistakably as a lens rather than sky.
-    int   GhostCount      = 5;       // [cnt]
-    float GhostIntensity  = 0.22f;   // [x]
-    float GhostDispersal  = 0.36f;   // [-]   spacing along the sun-to-centre vector
-    float GhostSize       = 2.6f;    // [deg] angular radius of the first ghost
-    float GhostChromatic  = 0.35f;   // [-]   per-ghost colour separation
+    int   GhostCount      = 6;       // [cnt]
+    float GhostIntensity  = 0.30f;   // [x]
+    float GhostDispersal  = 0.40f;   // [-]   spacing along the sun-to-centre vector
+    float GhostSize       = 1.70f;    // [deg] angular radius of the first ghost
+    float GhostChromatic  = 0.62f;   // [-]   per-ghost colour separation
 
     // ── Starburst ───────────────────────────────────────────────────────────────────────────────────────────
     //    Aperture diffraction. Blade count sets the spike count: an even-bladed iris gives N spikes, an odd one
@@ -273,18 +273,18 @@ struct CelestialLensFlare
     //    thin spikes rather than spread over an area — at the same nominal intensity as the streak it measured
     //    0.0002 ACES lift against the streak's 0.064. Raised so the spikes are actually visible; the SHAPE
     //    checks in LensFlareTest are what keep it from becoming a glow, so brightness is free to be useful.
-    float StarburstIntensity = 6.0f;   // [x]
-    float StarburstLength    = 7.0f;   // [deg]
-    float StarburstSharpness = 24.0f;  // [-]  higher = thinner, harder spikes
+    float StarburstIntensity = 2.6f;   // [x]
+    float StarburstLength    = 6.5f;   // [deg]
+    float StarburstSharpness = 15.0f;  // [-]  higher = thinner, harder spikes
 
     // ── Halo ─────────────────────────────────────────────────────────────────────────────────────────────────
     //    A broad, low-energy annulus around the source. Radius and thickness are explicit so the halo remains a
     //    camera artefact rather than becoming an accidental second atmospheric sun. The shader uses the sun's
     //    spectral radiance as its base colour, keeping the four elements optically related.
-    float HaloIntensity = 0.18f;  // [x]
-    float HaloRadius    = 2.40f;  // [deg] centre of the annulus from the source
-    float HaloThickness = 0.65f;  // [deg] soft radial width
-    float HaloFalloff   = 2.00f;  // [-] broad-to-tight profile exponent
+    float HaloIntensity = 0.30f;  // [x]
+    float HaloRadius    = 2.35f;  // [deg] centre of the annulus from the source
+    float HaloThickness = 1.05f;  // [deg] soft radial width
+    float HaloFalloff   = 1.80f;  // [-] broad-to-tight profile exponent
 
     // ⚠️ Occlusion. A flare is formed in the lens, so it must vanish when the sun goes behind something — but
     //    SOFTLY, because the sun has angular size and is progressively hidden. A hard on/off pops.
@@ -394,22 +394,26 @@ inline void ApplyLensFlareStyle(CelestialLensFlare& Flare, LensFlareStyleCategor
             // the composition reads as one lens rather than four equally loud mathematical primitives.
             Flare.ElementMask        = LensFlareElementStreak | LensFlareElementGhosts
                                       | LensFlareElementStarburst | LensFlareElementHalo;
-            Flare.StreakIntensity     = 0.38f;
-            Flare.StreakLength        = 14.0f;
-            Flare.StreakThickness     = 0.60f;
+            Flare.Intensity           = 5.0f;
+            Flare.StreakIntensity     = 0.30f;
+            Flare.StreakLength        = 15.0f;
+            Flare.StreakThickness     = 0.72f;
+            Flare.StreakTintR         = 0.68f;
+            Flare.StreakTintG         = 0.82f;
+            Flare.StreakTintB         = 1.00f;
             Flare.GhostCount          = 6;
-            Flare.GhostIntensity      = 0.25f;
-            Flare.GhostDispersal      = 0.43f;
-            Flare.GhostSize           = 2.20f;
-            Flare.GhostChromatic      = 0.42f;
-            Flare.StarburstBlades     = 7;
-            Flare.StarburstIntensity  = 4.2f;
-            Flare.StarburstLength     = 8.0f;
-            Flare.StarburstSharpness  = 28.0f;
-            Flare.HaloIntensity       = 0.20f;
-            Flare.HaloRadius          = 2.45f;
-            Flare.HaloThickness       = 0.70f;
-            Flare.HaloFalloff         = 2.00f;
+            Flare.GhostIntensity      = 0.30f;
+            Flare.GhostDispersal      = 0.40f;
+            Flare.GhostSize           = 1.70f;
+            Flare.GhostChromatic      = 0.62f;
+            Flare.StarburstBlades     = 6;
+            Flare.StarburstIntensity  = 2.6f;
+            Flare.StarburstLength     = 6.5f;
+            Flare.StarburstSharpness  = 15.0f;
+            Flare.HaloIntensity       = 0.30f;
+            Flare.HaloRadius          = 2.35f;
+            Flare.HaloThickness       = 1.05f;
+            Flare.HaloFalloff         = 1.80f;
             break;
 
         case LensFlareStyleCategory::Custom:

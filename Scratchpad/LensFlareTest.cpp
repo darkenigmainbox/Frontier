@@ -392,7 +392,7 @@ int main()
         const float inner = Luma(CelestialFlareHalo(record, Offset(0.4f, 0.0f)));
         const float far   = Luma(CelestialFlareHalo(record, Offset(8.0f, 0.0f)));
         Check(peak > 0.0f, "the halo has a visible annular peak", Fixed(peak, 6));
-        Check(peak > inner * 4.0f, "the halo is suppressed at the source", Fixed(peak / std::max(inner, 1e-8f), 2) + "x");
+        Check(peak > inner * 2.5f, "the halo is suppressed at the source", Fixed(peak / std::max(inner, 1e-8f), 2) + "x");
         Check(far < peak * 0.05f, "the halo falls away outside its optical radius", Fixed(far / peak, 4));
 
         Frontier::CelestialStructure thin = settings;

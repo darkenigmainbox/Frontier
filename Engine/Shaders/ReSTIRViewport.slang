@@ -696,37 +696,39 @@ vec3 CelestialFlareGhosts(CelestialRecord sky, vec3 rayDirection, vec3 forward)
     vec3  sunDirection = sky.SunDirectionAndCosRadius.xyz;
     float dispersal    = max(sky.FlareGhostAndCount.y, 0.0);
     float size         = max(sky.FlareGhostAndCount.z, 1e-5);
-    float chromatic    = max(sky.FlareChromaAndFade.x, 0.0);
+    float chromatic    = clamp(sky.FlareChromaAndFade.x, 0.0, 1.5);
 
     vec3 sunOffset = sunDirection - forward * dot(sunDirection, forward);
     float offAxis  = length(sunOffset);
     if (offAxis < 1e-4) return vec3(0.0);
 
     vec3 axis = sunOffset / offAxis;
-    // Ghosts fade in smoothly as the source leaves centre; this avoids a discontinuity at the exact optical axis.
+    // A reflection chain is undefined on the exact optical axis. Fade it in smoothly as the source leaves centre.
     float centreFade = smoothstep(0.0, 0.055, offAxis);
     vec3 total = vec3(0.0);
     for (int i = 1; i <= count; ++i)
     {
-        // A small first reflection sits beyond the centre, while later reflections spread farther and grow.
-        float step       = offAxis * (0.52 + float(i) * dispersal);
-        vec3  centre     = normalize(forward - axis * step);
-        float distance   = length(rayDirection - centre * dot(rayDirection, centre));
-        float radius     = size * (0.52 + 0.38 * float(i));
+        // Keep the first reflection between the source and the frame centre; later reflections cross the centre
+        //    and spread beyond it. This makes a readable chain instead of six discs piled at one end of the frame.
+        float position = offAxis * (0.15 + float(i) * dispersal * 0.85);
+        vec3  centre   = normalize(forward - axis * position);
+        float distance = length(rayDirection - centre * dot(rayDirection, centre));
+        float radius   = size * (0.48 + 0.20 * float(i));
         if (distance > radius) continue;
 
         float t = clamp(distance / radius, 0.0, 1.0);
-        // Soft aperture image: a diffuse body, a restrained coating rim, and no hard disc edge.
+        // A soft image of the aperture with a coloured coating rim. The rim is bright enough to read at low
+        //    sample counts but is not a hard procedural circle.
         float body = 1.0 - smoothstep(0.0, 1.0, t);
-        float rim  = exp(-pow((t - 0.72) / 0.20, 2.0)) * 0.16;
-        float disc = body * body * (0.82 + 0.18 * (1.0 - t)) + rim;
+        float rim  = exp(-pow((t - 0.74) / 0.18, 2.0)) * 0.22;
+        float disc = body * body * (0.74 + 0.26 * (1.0 - t)) + rim;
 
-        // Coatings separate wavelengths gradually. Keeping a white base prevents ghosts from becoming isolated
-        //    primary-colour stickers while the signed cosine shift gives the chain a coherent spectral drift.
-        float phase = float(i) * chromatic * 1.35;
-        vec3  tint  = clamp(vec3(1.0) + 0.34 * chromatic * vec3(cos(phase),
-                           cos(phase + 2.094), cos(phase + 4.189)), 0.0, 1.35);
-        float falloff = exp(-0.16 * float(i - 1)) * (0.94 - 0.035 * float(i - 1));
+        // Coating dispersion is progressive and stays near white. The phase is shared by all ghosts, so the chain
+        //    moves through colour as one optical system rather than becoming unrelated RGB stickers.
+        float phase = float(i) * chromatic * 1.20;
+        vec3  shift = vec3(cos(phase), cos(phase + 2.094), cos(phase + 4.189));
+        vec3  tint  = clamp(vec3(1.0) + 0.36 * chromatic * shift, 0.0, 1.42);
+        float falloff = exp(-0.24 * float(i - 1)) * (0.98 - 0.055 * float(i - 1));
         total += tint * disc * falloff;
     }
 
@@ -750,20 +752,31 @@ vec3 CelestialFlareStarburst(CelestialRecord sky, vec3 rayDirection, vec3 right,
     float theta  = atan(dot(offset, up), dot(offset, right));
     float blades = max(sky.FlareBurstAndChroma.w, 3.0);
     float spikes = mod(blades, 2.0) < 0.5 ? blades : blades * 2.0;
-    float edge   = abs(cos(theta * spikes * 0.5));
     float sharp  = max(sky.FlareBurstAndChroma.z, 1.0);
+    float radial = angle / reach;
 
-    // Diffraction has a hard core and a much broader shoulder. Both vanish between the blade-edge maxima, keeping
-    //    real gaps at a fixed radius while avoiding the unnaturally binary old asterisk.
-    float narrow = pow(edge, sharp);
-    float broad  = pow(edge, max(sharp * 0.30, 1.0));
-    float lobe   = 0.78 * narrow + 0.22 * broad;
+    // A stopped aperture produces a narrow edge diffraction order plus a weaker, wider shoulder. Offset the
+    //    wavelengths by a fraction of a pixel-equivalent angular width: the star has coloured feathering, not
+    //    three disconnected primary-colour rays.
+    float separation = 0.010 + 0.026 * radial;
+    float redEdge    = abs(cos((theta + separation) * spikes * 0.5));
+    float greenEdge  = abs(cos(theta * spikes * 0.5));
+    float blueEdge   = abs(cos((theta - separation) * spikes * 0.5));
+    float redLobe    = 0.82 * pow(redEdge, sharp)   + 0.18 * pow(redEdge, max(sharp * 0.32, 1.0));
+    float greenLobe  = 0.82 * pow(greenEdge, sharp) + 0.18 * pow(greenEdge, max(sharp * 0.32, 1.0));
+    float blueLobe   = 0.82 * pow(blueEdge, sharp)  + 0.18 * pow(blueEdge, max(sharp * 0.32, 1.0));
 
-    float r       = angle / reach;
-    float envelope= exp(-pow(r / 0.68, 1.35) * 1.55) * (1.0 - smoothstep(0.86, 1.0, r));
-    float core    = exp(-pow(angle / max(reach * 0.16, 1e-5), 2.0)) * 0.12;
-    vec3 spectral = vec3(1.0, 0.95, 0.88);
-    return spectral * (lobe * envelope + core) * sky.FlareBurstAndChroma.x;
+    // The envelope is broad at the source and rolls out naturally. Slight channel-dependent reach gives a very
+    //    restrained diffraction fringe at the ends of the blades.
+    // Alternate blade edges have slightly different effective lengths, a useful aperture cue that breaks the
+    //    perfectly uniform computer-generated asterisk while retaining the correct diffraction spike count.
+    float signedEdge = cos(theta * spikes * 0.5);
+    float lengthScale = 0.74 + 0.26 * (0.5 + 0.5 * signedEdge);
+    float envelope = exp(-pow(radial / max(0.70 * lengthScale, 1e-4), 1.28) * 1.45)
+                   * (1.0 - smoothstep(0.88 * lengthScale, lengthScale, radial));
+    vec3  spikesRgb = vec3(redLobe, greenLobe, blueLobe) * envelope;
+    float apertureBloom = exp(-pow(angle / max(reach * 0.19, 1e-5), 2.0)) * 0.18;
+    return spikesRgb * sky.FlareBurstAndChroma.x + vec3(1.0, 0.96, 0.90) * apertureBloom * sky.FlareBurstAndChroma.x;
 }
 
 // Halo: a controlled annulus around the source, not an atmospheric haze. Its profile is explicit and soft, with a
@@ -777,9 +790,16 @@ vec3 CelestialFlareHalo(CelestialRecord sky, vec3 rayDirection)
     float radius    = max(sky.FlareHalo.y, 1e-5);
     float thickness = max(sky.FlareHalo.z, radius * 0.08);
     float profile   = max(sky.FlareHalo.w, 0.5);
-    float ring      = exp(-pow(abs(angle - radius) / thickness, profile));
-    float shoulder  = 0.12 * exp(-pow(abs(angle - radius) / (thickness * 2.8), 2.0));
-    return vec3((ring + shoulder) * sky.FlareHalo.x);
+    float distance  = abs(angle - radius);
+
+    // Two orders keep the halo soft at normal resolution: a coloured inner ring and a broad neutral shoulder.
+    //    It is a ring around the source, but never a flat disk or a second atmospheric sun.
+    float ring       = exp(-pow(distance / thickness, profile));
+    float broad      = 0.26 * exp(-pow(distance / (thickness * 2.6), 2.0));
+    float innerBloom = 0.16 * exp(-pow(angle / max(radius * 0.62, 1e-5), 2.0));
+    float chroma     = clamp((angle - radius) / max(thickness * 1.7, 1e-5), -1.0, 1.0);
+    vec3  spectral   = vec3(1.0 + 0.10 * chroma, 1.0, 1.0 - 0.08 * chroma);
+    return (spectral * (ring + broad) + vec3(innerBloom)) * sky.FlareHalo.x;
 }
 
 // Everything the lens adds, composited. `occlusion` is 1 when the sun is fully visible and 0 when hidden.
