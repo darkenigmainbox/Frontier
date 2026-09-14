@@ -605,6 +605,26 @@ which was always fine. 43 checks. **ALL 25 SUITES GREEN.**
 re-cloned the third-party trees and libJolt. Unrelated to the work.
 
 
+### CLOUDS: the overcast ring was an under-sampled bounded layer (2026-09-14)
+
+User review of `Renders/38_clouds_overcast.png` caught a new visual failure: overcast was reading as a set of
+concentric rings / horizontal cloud bands rather than as one volumetric deck. The cause was not the density field
+or the soft-edge absorption fix. `MediaScatter` skipped the slab clip whenever any fog was enabled, so a sky ray
+was marched uniformly across the full 200 km fog span. At a ten-degree elevation the 900 m cloud layer received
+only one or two of the 48 samples; the exact midpoint planes aligned across neighbouring rays and made the thin
+layer appear as rings.
+
+Fixed in the production integrator, without adding a second medium path:
+- intersect the global cloud slab independently of fog;
+- stratify the same step budget into cloud, pre-cloud and post-cloud intervals, giving the deck up to 24 samples;
+- keep full-span samples for unbounded fog and local volumes, and return immediately for a cloud-only miss;
+- add stable, position-based per-ray jitter so the march is not a stack of shared midpoint planes. It is deterministic,
+  so temporal accumulation cannot shimmer.
+
+The CPU-compiled shipping shader now renders overcast as a continuous, textured cloud deck with no concentric ring.
+`Scratchpad/CelestialMediaTest.cpp` remains green at 46 checks; `CheckCelestialMedia.sh` also passes. The cloud
+renders were regenerated from the production shader port after the fix.
+
 Status log (append; newest last):
 - 2026-09-13: P0 LANDED (stability; no sky code). The three faults are fixed and measured.
   0a. ObserveCamera no longer restarts the accumulation on camera motion. Every temporal path is gated on

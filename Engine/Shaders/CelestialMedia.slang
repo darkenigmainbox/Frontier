@@ -392,44 +392,135 @@ vec3 MediaScatter(CelestialRecord sky, vec3 origin, vec3 direction, vec3 sunDire
     float ambient    = sky.CloudLighting.w;
     float powder     = sky.CloudShape.w;
 
-    // ⚠️ THE MARCH IS BOUNDED BY THE LAYER, NOT BY THE HORIZON. A ray that never reaches the cloud slab must not
-    //    pay for 64 steps of empty sky. Clip to the slab first; only fog (which is everywhere) uses the full
-    //    span, and fog needs no noise so its samples are cheap.
-    float near = 0.0;
-    float far  = maxDistance;
+    // ⚠️ A GLOBAL CLOUD LAYER MUST BE CLIPPED EVEN WHEN FOG IS ENABLED. The old code treated "fog is
+    //    present" as "march the whole 200 km uniformly". At a ten-degree elevation that gave the 900 m cloud
+    //    deck only one or two of the 48 samples; at overcast those under-sampled samples lined up into the
+    //    visible concentric bands / ring around the horizon. Fog is unbounded, but clouds are not.
+    //
+    //    The march is therefore stratified around the slab: reserve most samples for the actual cloud interval,
+    //    and spend the remainder on the fog before and after it. With no fog, a ray that misses the slab returns
+    //    immediately and a ray that hits it spends every sample there. This is still one integrator for every
+    //    medium; it is only a better allocation of the same budget.
+    bool fogPresent   = (flags & (kCelestialFlagFog | kCelestialFlagLocalFog)) != 0u;
+    bool cloudPresent = sky.CloudLayer.x > 0.0 && sky.CloudLayer.w > 0.0;
+    bool cloudHit     = false;
+    float cloudNear   = 0.0;
+    float cloudFar    = maxDistance;
 
-    bool fogPresent = (flags & (kCelestialFlagFog | kCelestialFlagLocalFog)) != 0u;
-    if (!fogPresent && sky.CloudLayer.x > 0.0)
+    if (cloudPresent)
     {
         float base = sky.CloudLayer.z;
         float top  = base + sky.CloudLayer.w;
 
         if (abs(direction.z) < 1e-5)
         {
-            if (origin.z < base || origin.z > top) return vec3(0.0);
+            cloudHit = origin.z >= base && origin.z <= top;
         }
         else
         {
             float tBase = (base - origin.z) / direction.z;
             float tTop  = (top  - origin.z) / direction.z;
-            near = max(0.0, min(tBase, tTop));
-            far  = min(maxDistance, max(tBase, tTop));
-            if (far <= near) return vec3(0.0);
+            cloudNear = max(0.0, min(tBase, tTop));
+            cloudFar  = min(maxDistance, max(tBase, tTop));
+            cloudHit  = cloudFar > cloudNear;
         }
+
+        if (!fogPresent && !cloudHit) return vec3(0.0);
     }
 
-    float step = (far - near) / float(steps);
+    int preSteps = steps;
+    int cloudSteps = 0;
+    int postSteps = 0;
+    if (cloudHit)
+    {
+        if (!fogPresent)
+        {
+            // There is no unbounded medium to cover, so do not waste samples outside the slab.
+            preSteps = 0;
+            cloudSteps = steps;
+            postSteps = 0;
+        }
+        else
+        {
+            // Half the budget resolves the cloud profile. The other half samples atmospheric/local fog over the
+            //    remaining distance, with the split proportional to the two outside intervals. Twelve samples is
+            //    the minimum at the small surface/occlusion budgets; 24 is enough at the 48-step sky budget to
+            //    remove the old slab banding without turning every miss into a 32-sample inner march.
+            cloudSteps = min(24, max(12, steps / 2));
+            float before = cloudNear;
+            float after  = max(maxDistance - cloudFar, 0.0);
+            float outside = before + after;
+            if (outside > 1e-4)
+            {
+                int outsideSteps = steps - cloudSteps;
+                preSteps  = min(outsideSteps, int(float(outsideSteps) * before / outside + 0.5));
+                postSteps = outsideSteps - preSteps;
+            }
+            else
+            {
+                // A ray inside the slab for its whole bounded march: all samples belong to the cloud interval.
+                preSteps = 0;
+                cloudSteps = steps;
+                postSteps = 0;
+            }
+        }
+    }
+    else
+    {
+        // No global deck intersects this ray. It still needs a normal full-span march for fog and local volumes.
+        preSteps = 0;
+        cloudSteps = steps;
+        postSteps = 0;
+    }
+
+    // A position-based jitter is stable across frames (no cloud shimmer) but breaks the exact midpoint planes that
+    //    turned a shallow, overcast slab into a stack of concentric rings. The golden-ratio offset gives every sample
+    //    a different stratum without adding a random stream or changing the public integrator signature.
+    float rayJitter = fract(sin(dot(floor(direction * 2048.0) + floor(origin * 0.125),
+                                    vec3(127.1, 311.7, 74.7))) * 43758.5453123);
+
     vec3  radiance = vec3(0.0);
     float transmittance = 1.0;
 
     for (int i = 0; i < steps; ++i)
     {
-        vec3 position = origin + direction * (near + step * (float(i) + 0.5));
+        float segmentNear;
+        float segmentFar;
+        int localIndex;
+        int localCount;
+
+        if (i < preSteps)
+        {
+            segmentNear = 0.0;
+            segmentFar  = cloudNear;
+            localIndex  = i;
+            localCount  = preSteps;
+        }
+        else if (i < preSteps + cloudSteps)
+        {
+            segmentNear = cloudHit ? cloudNear : 0.0;
+            segmentFar  = cloudHit ? cloudFar  : maxDistance;
+            localIndex  = i - preSteps;
+            localCount  = cloudSteps;
+        }
+        else
+        {
+            segmentNear = cloudFar;
+            segmentFar  = maxDistance;
+            localIndex  = i - preSteps - cloudSteps;
+            localCount  = postSteps;
+        }
+
+        float segmentLength = (segmentFar - segmentNear) / max(float(localCount), 1.0);
+        float u = (float(localIndex) + 0.5 + fract(rayJitter + float(localIndex) * 0.618033989))
+                / max(float(localCount), 1.0);
+        u = clamp(u, 0.001, 0.999);
+        vec3 position = origin + direction * (segmentNear + (segmentFar - segmentNear) * u);
 
         float density = MediaDensity(sky, position);
         if (density <= 0.001) continue;   // empty space is the common case; skip the lighting work
 
-        float extinction = density * absorption * step;
+        float extinction = density * absorption * segmentLength;
 
         // Sunlight reaching here, self-shadowed by the medium above.
         float sunlight = MediaSunTransmittance(sky, position, sunDirection);

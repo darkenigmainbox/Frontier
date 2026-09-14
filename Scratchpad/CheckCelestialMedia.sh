@@ -79,6 +79,11 @@ CheckConstant "clouds shadow the ground"              'float MediaSunShadow' "$M
 CheckConstant "and the shadow is wired to the sun light" 'MediaSunShadow\(Celestial\[0\], hitPos' "$Viewport"
 CheckConstant "coverage erodes through a remap"       'MediaRemap\(shape, 1\.0 - coverage' "$Media"
 CheckConstant "the height gradient shapes the slab"   'bottomGradient \* topGradient' "$Media"
+# The cloud deck has a bounded interval even when the unbounded fog flag is also on. Without this allocation,
+#    a shallow ray gets one cloud sample in a 200 km fog march and the deck becomes concentric rings.
+CheckConstant "the cloud slab is intersected independently of fog" 'bool cloudHit' "$Media"
+CheckConstant "fog and clouds receive separate sample strata"     'cloudSteps = min\(24, max\(12' "$Media"
+CheckConstant "the march has stable per-ray jitter"                'float rayJitter' "$Media"
 
 # The float32 hash trap: constants above 2^24 are rounded before use and the field collapses to a constant.
 if grep -qE 'MediaHash' "$Media" && grep -A6 'float MediaHash' "$Media" | grep -qE '[0-9]{9,}\.0'; then
