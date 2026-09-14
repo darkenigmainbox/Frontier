@@ -622,8 +622,12 @@ Fixed in the production integrator, without adding a second medium path:
   so temporal accumulation cannot shimmer.
 
 The CPU-compiled shipping shader now renders overcast as a continuous, textured cloud deck with no concentric ring.
-`Scratchpad/CelestialMediaTest.cpp` remains green at 46 checks; `CheckCelestialMedia.sh` also passes. The cloud
-renders were regenerated from the production shader port after the fix.
+The same pass also closes the local-volume gap: local clouds already shared view scattering, but their direct-sun
+shadow was missing; `MediaSunShadow` now ray-box intersects the local volume and attenuates the sun with the same
+local density field. The local cloud centre and half-extents are also exposed as live properties, so the volume is
+not a hard-coded demo puff. `Scratchpad/CelestialMediaTest.cpp` is green at 48 checks, including local camera
+transmittance and local sun occlusion; `CheckCelestialMedia.sh` also passes. The cloud renders were regenerated
+from the production shader port after the fix.
 
 Status log (append; newest last):
 - 2026-09-13: P0 LANDED (stability; no sky code). The three faults are fixed and measured.

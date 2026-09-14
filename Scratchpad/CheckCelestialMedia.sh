@@ -77,6 +77,8 @@ else
 fi
 CheckConstant "clouds shadow the ground"              'float MediaSunShadow' "$Media"
 CheckConstant "and the shadow is wired to the sun light" 'MediaSunShadow\(Celestial\[0\], hitPos' "$Viewport"
+CheckConstant "local clouds share the density path"     'float MediaLocalCloudDensity' "$Media"
+CheckConstant "local clouds cast direct-sun shadows"    'MediaLocalCloudDensity\(sky, position\)' "$Media"
 CheckConstant "coverage erodes through a remap"       'MediaRemap\(shape, 1\.0 - coverage' "$Media"
 CheckConstant "the height gradient shapes the slab"   'bottomGradient \* topGradient' "$Media"
 # The cloud deck has a bounded interval even when the unbounded fog flag is also on. Without this allocation,
@@ -102,7 +104,7 @@ CheckConstant "and a fill factor tempers the slab depth" '#define kMediaAmbientF
 # ── Dynamic settings ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 echo
 echo "[CelestialMedia] every medium is controllable"
-for Key in clouds.coverage clouds.backwardLobe clouds.absorption fog.density localCloud.enabled localFog.enabled; do
+for Key in clouds.coverage clouds.backwardLobe clouds.absorption fog.density localCloud.enabled localCloud.centreX localCloud.extentZ localFog.enabled; do
     if grep -q "\"$Key\"" Engine/DisplayPresentation/CelestialStructure.h; then
         echo "  OK    $Key is a registered property"
     else

@@ -236,28 +236,37 @@ float MediaBoxDensity(vec3 worldPosition, vec3 centre, vec3 extent, float densit
     return max(covered, 0.0) * falloff * density;
 }
 
+// The local cloud source is factored out because direct sunlight uses the same volume for shadowing. Keeping
+//    this beside the density function prevents the common bug where a local puff is visible to the camera but is
+//    ignored by the sun shadow, i.e. scenery instead of a participating volume.
+float MediaLocalCloudDensity(CelestialRecord sky, vec3 worldPosition)
+{
+    uint flags = uint(sky.ExposureAndFlags.w);
+    if ((flags & kCelestialFlagLocalCloud) == 0u) return 0.0;
+
+    return MediaBoxDensity(worldPosition,
+                           sky.LocalCloudCentreAndDensity.xyz,
+                           sky.LocalCloudExtentAndCoverage.xyz,
+                           sky.LocalCloudCentreAndDensity.w,
+                           sky.LocalCloudExtentAndCoverage.w,
+                           MediaWindOffset(sky, 0.5),
+                           sky.CloudShape.x * 0.08,
+                           kMediaLocalOctaves);
+}
+
+// Global and local clouds share this source so view transmittance, self-shadowing and ground shadowing cannot
+//    disagree about which cloud exists at a point. Fog is intentionally not included; it has its own column model.
+float MediaCloudDensity(CelestialRecord sky, vec3 worldPosition)
+{
+    return MediaLayerDensity(sky, worldPosition) + MediaLocalCloudDensity(sky, worldPosition);
+}
+
 // 🔴 THE ONE DENSITY FUNCTION. Every medium in the scene, summed. This is the concrete form of "they are all the
 //    same category": the integrator below never learns which of the four produced the density it is marching.
 float MediaDensity(CelestialRecord sky, vec3 worldPosition)
 {
     uint flags = uint(sky.ExposureAndFlags.w);
-    float total = 0.0;
-
-    // Global cloud layer.
-    total += MediaLayerDensity(sky, worldPosition);
-
-    // Local cloud: a bounded puff, using the cloud shape scale so it matches the deck it sits under.
-    if ((flags & kCelestialFlagLocalCloud) != 0u)
-    {
-        total += MediaBoxDensity(worldPosition,
-                                 sky.LocalCloudCentreAndDensity.xyz,
-                                 sky.LocalCloudExtentAndCoverage.xyz,
-                                 sky.LocalCloudCentreAndDensity.w,
-                                 sky.LocalCloudExtentAndCoverage.w,
-                                 MediaWindOffset(sky, 0.5),
-                                 sky.CloudShape.x * 0.08,
-                                 kMediaLocalOctaves);
-    }
+    float total = MediaCloudDensity(sky, worldPosition);
 
     // Atmospheric fog: an exponential column, densest at the ground. No noise — fog at this scale is smooth, and
     //    adding noise to it makes it look like smoke.
@@ -631,39 +640,77 @@ vec3 MediaScatter(CelestialRecord sky, vec3 origin, vec3 direction, vec3 sunDire
     return radiance;
 }
 
-// 🔴 HOW MUCH DIRECT SUNLIGHT A GROUND POINT RECEIVES THROUGH THE CLOUD DECK.
+// 🔴 HOW MUCH DIRECT SUNLIGHT A GROUND POINT RECEIVES THROUGH CLOUD VOLUMES.
 //
 //    Without this, clouds are painted on the sky and the ground below them stays in full sun — which is the
 //    single most obvious way volumetric clouds fail to be lighting. It is also what the user noticed:
 //    "clouds are also blocking light it seems", i.e. they should be and were not.
 //
 //    ⚠️ A FULL MARCH IS NOT AFFORDABLE HERE. This runs on the shadow-ray path, once per shaded pixel, so it
-//    samples the deck a handful of times along the line to the sun instead of marching it. That is enough to
-//    get a moving, shaped shadow — the point is that a cloud passing overhead dims the ground beneath it, not
-//    that the shadow edge is pixel-exact.
+//    samples each bounded volume a handful of times along the line to the sun instead of marching the whole
+//    atmosphere. Global layers and local boxes use their own intervals, so a floating local cloud also casts a
+//    real, continuous shadow rather than only being visible to the camera.
+bool MediaBoxRayInterval(vec3 origin, vec3 direction, vec3 centre, vec3 extent,
+                         out float outNear, out float outFar)
+{
+    vec3 inverseDirection = 1.0 / direction;
+    vec3 t0 = (centre - extent - origin) * inverseDirection;
+    vec3 t1 = (centre + extent - origin) * inverseDirection;
+    vec3 lower = min(t0, t1);
+    vec3 upper = max(t0, t1);
+
+    outNear = max(0.0, max(lower.x, max(lower.y, lower.z)));
+    outFar  = min(upper.x, min(upper.y, upper.z));
+    return outFar > outNear;
+}
+
 float MediaSunShadow(CelestialRecord sky, vec3 worldPosition, vec3 sunDirection)
 {
-    float coverage = sky.CloudLayer.x;
-    if (coverage <= 0.0 || sunDirection.z <= 0.01) return 1.0;
-
-    float base      = sky.CloudLayer.z;
-    float thickness = sky.CloudLayer.w;
-
-    // Where the line to the sun crosses the slab. Below the deck this is a climb; inside it, a short hop.
-    float toBase = (base - worldPosition.z) / sunDirection.z;
-    float toTop  = (base + thickness - worldPosition.z) / sunDirection.z;
-    float near = max(0.0, min(toBase, toTop));
-    float far  = max(toBase, toTop);
-    if (far <= near) return 1.0;
-
-    float span = far - near;
-    float step = span / float(kMediaShadowSteps);
+    uint flags = uint(sky.ExposureAndFlags.w);
+    bool globalCloud = sky.CloudLayer.x > 0.0 && sky.CloudLayer.w > 0.0 && sunDirection.z > 0.01;
+    bool localCloud  = (flags & kCelestialFlagLocalCloud) != 0u
+                    && sky.LocalCloudCentreAndDensity.w > 0.0;
+    if (!globalCloud && !localCloud) return 1.0;
 
     float depth = 0.0;
-    for (int i = 0; i < kMediaShadowSteps; ++i)
+
+    if (globalCloud)
     {
-        vec3 position = worldPosition + sunDirection * (near + step * (float(i) + 0.5));
-        depth += MediaLayerDensity(sky, position) * step;
+        float base      = sky.CloudLayer.z;
+        float thickness = sky.CloudLayer.w;
+
+        // Where the line to the sun crosses the slab. Below the deck this is a climb; inside it, a short hop.
+        float toBase = (base - worldPosition.z) / sunDirection.z;
+        float toTop  = (base + thickness - worldPosition.z) / sunDirection.z;
+        float near = max(0.0, min(toBase, toTop));
+        float far  = max(toBase, toTop);
+        if (far > near)
+        {
+            float step = (far - near) / float(kMediaShadowSteps);
+            for (int i = 0; i < kMediaShadowSteps; ++i)
+            {
+                vec3 position = worldPosition + sunDirection * (near + step * (float(i) + 0.5));
+                depth += MediaLayerDensity(sky, position) * step;
+            }
+        }
+    }
+
+    if (localCloud)
+    {
+        float near;
+        float far;
+        if (MediaBoxRayInterval(worldPosition, sunDirection,
+                                 sky.LocalCloudCentreAndDensity.xyz,
+                                 sky.LocalCloudExtentAndCoverage.xyz,
+                                 near, far))
+        {
+            float step = (far - near) / float(kMediaShadowSteps);
+            for (int i = 0; i < kMediaShadowSteps; ++i)
+            {
+                vec3 position = worldPosition + sunDirection * (near + step * (float(i) + 0.5));
+                depth += MediaLocalCloudDensity(sky, position) * step;
+            }
+        }
     }
 
     // The same absorption the view march uses, so a cloud that LOOKS opaque also SHADES as if it were.

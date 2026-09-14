@@ -638,6 +638,35 @@ int main()
         Check(std::get<2>(heavy) < 0.35f,
               "near-overcast leaves little direct sun on the ground",
               Fixed(std::get<2>(heavy) * 100.0, 1) + "% of full sun");
+
+        // A local cloud must be a real participating volume too, not a camera-only decal. Put a test puff directly
+        //    on the sun ray, disable the global deck, and verify both camera transmittance and ground sun shadow.
+        Frontier::CelestialStructure local = settings;
+        local.Clouds.Coverage = 0.0f;
+        local.AtmosphericFog.Enabled = false;
+        local.LocalCloud.Enabled = true;
+        local.LocalCloud.Density = 4.0f;
+        local.LocalCloud.Coverage = 0.0f;
+        const Frontier::CelestialSolution localSolution = Frontier::SolveCelestial(local);
+        for (int c = 0; c < 3; ++c)
+        {
+            local.LocalCloud.Centre[c] = localSolution.SunDirection[c] * 120.0f;
+            local.LocalCloud.Extent[c] = 45.0f;
+        }
+        CelestialRecord localRecord = BuildRecord(local);
+        gCelestialRecordPtr = &localRecord;
+        const vec3 localSun = localRecord.SunDirectionAndCosRadius.xyz();
+        const vec3 localRay = normalize(vec3(local.LocalCloud.Centre[0], local.LocalCloud.Centre[1], local.LocalCloud.Centre[2]));
+        float localTransmittance = 0.0f;
+        MediaScatter(localRecord, vec3(0.0f), localRay, localSun, vec3(1.0f), vec3(0.1f),
+                     300.0f, 48, localTransmittance);
+        Check(localTransmittance < 0.99f,
+              "a local cloud attenuates a camera ray",
+              "transmittance " + Fixed(localTransmittance, 4));
+        const float localShadow = MediaSunShadow(localRecord, vec3(0.0f), localSun);
+        Check(localShadow < 0.9f,
+              "a local cloud also occludes direct sunlight",
+              "sun transmittance " + Fixed(localShadow, 4));
     }
 
     //----------------------------------------------------------------------------------------------------------------

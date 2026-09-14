@@ -514,6 +514,12 @@ inline constexpr CelestialProperty kCelestialProperties[] =
     //    changing one silently contradicts the other in the same file.
 
     FRONTIER_CELESTIAL_SWITCH("localCloud.enabled",  LocalCloud.Enabled, "box-bounded local cloud volume"),
+    FRONTIER_CELESTIAL_REAL("localCloud.centreX", "m", LocalCloud.Centre[0], -10000.0f, 10000.0f, "local cloud centre X"),
+    FRONTIER_CELESTIAL_REAL("localCloud.centreY", "m", LocalCloud.Centre[1], -10000.0f, 10000.0f, "local cloud centre Y"),
+    FRONTIER_CELESTIAL_REAL("localCloud.centreZ", "m", LocalCloud.Centre[2], -1000.0f, 12000.0f, "local cloud centre height"),
+    FRONTIER_CELESTIAL_REAL("localCloud.extentX", "m", LocalCloud.Extent[0], 1.0f, 10000.0f, "local cloud half-width X"),
+    FRONTIER_CELESTIAL_REAL("localCloud.extentY", "m", LocalCloud.Extent[1], 1.0f, 10000.0f, "local cloud half-width Y"),
+    FRONTIER_CELESTIAL_REAL("localCloud.extentZ", "m", LocalCloud.Extent[2], 1.0f, 10000.0f, "local cloud half-height"),
     FRONTIER_CELESTIAL_REAL("localCloud.density", "x", LocalCloud.Density,  0.0f, 8.0f, "local volume density"),
     FRONTIER_CELESTIAL_REAL("localCloud.coverage","-", LocalCloud.Coverage, 0.0f, 1.0f, "local volume coverage"),
 
