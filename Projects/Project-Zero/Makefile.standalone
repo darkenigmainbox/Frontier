@@ -1,0 +1,61 @@
+#============================================================================================================================================
+# Project-Zero/Makefile.standalone — headless build against the minimal engine subset in this repository.
+#
+# The full `Makefile` links the entire Frontier engine (Vulkan, windowing, UI, …). This file builds the same
+# Project-Zero sources against only the engine translation units they actually use, all present here:
+#   DeviceExchange/{OrientationClassifier,DiagnosticMetrics,InputExchange} + GeometricRaster/CameraProjection.
+#
+#   make -f Makefile.standalone            → bin/Project-Zero   (shipped ReSTIR + celestial frame)
+#   make -f Makefile.standalone proof      → bin/ProofCelestial (flare/cloud exactness proof, Proof/)
+#   make -f Makefile.standalone run        → build + run the shipped binary (writes Diagnostics/*.ppm)
+#   make -f Makefile.standalone proof-run  → build + run the proof (writes Proof/*.ppm, *.ppm is git-ignored)
+#============================================================================================================================================
+
+CXX       := g++
+CXXFLAGS  := -std=c++20 -O2 -Wall -Wextra -Werror -pedantic -pthread
+INCLUDES  := -I. -I../..
+
+SRC       := Source
+GAME_SRCS := $(wildcard $(SRC)/*.cpp)
+GAME_OBJS := $(GAME_SRCS:.cpp=.o)
+
+PROOF_SRCS     := Proof/ProofCelestial.cpp
+PROOF_OBJS     := $(PROOF_SRCS:.cpp=.o)
+PROOF_LIB_OBJS := $(SRC)/CelestialIntegrator.o ../../DeviceExchange/OrientationClassifier.o
+
+ENGINE_SRCS := ../../DeviceExchange/OrientationClassifier.cpp \
+               ../../DeviceExchange/DiagnosticMetrics.cpp \
+               ../../DeviceExchange/InputExchange.cpp \
+               ../../GeometricRaster/CameraProjection.cpp
+ENGINE_OBJS := $(ENGINE_SRCS:.cpp=.o)
+
+TARGET       := bin/Project-Zero
+PROOF_TARGET := bin/ProofCelestial
+
+.PHONY: all proof clean run proof-run
+
+all: $(TARGET)
+
+$(TARGET): $(ENGINE_OBJS) $(GAME_OBJS)
+	@mkdir -p bin
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^
+
+proof: $(PROOF_TARGET)
+
+$(PROOF_TARGET): $(PROOF_OBJS) $(PROOF_LIB_OBJS)
+	@mkdir -p bin
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -MMD -MP -c $< -o $@
+
+run: $(TARGET)
+	./$(TARGET)
+
+proof-run: $(PROOF_TARGET)
+	./$(PROOF_TARGET)
+
+clean:
+	rm -rf $(GAME_OBJS) $(GAME_OBJS:.o=.d) $(PROOF_OBJS) $(PROOF_OBJS:.o=.d) $(ENGINE_OBJS) $(ENGINE_OBJS:.o=.d) bin
+
+-include $(GAME_OBJS:.o=.d) $(PROOF_OBJS:.o=.d)
