@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AAA Desert Canyon - Frontier</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{overflow:hidden;background:#0a0a0a;font-family:system-ui}
+  canvas{display:block}
+  #ui{
+    position:absolute;top:20px;left:20px;z-index:10;
+    background:rgba(0,0,0,0.7);backdrop-filter:blur(12px);
+    border:1px solid rgba(255,255,255,0.1);
+    padding:16px 20px;border-radius:12px;color:#fff;
+    max-width:320px;
+  }
+  #ui h1{font-size:14px;letter-spacing:0.1em;text-transform:uppercase;opacity:0.9;margin-bottom:8px}
+  #ui p{font-size:12px;line-height:1.5;opacity:0.6}
+  #ui .stats{margin-top:12px;display:flex;gap:8px}
+  #ui .dot{width:8px;height:8px;border-radius:50%;background:#00ff88;box-shadow:0 0 10px #00ff88;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+  #controls{
+    position:absolute;bottom:20px;left:20px;z-index:10;
+    display:flex;gap:8px;
+  }
+  .btn{
+    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);
+    color:#fff;padding:8px 14px;border-radius:8px;font-size:11px;letter-spacing:0.05em;
+    cursor:pointer;backdrop-filter:blur(8px);transition:all 0.2s;
+  }
+  .btn:hover{background:rgba(255,255,255,0.2)}
+  .btn.active{background:#fff;color:#000}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="ui">
+  <h1>FRONTIER // CANYON_01</h1>
+  <p>AAA PBR Desert Canyon - Real-time displacement, instanced rocks, PCF soft shadows, atmospheric scattering. Drag to orbit, scroll to zoom, right-drag to pan.</p>
+  <div class="stats">
+    <div class="dot"></div>
+    <p id="statText">Loading terrain...</p>
+  </div>
+</div>
+<div id="controls">
+  <button class="btn active" id="btnReal">PBR REALISTIC</button>
+  <button class="btn" id="btnWire">WIREFRAME</button>
+  <button class="btn" id="btnTop">TOP DOWN RACE VIEW</button>
+  <button class="btn" id="btnCanyon">CANYON DRIVE</button>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { ImprovedNoise } from 'three/addons/math/ImprovedNoise.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+
+// Scene
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0xC9A67A, 0.0012);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 5000);
+camera.position.set(120, 85, 180);
+
+const renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.9;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.maxPolarAngle = Math.PI/2 - 0.05;
+controls.minDistance = 10;
+controls.maxDistance = 800;
+controls.target.set(0,0,0);
+
+// Sky
+const sky = new Sky();
+sky.scale.setScalar(3000);
+scene.add(sky);
+const skyUniforms = sky.material.uniforms;
+skyUniforms['turbidity'].value = 3.5;
+skyUniforms['rayleigh'].value = 1.2;
+skyUniforms['mieCoefficient'].value = 0.003;
+skyUniforms['mieDirectionalG'].value = 0.75;
+const phi = THREE.MathUtils.degToRad(88);
+const theta = THREE.MathUtils.degToRad(180);
+const sun = new THREE.Vector3();
+sun.setFromSphericalCoords(1, phi, theta);
+skyUniforms['sunPosition'].value.copy(sun);
+
+// Lighting - AAA desert sun
+const sunLight = new THREE.DirectionalLight(0xfff4e0, 3.5);
+sunLight.position.set(300, 400, 200);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(4096,4096);
+sunLight.shadow.camera.near = 1;
+sunLight.shadow.camera.far = 1200;
+sunLight.shadow.camera.left = -400;
+sunLight.shadow.camera.right = 400;
+sunLight.shadow.camera.top = 400;
+sunLight.shadow.camera.bottom = -400;
+sunLight.shadow.bias = -0.0003;
+scene.add(sunLight);
+
+const hemi = new THREE.HemisphereLight(0x8ecae6, 0x5a3e2b, 0.6);
+scene.add(hemi);
+
+const fillLight = new THREE.DirectionalLight(0xc9a67a, 0.4);
+fillLight.position.set(-200, 100, -200);
+scene.add(fillLight);
+
+// Terrain generation - realistic canyon
+const SIZE = 2000;
+const SEG = 350;
+const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
+geo.rotateX(-Math.PI/2);
+
+const noise = new ImprovedNoise();
+const zSeed = Math.random()*100;
+let nScale = 0.008;
+
+const pos = geo.attributes.position;
+const colors = [];
+const color = new THREE.Color();
+
+for(let i=0;i<pos.count;i++){
+  const x = pos.getX(i);
+  const z = pos.getZ(i);
+  
+  // Canyon shape: central valley
+  const distZ = Math.abs(z);
+  const canyonFloor = 150;
+  const canyonWallStart = 180;
+  const canyonWallHeight = 120;
+  
+  let canyonH = 0;
+  if(distZ < canyonFloor){
+    canyonH = -15 + Math.sin(x*0.01)*3; // slight river bed variation
+  } else if(distZ < canyonWallStart){
+    const t = (distZ - canyonFloor)/(canyonWallStart - canyonFloor);
+    canyonH = THREE.MathUtils.lerp(-15, 0, t*t);
+  } else {
+    const t = (distZ - canyonWallStart)/(SIZE/2 - canyonWallStart);
+    canyonH = Math.pow(t, 1.4) * canyonWallHeight;
+    // Add wall roughness
+    canyonH += Math.sin(x*0.02 + z*0.01)*8 * t;
+  }
+  
+  // Multi-octave noise for rocks
+  let n = 0;
+  let amp = 25, freq = nScale;
+  for(let o=0;o<4;o++){
+    n += noise.noise(x*freq, z*freq, zSeed) * amp;
+    amp *= 0.5;
+    freq *= 2.1;
+  }
+  // High freq detail for rocky surface
+  n += noise.noise(x*0.05, z*0.05, 0)*2;
+  
+  const h = canyonH + n;
+  pos.setY(i, h);
+  
+  // Vertex color based on height/slope - AAA texturing
+  const slopeFactor = distZ > canyonWallStart ? 0.9 : 0.3;
+  if(h < -5){
+    color.setRGB(0.76, 0.65, 0.48); // sandy floor
+  } else if(distZ > canyonWallStart){
+    // Rocky wall - stratified colors
+    const strat = Math.sin(h*0.15)*0.5+0.5;
+    if(strat > 0.7) color.setRGB(0.62, 0.36, 0.24); // red sandstone
+    else if(strat > 0.4) color.setRGB(0.55, 0.42, 0.33); // brown
+    else color.setRGB(0.68, 0.58, 0.48); // light rock
+  } else {
+    color.setRGB(0.8, 0.68, 0.5);
+  }
+  colors.push(color.r, color.g, color.b);
+}
+
+geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+geo.computeVertexNormals();
+
+// PBR Terrain material - super realistic
+const terrainMat = new THREE.MeshStandardMaterial({
+  vertexColors:true,
+  roughness:0.92,
+  metalness:0.05,
+  flatShading:false,
+});
+const terrain = new THREE.Mesh(geo, terrainMat);
+terrain.receiveShadow = true;
+terrain.castShadow = false;
+scene.add(terrain);
+
+// Instanced rocks - AAA scatter
+const rockGeo = new THREE.IcosahedronGeometry(1, 1);
+const rPos = rockGeo.attributes.position;
+for(let i=0;i<rPos.count;i++){
+  const v = new THREE.Vector3().fromBufferAttribute(rPos, i);
+  v.x += (Math.random()-0.5)*0.4;
+  v.y += (Math.random()-0.5)*0.4;
+  v.z += (Math.random()-0.5)*0.4;
+  rPos.setXYZ(i, v.x, v.y, v.z);
+}
+rockGeo.computeVertexNormals();
+
+const rockMat = new THREE.MeshStandardMaterial({
+  color:0x8a7060,
+  roughness:0.85,
+  metalness:0.1,
+  flatShading:false
+});
+
+const ROCK_COUNT = 800;
+const instancedRocks = new THREE.InstancedMesh(rockGeo, rockMat, ROCK_COUNT);
+instancedRocks.castShadow = true;
+instancedRocks.receiveShadow = true;
+
+const dummy = new THREE.Object3D();
+const _color = new THREE.Color();
+
+for(let i=0;i<ROCK_COUNT;i++){
+  const x = (Math.random()-0.5)*SIZE*0.9;
+  const z = (Math.random()-0.5)*SIZE*0.9;
+  const distZ = Math.abs(z);
+  
+  // Place more rocks on walls and floor edges
+  let y = 0;
+  // Sample terrain height roughly
+  if(distZ < 150) y = -10 + (Math.random()-0.5)*5;
+  else if(distZ < 180) y = (Math.random()-0.5)*10;
+  else {
+    const t = (distZ-180)/(1000-180);
+    y = Math.pow(t,1.4)*120 + (Math.random()-0.5)*20;
+  }
+  y += (Math.random()-0.5)*3;
+  
+  const scale = distZ < 160 ? 
+    THREE.MathUtils.lerp(0.8, 3.5, Math.random()) : 
+    THREE.MathUtils.lerp(1.5, 8, Math.random());
+  
+  dummy.position.set(x, y, z);
+  dummy.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+  dummy.scale.set(scale, scale*0.8, scale);
+  dummy.updateMatrix();
+  instancedRocks.setMatrixAt(i, dummy.matrix);
+  
+  // Color variation - sandstone palette
+  const cVar = Math.random();
+  if(cVar>0.6) _color.setRGB(0.62+Math.random()*0.1, 0.45+Math.random()*0.1, 0.32+Math.random()*0.1);
+  else if(cVar>0.3) _color.setRGB(0.75,0.65,0.55);
+  else _color.setRGB(0.55,0.48,0.42);
+  instancedRocks.setColorAt(i, _color);
+}
+instancedRocks.instanceMatrix.needsUpdate = true;
+instancedRocks.instanceColor.needsUpdate = true;
+scene.add(instancedRocks);
+
+// Large hero boulders - for racing obstacles
+const heroRocks = [];
+for(let i=0;i<12;i++){
+  const g = new THREE.DodecahedronGeometry(THREE.MathUtils.lerp(6,14,Math.random()), 1);
+  const m = new THREE.MeshStandardMaterial({
+    color:new THREE.Color().setHSL(0.08+Math.random()*0.05, 0.25, 0.5+Math.random()*0.1),
+    roughness:0.9,
+    metalness:0.05
+  });
+  const mesh = new THREE.Mesh(g,m);
+  const x = (Math.random()-0.5)*600;
+  const z = (Math.random()-0.5)*300;
+  if(Math.abs(z)<140) continue;
+  mesh.position.set(x, 5, z);
+  mesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  heroRocks.push(mesh);
+  scene.add(mesh);
+}
+
+// Dust particles - atmospheric
+const dustGeo = new THREE.BufferGeometry();
+const dustCount = 3000;
+const dustPos = new Float32Array(dustCount*3);
+for(let i=0;i<dustCount;i++){
+  dustPos[i*3] = (Math.random()-0.5)*1000;
+  dustPos[i*3+1] = Math.random()*200 + 5;
+  dustPos[i*3+2] = (Math.random()-0.5)*1000;
+}
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos,3));
+const dustMat = new THREE.PointsMaterial({color:0xC9A67A, size:0.8, transparent:true, opacity:0.25, sizeAttenuation:true});
+const dust = new THREE.Points(dustGeo, dustMat);
+scene.add(dust);
+
+// Race track spline - visual guide
+const curve = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(-800, -12, 0),
+  new THREE.Vector3(-400, -14, 20),
+  new THREE.Vector3(0, -13, -10),
+  new THREE.Vector3(400, -12, 15),
+  new THREE.Vector3(800, -10, 0),
+]);
+const trackGeo = new THREE.TubeGeometry(curve, 200, 3, 8, false);
+const trackMat = new THREE.MeshStandardMaterial({color:0x2a2a2a, roughness:0.7, metalness:0.2, emissive:0x111111});
+const track = new THREE.Mesh(trackGeo, trackMat);
+track.receiveShadow = true;
+scene.add(track);
+
+// Animate
+let time = 0;
+function animate(){
+  requestAnimationFrame(animate);
+  time += 0.005;
+  controls.update();
+  
+  // Subtle dust drift
+  dust.rotation.y = time*0.05;
+  
+  // Sun movement for dynamic shadows
+  // sunLight.position.x = 300*Math.cos(time*0.1);
+  // sunLight.position.z = 200*Math.sin(time*0.1);
+  
+  renderer.render(scene,camera);
+  document.getElementById('statText').textContent = `${ROCK_COUNT} instanced rocks | ${SEG*SEG} terrain polys | ${Math.round(renderer.info.render.triangles/1000)}k tris`;
+}
+animate();
+
+// Resize
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// Buttons
+document.getElementById('btnWire').onclick = (e)=>{
+  const active = e.target.classList.contains('active');
+  document.querySelectorAll('.btn').forEach(b=>b.classList.remove('active'));
+  if(!active){
+    e.target.classList.add('active');
+    terrainMat.wireframe = true;
+    rockMat.wireframe = true;
+  } else {
+    document.getElementById('btnReal').classList.add('active');
+    terrainMat.wireframe = false;
+    rockMat.wireframe = false;
+  }
+};
+document.getElementById('btnReal').onclick = (e)=>{
+  document.querySelectorAll('.btn').forEach(b=>b.classList.remove('active'));
+  e.target.classList.add('active');
+  terrainMat.wireframe = false;
+  rockMat.wireframe = false;
+};
+document.getElementById('btnTop').onclick = ()=>{
+  controls.target.set(0,0,0);
+  camera.position.set(0, 450, 0.1);
+  controls.update();
+};
+document.getElementById('btnCanyon').onclick = ()=>{
+  camera.position.set(120, 25, 10);
+  controls.target.set(400, -10, 15);
+  controls.update();
+};
+
+</script>
+</body>
+</html>
