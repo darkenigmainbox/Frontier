@@ -66,7 +66,7 @@ inline float degrees(float r) { return r * 57.2957795130823f; }
 // reports "too many arguments", which is how the lens-flare port first failed.
 inline float atan(float y, float x) { return std::atan2(y, x); }
 // GLSL's mod is a true modulus (result takes the sign of y), unlike C's fmod which takes the sign of x.
-inline float mod(float x, float y) { return x - y * std::floor(x / y); }
+inline float mod(float x, float y) { return x - y * std::floor(x / y); } inline vec3 mod(vec3 x, float y) { return {mod(x.x, y), mod(x.y, y), mod(x.z, y)}; }
 // GLSL's floor/fract are component-wise on vectors; the procedural cloud noise needs vec3 floor.
 inline vec3 floor(vec3 a) { return { std::floor(a.x), std::floor(a.y), std::floor(a.z) }; }
 inline vec2 floor(vec2 a) { return { std::floor(a.x), std::floor(a.y) }; }

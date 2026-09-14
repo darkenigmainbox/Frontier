@@ -401,7 +401,7 @@ int main(int argc, char** argv)
 
                 // 🔴 The lens flare, from the shader's own functions. Occlusion is 1 on a miss by definition.
                 colour = colour + CelestialLensFlare(sky, dir, camera.Forward, camera.Right, camera.Up,
-                                                     sky.SunTransmittance.xyz(), 1.0f);
+                                                     camera.Aspect, sky.SunTransmittance.xyz(), 1.0f);
             }
 
             // 🔴 AERIAL PERSPECTIVE, through the shader's own function. Surface pixels only — the sky is

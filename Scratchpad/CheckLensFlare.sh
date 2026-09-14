@@ -54,18 +54,14 @@ CheckConstant "the element mask has four bits"     'LensFlareElementHalo' "$Stru
 CheckConstant "halo is packed on the CPU"           'Out\.FlareHalo\[0\]' "Engine/DisplayPresentation/CelestialUniform.h"
 CheckConstant "the extracted port includes halo"    'CelestialFlareHalo' "Scratchpad/ExtractCelestialPort.sh"
 
-# ── The degenerate case that WAS a halo ──────────────────────────────────────────────────────────────────────────────────────────
+# ── Reference source profiles that must not be replaced by an invented approximation ───────────────────────────────────────────────
 echo
-echo "[LensFlare] the dead-centre ghost collapse stays fixed"
-# With the camera looking exactly at the sun there is no displacement axis for a ghost chain. The guard keeps the
-# reflections from collapsing into the source while the explicit halo owns the annular response.
-CheckConstant "ghosts bail out when the sun is dead centre" 'if \(offAxis < 1e-4\) return vec3\(0\.0\)' "$Viewport"
-CheckConstant "and ramp in rather than popping"             'centreFade' "$Viewport"
-
-# ── Physical behaviour that is easy to "simplify" wrongly ────────────────────────────────────────────────────────────────────────
-echo
-echo "[LensFlare] odd apertures still double their spikes"
-CheckConstant "odd blade counts double the spike count" 'mod\(blades, 2\.0\) < 0\.5 \? blades : blades \* 2\.0' "$Viewport"
+echo "[LensFlare] the supplied Celestial profiles stay verbatim"
+CheckConstant "ghosts use the reference source-vector spacing" 'float k = -1\.35 \+ fi \* 0\.42' "$Viewport"
+CheckConstant "ghosts use the reference attenuation"               'g \*= \(\.06 \+ \.06 \* fract' "$Viewport"
+CheckConstant "starburst carries the reference four-cycle lobe"  'pow\(abs\(sin\(a \* 4\.0 \+ \.3\)\), 24\.0\)' "$Viewport"
+CheckConstant "starburst carries the reference seven-cycle lobe" 'pow\(abs\(sin\(a \* 7\.0\)\), 40\.0\)' "$Viewport"
+CheckConstant "the source glow is retained"                      'exp\(-length\(uv - sunUv\) \* 1\.6\) \* \.04' "$Viewport"
 
 # ── Styles and combining ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 echo

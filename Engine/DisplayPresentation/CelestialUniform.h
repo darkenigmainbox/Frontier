@@ -41,14 +41,14 @@ struct alignas(16) CelestialUniform
     float SunDirectionAndCosRadius[4];   // xyz = unit direction TO the sun, w = cos(angular radius)
     float SunRadianceAndLimb[4];         // rgb = DISC radiance [W/m2/sr], w = limb darkening
     float SunIrradianceAndScale[4];      // rgb = top-of-atmosphere IRRADIANCE [W/m2], w = sky scale
-    float SunTransmittance[4];           // rgb = atmospheric transmittance to the sun at ground level, w unused
+    float SunTransmittance[4];           // rgb = atmospheric transmittance to the sun at ground level, w = flare master intensity
 
     // ── Lens flare ──────────────────────────────────────────────────────────────────────────────────────────────
-    float FlareStreakAndFlags[4];        // rgb = streak tint x intensity, w = element bits as a float
-    float FlareGhostAndCount[4];         // x intensity, y dispersal, z size [rad], w count
-    float FlareBurstAndChroma[4];        // x intensity, y length [rad], z sharpness, w blades
-    float FlareChromaAndFade[4];         // x ghost chromatic, y occlusion fade, z streak length, w streak thickness
-    float FlareHalo[4];                  // x intensity, y radius [rad], z thickness [rad], w profile exponent
+    float FlareStreakAndFlags[4];        // x = reference uStreak, yz = legacy tint controls, w = element bits as a float
+    float FlareGhostAndCount[4];         // x intensity (without master), y reference dispersal, z reference size scale, w count
+    float FlareBurstAndChroma[4];        // x intensity (without master), y/z/w legacy controls retained for settings compatibility
+    float FlareChromaAndFade[4];         // x = reference uChroma, y occlusion fade, zw = legacy streak controls
+    float FlareHalo[4];                  // x intensity (without master), y reference screen radius, z reference ring width, w legacy profile
 
     // ── Moon ──────────────────────────────────────────────────────────────────────────────────────────────────
     float MoonDirectionAndCosRadius[4];  // xyz = unit direction TO the moon, w = cos(angular radius)
@@ -219,7 +219,7 @@ inline void PackCelestialUniform(
         float Transmittance[3];
         SolveSunTransmittance(Settings, Elevation, Transmittance);
         for (int C = 0; C < 3; ++C) Out.SunTransmittance[C] = Transmittance[C];
-        Out.SunTransmittance[3] = 0.0f;
+        Out.SunTransmittance[3] = Settings.LensFlare.Intensity;
     }
 
     // ── Moon ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -332,15 +332,15 @@ inline void PackCelestialUniform(
         uint32_t Elements = Settings.LensFlare.ElementMask;
         if (!Settings.LensFlare.Enabled || Settings.LensFlare.Style == LensFlareStyleCategory::Off) Elements = 0u;
 
-        const float Master = Settings.LensFlare.Intensity;
-
-        Out.FlareStreakAndFlags[0] = Settings.LensFlare.StreakTintR * Settings.LensFlare.StreakIntensity * Master;
-        Out.FlareStreakAndFlags[1] = Settings.LensFlare.StreakTintG * Settings.LensFlare.StreakIntensity * Master;
-        Out.FlareStreakAndFlags[2] = Settings.LensFlare.StreakTintB * Settings.LensFlare.StreakIntensity * Master;
+        // The reference shader has one scalar uStreak. x carries that exact scalar; y/z retain the current tint
+        // controls for record compatibility. Master is uploaded once in the spare transmittance w.
+        Out.FlareStreakAndFlags[0] = Settings.LensFlare.StreakIntensity;
+        Out.FlareStreakAndFlags[1] = Settings.LensFlare.StreakTintR;
+        Out.FlareStreakAndFlags[2] = Settings.LensFlare.StreakTintG;
         Out.FlareStreakAndFlags[3] = static_cast<float>(Elements);
 
-        // ⚠️ Angular sizes are shipped as COSINES, like every other angular quantity in this record, so the
-        //    shader compares dot products directly and never calls acos in an inner loop.
+        // The reference screen-space controls are shipped in their native units. The old angular shaping values
+        // remain in the record's legacy slots so existing settings files and the 448-byte contract stay intact.
         const float StreakLengthRadians = Settings.LensFlare.StreakLength * kDegreesToRadiansF;
         const float StreakThickRadians  = Settings.LensFlare.StreakThickness * kDegreesToRadiansF;
         Out.FlareChromaAndFade[0] = Settings.LensFlare.GhostChromatic;
@@ -348,19 +348,19 @@ inline void PackCelestialUniform(
         Out.FlareChromaAndFade[2] = StreakLengthRadians;
         Out.FlareChromaAndFade[3] = StreakThickRadians;
 
-        Out.FlareGhostAndCount[0] = Settings.LensFlare.GhostIntensity * Master;
+        Out.FlareGhostAndCount[0] = Settings.LensFlare.GhostIntensity;
         Out.FlareGhostAndCount[1] = Settings.LensFlare.GhostDispersal;
-        Out.FlareGhostAndCount[2] = Settings.LensFlare.GhostSize * kDegreesToRadiansF;
+        Out.FlareGhostAndCount[2] = Settings.LensFlare.GhostSize;
         Out.FlareGhostAndCount[3] = static_cast<float>(Settings.LensFlare.GhostCount);
 
-        Out.FlareBurstAndChroma[0] = Settings.LensFlare.StarburstIntensity * Master;
+        Out.FlareBurstAndChroma[0] = Settings.LensFlare.StarburstIntensity;
         Out.FlareBurstAndChroma[1] = Settings.LensFlare.StarburstLength * kDegreesToRadiansF;
         Out.FlareBurstAndChroma[2] = Settings.LensFlare.StarburstSharpness;
         Out.FlareBurstAndChroma[3] = static_cast<float>(Settings.LensFlare.StarburstBlades);
 
-        Out.FlareHalo[0] = Settings.LensFlare.HaloIntensity * Master;
-        Out.FlareHalo[1] = Settings.LensFlare.HaloRadius * kDegreesToRadiansF;
-        Out.FlareHalo[2] = Settings.LensFlare.HaloThickness * kDegreesToRadiansF;
+        Out.FlareHalo[0] = Settings.LensFlare.HaloIntensity;
+        Out.FlareHalo[1] = Settings.LensFlare.HaloRadius;
+        Out.FlareHalo[2] = Settings.LensFlare.HaloThickness;
         Out.FlareHalo[3] = Settings.LensFlare.HaloFalloff;
     }
 

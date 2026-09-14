@@ -244,14 +244,14 @@ struct CelestialLensFlare
     //    The first defaults (1x) produced 38 changed pixels out of 128 000 — present in the numbers, invisible
     //    on screen. 6x is the knee: clearly readable, and past it the curve flattens so extra energy buys
     //    saturation rather than visibility.
-    float Intensity = 5.0f;    // [x]   master multiplier over every element
+    float Intensity = 1.0f;    // [x]   reference uFlareInt master multiplier
 
     // ── Anamorphic streak ───────────────────────────────────────────────────────────────────────────────────
     //    The horizontal blue smear of a cinema lens. Cheapest element and the most recognisable, which is why
     //    it is the one the Cinematic look emphasises.
-    float StreakIntensity = 0.30f;   // [x]
-    float StreakLength    = 15.0f;   // [deg] half-length along the horizontal
-    float StreakThickness = 0.72f;   // [deg] vertical falloff
+    float StreakIntensity = 0.80f;   // [x]   reference uStreak
+    float StreakLength    = 15.0f;   // [legacy] retained for settings compatibility; reference uses a fixed envelope
+    float StreakThickness = 0.72f;   // [legacy] retained for settings compatibility; reference uses a fixed envelope
     float StreakTintR     = 0.68f;   // [-]   anamorphic streaks are classically blue
     float StreakTintG     = 0.82f;
     float StreakTintB     = 1.00f;
@@ -259,21 +259,19 @@ struct CelestialLensFlare
     // ── Ghosts ──────────────────────────────────────────────────────────────────────────────────────────────
     //    Internal reflections. Each ghost sits at -i x (sun position) through the frame centre, so they sweep
     //    ACROSS the frame as the camera turns — the behaviour that reads unmistakably as a lens rather than sky.
-    int   GhostCount      = 6;       // [cnt]
-    float GhostIntensity  = 0.30f;   // [x]
-    float GhostDispersal  = 0.40f;   // [-]   spacing along the sun-to-centre vector
-    float GhostSize       = 1.70f;    // [deg] angular radius of the first ghost
-    float GhostChromatic  = 0.62f;   // [-]   per-ghost colour separation
+    int   GhostCount      = 5;       // [cnt]   reference default
+    float GhostIntensity  = 1.0f;    // [x]   reference contribution scale
+    float GhostDispersal  = 0.42f;   // [-]   reference spacing
+    float GhostSize       = 1.0f;    // [-]   reference ghost-size scale
+    float GhostChromatic  = 0.65f;   // [-]   reference uChroma
 
     // ── Starburst ───────────────────────────────────────────────────────────────────────────────────────────
-    //    Aperture diffraction. Blade count sets the spike count: an even-bladed iris gives N spikes, an odd one
-    //    gives 2N, which is why 6 blades give 6 and 7 blades give 14. Real photographic behaviour, not a choice.
+    //    Aperture diffraction. The supplied reference shader fixes its two lobes (sin(4a)^24 and sin(7a)^40);
+    //    the legacy blade field remains serialised for settings compatibility but does not replace those lobes.
     int   StarburstBlades    = 6;      // [cnt]
-    // ⚠️ The starburst reads far weaker than its number suggests, because its energy is concentrated into a few
-    //    thin spikes rather than spread over an area — at the same nominal intensity as the streak it measured
-    //    0.0002 ACES lift against the streak's 0.064. Raised so the spikes are actually visible; the SHAPE
-    //    checks in LensFlareTest are what keep it from becoming a glow, so brightness is free to be useful.
-    float StarburstIntensity = 2.6f;   // [x]
+    // The reference contribution is intentionally low and spatially concentrated; keep the exact lobe formula
+    //    rather than compensating with a new radial glow.
+    float StarburstIntensity = 1.0f;   // [x]   reference burst contribution scale
     float StarburstLength    = 6.5f;   // [deg]
     float StarburstSharpness = 15.0f;  // [-]  higher = thinner, harder spikes
 
@@ -281,10 +279,10 @@ struct CelestialLensFlare
     //    A broad, low-energy annulus around the source. Radius and thickness are explicit so the halo remains a
     //    camera artefact rather than becoming an accidental second atmospheric sun. The shader uses the sun's
     //    spectral radiance as its base colour, keeping the four elements optically related.
-    float HaloIntensity = 0.30f;  // [x]
-    float HaloRadius    = 2.35f;  // [deg] centre of the annulus from the source
-    float HaloThickness = 1.05f;  // [deg] soft radial width
-    float HaloFalloff   = 1.80f;  // [-] broad-to-tight profile exponent
+    float HaloIntensity = 1.0f;  // [x]   reference halo contribution scale
+    float HaloRadius    = 0.55f;  // [-] reference uHalo screen-space radius
+    float HaloThickness = 0.045f;  // [-] reference ring width
+    float HaloFalloff   = 1.80f;  // [legacy] reference uses a fixed ring profile
 
     // ⚠️ Occlusion. A flare is formed in the lens, so it must vanish when the sun goes behind something — but
     //    SOFTLY, because the sun has angular size and is progressively hidden. A hard on/off pops.
@@ -293,11 +291,9 @@ struct CelestialLensFlare
 
 // Apply a named style, overwriting the element set and the shaping that defines that look.
 //
-//    🔴 EVERY PRESET IS A COMPLETE CAMERA, INCLUDING ITS APERTURE. That is the part the old tiers got wrong:
-//    "which starburst you get" was a separate hidden setting, so Vintage and Clean could accidentally share a
-//    blade count and look like the same lens with different elements switched on. Here the blade count IS part
-//    of the style — Vintage is a 6-bladed iris giving a soft 6-point burst, Clean is 7-bladed giving the crisp
-//    14-point star of a stopped-down modern prime. Same code path, visibly different cameras.
+//    Presets select masks and the current project's presentation controls, while the optical profiles themselves
+//    remain the exact deployed Celestial shader. The reference page has no blade-count uniform, so that legacy
+//    setting is retained for file compatibility but cannot silently turn the copied starburst into another model.
 //
 //    ⚠️ Custom returns untouched. Without that there is nowhere to stand: any hand-tuned value would be
 //    stamped over the moment the settings were re-applied, and live TOML editing would fight the preset.
@@ -309,25 +305,25 @@ inline void ApplyLensFlareStyle(CelestialLensFlare& Flare, LensFlareStyleCategor
     // Everything a style owns starts from a common baseline, so a preset never inherits a stray value from
     //    whichever preset happened to be selected before it.
     Flare.ElementMask       = 0u;
-    Flare.Intensity         = 6.0f;
-    Flare.StreakIntensity   = 0.55f;
+    Flare.Intensity         = 1.0f;
+    Flare.StreakIntensity   = 0.80f;
     Flare.StreakLength      = 14.0f;
     Flare.StreakThickness   = 0.55f;
     Flare.StreakTintR       = 0.45f;
     Flare.StreakTintG       = 0.62f;
     Flare.StreakTintB       = 1.00f;
     Flare.GhostCount        = 5;
-    Flare.GhostIntensity    = 0.22f;
-    Flare.GhostDispersal    = 0.36f;
-    Flare.GhostSize         = 2.6f;
-    Flare.GhostChromatic    = 0.35f;
+    Flare.GhostIntensity    = 1.0f;
+    Flare.GhostDispersal    = 0.42f;
+    Flare.GhostSize         = 1.0f;
+    Flare.GhostChromatic    = 0.65f;
     Flare.StarburstBlades   = 6;
-    Flare.StarburstIntensity= 6.0f;
+    Flare.StarburstIntensity= 1.0f;
     Flare.StarburstLength   = 7.0f;
     Flare.StarburstSharpness= 24.0f;
-    Flare.HaloIntensity     = 0.18f;
-    Flare.HaloRadius        = 2.40f;
-    Flare.HaloThickness     = 0.65f;
+    Flare.HaloIntensity     = 1.0f;
+    Flare.HaloRadius        = 0.55f;
+    Flare.HaloThickness     = 0.045f;
     Flare.HaloFalloff       = 2.00f;
 
     switch (Style)
@@ -348,14 +344,14 @@ inline void ApplyLensFlareStyle(CelestialLensFlare& Flare, LensFlareStyleCategor
             Flare.GhostIntensity  = 0.20f;
             Flare.GhostChromatic  = 0.30f;
             Flare.HaloIntensity   = 0.12f;
-            Flare.HaloRadius      = 2.20f;
-            Flare.HaloThickness   = 0.55f;
+            Flare.HaloRadius      = 0.55f;
+            Flare.HaloThickness   = 0.045f;
             Flare.HaloFalloff     = 2.20f;
             break;
 
         case LensFlareStyleCategory::Vintage:
-            // Uncoated glass scatters far more between elements, so: many ghosts, larger and warmer, a soft
-            //    6-point burst from a simple iris, and only a faint streak because old primes are not anamorphic.
+            // Uncoated-glass presentation: many ghosts, warmer tint and a softer contribution to the same
+            //    reference diffraction profile.
             Flare.ElementMask        = LensFlareElementStreak | LensFlareElementGhosts
                                       | LensFlareElementStarburst | LensFlareElementHalo;
             Flare.StreakIntensity    = 0.20f;
@@ -367,26 +363,25 @@ inline void ApplyLensFlareStyle(CelestialLensFlare& Flare, LensFlareStyleCategor
             Flare.GhostCount         = 8;
             Flare.GhostIntensity     = 0.34f;
             Flare.GhostDispersal     = 0.30f;
-            Flare.GhostSize          = 3.4f;
+            Flare.GhostSize          = 1.35f;
             Flare.GhostChromatic     = 0.55f;
-            Flare.StarburstBlades    = 6;      // even -> 6 spikes
-            Flare.StarburstSharpness = 10.0f;  // low sharpness = soft, blooming spikes
+            Flare.StarburstBlades    = 6;      // legacy setting; reference lobes remain fixed
+            Flare.StarburstSharpness = 10.0f;  // legacy setting; reference lobes remain fixed
             Flare.StarburstLength    = 5.0f;
             Flare.StarburstIntensity = 3.5f;
-            Flare.HaloIntensity      = 0.26f;
-            Flare.HaloRadius         = 2.80f;
-            Flare.HaloThickness      = 0.85f;
+            Flare.HaloIntensity      = 1.0f;
+            Flare.HaloRadius         = 0.55f;
+            Flare.HaloThickness      = 0.045f;
             Flare.HaloFalloff        = 1.70f;
             break;
 
         case LensFlareStyleCategory::Clean:
-            // A stopped-down modern prime: excellent coatings kill the ghosting entirely, and the small iris
-            //    diffracts hard. 7 blades -> 14 spikes, long and thin.
+            // A clean presentation: the reference starburst alone, with no ghost/halo/streak mask bits.
             Flare.ElementMask        = LensFlareElementStarburst;
-            Flare.StarburstBlades    = 7;      // odd -> 14 spikes
+            Flare.StarburstBlades    = 7;      // legacy setting; reference lobes remain fixed
             Flare.StarburstSharpness = 40.0f;
             Flare.StarburstLength    = 11.0f;
-            Flare.StarburstIntensity = 8.0f;
+            Flare.StarburstIntensity = 1.0f;
             break;
 
         case LensFlareStyleCategory::Full:
@@ -394,25 +389,25 @@ inline void ApplyLensFlareStyle(CelestialLensFlare& Flare, LensFlareStyleCategor
             // the composition reads as one lens rather than four equally loud mathematical primitives.
             Flare.ElementMask        = LensFlareElementStreak | LensFlareElementGhosts
                                       | LensFlareElementStarburst | LensFlareElementHalo;
-            Flare.Intensity           = 5.0f;
-            Flare.StreakIntensity     = 0.30f;
+            Flare.Intensity           = 1.0f;
+            Flare.StreakIntensity     = 0.80f;
             Flare.StreakLength        = 15.0f;
             Flare.StreakThickness     = 0.72f;
             Flare.StreakTintR         = 0.68f;
             Flare.StreakTintG         = 0.82f;
             Flare.StreakTintB         = 1.00f;
-            Flare.GhostCount          = 6;
-            Flare.GhostIntensity      = 0.30f;
-            Flare.GhostDispersal      = 0.40f;
-            Flare.GhostSize           = 1.70f;
-            Flare.GhostChromatic      = 0.62f;
+            Flare.GhostCount          = 5;
+            Flare.GhostIntensity      = 1.0f;
+            Flare.GhostDispersal      = 0.42f;
+            Flare.GhostSize           = 1.0f;
+            Flare.GhostChromatic      = 0.65f;
             Flare.StarburstBlades     = 6;
-            Flare.StarburstIntensity  = 2.6f;
+            Flare.StarburstIntensity  = 1.0f;
             Flare.StarburstLength     = 6.5f;
             Flare.StarburstSharpness  = 15.0f;
-            Flare.HaloIntensity       = 0.30f;
-            Flare.HaloRadius          = 2.35f;
-            Flare.HaloThickness       = 1.05f;
+            Flare.HaloIntensity       = 1.0f;
+            Flare.HaloRadius          = 0.55f;
+            Flare.HaloThickness       = 0.045f;
             Flare.HaloFalloff         = 1.80f;
             break;
 
@@ -596,17 +591,17 @@ inline constexpr CelestialProperty kCelestialProperties[] =
     FRONTIER_CELESTIAL_INTEGER("flare.ghost.count",   "",    LensFlare.GhostCount,      0.0f, 12.0f, "how many internal reflections"),
     FRONTIER_CELESTIAL_REAL("flare.ghost.intensity",  "x",   LensFlare.GhostIntensity,  0.0f, 4.0f, "ghost strength"),
     FRONTIER_CELESTIAL_REAL("flare.ghost.dispersal",  "-",   LensFlare.GhostDispersal,  0.0f, 2.0f, "ghost spacing along the centre vector"),
-    FRONTIER_CELESTIAL_REAL("flare.ghost.size",       "deg", LensFlare.GhostSize,       0.1f, 20.0f, "angular radius of the first ghost"),
+    FRONTIER_CELESTIAL_REAL("flare.ghost.size",       "x",   LensFlare.GhostSize,       0.1f, 4.0f, "reference ghost-size scale"),
     FRONTIER_CELESTIAL_REAL("flare.ghost.chromatic",  "-",   LensFlare.GhostChromatic,  0.0f, 2.0f, "per-ghost colour separation"),
 
-    FRONTIER_CELESTIAL_INTEGER("flare.starburst.blades", "", LensFlare.StarburstBlades, 3.0f, 16.0f, "iris blades: even N gives N spikes, odd gives 2N"),
+    FRONTIER_CELESTIAL_INTEGER("flare.starburst.blades", "", LensFlare.StarburstBlades, 3.0f, 16.0f, "legacy iris setting; reference diffraction lobes are fixed"),
     FRONTIER_CELESTIAL_REAL("flare.starburst.intensity", "x",   LensFlare.StarburstIntensity, 0.0f, 30.0f, "starburst strength"),
     FRONTIER_CELESTIAL_REAL("flare.starburst.length",    "deg", LensFlare.StarburstLength,    0.0f, 40.0f, "spike length"),
     FRONTIER_CELESTIAL_REAL("flare.starburst.sharpness", "-",   LensFlare.StarburstSharpness, 1.0f, 96.0f, "higher = thinner spikes"),
 
     FRONTIER_CELESTIAL_REAL("flare.halo.intensity", "x",   LensFlare.HaloIntensity, 0.0f, 4.0f, "soft annulus strength"),
-    FRONTIER_CELESTIAL_REAL("flare.halo.radius",    "deg", LensFlare.HaloRadius,    0.1f, 20.0f, "annulus centre radius"),
-    FRONTIER_CELESTIAL_REAL("flare.halo.thickness", "deg", LensFlare.HaloThickness, 0.05f, 8.0f, "annulus width"),
+    FRONTIER_CELESTIAL_REAL("flare.halo.radius",    "x",   LensFlare.HaloRadius,    0.1f, 1.2f, "reference screen-space annulus radius"),
+    FRONTIER_CELESTIAL_REAL("flare.halo.thickness", "x",   LensFlare.HaloThickness, 0.005f, 0.25f, "reference screen-space annulus width"),
     FRONTIER_CELESTIAL_REAL("flare.halo.falloff",   "-",   LensFlare.HaloFalloff,   0.5f, 8.0f, "annulus profile"),
 
     FRONTIER_CELESTIAL_REAL("flare.occlusionFade", "-", LensFlare.OcclusionFade, 0.0f, 1.0f, "how much occlusion kills the flare"),

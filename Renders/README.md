@@ -43,3 +43,14 @@ Regenerate:
 against a clean sunset. `44_project_zero_full_flare_inspected.png` frames the sun against the clear blue sky so the halo,
 colored diffraction edge, horizontal streak and displaced ghost chain can be inspected at once. These are CPU references
 built from the extracted shipping shader and the exact 448-byte packed celestial record; they are not native Vulkan screenshots.
+
+### Direct Celestial lens-flare port (2026-09-14)
+
+`45_reference_flare_clear.png` is a regenerated clear-sky frame from the current CPU shader port using the default
+Full mask and the exact 448-byte packed record. `46_reference_flare_inspected.png` uses the same scene and copied
+reference profiles with an inspection-only intensity lift, so the halo, horizontal streak, source-axis ghosts and
+dual starburst can be inspected without changing their shape. These are CPU renders; native Project Zero Vulkan
+rendering remains unavailable in the local environment.
+
+The older `40`, `43`, and `44` images predate the direct Celestial-source adaptation and are retained as historical
+renders only; they are not parity evidence for the current lens-flare implementation.

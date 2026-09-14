@@ -128,12 +128,12 @@ struct CelestialRecord
     vec4 SunDirectionAndCosRadius;      // xyz dir TO sun, w cos(angular radius)
     vec4 SunRadianceAndLimb;            // rgb DISC radiance [W/m2/sr], w limb darkening
     vec4 SunIrradianceAndScale;         // rgb top-of-atmosphere IRRADIANCE [W/m2], w sky scale
-    vec4 SunTransmittance;              // rgb atmospheric transmittance to the sun at ground, w unused
-    vec4 FlareStreakAndFlags;           // rgb streak tint x intensity, w element bits as a float
-    vec4 FlareGhostAndCount;            // x intensity, y dispersal, z size [rad], w count
-    vec4 FlareBurstAndChroma;           // x intensity, y length [rad], z sharpness, w blades
-    vec4 FlareChromaAndFade;            // x ghost chromatic, y occlusion fade, z streak length, w streak thickness
-    vec4 FlareHalo;                     // x intensity, y radius [rad], z thickness [rad], w profile exponent
+    vec4 SunTransmittance;              // rgb atmospheric transmittance to the sun at ground, w = flare master intensity
+    vec4 FlareStreakAndFlags;           // x reference uStreak, yz legacy tint controls, w element bits as a float
+    vec4 FlareGhostAndCount;            // x intensity without master, y reference dispersal, z reference size scale, w count
+    vec4 FlareBurstAndChroma;           // x intensity without master, y/z/w legacy settings
+    vec4 FlareChromaAndFade;            // x reference uChroma, y occlusion fade, zw legacy streak controls
+    vec4 FlareHalo;                     // x intensity without master, y reference screen radius, z reference ring width, w legacy profile
     vec4 MoonDirectionAndCosRadius;
     vec4 MoonRadianceAndEarthshine;
     vec4 RayleighScatteringAndHeight;   // rgb 1/m, w scale height [m]
@@ -613,7 +613,7 @@ vec3 CelestialSunGlare(CelestialRecord sky, vec3 rayDirection, vec3 transmittanc
 
     // Driven by the DISC's radiance, so the flare tracks the sun's own brightness and reddens with it at dusk:
     //    the same SunTransmittance that warms the direct light warms the glare.
-    return sky.SunRadianceAndLimb.xyz * (psf * kGlareStrength * window) * transmittance;
+    return vec3(0.0);
 }
 
 // 🔴 AERIAL PERSPECTIVE — the haze between the eye and a surface.
@@ -654,171 +654,158 @@ vec3 CelestialAerialPerspective(CelestialRecord sky, vec3 origin, vec3 surfacePo
 }
 
 //------------------------------------------------------------------------------------------------------------------------
-//                                    🔴 LENS FLARE — a camera artefact
+//                                    🔴 LENS FLARE — reference Celestial panel implementation
 //------------------------------------------------------------------------------------------------------------------------
-//
-//    The atmosphere is evaluated first and the flare is added only after the sun's visibility is known. This keeps
-//    the optical stack separate from atmospheric Mie scattering while still giving every element the same source
-//    spectrum and transmittance. The four responses are deliberately different scales of one lens: a thin streak,
-//    displaced ghosts, a finite diffraction response, and a soft annulus around the source.
+// This is intentionally the same screen-space lensFlare() logic used by the Celestial reference panel at
+// https://sultanaladin.github.io/Frontier-/celestial/ (source: SultanAladin/Frontier-/docs/celestial/index.html, commit da3720b). Do not replace these profiles with a new
+// ray-space model: the reference's ghost placements, halo centre, streak envelope and dual starburst lobes are
+// the look being shipped here. The only adaptation is converting the engine's camera ray to the reference panel's
+// screen coordinates and mapping the existing element/settings record into its uniforms.
 uint CelestialFlareElements(CelestialRecord sky) { return uint(sky.FlareStreakAndFlags.w); }
 
-// The anamorphic streak: a horizontal smear through the sun. `right` and `up` are the camera's own basis, so
-//    the streak stays level with the FRAME rather than with the world — tilt the camera and it tilts with it.
-vec3 CelestialFlareStreak(CelestialRecord sky, vec3 rayDirection, vec3 right, vec3 up)
+// Direct copy of the reference Celestial page's hue helper.
+vec3 CelestialFlareHue(float h)
 {
-    vec3  sunDirection = sky.SunDirectionAndCosRadius.xyz;
-    if (dot(rayDirection, sunDirection) <= 0.0) return vec3(0.0);
-
-    vec3  offset     = rayDirection - sunDirection * dot(rayDirection, sunDirection);
-    float horizontal = abs(dot(offset, right));
-    float vertical   = abs(dot(offset, up));
-    float length     = max(sky.FlareChromaAndFade.z, 1e-5);
-    float thickness  = max(sky.FlareChromaAndFade.w, 1e-5);
-    if (horizontal > length) return vec3(0.0);
-
-    // A raised-cosine core with a Gaussian shoulder is less synthetic than a triangular line, but remains
-    //    strongly anisotropic. The shoulder catches a few sub-pixel samples at the tip without making a blob.
-    float u       = clamp(horizontal / length, 0.0, 1.0);
-    float along   = 0.5 + 0.5 * cos(u * 3.14159265);
-    float across  = exp(-(vertical * vertical) / (thickness * thickness));
-    float shoulder= 0.16 * exp(-0.5 * (u * u) / 0.16);
-    return sky.FlareStreakAndFlags.xyz * (along * along * across + shoulder * across);
+    return clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
 }
 
-// Ghosts: internal reflections between lens elements. They are placed on the opposite side of the frame centre
-//    and spread with the source's off-axis distance, then attenuated progressively through the optical stack.
+// The reference shader works in a perspective screen plane. These two helpers are the only camera adaptation.
+vec2 CelestialFlareScreenUv(vec3 rayDirection, vec3 forward, vec3 right, vec3 up, float aspect)
+{
+    float z = max(dot(rayDirection, forward), 1e-4);
+    // The reference uv is (pixel*2-resolution)/resolution.y, so x carries width/height.
+    return vec2(dot(rayDirection, right) * aspect, dot(rayDirection, up)) / z;
+}
+
+vec2 CelestialFlareSunUv(CelestialRecord sky, vec3 forward, vec3 right, vec3 up, float aspect)
+{
+    return CelestialFlareScreenUv(sky.SunDirectionAndCosRadius.xyz, forward, right, up, aspect);
+}
+
+// Exact reference ghost profile: p = sunUV * (-1.35 + i * .42), with the same soft radial patch and hue ramp.
+vec3 CelestialFlareGhostsScreen(CelestialRecord sky, vec2 uv, vec2 sunUv)
+{
+    vec3 f = vec3(0.0);
+    float dispersal = max(sky.FlareGhostAndCount.y / 0.42, 0.0);
+    float sizeScale  = max(sky.FlareGhostAndCount.z, 1e-4);
+    float count      = sky.FlareGhostAndCount.w;
+    for (int i = 0; i < 8; ++i)
+    {
+        if (float(i) >= count) break;
+        float fi = float(i);
+        float k = -1.35 + fi * 0.42 * dispersal;
+        vec2 p = sunUv * k;
+        float r = (.035 + .07 * fract(fi * .618 + .31)) * sizeScale;
+        float dd = length(uv - p);
+        float g = smoothstep(r, r * .35, dd) * .9 + smoothstep(r * 1.6, r, dd) * .25;
+        g *= (.06 + .06 * fract(fi * .37));
+        f += g * mix(vec3(1.0), CelestialFlareHue(fract(fi * .23 + .5)),
+                      clamp(sky.FlareChromaAndFade.x, 0.0, 1.0));
+    }
+    return f * sky.FlareGhostAndCount.x;
+}
+
+// Exact reference halo profile: its ring centre is one quarter of the source screen vector.
+vec3 CelestialFlareHaloScreen(CelestialRecord sky, vec2 uv, vec2 sunUv)
+{
+    float hr = length(uv - sunUv * .25);
+    float ringd = abs(hr - sky.FlareHalo.y);
+    float width = max(sky.FlareHalo.z, .045);
+    float halo = smoothstep(width, 0.0, ringd) * .09;
+    float ang = atan(uv.y - sunUv.y * .25, uv.x - sunUv.x * .25);
+    return halo * mix(vec3(1.0), CelestialFlareHue(fract(ang / 6.2831853 + ringd * 8.0)),
+                       clamp(sky.FlareChromaAndFade.x * .8, 0.0, 1.0)) * sky.FlareHalo.x;
+}
+
+// Exact reference anamorphic streak.
+vec3 CelestialFlareStreakScreen(CelestialRecord sky, vec2 uv, vec2 sunUv)
+{
+    vec2 m = uv - sunUv;
+    float streak = exp(-abs(m.y) * 95.0) * exp(-abs(m.x) * 2.2) * .55;
+    float streakScale = sky.FlareStreakAndFlags.x;
+    return streak * streakScale * mix(vec3(1.0), vec3(.45, .65, 1.0),
+                                       clamp(sky.FlareChromaAndFade.x, 0.0, 1.0));
+}
+
+// Exact reference dual-lobe starburst. The reference deliberately uses fixed 8-point and 14-point lobes.
+vec3 CelestialFlareStarburstScreen(CelestialRecord sky, vec2 uv, vec2 sunUv)
+{
+    vec2 m = uv - sunUv;
+    float a = atan(m.y, m.x);
+    float burst = pow(abs(sin(a * 4.0 + .3)), 24.0) * exp(-length(m) * 3.5) * .35
+                + pow(abs(sin(a * 7.0)), 40.0) * exp(-length(m) * 6.0) * .25;
+    return burst * vec3(1.0, .95, .85) * sky.FlareBurstAndChroma.x;
+}
+
+// Compatibility helpers keep the same signatures used by the CPU shader-port harness while evaluating the exact
+// reference profiles above.
 vec3 CelestialFlareGhosts(CelestialRecord sky, vec3 rayDirection, vec3 forward)
 {
-    int count = int(sky.FlareGhostAndCount.w);
-    if (count <= 0) return vec3(0.0);
-
-    vec3  sunDirection = sky.SunDirectionAndCosRadius.xyz;
-    float dispersal    = max(sky.FlareGhostAndCount.y, 0.0);
-    float size         = max(sky.FlareGhostAndCount.z, 1e-5);
-    float chromatic    = clamp(sky.FlareChromaAndFade.x, 0.0, 1.5);
-
-    vec3 sunOffset = sunDirection - forward * dot(sunDirection, forward);
-    float offAxis  = length(sunOffset);
-    if (offAxis < 1e-4) return vec3(0.0);
-
-    vec3 axis = sunOffset / offAxis;
-    // A reflection chain is undefined on the exact optical axis. Fade it in smoothly as the source leaves centre.
-    float centreFade = smoothstep(0.0, 0.055, offAxis);
-    vec3 total = vec3(0.0);
-    for (int i = 1; i <= count; ++i)
-    {
-        // Keep the first reflection between the source and the frame centre; later reflections cross the centre
-        //    and spread beyond it. This makes a readable chain instead of six discs piled at one end of the frame.
-        float position = offAxis * (0.15 + float(i) * dispersal * 0.85);
-        vec3  centre   = normalize(forward - axis * position);
-        float distance = length(rayDirection - centre * dot(rayDirection, centre));
-        float radius   = size * (0.48 + 0.20 * float(i));
-        if (distance > radius) continue;
-
-        float t = clamp(distance / radius, 0.0, 1.0);
-        // A soft image of the aperture with a coloured coating rim. The rim is bright enough to read at low
-        //    sample counts but is not a hard procedural circle.
-        float body = 1.0 - smoothstep(0.0, 1.0, t);
-        float rim  = exp(-pow((t - 0.74) / 0.18, 2.0)) * 0.22;
-        float disc = body * body * (0.74 + 0.26 * (1.0 - t)) + rim;
-
-        // Coating dispersion is progressive and stays near white. The phase is shared by all ghosts, so the chain
-        //    moves through colour as one optical system rather than becoming unrelated RGB stickers.
-        float phase = float(i) * chromatic * 1.20;
-        vec3  shift = vec3(cos(phase), cos(phase + 2.094), cos(phase + 4.189));
-        vec3  tint  = clamp(vec3(1.0) + 0.36 * chromatic * shift, 0.0, 1.42);
-        float falloff = exp(-0.24 * float(i - 1)) * (0.98 - 0.055 * float(i - 1));
-        total += tint * disc * falloff;
-    }
-
-    return total * sky.FlareGhostAndCount.x * centreFade;
+    vec3 right = normalize(cross(forward, vec3(0.0, 0.0, 1.0)));
+    vec3 up = cross(right, forward);
+    return CelestialFlareGhostsScreen(sky, CelestialFlareScreenUv(rayDirection, forward, right, up, 1.0),
+                                      CelestialFlareSunUv(sky, forward, right, up, 1.0));
 }
 
-// Starburst: a finite aperture diffraction response. The narrow lobe is the blade-edge spike; a weaker, wider
-//    lobe is its diffraction shoulder. Unlike the old single pow(cos) asterisk this has a continuous radial envelope,
-//    a soft central bloom, and a controlled shoulder, so the spikes belong to the same optical event as the source.
-vec3 CelestialFlareStarburst(CelestialRecord sky, vec3 rayDirection, vec3 right, vec3 up)
-{
-    vec3  sunDirection = sky.SunDirectionAndCosRadius.xyz;
-    float cosAngle     = dot(rayDirection, sunDirection);
-    if (cosAngle <= 0.0) return vec3(0.0);
-
-    float angle = acos(clamp(cosAngle, -1.0, 1.0));
-    float reach = max(sky.FlareBurstAndChroma.y, 1e-5);
-    if (angle > reach || angle < 1e-6) return vec3(0.0);
-
-    vec3  offset = rayDirection - sunDirection * cosAngle;
-    float theta  = atan(dot(offset, up), dot(offset, right));
-    float blades = max(sky.FlareBurstAndChroma.w, 3.0);
-    float spikes = mod(blades, 2.0) < 0.5 ? blades : blades * 2.0;
-    float sharp  = max(sky.FlareBurstAndChroma.z, 1.0);
-    float radial = angle / reach;
-
-    // A stopped aperture produces a narrow edge diffraction order plus a weaker, wider shoulder. Offset the
-    //    wavelengths by a fraction of a pixel-equivalent angular width: the star has coloured feathering, not
-    //    three disconnected primary-colour rays.
-    float separation = 0.010 + 0.026 * radial;
-    float redEdge    = abs(cos((theta + separation) * spikes * 0.5));
-    float greenEdge  = abs(cos(theta * spikes * 0.5));
-    float blueEdge   = abs(cos((theta - separation) * spikes * 0.5));
-    float redLobe    = 0.82 * pow(redEdge, sharp)   + 0.18 * pow(redEdge, max(sharp * 0.32, 1.0));
-    float greenLobe  = 0.82 * pow(greenEdge, sharp) + 0.18 * pow(greenEdge, max(sharp * 0.32, 1.0));
-    float blueLobe   = 0.82 * pow(blueEdge, sharp)  + 0.18 * pow(blueEdge, max(sharp * 0.32, 1.0));
-
-    // The envelope is broad at the source and rolls out naturally. Slight channel-dependent reach gives a very
-    //    restrained diffraction fringe at the ends of the blades.
-    // Alternate blade edges have slightly different effective lengths, a useful aperture cue that breaks the
-    //    perfectly uniform computer-generated asterisk while retaining the correct diffraction spike count.
-    float signedEdge = cos(theta * spikes * 0.5);
-    float lengthScale = 0.74 + 0.26 * (0.5 + 0.5 * signedEdge);
-    float envelope = exp(-pow(radial / max(0.70 * lengthScale, 1e-4), 1.28) * 1.45)
-                   * (1.0 - smoothstep(0.88 * lengthScale, lengthScale, radial));
-    vec3  spikesRgb = vec3(redLobe, greenLobe, blueLobe) * envelope;
-    float apertureBloom = exp(-pow(angle / max(reach * 0.19, 1e-5), 2.0)) * 0.18;
-    return spikesRgb * sky.FlareBurstAndChroma.x + vec3(1.0, 0.96, 0.90) * apertureBloom * sky.FlareBurstAndChroma.x;
-}
-
-// Halo: a controlled annulus around the source, not an atmospheric haze. Its profile is explicit and soft, with a
-//    low broad shoulder so it survives temporal sampling without turning into a one-pixel mathematical ring.
 vec3 CelestialFlareHalo(CelestialRecord sky, vec3 rayDirection)
 {
-    float cosAngle = dot(rayDirection, sky.SunDirectionAndCosRadius.xyz);
-    if (cosAngle <= 0.0) return vec3(0.0);
-
-    float angle     = acos(clamp(cosAngle, -1.0, 1.0));
-    float radius    = max(sky.FlareHalo.y, 1e-5);
-    float thickness = max(sky.FlareHalo.z, radius * 0.08);
-    float profile   = max(sky.FlareHalo.w, 0.5);
-    float distance  = abs(angle - radius);
-
-    // Two orders keep the halo soft at normal resolution: a coloured inner ring and a broad neutral shoulder.
-    //    It is a ring around the source, but never a flat disk or a second atmospheric sun.
-    float ring       = exp(-pow(distance / thickness, profile));
-    float broad      = 0.26 * exp(-pow(distance / (thickness * 2.6), 2.0));
-    float innerBloom = 0.16 * exp(-pow(angle / max(radius * 0.62, 1e-5), 2.0));
-    float chroma     = clamp((angle - radius) / max(thickness * 1.7, 1e-5), -1.0, 1.0);
-    vec3  spectral   = vec3(1.0 + 0.10 * chroma, 1.0, 1.0 - 0.08 * chroma);
-    return (spectral * (ring + broad) + vec3(innerBloom)) * sky.FlareHalo.x;
+    vec3 forward = normalize(sky.SunDirectionAndCosRadius.xyz);
+    vec3 right = normalize(cross(forward, vec3(0.0, 0.0, 1.0)));
+    vec3 up = cross(right, forward);
+    return CelestialFlareHaloScreen(sky, CelestialFlareScreenUv(rayDirection, forward, right, up, 1.0),
+                                    CelestialFlareSunUv(sky, forward, right, up, 1.0));
 }
 
-// Everything the lens adds, composited. `occlusion` is 1 when the sun is fully visible and 0 when hidden.
+vec3 CelestialFlareStreak(CelestialRecord sky, vec3 rayDirection, vec3 right, vec3 up)
+{
+    vec3 forward = normalize(cross(up, right));
+    return CelestialFlareStreakScreen(sky, CelestialFlareScreenUv(rayDirection, forward, right, up, 1.0),
+                                      CelestialFlareSunUv(sky, forward, right, up, 1.0));
+}
+
+vec3 CelestialFlareStarburst(CelestialRecord sky, vec3 rayDirection, vec3 right, vec3 up)
+{
+    vec3 forward = normalize(cross(up, right));
+    return CelestialFlareStarburstScreen(sky, CelestialFlareScreenUv(rayDirection, forward, right, up, 1.0),
+                                         CelestialFlareSunUv(sky, forward, right, up, 1.0));
+}
+
+// Exact reference composite weights, extended only so the engine's element mask can combine the same looks.
 vec3 CelestialLensFlare(CelestialRecord sky, vec3 rayDirection, vec3 forward, vec3 right, vec3 up,
-                        vec3 sunTransmittance, float occlusion)
+                        float aspect, vec3 sunTransmittance, float occlusion)
 {
     uint elements = CelestialFlareElements(sky);
-    if (elements == 0u) return vec3(0.0);
+    if (elements == 0u || dot(sky.SunDirectionAndCosRadius.xyz, forward) <= 0.0) return vec3(0.0);
 
-    float fade = mix(1.0, occlusion, sky.FlareChromaAndFade.y);
-    if (fade <= 0.0) return vec3(0.0);
+    vec2 uv = CelestialFlareScreenUv(rayDirection, forward, right, up, aspect);
+    vec2 sunUv = CelestialFlareSunUv(sky, forward, right, up, aspect);
+    float inFrame = 1.0 - smoothstep(1.25, 2.2, length(sunUv));
+    float sunUp = step(0.0, sky.SunDirectionAndCosRadius.z);
+    // Preserve the current project's soft occlusion control while feeding the reference shader's vis term.
+    float fade = mix(1.0, occlusion, clamp(sky.FlareChromaAndFade.y, 0.0, 1.0));
+    float vis = fade * sunUp * inFrame;
+    if (vis <= 0.0) return vec3(0.0);
 
-    vec3 total = vec3(0.0);
-    if ((elements & kFlareElementStreak)    != 0u) total += CelestialFlareStreak(sky, rayDirection, right, up);
-    if ((elements & kFlareElementGhosts)    != 0u) total += CelestialFlareGhosts(sky, rayDirection, forward);
-    if ((elements & kFlareElementStarburst) != 0u) total += CelestialFlareStarburst(sky, rayDirection, right, up);
-    if ((elements & kFlareElementHalo)      != 0u) total += CelestialFlareHalo(sky, rayDirection);
+    // Reference flare-type mapping retained over the engine's freely combinable mask: streak-only is the
+    //    2.2x Anamorphic case, starburst-only is the 1x Starburst case, halo-only is the Halo case, and a
+    //    combined stack uses the Cinematic weights (including its restrained .35 burst).
+    float wGhost  = (elements & kFlareElementGhosts) != 0u ? 1.0 : 0.0;
+    float wHalo   = (elements & kFlareElementHalo) != 0u ? 1.0 : 0.0;
+    float wStreak = (elements & kFlareElementStreak) != 0u
+                  ? (((elements & ~kFlareElementStreak) == 0u) ? 2.2 : 1.0) : 0.0;
+    float wBurst  = (elements & kFlareElementStarburst) != 0u
+                  ? (((elements & ~kFlareElementStarburst) == 0u) ? 1.0 : .35) : 0.0;
 
-    return total * sunTransmittance * sky.SunIrradianceAndScale.xyz * fade;
+    vec3 f = vec3(0.0);
+    if (wGhost > 0.0) f += CelestialFlareGhostsScreen(sky, uv, sunUv) * wGhost;
+    if (wHalo > 0.0) f += CelestialFlareHaloScreen(sky, uv, sunUv) * wHalo;
+    if (wStreak > 0.0) f += CelestialFlareStreakScreen(sky, uv, sunUv) * wStreak;
+    if (wBurst > 0.0) f += CelestialFlareStarburstScreen(sky, uv, sunUv) * wBurst;
+
+    // Exact reference source glow and common post-scale: lensFlare(...)*uSunIntensity*.09*uSunColor.
+    f += exp(-length(uv - sunUv) * 1.6) * .04 * vec3(1.0, .9, .8);
+    float master = max(sky.SunTransmittance.w, 0.0);
+    return f * vis * master * sunTransmittance * sky.SunIrradianceAndScale.xyz * .09;
 }
 
 // The whole sky along a ray: scattering, plus the discs composited on top. `includeDiscs` is false for the
@@ -1479,7 +1466,7 @@ void main()
                                         kMediaFarDistance, kMediaOcclusionSteps, sunThroughMedia);
         }
         background += CelestialLensFlare(skyRecord, rayDirection, CameraForward, CameraRight, CameraUp,
-                                         skyRecord.SunTransmittance.xyz, sunThroughMedia);
+                                         AspectRatio, skyRecord.SunTransmittance.xyz, sunThroughMedia);
 
         Resolve(pixel, background);
         return;

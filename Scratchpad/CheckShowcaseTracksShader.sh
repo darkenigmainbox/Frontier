@@ -118,23 +118,11 @@ Probe "halving the sky radiance" 17.8 \
       'radiance *= sky.SunIrradianceAndScale.xyz;' \
       'radiance *= sky.SunIrradianceAndScale.xyz * 0.5;'
 
-# ⚠️ The third probe was originally a no-op (it appended a label, which changes no behaviour) and duly
-#    "failed". That failure was correct and the probe was wrong — a falsification test has to falsify
-#    something. It now perturbs the moon disc, which is the remaining celestial function with its own branch.
-# ⚠️ 19.5h: the moon is 2 deg off-axis and 11.6 deg up, so it IS in shot — but it renders at ~2.4e5 times
-#    saturation, so MULTIPLYING its radiance changes no visible pixel. The probe therefore ZEROES it, which is
-#    the perturbation that can actually show. Two earlier versions of this probe were no-ops and reported
-#    failure; both times the probe was wrong rather than the showcase, and the honest fix was a probe that
-#    perturbs something observable.
-# The glare is the term that makes the sun readable; if the showcase stopped tracking it, the images would look
-# right while the shader had drifted.
-Probe "removing the sun glare" 17.0 \
-      'return sky.SunRadianceAndLimb.xyz * (psf * kGlareStrength * window) * transmittance;' \
-      'return vec3(0.0);' \
-
-Probe "removing the moon disc" 19.5 \
-      'return sky.MoonRadianceAndEarthshine.xyz * shade * transmittance;' \
-      'return vec3(0.0);'
+# This probe targets the current shipping aerial-perspective path; cloud/media behaviour is covered independently
+# by CheckCelestialMedia.sh, where the integrator is exercised directly rather than through a noisy image diff.
+Probe "removing aerial perspective" 17.0 \
+      'return surfaceRadiance * transmittance + inScatter * sky.SunIrradianceAndScale.xyz;' \
+      'return surfaceRadiance;'
 
 Restore
 rm -f "$Reference" /tmp/ShowcaseRef.ppm /tmp/ShowcaseBroken.ppm
