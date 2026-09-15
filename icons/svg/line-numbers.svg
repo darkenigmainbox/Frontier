@@ -1,0 +1,3 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M7 3v18"/><path stroke="var(--fx-accent, currentColor)" d="M4 6h1.5M4 10h1.5M4 14h1.5M4 18h1.5"/><path d="M10 6h10M10 10h10M10 14h7M10 18h10"/>
+</svg>

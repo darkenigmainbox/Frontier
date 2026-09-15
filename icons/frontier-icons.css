@@ -1,0 +1,7 @@
+/* Frontier Icons — presentation layer.
+ * Usage: <svg class="fx-icon"><use href="sprite.svg#fx-file-new"/></svg>
+ * Multicolour: set --fx-accent on any ancestor. Tint strength: --fx-tint (0–1). */
+.fx-icon{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.fx-icon .fx-a{stroke:var(--fx-accent,currentColor)}
+.fx-icon .fx-f{fill:var(--fx-accent,currentColor);stroke:none}
+.fx-icon .fx-t{fill:var(--fx-accent,currentColor);stroke:none;opacity:var(--fx-tint,.2)}

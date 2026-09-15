@@ -1,0 +1,2221 @@
+{
+  "name": "frontier-icons",
+  "version": 1,
+  "grid": "24x24",
+  "stroke": 2,
+  "license": "Project-internal",
+  "generated": "2026-09-15T17:57:30.244Z",
+  "count": 191,
+  "icons": [
+    {
+      "id": "file",
+      "name": "File",
+      "cat": "file",
+      "tags": [
+        "document",
+        "page",
+        "plain"
+      ],
+      "risk": "original",
+      "note": "Cut corner sits top-LEFT with no fold line — the inverse of the usual folded-page glyph."
+    },
+    {
+      "id": "file-new",
+      "name": "New File",
+      "cat": "file",
+      "tags": [
+        "create",
+        "add",
+        "document",
+        "plus"
+      ],
+      "risk": "original",
+      "note": "Page + centred accent plus; page silhouette is the Frontier cut-corner document."
+    },
+    {
+      "id": "file-code",
+      "name": "Code File",
+      "cat": "file",
+      "tags": [
+        "source",
+        "script",
+        "angle brackets"
+      ],
+      "risk": "original",
+      "note": "Angle brackets rendered as two open 90° hooks inside the cut-corner page."
+    },
+    {
+      "id": "file-json",
+      "name": "Data File",
+      "cat": "file",
+      "tags": [
+        "json",
+        "config",
+        "braces",
+        "object"
+      ],
+      "risk": "conventional",
+      "note": "Braces-in-page is a common concept; the brace here is a single-stroke S-curve, tighter than typical curly-brace icons."
+    },
+    {
+      "id": "file-image",
+      "name": "Image File",
+      "cat": "file",
+      "tags": [
+        "picture",
+        "media",
+        "photo"
+      ],
+      "risk": "conventional",
+      "note": "Mountain-in-frame is universal; differentiated by the cut-corner page and an offset accent sun dot."
+    },
+    {
+      "id": "file-md",
+      "name": "Markdown File",
+      "cat": "file",
+      "tags": [
+        "markdown",
+        "docs",
+        "text"
+      ],
+      "risk": "original",
+      "note": "Monogram M + down-arrow (the Markdown mark) rebuilt as a chamfered M, not the usual rounded one."
+    },
+    {
+      "id": "folder",
+      "name": "Folder",
+      "cat": "file",
+      "tags": [
+        "directory",
+        "project"
+      ],
+      "risk": "constrained",
+      "note": "Folder silhouette is unavoidable; the tab joint is a 45° ramp and body corners are cut, not rounded."
+    },
+    {
+      "id": "folder-open",
+      "name": "Open Folder",
+      "cat": "file",
+      "tags": [
+        "directory",
+        "expand",
+        "browse"
+      ],
+      "risk": "original",
+      "note": "Open state drawn as a slanted front flap overlapping an open-backed shell — no lid swing."
+    },
+    {
+      "id": "folder-new",
+      "name": "New Folder",
+      "cat": "file",
+      "tags": [
+        "create",
+        "directory",
+        "add"
+      ],
+      "risk": "conventional",
+      "note": "Folder + plus; plus is the accent layer so it can carry the brand colour."
+    },
+    {
+      "id": "file-save",
+      "name": "Save",
+      "cat": "file",
+      "tags": [
+        "write",
+        "disk",
+        "persist",
+        "download"
+      ],
+      "risk": "original",
+      "note": "Deliberately NOT a floppy disk: a page with an accent arrow driving into a baseline slot."
+    },
+    {
+      "id": "file-save-all",
+      "name": "Save All",
+      "cat": "file",
+      "tags": [
+        "write",
+        "multiple",
+        "persist"
+      ],
+      "risk": "original",
+      "note": "Stacked pages share one accent arrow — reads as \"many files, one write\"."
+    },
+    {
+      "id": "file-close",
+      "name": "Close File",
+      "cat": "file",
+      "tags": [
+        "dismiss",
+        "document",
+        "x"
+      ],
+      "risk": "conventional",
+      "note": "Page + x; the x is accent-coloured so destructive/dismiss intent is tintable."
+    },
+    {
+      "id": "file-duplicate",
+      "name": "Duplicate File",
+      "cat": "file",
+      "tags": [
+        "copy file",
+        "clone",
+        "repeat"
+      ],
+      "risk": "original",
+      "note": "Two cut-corner pages offset on the diagonal with the back page reduced to an echo stroke."
+    },
+    {
+      "id": "trash",
+      "name": "Delete",
+      "cat": "file",
+      "tags": [
+        "remove",
+        "bin",
+        "discard"
+      ],
+      "risk": "constrained",
+      "note": "Bin glyph is universal; body is a tapered cut-corner can with accent ribs."
+    },
+    {
+      "id": "file-tree",
+      "name": "File Tree",
+      "cat": "file",
+      "tags": [
+        "explorer",
+        "structure",
+        "hierarchy"
+      ],
+      "risk": "original",
+      "note": "Hierarchy drawn as chamfered \"tag\" nodes on a spine, not indented lines."
+    },
+    {
+      "id": "panel-left",
+      "name": "Left Panel",
+      "cat": "workspace",
+      "tags": [
+        "sidebar",
+        "layout",
+        "left"
+      ],
+      "risk": "conventional",
+      "note": "Pane layout icons are inherently generic; the frame is a cut-corner octagon and the active pane is a tint fill."
+    },
+    {
+      "id": "panel-right",
+      "name": "Right Panel",
+      "cat": "workspace",
+      "tags": [
+        "sidebar",
+        "layout",
+        "right"
+      ],
+      "risk": "conventional",
+      "note": "Mirror of Left Panel; tint marks the active pane."
+    },
+    {
+      "id": "panel-bottom",
+      "name": "Bottom Panel",
+      "cat": "workspace",
+      "tags": [
+        "terminal drawer",
+        "layout",
+        "output"
+      ],
+      "risk": "conventional",
+      "note": "Same octagon frame family; horizontal divider with tinted lower pane."
+    },
+    {
+      "id": "panel-close",
+      "name": "Hide Panel",
+      "cat": "workspace",
+      "tags": [
+        "close sidebar",
+        "dismiss layout"
+      ],
+      "risk": "original",
+      "note": "Frame with an accent x sitting on the divider — \"the pane goes away\"."
+    },
+    {
+      "id": "split-right",
+      "name": "Split Right",
+      "cat": "workspace",
+      "tags": [
+        "editor group",
+        "columns",
+        "side by side"
+      ],
+      "risk": "conventional",
+      "note": "Divider + chevron; the chevron is accent so the \"push\" direction is tintable."
+    },
+    {
+      "id": "split-down",
+      "name": "Split Down",
+      "cat": "workspace",
+      "tags": [
+        "editor group",
+        "rows",
+        "horizontal split"
+      ],
+      "risk": "conventional",
+      "note": "Vertical twin of Split Right."
+    },
+    {
+      "id": "workspace",
+      "name": "Workspace",
+      "cat": "workspace",
+      "tags": [
+        "three pane",
+        "ide",
+        "layout"
+      ],
+      "risk": "original",
+      "note": "Three-pane IDE silhouette with a tinted centre editor — reads as a workbench, not a window."
+    },
+    {
+      "id": "tab",
+      "name": "Tab",
+      "cat": "workspace",
+      "tags": [
+        "editor tab",
+        "document switcher"
+      ],
+      "risk": "original",
+      "note": "Tab drawn as a trapezoid with a 45° left ramp sitting on a rail — no rounded-top tab."
+    },
+    {
+      "id": "tab-close",
+      "name": "Close Tab",
+      "cat": "workspace",
+      "tags": [
+        "dismiss tab",
+        "x"
+      ],
+      "risk": "conventional",
+      "note": "Tab + accent x."
+    },
+    {
+      "id": "tabs",
+      "name": "All Tabs",
+      "cat": "workspace",
+      "tags": [
+        "tab overflow",
+        "chevron list",
+        "switcher"
+      ],
+      "risk": "original",
+      "note": "Two nested tab ramps suggest a stack without drawing stacked rectangles."
+    },
+    {
+      "id": "pin",
+      "name": "Pin",
+      "cat": "workspace",
+      "tags": [
+        "keep open",
+        "sticky",
+        "fix"
+      ],
+      "risk": "constrained",
+      "note": "Pushpin is universal; head is a cut-corner block and the needle is the accent layer."
+    },
+    {
+      "id": "sidebar-collapse",
+      "name": "Collapse Sidebar",
+      "cat": "workspace",
+      "tags": [
+        "fold pane",
+        "hide left"
+      ],
+      "risk": "original",
+      "note": "Divider with an accent arrow folding INTO the edge — direction is explicit."
+    },
+    {
+      "id": "window",
+      "name": "Window",
+      "cat": "workspace",
+      "tags": [
+        "app frame",
+        "chrome",
+        "titlebar"
+      ],
+      "risk": "conventional",
+      "note": "Title-bar window is generic; traffic dots are accent fills and the frame is cut-cornered."
+    },
+    {
+      "id": "archive",
+      "name": "Archive",
+      "cat": "file",
+      "tags": [
+        "box",
+        "store",
+        "pack"
+      ],
+      "risk": "conventional",
+      "note": "Lidded box; lid is a wide cut-corner band rather than a rounded rect."
+    },
+    {
+      "id": "lock",
+      "name": "Locked",
+      "cat": "file",
+      "tags": [
+        "readonly",
+        "secure",
+        "private"
+      ],
+      "risk": "constrained",
+      "note": "Padlock is universal; shackle is squared with cut shoulders to match the family."
+    },
+    {
+      "id": "unlock",
+      "name": "Unlocked",
+      "cat": "file",
+      "tags": [
+        "editable",
+        "open",
+        "public"
+      ],
+      "risk": "constrained",
+      "note": "Open-shackle padlock; same family body."
+    },
+    {
+      "id": "undo",
+      "name": "Undo",
+      "cat": "edit",
+      "tags": [
+        "revert",
+        "back",
+        "history"
+      ],
+      "risk": "constrained",
+      "note": "Undo arrow is universal; the hook here is a 45° corner instead of a full semicircle."
+    },
+    {
+      "id": "redo",
+      "name": "Redo",
+      "cat": "edit",
+      "tags": [
+        "forward",
+        "reapply"
+      ],
+      "risk": "constrained",
+      "note": "Mirror of Undo."
+    },
+    {
+      "id": "cut",
+      "name": "Cut",
+      "cat": "edit",
+      "tags": [
+        "scissors",
+        "clip"
+      ],
+      "risk": "constrained",
+      "note": "Scissors are unavoidable; blades cross at a steeper 60° and handles are cut-corner rings, not circles."
+    },
+    {
+      "id": "copy",
+      "name": "Copy",
+      "cat": "edit",
+      "tags": [
+        "duplicate",
+        "clipboard"
+      ],
+      "risk": "constrained",
+      "note": "Two-page copy is universal; both pages carry the cut corner and the back page is an echo stroke."
+    },
+    {
+      "id": "paste",
+      "name": "Paste",
+      "cat": "edit",
+      "tags": [
+        "clipboard",
+        "insert"
+      ],
+      "risk": "constrained",
+      "note": "Clipboard is universal; board is cut-cornered and the clip is a squared bridge."
+    },
+    {
+      "id": "select-all",
+      "name": "Select All",
+      "cat": "edit",
+      "tags": [
+        "selection",
+        "frame",
+        "brackets"
+      ],
+      "risk": "original",
+      "note": "Selection drawn as four detached corner brackets (a marching-ants abstraction), not a solid rect."
+    },
+    {
+      "id": "find",
+      "name": "Find",
+      "cat": "edit",
+      "tags": [
+        "search",
+        "magnifier",
+        "locate"
+      ],
+      "risk": "constrained",
+      "note": "Magnifier is the most universal glyph in UI; differentiation: lens is a cut-corner OCTAGON, handle at 45°."
+    },
+    {
+      "id": "find-alt",
+      "name": "Find (text)",
+      "cat": "edit",
+      "tags": [
+        "search",
+        "in document",
+        "alternate"
+      ],
+      "risk": "original",
+      "note": "Alternative search with zero magnifier: a page whose lines are interrupted by a highlighted run."
+    },
+    {
+      "id": "replace",
+      "name": "Find & Replace",
+      "cat": "edit",
+      "tags": [
+        "swap",
+        "substitute"
+      ],
+      "risk": "original",
+      "note": "Two text runs with a swap arrow between; the incoming run is tinted to show the substitution target."
+    },
+    {
+      "id": "find-in-files",
+      "name": "Find in Files",
+      "cat": "edit",
+      "tags": [
+        "global search",
+        "project search"
+      ],
+      "risk": "original",
+      "note": "Octagon lens sweeping two stacked pages."
+    },
+    {
+      "id": "line-numbers",
+      "name": "Line Numbers",
+      "cat": "edit",
+      "tags": [
+        "gutter",
+        "numbering",
+        "ruler"
+      ],
+      "risk": "original",
+      "note": "Gutter rule with tick digits abstraction: short ticks left of long text lines."
+    },
+    {
+      "id": "indent-more",
+      "name": "Increase Indent",
+      "cat": "edit",
+      "tags": [
+        "tab in",
+        "nest"
+      ],
+      "risk": "conventional",
+      "note": "Indent arrows are standard; the pushed line carries an accent chevron."
+    },
+    {
+      "id": "indent-less",
+      "name": "Decrease Indent",
+      "cat": "edit",
+      "tags": [
+        "tab out",
+        "unnest"
+      ],
+      "risk": "conventional",
+      "note": "Mirror of Increase Indent."
+    },
+    {
+      "id": "comment-lines",
+      "name": "Toggle Comment",
+      "cat": "edit",
+      "tags": [
+        "comment out",
+        "slash",
+        "mute code"
+      ],
+      "risk": "original",
+      "note": "Two code lines each slashed at 45° by one continuous accent stroke — literal \"commented out\"."
+    },
+    {
+      "id": "word-wrap",
+      "name": "Word Wrap",
+      "cat": "edit",
+      "tags": [
+        "wrap",
+        "soft break",
+        "reflow"
+      ],
+      "risk": "conventional",
+      "note": "Wrap arrow bending under a line; bend is a cut corner rather than a curve."
+    },
+    {
+      "id": "format-doc",
+      "name": "Format Document",
+      "cat": "edit",
+      "tags": [
+        "prettify",
+        "tidy",
+        "align"
+      ],
+      "risk": "original",
+      "note": "Ragged lines snapped to a shared accent baseline tick — shows the result, not a wand."
+    },
+    {
+      "id": "sort-lines",
+      "name": "Sort Lines",
+      "cat": "edit",
+      "tags": [
+        "order",
+        "az",
+        "arrange"
+      ],
+      "risk": "original",
+      "note": "Three lines of decreasing length with a descending accent arrow alongside."
+    },
+    {
+      "id": "delete-line",
+      "name": "Delete Line",
+      "cat": "edit",
+      "tags": [
+        "remove row",
+        "kill line"
+      ],
+      "risk": "original",
+      "note": "A line struck through with an accent x-slash while its neighbours survive."
+    },
+    {
+      "id": "move-line-up",
+      "name": "Move Line Up",
+      "cat": "edit",
+      "tags": [
+        "reorder",
+        "shift up"
+      ],
+      "risk": "conventional",
+      "note": "Line + up arrow; the moving line is accent to distinguish actor from context."
+    },
+    {
+      "id": "move-line-down",
+      "name": "Move Line Down",
+      "cat": "edit",
+      "tags": [
+        "reorder",
+        "shift down"
+      ],
+      "risk": "conventional",
+      "note": "Mirror of Move Line Up."
+    },
+    {
+      "id": "multi-cursor",
+      "name": "Multi Cursor",
+      "cat": "edit",
+      "tags": [
+        "multiple carets",
+        "column edit"
+      ],
+      "risk": "original",
+      "note": "Three I-beam carets staggered — no other common set shows plural carets."
+    },
+    {
+      "id": "column-select",
+      "name": "Column Selection",
+      "cat": "edit",
+      "tags": [
+        "box select",
+        "block"
+      ],
+      "risk": "original",
+      "note": "A tinted block with corner nubs — the box-selection rectangle made tangible."
+    },
+    {
+      "id": "fold",
+      "name": "Fold",
+      "cat": "edit",
+      "tags": [
+        "collapse",
+        "region",
+        "chevron"
+      ],
+      "risk": "conventional",
+      "note": "Chevron-into-bracket; bracket is cut-cornered."
+    },
+    {
+      "id": "unfold",
+      "name": "Unfold",
+      "cat": "edit",
+      "tags": [
+        "expand",
+        "region"
+      ],
+      "risk": "conventional",
+      "note": "Mirror of Fold."
+    },
+    {
+      "id": "fold-all",
+      "name": "Fold All",
+      "cat": "edit",
+      "tags": [
+        "collapse all",
+        "regions"
+      ],
+      "risk": "original",
+      "note": "Double chevron stacked into a bracket pair."
+    },
+    {
+      "id": "unfold-all",
+      "name": "Unfold All",
+      "cat": "edit",
+      "tags": [
+        "expand all",
+        "regions"
+      ],
+      "risk": "original",
+      "note": "Mirror of Fold All."
+    },
+    {
+      "id": "bookmark",
+      "name": "Bookmark",
+      "cat": "edit",
+      "tags": [
+        "marker",
+        "flag",
+        "remember"
+      ],
+      "risk": "constrained",
+      "note": "Ribbon bookmark is universal; tail is cut as a double 45° notch instead of a V."
+    },
+    {
+      "id": "snippet",
+      "name": "Snippet",
+      "cat": "edit",
+      "tags": [
+        "template",
+        "block insert"
+      ],
+      "risk": "original",
+      "note": "A cut-corner page with a bite taken out (dashed gap) where the snippet slots in."
+    },
+    {
+      "id": "cursor",
+      "name": "Text Cursor",
+      "cat": "edit",
+      "tags": [
+        "caret",
+        "insertion point",
+        "i-beam"
+      ],
+      "risk": "conventional",
+      "note": "I-beam; serifs are angled cuts rather than horizontal bars."
+    },
+    {
+      "id": "highlight",
+      "name": "Highlight",
+      "cat": "edit",
+      "tags": [
+        "marker pen",
+        "emphasise"
+      ],
+      "risk": "conventional",
+      "note": "Marker pen at 45°; the ink trail is the tint layer."
+    },
+    {
+      "id": "edit-pencil",
+      "name": "Rename / Edit",
+      "cat": "edit",
+      "tags": [
+        "pencil",
+        "write",
+        "modify"
+      ],
+      "risk": "constrained",
+      "note": "Pencil is universal; ferrule is a cut band and the tip is accent."
+    },
+    {
+      "id": "code",
+      "name": "Code",
+      "cat": "code",
+      "tags": [
+        "angle brackets",
+        "source",
+        "markup"
+      ],
+      "risk": "constrained",
+      "note": "Angle brackets are universal; the slash between them is a steep accent diagonal, not the usual gentle one."
+    },
+    {
+      "id": "braces",
+      "name": "Braces",
+      "cat": "code",
+      "tags": [
+        "curly brackets",
+        "object",
+        "block"
+      ],
+      "risk": "conventional",
+      "note": "Brace glyph is standard; drawn as one continuous S-curve per side with pointed waist."
+    },
+    {
+      "id": "brackets",
+      "name": "Brackets",
+      "cat": "code",
+      "tags": [
+        "square brackets",
+        "array",
+        "index"
+      ],
+      "risk": "original",
+      "note": "Square brackets with 45° cut outer corners — the family chamfer applied to punctuation."
+    },
+    {
+      "id": "parens",
+      "name": "Parentheses",
+      "cat": "code",
+      "tags": [
+        "round brackets",
+        "call",
+        "arguments"
+      ],
+      "risk": "conventional",
+      "note": "Parenthesis arcs; kept pure since the curve IS the glyph."
+    },
+    {
+      "id": "terminal",
+      "name": "Terminal",
+      "cat": "code",
+      "tags": [
+        "console",
+        "shell",
+        "prompt",
+        "cli"
+      ],
+      "risk": "constrained",
+      "note": "Prompt-in-frame is universal; frame is the cut-corner octagon and the prompt is accent."
+    },
+    {
+      "id": "function",
+      "name": "Function",
+      "cat": "code",
+      "tags": [
+        "method",
+        "f",
+        "routine"
+      ],
+      "risk": "original",
+      "note": "Italic ƒ built from one descending stem with a top hook; crossbar is the accent layer."
+    },
+    {
+      "id": "variable",
+      "name": "Variable",
+      "cat": "code",
+      "tags": [
+        "identifier",
+        "value",
+        "x"
+      ],
+      "risk": "original",
+      "note": "An x with an assignment dash — reads as \"x =\" without letterforms."
+    },
+    {
+      "id": "class",
+      "name": "Class",
+      "cat": "code",
+      "tags": [
+        "type",
+        "object",
+        "uml"
+      ],
+      "risk": "original",
+      "note": "UML class box: cut-corner frame, header rule, accent type name."
+    },
+    {
+      "id": "interface",
+      "name": "Interface",
+      "cat": "code",
+      "tags": [
+        "contract",
+        "protocol",
+        "abstract"
+      ],
+      "risk": "original",
+      "note": "A dashed contract frame around a solid accent core — \"shape without body\"."
+    },
+    {
+      "id": "database",
+      "name": "Database",
+      "cat": "code",
+      "tags": [
+        "storage",
+        "sql",
+        "cylinder"
+      ],
+      "risk": "constrained",
+      "note": "Cylinder is universal; the middle ring is accent so \"data level\" is tintable."
+    },
+    {
+      "id": "api",
+      "name": "API",
+      "cat": "code",
+      "tags": [
+        "request",
+        "response",
+        "exchange",
+        "endpoint"
+      ],
+      "risk": "original",
+      "note": "Two-way exchange arrows inside brackets — request/response instead of a cloud."
+    },
+    {
+      "id": "regex",
+      "name": "Regex",
+      "cat": "code",
+      "tags": [
+        "pattern",
+        "wildcard",
+        "match"
+      ],
+      "risk": "original",
+      "note": "Literal \".*\" — a six-ray asterisk over two accent dots. No other set ships this."
+    },
+    {
+      "id": "constant",
+      "name": "Constant",
+      "cat": "code",
+      "tags": [
+        "hash",
+        "number",
+        "immutable"
+      ],
+      "risk": "original",
+      "note": "A hash whose horizontals are accent and verticals lean — reads as # and as \"fixed value\"."
+    },
+    {
+      "id": "string",
+      "name": "String",
+      "cat": "code",
+      "tags": [
+        "quotes",
+        "text literal"
+      ],
+      "risk": "original",
+      "note": "Open-quote pair drawn as two tapered commas, oversized so they read at 16px."
+    },
+    {
+      "id": "module",
+      "name": "Module",
+      "cat": "code",
+      "tags": [
+        "package",
+        "cube",
+        "import"
+      ],
+      "risk": "constrained",
+      "note": "Isometric cube is standard for packages; top face is tinted."
+    },
+    {
+      "id": "command-palette",
+      "name": "Command Palette",
+      "cat": "code",
+      "tags": [
+        "quick open",
+        "commands",
+        "input"
+      ],
+      "risk": "original",
+      "note": "Frame with prompt chevron, a typed token and a suggestion line — a palette in miniature."
+    },
+    {
+      "id": "extension",
+      "name": "Extension",
+      "cat": "code",
+      "tags": [
+        "plugin",
+        "add-on",
+        "plug"
+      ],
+      "risk": "constrained",
+      "note": "Plug glyph; body is a cut-corner bowl and the cord is accent."
+    },
+    {
+      "id": "run",
+      "name": "Run",
+      "cat": "code",
+      "tags": [
+        "play",
+        "start",
+        "execute"
+      ],
+      "risk": "constrained",
+      "note": "Play triangle with a cut leading edge; accent so \"go\" can be green in-app."
+    },
+    {
+      "id": "build",
+      "name": "Build",
+      "cat": "code",
+      "tags": [
+        "compile",
+        "hammer",
+        "make"
+      ],
+      "risk": "conventional",
+      "note": "Hammer head is a cut-corner block on an accent handle."
+    },
+    {
+      "id": "test",
+      "name": "Test",
+      "cat": "code",
+      "tags": [
+        "flask",
+        "spec",
+        "check"
+      ],
+      "risk": "conventional",
+      "note": "Flask with cut shoulders; liquid line is accent."
+    },
+    {
+      "id": "bold",
+      "name": "Bold",
+      "cat": "text",
+      "tags": [
+        "weight",
+        "strong",
+        "b"
+      ],
+      "risk": "original",
+      "note": "B rebuilt as two stacked cut-corner bowls on a shared spine — no round counters."
+    },
+    {
+      "id": "italic",
+      "name": "Italic",
+      "cat": "text",
+      "tags": [
+        "slant",
+        "emphasis",
+        "i"
+      ],
+      "risk": "conventional",
+      "note": "Slanted I with serifs; the slant angle matches the family 45°."
+    },
+    {
+      "id": "underline",
+      "name": "Underline",
+      "cat": "text",
+      "tags": [
+        "underline",
+        "u"
+      ],
+      "risk": "conventional",
+      "note": "U + rule; the U base is a cut corner instead of an arc."
+    },
+    {
+      "id": "strikethrough",
+      "name": "Strikethrough",
+      "cat": "text",
+      "tags": [
+        "strike",
+        "deleted text"
+      ],
+      "risk": "original",
+      "note": "Two text rows pierced by one continuous accent rule."
+    },
+    {
+      "id": "heading",
+      "name": "Heading",
+      "cat": "text",
+      "tags": [
+        "title",
+        "h1",
+        "header"
+      ],
+      "risk": "original",
+      "note": "H with an accent rank digit drawn as a single flag stroke."
+    },
+    {
+      "id": "list-bullet",
+      "name": "Bullet List",
+      "cat": "text",
+      "tags": [
+        "unordered",
+        "points",
+        "ul"
+      ],
+      "risk": "conventional",
+      "note": "Bullets are accent squares (cut corners) rather than dots."
+    },
+    {
+      "id": "list-number",
+      "name": "Numbered List",
+      "cat": "text",
+      "tags": [
+        "ordered",
+        "ol",
+        "steps"
+      ],
+      "risk": "original",
+      "note": "Micro-numerals 1-2-3 drawn with hairline accent strokes beside ink rows."
+    },
+    {
+      "id": "checklist",
+      "name": "Task List",
+      "cat": "text",
+      "tags": [
+        "todo",
+        "checkbox",
+        "tasks"
+      ],
+      "risk": "conventional",
+      "note": "Cut-corner checkboxes; the done tick is accent, the open box is ink."
+    },
+    {
+      "id": "quote-block",
+      "name": "Quote",
+      "cat": "text",
+      "tags": [
+        "blockquote",
+        "cite"
+      ],
+      "risk": "original",
+      "note": "Accent gutter bar + two tapered quote commas."
+    },
+    {
+      "id": "link",
+      "name": "Link",
+      "cat": "text",
+      "tags": [
+        "hyperlink",
+        "url",
+        "chain"
+      ],
+      "risk": "constrained",
+      "note": "Chain link is universal; the connecting strand is the accent layer."
+    },
+    {
+      "id": "image",
+      "name": "Insert Image",
+      "cat": "text",
+      "tags": [
+        "picture",
+        "media"
+      ],
+      "risk": "conventional",
+      "note": "Frame + ridge + sun; frame is the cut-corner octagon."
+    },
+    {
+      "id": "table",
+      "name": "Insert Table",
+      "cat": "text",
+      "tags": [
+        "grid",
+        "rows",
+        "columns"
+      ],
+      "risk": "conventional",
+      "note": "Grid in the octagon frame; header row is tinted."
+    },
+    {
+      "id": "divider",
+      "name": "Divider",
+      "cat": "text",
+      "tags": [
+        "horizontal rule",
+        "separator",
+        "hr"
+      ],
+      "risk": "original",
+      "note": "Two ink rows separated by a dashed accent rule — the divider is the star."
+    },
+    {
+      "id": "emoji",
+      "name": "Emoji",
+      "cat": "text",
+      "tags": [
+        "smiley",
+        "reaction",
+        "insert"
+      ],
+      "risk": "original",
+      "note": "The smiley lives in a cut-corner octagon face — instantly Frontier."
+    },
+    {
+      "id": "type",
+      "name": "Type",
+      "cat": "text",
+      "tags": [
+        "typography",
+        "font",
+        "t"
+      ],
+      "risk": "conventional",
+      "note": "T with cut serif ends."
+    },
+    {
+      "id": "case-toggle",
+      "name": "Change Case",
+      "cat": "text",
+      "tags": [
+        "uppercase",
+        "lowercase",
+        "Aa"
+      ],
+      "risk": "conventional",
+      "note": "Big A + small a; the lowercase a is the accent layer."
+    },
+    {
+      "id": "spellcheck",
+      "name": "Spellcheck",
+      "cat": "text",
+      "tags": [
+        "grammar",
+        "lint text",
+        "abc"
+      ],
+      "risk": "original",
+      "note": "Word bars with an accent verification tick under the last word."
+    },
+    {
+      "id": "whitespace",
+      "name": "Show Whitespace",
+      "cat": "text",
+      "tags": [
+        "pilcrow",
+        "invisible characters",
+        "paragraph"
+      ],
+      "risk": "conventional",
+      "note": "Pilcrow; the bowl is accent so toggled state is tintable."
+    },
+    {
+      "id": "text-size",
+      "name": "Text Size",
+      "cat": "text",
+      "tags": [
+        "font size",
+        "scale",
+        "aA"
+      ],
+      "risk": "original",
+      "note": "Small a and large A share a baseline; the delta is the accent arrow between."
+    },
+    {
+      "id": "align-left",
+      "name": "Align Left",
+      "cat": "text",
+      "tags": [
+        "justify left",
+        "rag right"
+      ],
+      "risk": "conventional",
+      "note": "Ragged rows against an accent left rule."
+    },
+    {
+      "id": "align-center",
+      "name": "Align Center",
+      "cat": "text",
+      "tags": [
+        "centre",
+        "middle"
+      ],
+      "risk": "conventional",
+      "note": "Centred rows with an accent axis."
+    },
+    {
+      "id": "align-right",
+      "name": "Align Right",
+      "cat": "text",
+      "tags": [
+        "justify right",
+        "rag left"
+      ],
+      "risk": "conventional",
+      "note": "Mirror of Align Left."
+    },
+    {
+      "id": "keyboard",
+      "name": "Shortcuts",
+      "cat": "text",
+      "tags": [
+        "keys",
+        "bindings",
+        "kbd"
+      ],
+      "risk": "original",
+      "note": "Key bed in the octagon frame with an accent spacebar."
+    },
+    {
+      "id": "zoom-in",
+      "name": "Zoom In",
+      "cat": "view",
+      "tags": [
+        "magnify",
+        "enlarge"
+      ],
+      "risk": "constrained",
+      "note": "Magnifier again, but octagon lens + accent plus/handle keeps it in-family."
+    },
+    {
+      "id": "zoom-out",
+      "name": "Zoom Out",
+      "cat": "view",
+      "tags": [
+        "magnify",
+        "shrink"
+      ],
+      "risk": "constrained",
+      "note": "Mirror semantics of Zoom In."
+    },
+    {
+      "id": "zoom-fit",
+      "name": "Zoom to Fit",
+      "cat": "view",
+      "tags": [
+        "fit view",
+        "frame",
+        "reset zoom"
+      ],
+      "risk": "original",
+      "note": "Four cut corner hooks closing around an accent content block — \"fit\" without a lens."
+    },
+    {
+      "id": "fullscreen",
+      "name": "Fullscreen",
+      "cat": "view",
+      "tags": [
+        "maximize",
+        "expand"
+      ],
+      "risk": "conventional",
+      "note": "Outward arrows; arrowheads are accent."
+    },
+    {
+      "id": "preview",
+      "name": "Preview",
+      "cat": "view",
+      "tags": [
+        "eye",
+        "show",
+        "visible"
+      ],
+      "risk": "original",
+      "note": "Eye whose iris is a cut-corner octagon — the family mark inside a universal shell."
+    },
+    {
+      "id": "preview-off",
+      "name": "Hide Preview",
+      "cat": "view",
+      "tags": [
+        "eye off",
+        "hidden"
+      ],
+      "risk": "conventional",
+      "note": "Eye with accent slash."
+    },
+    {
+      "id": "theme",
+      "name": "Theme",
+      "cat": "view",
+      "tags": [
+        "contrast",
+        "dark mode",
+        "appearance"
+      ],
+      "risk": "original",
+      "note": "Half-tinted octagon = contrast dial; no sun/moon cliché."
+    },
+    {
+      "id": "sun",
+      "name": "Light Mode",
+      "cat": "view",
+      "tags": [
+        "brightness",
+        "day"
+      ],
+      "risk": "conventional",
+      "note": "Octagon core instead of a circle core; rays are accent."
+    },
+    {
+      "id": "moon",
+      "name": "Dark Mode",
+      "cat": "view",
+      "tags": [
+        "night",
+        "dim"
+      ],
+      "risk": "conventional",
+      "note": "Crescent; inner edge is a cut chord rather than a pure arc."
+    },
+    {
+      "id": "go-to-line",
+      "name": "Go to Line",
+      "cat": "view",
+      "tags": [
+        "jump",
+        "line number"
+      ],
+      "risk": "original",
+      "note": "Code rows with an accent pointer bracketing the destination row."
+    },
+    {
+      "id": "breadcrumb",
+      "name": "Breadcrumb",
+      "cat": "view",
+      "tags": [
+        "path",
+        "trail",
+        "navigation"
+      ],
+      "risk": "original",
+      "note": "Path segments joined by a single accent chevron hinge."
+    },
+    {
+      "id": "outline",
+      "name": "Symbol Outline",
+      "cat": "view",
+      "tags": [
+        "structure",
+        "tree",
+        "symbols"
+      ],
+      "risk": "original",
+      "note": "Indented symbol bars; the active symbol is an accent square bullet."
+    },
+    {
+      "id": "minimap",
+      "name": "Minimap",
+      "cat": "view",
+      "tags": [
+        "overview",
+        "ruler",
+        "scroll map"
+      ],
+      "risk": "original",
+      "note": "Narrow page of hairlines with an accent viewport frame sliding over it."
+    },
+    {
+      "id": "go-to-definition",
+      "name": "Go to Definition",
+      "cat": "view",
+      "tags": [
+        "jump to source",
+        "navigate"
+      ],
+      "risk": "original",
+      "note": "An accent arrow diving into a bracket pair — destination is code."
+    },
+    {
+      "id": "find-references",
+      "name": "Find References",
+      "cat": "view",
+      "tags": [
+        "usages",
+        "outgoing"
+      ],
+      "risk": "original",
+      "note": "Inverse of Go to Definition: arrow leaves the brackets toward three use-sites."
+    },
+    {
+      "id": "history",
+      "name": "History",
+      "cat": "view",
+      "tags": [
+        "clock",
+        "recent",
+        "time"
+      ],
+      "risk": "original",
+      "note": "Clock face as a cut-corner octagon with accent hands."
+    },
+    {
+      "id": "refresh",
+      "name": "Refresh",
+      "cat": "view",
+      "tags": [
+        "reload",
+        "sync",
+        "retry"
+      ],
+      "risk": "constrained",
+      "note": "Circular arrow is universal; the head is accent and the arc stops short with square ends."
+    },
+    {
+      "id": "download",
+      "name": "Download",
+      "cat": "view",
+      "tags": [
+        "export file",
+        "save as"
+      ],
+      "risk": "conventional",
+      "note": "Cut-corner tray + accent down arrow."
+    },
+    {
+      "id": "upload",
+      "name": "Upload",
+      "cat": "view",
+      "tags": [
+        "import file",
+        "publish"
+      ],
+      "risk": "conventional",
+      "note": "Mirror of Download."
+    },
+    {
+      "id": "external-link",
+      "name": "Open Externally",
+      "cat": "view",
+      "tags": [
+        "new window",
+        "outbound"
+      ],
+      "risk": "conventional",
+      "note": "Cut-corner box with accent escape arrow."
+    },
+    {
+      "id": "focus",
+      "name": "Focus Editor",
+      "cat": "view",
+      "tags": [
+        "zen",
+        "center",
+        "isolate"
+      ],
+      "risk": "original",
+      "note": "Centre line stays bright while outer lines dim to ticks — focus by subtraction."
+    },
+    {
+      "id": "error",
+      "name": "Error",
+      "cat": "diag",
+      "tags": [
+        "problem",
+        "failure",
+        "x"
+      ],
+      "risk": "original",
+      "note": "Cut-corner octagon badge with accent x — no circle-slash cliché."
+    },
+    {
+      "id": "warning",
+      "name": "Warning",
+      "cat": "diag",
+      "tags": [
+        "caution",
+        "alert",
+        "triangle"
+      ],
+      "risk": "constrained",
+      "note": "Warning triangle is universal; ours has cut base corners and an accent exclamation."
+    },
+    {
+      "id": "info",
+      "name": "Info",
+      "cat": "diag",
+      "tags": [
+        "note",
+        "detail"
+      ],
+      "risk": "original",
+      "note": "Octagon badge with accent i."
+    },
+    {
+      "id": "hint",
+      "name": "Hint",
+      "cat": "diag",
+      "tags": [
+        "lightbulb",
+        "suggestion",
+        "idea"
+      ],
+      "risk": "constrained",
+      "note": "Bulb with a cut-corner glass and accent filament rays."
+    },
+    {
+      "id": "breakpoint",
+      "name": "Breakpoint",
+      "cat": "diag",
+      "tags": [
+        "debug marker",
+        "gutter",
+        "pause here"
+      ],
+      "risk": "original",
+      "note": "Gutter rule with a solid accent marker tag — exactly how breakpoints live in editors."
+    },
+    {
+      "id": "debug-start",
+      "name": "Debug",
+      "cat": "diag",
+      "tags": [
+        "start debugging",
+        "play",
+        "bug"
+      ],
+      "risk": "original",
+      "note": "Chamfered play wedge plus a bug antenna pair — run + inspect in one glyph."
+    },
+    {
+      "id": "debug-pause",
+      "name": "Pause",
+      "cat": "diag",
+      "tags": [
+        "halt",
+        "suspend"
+      ],
+      "risk": "conventional",
+      "note": "Twin accent bars with cut ends."
+    },
+    {
+      "id": "debug-stop",
+      "name": "Stop",
+      "cat": "diag",
+      "tags": [
+        "terminate",
+        "end run"
+      ],
+      "risk": "conventional",
+      "note": "Accent cut-corner block."
+    },
+    {
+      "id": "step-over",
+      "name": "Step Over",
+      "cat": "diag",
+      "tags": [
+        "next",
+        "skip call"
+      ],
+      "risk": "conventional",
+      "note": "Arc over a node with accent landing arrow."
+    },
+    {
+      "id": "step-into",
+      "name": "Step Into",
+      "cat": "diag",
+      "tags": [
+        "dive",
+        "enter call"
+      ],
+      "risk": "conventional",
+      "note": "Accent arrow descending into a cut bracket floor."
+    },
+    {
+      "id": "step-out",
+      "name": "Step Out",
+      "cat": "diag",
+      "tags": [
+        "return",
+        "exit call"
+      ],
+      "risk": "conventional",
+      "note": "Mirror of Step Into."
+    },
+    {
+      "id": "console",
+      "name": "Console",
+      "cat": "diag",
+      "tags": [
+        "output",
+        "logs",
+        "terminal"
+      ],
+      "risk": "original",
+      "note": "Frame with prompt chevron and three log rows of decreasing weight."
+    },
+    {
+      "id": "stack-trace",
+      "name": "Stack Trace",
+      "cat": "diag",
+      "tags": [
+        "frames",
+        "call stack"
+      ],
+      "risk": "original",
+      "note": "Stacked frames offset like falling cards; top frame is the accent active frame."
+    },
+    {
+      "id": "profile",
+      "name": "Profile",
+      "cat": "diag",
+      "tags": [
+        "flame graph",
+        "performance",
+        "hot path"
+      ],
+      "risk": "conventional",
+      "note": "Flame silhouette with cut base; inner flame is accent."
+    },
+    {
+      "id": "watch",
+      "name": "Watch",
+      "cat": "diag",
+      "tags": [
+        "inspect",
+        "monitor",
+        "expression"
+      ],
+      "risk": "original",
+      "note": "Octagon eye-lid over an accent variable x — \"watched value\"."
+    },
+    {
+      "id": "problems",
+      "name": "Problems",
+      "cat": "diag",
+      "tags": [
+        "diagnostics list",
+        "issues"
+      ],
+      "risk": "original",
+      "note": "List rows each prefixed by a severity glyph: accent x, then wedge, then dot."
+    },
+    {
+      "id": "coverage",
+      "name": "Coverage",
+      "cat": "diag",
+      "tags": [
+        "tests hit",
+        "percentage"
+      ],
+      "risk": "original",
+      "note": "A bar gauge: tinted filled portion against an ink outline track."
+    },
+    {
+      "id": "git-branch",
+      "name": "Branch",
+      "cat": "git",
+      "tags": [
+        "fork",
+        "side branch"
+      ],
+      "risk": "constrained",
+      "note": "Branch graph is universal; nodes are Frontier hex-nodes instead of circles."
+    },
+    {
+      "id": "git-commit",
+      "name": "Commit",
+      "cat": "git",
+      "tags": [
+        "save point",
+        "revision"
+      ],
+      "risk": "constrained",
+      "note": "Line-node-line; the node is a hex-node."
+    },
+    {
+      "id": "git-merge",
+      "name": "Merge",
+      "cat": "git",
+      "tags": [
+        "integrate",
+        "join branches"
+      ],
+      "risk": "constrained",
+      "note": "Two rails converging into one hex-node."
+    },
+    {
+      "id": "git-compare",
+      "name": "Compare",
+      "cat": "git",
+      "tags": [
+        "diff branches",
+        "arrows"
+      ],
+      "risk": "conventional",
+      "note": "Opposed transfer arrows between hex-nodes."
+    },
+    {
+      "id": "git-sync",
+      "name": "Sync / Pull",
+      "cat": "git",
+      "tags": [
+        "fetch",
+        "update",
+        "clone"
+      ],
+      "risk": "original",
+      "note": "Accent arrow dropping a commit node onto a branch rail."
+    },
+    {
+      "id": "version-history",
+      "name": "Version History",
+      "cat": "git",
+      "tags": [
+        "timeline",
+        "rewind",
+        "revisions"
+      ],
+      "risk": "original",
+      "note": "Rewind arrow wrapping a rail of three hex-nodes (oldest tinted)."
+    },
+    {
+      "id": "tag",
+      "name": "Tag",
+      "cat": "git",
+      "tags": [
+        "release",
+        "label",
+        "version"
+      ],
+      "risk": "conventional",
+      "note": "Tag plate with cut point and accent eyelet."
+    },
+    {
+      "id": "repo",
+      "name": "Repository",
+      "cat": "git",
+      "tags": [
+        "project",
+        "remote",
+        "origin"
+      ],
+      "risk": "original",
+      "note": "Cut-corner folder carrying a branch rail with two hex-nodes."
+    },
+    {
+      "id": "commit-list",
+      "name": "Commit List",
+      "cat": "git",
+      "tags": [
+        "log",
+        "graph"
+      ],
+      "risk": "original",
+      "note": "Vertical rail with alternating hex-nodes and message bars."
+    },
+    {
+      "id": "conflict",
+      "name": "Conflict",
+      "cat": "git",
+      "tags": [
+        "merge clash",
+        "resolution"
+      ],
+      "risk": "original",
+      "note": "Two commit arrows colliding head-on with an accent clash spark."
+    },
+    {
+      "id": "stash",
+      "name": "Stash",
+      "cat": "git",
+      "tags": [
+        "shelve",
+        "set aside"
+      ],
+      "risk": "original",
+      "note": "Three stacked plates with the top one lifted and tinted — changes set aside."
+    },
+    {
+      "id": "diff",
+      "name": "Diff",
+      "cat": "git",
+      "tags": [
+        "changes",
+        "plus minus",
+        "compare files"
+      ],
+      "risk": "conventional",
+      "note": "Split pane: accent plus on the new side, ink minus on the old."
+    },
+    {
+      "id": "ai-spark",
+      "name": "Assistant",
+      "cat": "ai",
+      "tags": [
+        "ai",
+        "spark",
+        "copilot"
+      ],
+      "risk": "original",
+      "note": "Four-ray concave spark with a satellite spark — the Frontier AI mark."
+    },
+    {
+      "id": "ai-complete",
+      "name": "Inline Suggestion",
+      "cat": "ai",
+      "tags": [
+        "autocomplete",
+        "ghost text",
+        "suggest"
+      ],
+      "risk": "original",
+      "note": "Typed rows end in a ghost spark: the suggestion arrives mid-line."
+    },
+    {
+      "id": "ai-chat",
+      "name": "AI Chat",
+      "cat": "ai",
+      "tags": [
+        "assistant panel",
+        "conversation"
+      ],
+      "risk": "original",
+      "note": "Cut-corner speech bubble holding the spark."
+    },
+    {
+      "id": "ai-refactor",
+      "name": "AI Refactor",
+      "cat": "ai",
+      "tags": [
+        "rewrite",
+        "transform code"
+      ],
+      "risk": "original",
+      "note": "Spark inside a two-arrow cycle: intelligence applied around the code."
+    },
+    {
+      "id": "ai-explain",
+      "name": "Explain",
+      "cat": "ai",
+      "tags": [
+        "summarise",
+        "why",
+        "docs"
+      ],
+      "risk": "original",
+      "note": "Spark above an open book of two ruled pages."
+    },
+    {
+      "id": "ai-fix",
+      "name": "AI Fix",
+      "cat": "ai",
+      "tags": [
+        "auto repair",
+        "quick fix"
+      ],
+      "risk": "original",
+      "note": "Spark fused to a wrench jaw — repair with intent."
+    },
+    {
+      "id": "ai-diff",
+      "name": "AI Changes",
+      "cat": "ai",
+      "tags": [
+        "suggested edits",
+        "review ai"
+      ],
+      "risk": "original",
+      "note": "Spark beside a plus/minus pair: machine-authored additions and removals."
+    },
+    {
+      "id": "robot",
+      "name": "Agent",
+      "cat": "ai",
+      "tags": [
+        "bot",
+        "autonomous",
+        "runner"
+      ],
+      "risk": "conventional",
+      "note": "Robot head in the octagon family with accent eyes and antenna spark."
+    },
+    {
+      "id": "chevron-down",
+      "name": "Chevron Down",
+      "cat": "ui",
+      "tags": [
+        "expand",
+        "down"
+      ],
+      "risk": "conventional",
+      "note": "Plain chevron; universal primitive."
+    },
+    {
+      "id": "chevron-up",
+      "name": "Chevron Up",
+      "cat": "ui",
+      "tags": [
+        "collapse",
+        "up"
+      ],
+      "risk": "conventional",
+      "note": "Plain chevron; universal primitive."
+    },
+    {
+      "id": "chevron-left",
+      "name": "Chevron Left",
+      "cat": "ui",
+      "tags": [
+        "back",
+        "previous"
+      ],
+      "risk": "conventional",
+      "note": "Plain chevron; universal primitive."
+    },
+    {
+      "id": "chevron-right",
+      "name": "Chevron Right",
+      "cat": "ui",
+      "tags": [
+        "forward",
+        "next"
+      ],
+      "risk": "conventional",
+      "note": "Plain chevron; universal primitive."
+    },
+    {
+      "id": "arrow-left",
+      "name": "Arrow Left",
+      "cat": "ui",
+      "tags": [
+        "back"
+      ],
+      "risk": "conventional",
+      "note": "Plain arrow; universal primitive."
+    },
+    {
+      "id": "arrow-right",
+      "name": "Arrow Right",
+      "cat": "ui",
+      "tags": [
+        "forward"
+      ],
+      "risk": "conventional",
+      "note": "Plain arrow; universal primitive."
+    },
+    {
+      "id": "arrow-up",
+      "name": "Arrow Up",
+      "cat": "ui",
+      "tags": [
+        "rise"
+      ],
+      "risk": "conventional",
+      "note": "Plain arrow; universal primitive."
+    },
+    {
+      "id": "arrow-down",
+      "name": "Arrow Down",
+      "cat": "ui",
+      "tags": [
+        "fall"
+      ],
+      "risk": "conventional",
+      "note": "Plain arrow; universal primitive."
+    },
+    {
+      "id": "check",
+      "name": "Check",
+      "cat": "ui",
+      "tags": [
+        "ok",
+        "done",
+        "success"
+      ],
+      "risk": "conventional",
+      "note": "Plain tick; universal primitive."
+    },
+    {
+      "id": "x",
+      "name": "Close",
+      "cat": "ui",
+      "tags": [
+        "dismiss",
+        "cancel"
+      ],
+      "risk": "conventional",
+      "note": "Plain cross; universal primitive."
+    },
+    {
+      "id": "plus",
+      "name": "Plus",
+      "cat": "ui",
+      "tags": [
+        "add",
+        "new"
+      ],
+      "risk": "conventional",
+      "note": "Plain plus; universal primitive."
+    },
+    {
+      "id": "minus",
+      "name": "Minus",
+      "cat": "ui",
+      "tags": [
+        "remove",
+        "subtract"
+      ],
+      "risk": "conventional",
+      "note": "Plain minus; universal primitive."
+    },
+    {
+      "id": "more-h",
+      "name": "More",
+      "cat": "ui",
+      "tags": [
+        "overflow",
+        "menu",
+        "ellipsis"
+      ],
+      "risk": "conventional",
+      "note": "Three accent squares instead of dots — family chamfer at micro scale."
+    },
+    {
+      "id": "more-v",
+      "name": "More Vertical",
+      "cat": "ui",
+      "tags": [
+        "overflow",
+        "kebab"
+      ],
+      "risk": "conventional",
+      "note": "Vertical twin of More."
+    },
+    {
+      "id": "grip",
+      "name": "Drag Handle",
+      "cat": "ui",
+      "tags": [
+        "grab",
+        "reorder",
+        "dots"
+      ],
+      "risk": "conventional",
+      "note": "Six square grips."
+    },
+    {
+      "id": "settings",
+      "name": "Settings",
+      "cat": "ui",
+      "tags": [
+        "preferences",
+        "sliders",
+        "options"
+      ],
+      "risk": "original",
+      "note": "Three slider rails with hex knobs at different offsets — no gear cliché."
+    },
+    {
+      "id": "bell",
+      "name": "Notifications",
+      "cat": "ui",
+      "tags": [
+        "alert",
+        "ping"
+      ],
+      "risk": "constrained",
+      "note": "Bell with cut shoulders; clapper is accent."
+    },
+    {
+      "id": "star",
+      "name": "Favourite",
+      "cat": "ui",
+      "tags": [
+        "favorite",
+        "pin top"
+      ],
+      "risk": "conventional",
+      "note": "Five-point star with flattened top ray."
+    },
+    {
+      "id": "filter",
+      "name": "Filter",
+      "cat": "ui",
+      "tags": [
+        "funnel",
+        "narrow"
+      ],
+      "risk": "constrained",
+      "note": "Funnel with cut rim corners."
+    },
+    {
+      "id": "sort",
+      "name": "Sort",
+      "cat": "ui",
+      "tags": [
+        "order",
+        "ascending"
+      ],
+      "risk": "conventional",
+      "note": "Up/down arrow pair; down arrow is accent."
+    },
+    {
+      "id": "user",
+      "name": "Account",
+      "cat": "ui",
+      "tags": [
+        "person",
+        "profile",
+        "avatar"
+      ],
+      "risk": "constrained",
+      "note": "Person with cut-corner head instead of circle head."
+    },
+    {
+      "id": "zap",
+      "name": "Quick Action",
+      "cat": "ui",
+      "tags": [
+        "bolt",
+        "fast",
+        "macro"
+      ],
+      "risk": "conventional",
+      "note": "Bolt with cut waist."
+    },
+    {
+      "id": "flag",
+      "name": "Flag",
+      "cat": "ui",
+      "tags": [
+        "mark",
+        "follow up"
+      ],
+      "risk": "conventional",
+      "note": "Pennant with cut fly end."
+    },
+    {
+      "id": "shield",
+      "name": "Trust",
+      "cat": "ui",
+      "tags": [
+        "security",
+        "workspace trust"
+      ],
+      "risk": "constrained",
+      "note": "Shield with cut top corners and accent check."
+    },
+    {
+      "id": "cloud",
+      "name": "Cloud Sync",
+      "cat": "ui",
+      "tags": [
+        "remote",
+        "settings sync"
+      ],
+      "risk": "constrained",
+      "note": "Cloud built from two cut lobes over a flat base."
+    },
+    {
+      "id": "circle-oct",
+      "name": "Status Dot",
+      "cat": "ui",
+      "tags": [
+        "indicator",
+        "octagon",
+        "placeholder"
+      ],
+      "risk": "original",
+      "note": "The family octagon, empty — a status container."
+    },
+    {
+      "id": "dot",
+      "name": "Modified Dot",
+      "cat": "ui",
+      "tags": [
+        "unsaved",
+        "dirty",
+        "indicator"
+      ],
+      "risk": "original",
+      "note": "Solid accent hex-node: the \"unsaved change\" marker."
+    },
+    {
+      "id": "home",
+      "name": "Home",
+      "cat": "ui",
+      "tags": [
+        "start",
+        "welcome"
+      ],
+      "risk": "conventional",
+      "note": "House with cut eaves."
+    }
+  ]
+}

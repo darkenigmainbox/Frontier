@@ -1,0 +1,193 @@
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="fx-file" viewBox="0 0 24 24"><path d="M8 2h10l2 2v16l-2 2H6l-2-2V6z"/><path class="fx-a" d="M8.5 11h7M8.5 15h7M8.5 18.5h4"/></symbol>
+  <symbol id="fx-file-new" viewBox="0 0 24 24"><path d="M8 2h10l2 2v16l-2 2H6l-2-2V6z"/><path class="fx-a" d="M12 9v6M9 12h6"/></symbol>
+  <symbol id="fx-file-code" viewBox="0 0 24 24"><path d="M8 2h10l2 2v16l-2 2H6l-2-2V6z"/><path class="fx-a" d="M10.5 10.5 8 13.5l2.5 3M13.5 10.5 16 13.5l-2.5 3"/></symbol>
+  <symbol id="fx-file-json" viewBox="0 0 24 24"><path d="M8 2h10l2 2v16l-2 2H6l-2-2V6z"/><path class="fx-a" d="M10.5 9.5c-1.5 0-1.5 1.4-1.5 2.4s-.4 1.7-1.3 2.1c.9.4 1.3 1.1 1.3 2.1s0 2.4 1.5 2.4M13.5 9.5c1.5 0 1.5 1.4 1.5 2.4s.4 1.7 1.3 2.1c-.9.4-1.3 1.1-1.3 2.1s0 2.4-1.5 2.4"/></symbol>
+  <symbol id="fx-file-image" viewBox="0 0 24 24"><path d="M8 2h10l2 2v16l-2 2H6l-2-2V6z"/><path class="fx-a" d="M6.5 17.5 10 13l2.6 3.2 2-2.4 2.9 3.7"/><circle class="fx-f" cx="14.8" cy="9.6" r="1.5"/></symbol>
+  <symbol id="fx-file-md" viewBox="0 0 24 24"><path d="M8 2h10l2 2v16l-2 2H6l-2-2V6z"/><path class="fx-a" d="M7.5 17v-5.5l2.5 3 2.5-3V17M16.5 11v6M14.5 15l2 2 2-2"/></symbol>
+  <symbol id="fx-folder" viewBox="0 0 24 24"><path d="M3 7l2-2h5l2 2h7l2 2v9l-2 2H5l-2-2z"/></symbol>
+  <symbol id="fx-folder-open" viewBox="0 0 24 24"><path d="M3 20V6l2-2h4l2 2h7l2 2v4"/><path d="M3 20h14l3-8H6z"/></symbol>
+  <symbol id="fx-folder-new" viewBox="0 0 24 24"><path d="M3 7l2-2h5l2 2h7l2 2v9l-2 2H5l-2-2z"/><path class="fx-a" d="M12 10v6M9 13h6"/></symbol>
+  <symbol id="fx-file-save" viewBox="0 0 24 24"><path d="M8 2h10l2 2v16l-2 2H6l-2-2V6z"/><path class="fx-a" d="M12 7.5v6M9 10.5l3 3 3-3"/><path d="M8.5 17.5h7"/></symbol>
+  <symbol id="fx-file-save-all" viewBox="0 0 24 24"><path d="M11 2h7l2 2v9"/><path d="M6 6h8l2 2v12l-2 2H6l-2-2V8z"/><path class="fx-a" d="M10 10.5v5M8 13.5l2 2 2-2"/></symbol>
+  <symbol id="fx-file-close" viewBox="0 0 24 24"><path d="M8 2h10l2 2v16l-2 2H6l-2-2V6z"/><path class="fx-a" d="M9.5 9.5l5 5M14.5 9.5l-5 5"/></symbol>
+  <symbol id="fx-file-duplicate" viewBox="0 0 24 24"><path class="fx-a" d="M10 2h8l2 2v16"/><path d="M6 6h8l2 2v12l-2 2H6l-2-2V8z"/></symbol>
+  <symbol id="fx-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V4h5v3"/><path d="M6.5 7 8 21h8l1.5-14"/><path class="fx-a" d="M10.2 11v6M13.8 11v6"/></symbol>
+  <symbol id="fx-file-tree" viewBox="0 0 24 24"><path d="M6 3.5v17"/><path d="M6 6.2h3"/><path d="M9 4h6l2 2.2-2 2.3H9L7 6.2z"/><path d="M6 14h4"/><path class="fx-a" d="M10 14h9"/><path d="M6 20h4"/><path d="M10 20h6"/></symbol>
+  <symbol id="fx-panel-left" viewBox="0 0 24 24"><path d="M5 3h14l2 2v14l-2 2H5l-2-2V5z"/><path d="M9.5 3.5v17"/><path class="fx-t" d="M5 5h4.5v14H5z"/></symbol>
+  <symbol id="fx-panel-right" viewBox="0 0 24 24"><path d="M5 3h14l2 2v14l-2 2H5l-2-2V5z"/><path d="M14.5 3.5v17"/><path class="fx-t" d="M14.5 5H19v14h-4.5z"/></symbol>
+  <symbol id="fx-panel-bottom" viewBox="0 0 24 24"><path d="M5 3h14l2 2v14l-2 2H5l-2-2V5z"/><path d="M3.5 14.5h17"/><path class="fx-t" d="M5 14.5h14V19H5z"/></symbol>
+  <symbol id="fx-panel-close" viewBox="0 0 24 24"><path d="M5 3h14l2 2v14l-2 2H5l-2-2V5z"/><path d="M9.5 3.5v17"/><path class="fx-a" d="M13 9.5l4 4M17 9.5l-4 4"/></symbol>
+  <symbol id="fx-split-right" viewBox="0 0 24 24"><path d="M5 3h14l2 2v14l-2 2H5l-2-2V5z"/><path d="M12 3v18"/><path class="fx-a" d="M14.5 9.5 17 12l-2.5 2.5"/></symbol>
+  <symbol id="fx-split-down" viewBox="0 0 24 24"><path d="M5 3h14l2 2v14l-2 2H5l-2-2V5z"/><path d="M3 12h18"/><path class="fx-a" d="M9.5 14.5 12 17l2.5-2.5"/></symbol>
+  <symbol id="fx-workspace" viewBox="0 0 24 24"><path d="M5 3h14l2 2v14l-2 2H5l-2-2V5z"/><path d="M8.5 3.5v17M15.5 3.5v17"/><path class="fx-t" d="M8.5 5h7v14h-7z"/></symbol>
+  <symbol id="fx-tab" viewBox="0 0 24 24"><path d="M2 19v-4h3l2.5-5h6L16 15h6v4"/><path d="M2 19h20"/><path class="fx-a" d="M9.5 13h4"/></symbol>
+  <symbol id="fx-tab-close" viewBox="0 0 24 24"><path d="M2 19v-4h3l2.5-5h6L16 15h6v4"/><path d="M2 19h20"/><path class="fx-a" d="M10 11l3 3M13 11l-3 3"/></symbol>
+  <symbol id="fx-tabs" viewBox="0 0 24 24"><path d="M2 19v-4h3l2.5-5h6L16 15h1l2-3h3v7"/><path d="M2 19h20"/></symbol>
+  <symbol id="fx-pin" viewBox="0 0 24 24"><path d="M9 3h6v4l2.5 3v2h-11v-2L9 7z"/><path class="fx-a" d="M12 12v8"/></symbol>
+  <symbol id="fx-sidebar-collapse" viewBox="0 0 24 24"><path d="M5 3h14l2 2v14l-2 2H5l-2-2V5z"/><path d="M9 3v18"/><path class="fx-a" d="M18 12h-5M15.5 9.5 13 12l2.5 2.5"/></symbol>
+  <symbol id="fx-window" viewBox="0 0 24 24"><path d="M5 3h14l2 2v14l-2 2H5l-2-2V5z"/><path d="M3.5 8h17"/><circle class="fx-f" cx="6.5" cy="5.7" r="1"/><circle class="fx-f" cx="9.7" cy="5.7" r="1"/></symbol>
+  <symbol id="fx-archive" viewBox="0 0 24 24"><path d="M3 4h18l1 3v2H2V7z"/><path d="M4 10v8l2 2h12l2-2v-8"/><path class="fx-a" d="M10 14h4"/></symbol>
+  <symbol id="fx-lock" viewBox="0 0 24 24"><path d="M6 11h12l2 2v6l-2 2H6l-2-2v-6z"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/><circle class="fx-f" cx="12" cy="16" r="1.6"/></symbol>
+  <symbol id="fx-unlock" viewBox="0 0 24 24"><path d="M6 11h12l2 2v6l-2 2H6l-2-2v-6z"/><path d="M8.5 11V8a3.5 3.5 0 0 1 6.8-1.2"/><circle class="fx-f" cx="12" cy="16" r="1.6"/></symbol>
+  <symbol id="fx-undo" viewBox="0 0 24 24"><path d="M4 9h10a5 5 0 0 1 5 5v3"/><path class="fx-a" d="M7.5 5.5 4 9l3.5 3.5"/></symbol>
+  <symbol id="fx-redo" viewBox="0 0 24 24"><path d="M20 9H10a5 5 0 0 0-5 5v3"/><path class="fx-a" d="M16.5 5.5 20 9l-3.5 3.5"/></symbol>
+  <symbol id="fx-cut" viewBox="0 0 24 24"><circle cx="6.5" cy="18" r="2.8"/><circle cx="17.5" cy="18" r="2.8"/><path d="M8.6 15.9 18 3M15.4 15.9 6 3"/><path class="fx-a" d="M12 10.5v.01"/></symbol>
+  <symbol id="fx-copy" viewBox="0 0 24 24"><path class="fx-a" d="M9 9V4l2-2h8l2 2v11l-2 2h-3"/><path d="M5 9h8l2 2v9l-2 2H5l-2-2V11z"/></symbol>
+  <symbol id="fx-paste" viewBox="0 0 24 24"><path d="M8 4H6l-2 2v14l2 2h12l2-2V6l-2-2h-2"/><path d="M9 2.5h6V6H9z"/><path class="fx-a" d="M8 11h8M8 15h5"/></symbol>
+  <symbol id="fx-select-all" viewBox="0 0 24 24"><path d="M4 8V6l2-2h2M16 4h2l2 2v2M20 16v2l-2 2h-2M8 20H6l-2-2v-2"/><path class="fx-t" d="M8 8h8v8H8z"/></symbol>
+  <symbol id="fx-find" viewBox="0 0 24 24"><path d="M8 3h6l3 3v6l-3 3H8l-3-3V6z"/><path class="fx-a" d="M15.5 15.5 21 21"/><path d="M8.5 8h4"/></symbol>
+  <symbol id="fx-find-alt" viewBox="0 0 24 24"><path d="M8 2h10l2 2v16l-2 2H6l-2-2V6z"/><path d="M8.5 8h7"/><path d="M8.5 18h4"/><path class="fx-a" d="M8 11.5h8v3.5H8z"/></symbol>
+  <symbol id="fx-replace" viewBox="0 0 24 24"><path d="M4 6h13"/><path d="M7 18h13"/><path class="fx-t" d="M7 16.5h6v3H7z"/><path class="fx-a" d="M19 6v6a3 3 0 0 1-3 3h-5M14 12l-3 3 3 3"/></symbol>
+  <symbol id="fx-find-in-files" viewBox="0 0 24 24"><path d="M11 2h7l2 2v5"/><path d="M6 6h8l2 2v11l-2 2H6l-2-2V8z"/><path d="M8 10h5"/><path class="fx-a" d="M10.5 13h4l2 2v3l-2 2h-4l-2-2v-3zM16.5 18.5l4 4"/></symbol>
+  <symbol id="fx-line-numbers" viewBox="0 0 24 24"><path d="M7 3v18"/><path class="fx-a" d="M4 6h1.5M4 10h1.5M4 14h1.5M4 18h1.5"/><path d="M10 6h10M10 10h10M10 14h7M10 18h10"/></symbol>
+  <symbol id="fx-indent-more" viewBox="0 0 24 24"><path d="M4 5h16M4 19h16"/><path d="M12 9h8M12 15h8"/><path class="fx-a" d="M5 9l3 3-3 3"/></symbol>
+  <symbol id="fx-indent-less" viewBox="0 0 24 24"><path d="M4 5h16M4 19h16"/><path d="M12 9h8M12 15h8"/><path class="fx-a" d="M8 9l-3 3 3 3"/></symbol>
+  <symbol id="fx-comment-lines" viewBox="0 0 24 24"><path d="M4 7h10M4 12h10M4 17h7"/><path class="fx-a" d="M15.5 5 8.5 19M19.5 5l-7 14"/></symbol>
+  <symbol id="fx-word-wrap" viewBox="0 0 24 24"><path d="M4 6h16v5l-2 2h-6"/><path class="fx-a" d="M15 10l-3 3 3 3"/><path d="M4 18h9"/></symbol>
+  <symbol id="fx-format-doc" viewBox="0 0 24 24"><path d="M5 5h9M5 9h13M5 13h6M5 17h11"/><path class="fx-a" d="M19.5 4v16"/></symbol>
+  <symbol id="fx-sort-lines" viewBox="0 0 24 24"><path d="M5 6h12M5 11h9M5 16h6"/><path class="fx-a" d="M20 5v14M17 16l3 3 3-3"/></symbol>
+  <symbol id="fx-delete-line" viewBox="0 0 24 24"><path d="M4 6h12M4 18h12"/><path d="M4 12h10"/><path class="fx-a" d="M16 9.5 21 14.5M21 9.5 16 14.5"/></symbol>
+  <symbol id="fx-move-line-up" viewBox="0 0 24 24"><path d="M5 6h9M5 13h14M5 18h14"/><path class="fx-a" d="M18 10V3M15 6l3-3 3 3"/></symbol>
+  <symbol id="fx-move-line-down" viewBox="0 0 24 24"><path d="M5 6h14M5 11h14M5 18h9"/><path class="fx-a" d="M18 14v7M15 18l3 3 3-3"/></symbol>
+  <symbol id="fx-multi-cursor" viewBox="0 0 24 24"><path d="M5 4v6M3.5 4h3M3.5 10h3"/><path class="fx-a" d="M12 9v6M10.5 9h3M10.5 15h3"/><path d="M19 14v6M17.5 14h3M17.5 20h3"/></symbol>
+  <symbol id="fx-column-select" viewBox="0 0 24 24"><path class="fx-t" d="M6 5h12v14H6z"/><path d="M6 5h12v14H6z"/><path class="fx-a" d="M6 2.5v2.5M18 2.5V5M6 19v2.5M18 19v2.5"/></symbol>
+  <symbol id="fx-fold" viewBox="0 0 24 24"><path d="M6 4H4v16h2M18 4h2v16h-2"/><path class="fx-a" d="M9 9l3 3 3-3"/></symbol>
+  <symbol id="fx-unfold" viewBox="0 0 24 24"><path d="M6 4H4v16h2M18 4h2v16h-2"/><path class="fx-a" d="M9 12l3-3 3 3"/></symbol>
+  <symbol id="fx-fold-all" viewBox="0 0 24 24"><path d="M6 4H4v16h2M18 4h2v16h-2"/><path class="fx-a" d="M9 8l3 3 3-3M9 13l3 3 3-3"/></symbol>
+  <symbol id="fx-unfold-all" viewBox="0 0 24 24"><path d="M6 4H4v16h2M18 4h2v16h-2"/><path class="fx-a" d="M9 11l3-3 3 3M9 16l3-3 3 3"/></symbol>
+  <symbol id="fx-bookmark" viewBox="0 0 24 24"><path d="M9 3h8l2 2v16l-6-4-6 4V5z"/></symbol>
+  <symbol id="fx-snippet" viewBox="0 0 24 24"><path d="M8 2h10l2 2v16l-2 2H6l-2-2V6z"/><path class="fx-a" d="M13 10h8v7h-8zM15.5 13.5h3"/></symbol>
+  <symbol id="fx-cursor" viewBox="0 0 24 24"><path d="M12 5v14"/><path class="fx-a" d="M9 3.5 12 5l3-1.5M9 20.5 12 19l3 1.5"/></symbol>
+  <symbol id="fx-highlight" viewBox="0 0 24 24"><path d="M15 4l5 5-9 9H6v-5z"/><path d="M13 6l5 5"/><path class="fx-a" d="M4 20.5h9"/></symbol>
+  <symbol id="fx-edit-pencil" viewBox="0 0 24 24"><path d="M4 20l1-5L16 4l4 4L9 19z"/><path d="M14 6l4 4"/><path class="fx-a" d="M4 20l1-5 4 4z"/></symbol>
+  <symbol id="fx-code" viewBox="0 0 24 24"><path d="M8.5 7 4 12l4.5 5M15.5 7 20 12l-4.5 5"/><path class="fx-a" d="M13.5 5l-3 14"/></symbol>
+  <symbol id="fx-braces" viewBox="0 0 24 24"><path d="M10 3c-2.5 0-2 2.5-2 4.5S7 11 5.5 12C7 13 8 13.5 8 15.5S7.5 21 10 21"/><path d="M14 3c2.5 0 2 2.5 2 4.5s1 3.5 2.5 4.5c-1.5 1-2.5 1.5-2.5 3.5S16.5 21 14 21"/></symbol>
+  <symbol id="fx-brackets" viewBox="0 0 24 24"><path d="M8 4H6L5 5v14l1 1h2M16 4h2l1 1v14l-1 1h-2"/></symbol>
+  <symbol id="fx-parens" viewBox="0 0 24 24"><path d="M9 4a12.5 12.5 0 0 0 0 16M15 4a12.5 12.5 0 0 1 0 16"/></symbol>
+  <symbol id="fx-terminal" viewBox="0 0 24 24"><path d="M5 3h14l2 2v14l-2 2H5l-2-2V5z"/><path class="fx-a" d="M7 9l3 3-3 3M13 15h5"/></symbol>
+  <symbol id="fx-function" viewBox="0 0 24 24"><path d="M15 4c-3.5 0-4 2.5-4 5v6c0 3-.5 5-4 5"/><path class="fx-a" d="M8 10h7"/></symbol>
+  <symbol id="fx-variable" viewBox="0 0 24 24"><path class="fx-a" d="M6 9l4 4-4 4M10 9l-4 4 4 4"/><path d="M14 13h6"/></symbol>
+  <symbol id="fx-class" viewBox="0 0 24 24"><path d="M5 4h14l2 2v12l-2 2H5l-2-2V6z"/><path d="M3 9h18"/><path class="fx-a" d="M7 6.5h5"/><path d="M7 13h6M7 16.5h4"/></symbol>
+  <symbol id="fx-interface" viewBox="0 0 24 24"><path stroke-dasharray="4 3" d="M5 3h14l2 2v14l-2 2H5l-2-2V5z"/><path class="fx-a" d="M10 8h4l2 2v4l-2 2h-4l-2-2v-4z"/></symbol>
+  <symbol id="fx-database" viewBox="0 0 24 24"><path d="M5 6c0-1.7 3.1-3 7-3s7 1.3 7 3-3.1 3-7 3-7-1.3-7-3z"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path class="fx-a" d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></symbol>
+  <symbol id="fx-api" viewBox="0 0 24 24"><path d="M7 4H4v16h3M17 4h3v16h-3"/><path class="fx-a" d="M8.5 9.5h7M13 7l2.5 2.5L13 12M15.5 15.5h-7M11 13l-2.5 2.5L11 18"/></symbol>
+  <symbol id="fx-regex" viewBox="0 0 24 24"><path d="M10 4v7M7 5.5l6 4M13 5.5l-6 4"/><circle class="fx-f" cx="15.5" cy="16" r="1.6"/><circle class="fx-f" cx="20" cy="16" r="1.6"/><path d="M4 20h16"/></symbol>
+  <symbol id="fx-constant" viewBox="0 0 24 24"><path d="M10 4 8 20M16 4l-2 16"/><path class="fx-a" d="M5 9h15M4 15h15"/></symbol>
+  <symbol id="fx-string" viewBox="0 0 24 24"><path d="M9.5 6C6.5 6 5 8.2 5 10.6S6.7 15 9 15c0 2.2-1 3.6-2.7 4.4"/><path d="M18.5 6c-3 0-4.5 2.2-4.5 4.6S15.7 15 18 15c0 2.2-1 3.6-2.7 4.4"/></symbol>
+  <symbol id="fx-module" viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/><path class="fx-t" d="M12 4l8 4-8 4-8-4z"/></symbol>
+  <symbol id="fx-command-palette" viewBox="0 0 24 24"><path d="M5 3h14l2 2v14l-2 2H5l-2-2V5z"/><path class="fx-a" d="M7 8l2.5 2.5L7 13"/><path d="M12 10.5h6"/><path d="M7 16.5h10"/></symbol>
+  <symbol id="fx-extension" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5"/><path d="M6 8h12v4a6 6 0 0 1-6 6 6 6 0 0 1-6-6z"/><path class="fx-a" d="M12 18v3"/></symbol>
+  <symbol id="fx-run" viewBox="0 0 24 24"><path class="fx-a" d="M8 5l10 5.5v3L8 19z"/></symbol>
+  <symbol id="fx-build" viewBox="0 0 24 24"><path d="M4.5 8.5 8.5 4.5 14 10l-4 4z"/><path d="M8.5 4.5 11 2l5.5 5.5L14 10"/><path class="fx-a" d="M12 12l8 8"/></symbol>
+  <symbol id="fx-test" viewBox="0 0 24 24"><path d="M10 3h4M11 3v6l-6 9 1.5 3h11L19 18l-6-9V3"/><path class="fx-a" d="M7.5 15h9"/></symbol>
+  <symbol id="fx-bold" viewBox="0 0 24 24"><path d="M8 4v16"/><path d="M8 4h6l2.5 2.5v3L14 12H8M8 12h7l2.5 2.5v3L15 20H8"/></symbol>
+  <symbol id="fx-italic" viewBox="0 0 24 24"><path d="M10 4h8M6 20h8M14 4l-4 16"/></symbol>
+  <symbol id="fx-underline" viewBox="0 0 24 24"><path d="M7 4v9l2 2h6l2-2V4"/><path class="fx-a" d="M5 20h14"/></symbol>
+  <symbol id="fx-strikethrough" viewBox="0 0 24 24"><path d="M7 7h10M7 17h10"/><path class="fx-a" d="M4 12h16"/></symbol>
+  <symbol id="fx-heading" viewBox="0 0 24 24"><path d="M5 4v16M13 4v16M5 12h8"/><path class="fx-a" d="M17.5 8.5 20 7v13"/></symbol>
+  <symbol id="fx-list-bullet" viewBox="0 0 24 24"><path class="fx-a" d="M4.5 4.5h3v3h-3zM4.5 10.5h3v3h-3zM4.5 16.5h3v3h-3z"/><path d="M11 6h9M11 12h9M11 18h9"/></symbol>
+  <symbol id="fx-list-number" viewBox="0 0 24 24"><path stroke-width="1.5" class="fx-a" d="M5 4.5 6.5 3.5V8M4.5 10.5H7V12l-2.5 2H7M4.5 16.5H7l-1.5 1.7L7 20H4.5"/><path d="M11 6h9M11 12h9M11 18h9"/></symbol>
+  <symbol id="fx-checklist" viewBox="0 0 24 24"><path d="M4.5 3.5h4l1 1v4l-1 1h-4l-1-1v-4z"/><path stroke-width="1.6" class="fx-a" d="M5.4 6l1.3 1.3 2.7-2.9"/><path d="M4.5 14h4l1 1v4l-1 1h-4l-1-1v-4z"/><path d="M12 6.5h8M12 17h8"/></symbol>
+  <symbol id="fx-quote-block" viewBox="0 0 24 24"><path class="fx-a" d="M4.5 5v14"/><path d="M12 7c-2 0-3.2 1.5-3.2 3.2S10 13.4 11.8 13.4c0 1.6-.8 2.7-2 3.3"/><path d="M19 7c-2 0-3.2 1.5-3.2 3.2s1.2 3.2 3 3.2c0 1.6-.8 2.7-2 3.3"/></symbol>
+  <symbol id="fx-link" viewBox="0 0 24 24"><path d="M10.2 13.8a4.5 4.5 0 0 0 6.7.4l2.6-2.6a4.5 4.5 0 0 0-6.4-6.4l-1.5 1.5"/><path d="M13.8 10.2a4.5 4.5 0 0 0-6.7-.4l-2.6 2.6a4.5 4.5 0 0 0 6.4 6.4l1.5-1.5"/><path class="fx-a" d="M9 15l6-6"/></symbol>
+  <symbol id="fx-image" viewBox="0 0 24 24"><path d="M5 3h14l2 2v14l-2 2H5l-2-2V5z"/><path class="fx-a" d="M6 16.5 10 12l2.7 3.2 2-2.4 3.3 3.7"/><circle class="fx-f" cx="15.5" cy="8.5" r="1.5"/></symbol>
+  <symbol id="fx-table" viewBox="0 0 24 24"><path d="M5 3h14l2 2v14l-2 2H5l-2-2V5z"/><path d="M3.5 9h17M3.5 15h17M10 3.5v17M15 3.5v17"/><path class="fx-t" d="M5 5h14v4H5z"/></symbol>
+  <symbol id="fx-divider" viewBox="0 0 24 24"><path d="M4 6h16M4 18h16"/><path stroke-dasharray="4 3" class="fx-a" d="M4 12h16"/></symbol>
+  <symbol id="fx-emoji" viewBox="0 0 24 24"><path d="M8 3h8l3 3v8l-3 3H8l-3-3V6z"/><circle class="fx-f" cx="9.5" cy="9.5" r="1.2"/><circle class="fx-f" cx="14.5" cy="9.5" r="1.2"/><path class="fx-a" d="M9 13.5c1 1.3 2 2 3 2s2-.7 3-2"/></symbol>
+  <symbol id="fx-type" viewBox="0 0 24 24"><path d="M5 7V4h14v3"/><path d="M12 4v16"/><path d="M9 20h6"/></symbol>
+  <symbol id="fx-case-toggle" viewBox="0 0 24 24"><path d="M3.5 18 8 5l4.5 13M5.2 13.5h5.6"/><path class="fx-a" d="M20.5 18v-6.5M20.5 14.5a3.2 3.2 0 1 1-6.4 0 3.2 3.2 0 0 1 6.4 0z"/></symbol>
+  <symbol id="fx-spellcheck" viewBox="0 0 24 24"><path d="M4 7h5M11 7h4M4 12h9"/><path class="fx-a" d="M12.5 16.5 15 19l5.5-6"/></symbol>
+  <symbol id="fx-whitespace" viewBox="0 0 24 24"><path d="M13 4v16M17 4v16"/><path class="fx-a" d="M13 4h-3a4 4 0 0 0 0 8h3"/></symbol>
+  <symbol id="fx-text-size" viewBox="0 0 24 24"><path d="M3 10 5.5 3.5 8 10M4 7.8h3"/><path d="M13 20 17 9l4 11M14.5 16h5"/><path class="fx-a" d="M10.5 8v8M8.5 10l2-2 2 2"/></symbol>
+  <symbol id="fx-align-left" viewBox="0 0 24 24"><path class="fx-a" d="M4 4v16"/><path d="M8 6h12M8 10h9M8 14h12M8 18h7"/></symbol>
+  <symbol id="fx-align-center" viewBox="0 0 24 24"><path class="fx-a" d="M12 3v18"/><path d="M5 6.5h14M7 10.5h10M5 14.5h14M8 18.5h8"/></symbol>
+  <symbol id="fx-align-right" viewBox="0 0 24 24"><path class="fx-a" d="M20 4v16"/><path d="M4 6h12M7 10h9M4 14h12M9 18h7"/></symbol>
+  <symbol id="fx-keyboard" viewBox="0 0 24 24"><path d="M5 5h14l2 2v10l-2 2H5l-2-2V7z"/><path class="fx-f" d="M7 8.5h2v2H7zM11 8.5h2v2h-2zM15 8.5h2v2h-2z"/><path class="fx-a" d="M8 15h8"/></symbol>
+  <symbol id="fx-zoom-in" viewBox="0 0 24 24"><path d="M8 3h6l3 3v6l-3 3H8l-3-3V6z"/><path class="fx-a" d="M15.5 15.5 21 21M9 9.5h4M11 7.5v4"/></symbol>
+  <symbol id="fx-zoom-out" viewBox="0 0 24 24"><path d="M8 3h6l3 3v6l-3 3H8l-3-3V6z"/><path class="fx-a" d="M15.5 15.5 21 21M9 9.5h4"/></symbol>
+  <symbol id="fx-zoom-fit" viewBox="0 0 24 24"><path d="M4 9V6l2-2h3M15 4h3l2 2v3M20 15v3l-2 2h-3M9 20H6l-2-2v-3"/><path class="fx-a" d="M9 9h6v6H9z"/></symbol>
+  <symbol id="fx-fullscreen" viewBox="0 0 24 24"><path class="fx-a" d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"/><path d="M4 4l6 6M20 4l-6 6M4 20l6-6M20 20l-6-6"/></symbol>
+  <symbol id="fx-preview" viewBox="0 0 24 24"><path d="M2.5 12S6.5 5.5 12 5.5 21.5 12 21.5 12 17.5 18.5 12 18.5 2.5 12 2.5 12z"/><path class="fx-a" d="M10 9.5h4l1.5 1.5v2L14 14.5h-4L8.5 13v-2z"/></symbol>
+  <symbol id="fx-preview-off" viewBox="0 0 24 24"><path d="M2.5 12S6.5 5.5 12 5.5 21.5 12 21.5 12 17.5 18.5 12 18.5 2.5 12 2.5 12z"/><path class="fx-a" d="M4 4l16 16"/></symbol>
+  <symbol id="fx-theme" viewBox="0 0 24 24"><path d="M8 3h8l3 3v8l-3 3H8l-3-3V6z"/><path class="fx-t" d="M12 3h4l3 3v8l-3 3h-4z"/><path d="M12 3v14"/></symbol>
+  <symbol id="fx-sun" viewBox="0 0 24 24"><path d="M10 8h4l2 2v4l-2 2h-4l-2-2v-4z"/><path class="fx-a" d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3 7 7M17 17l1.7 1.7M18.7 5.3 17 7M7 17l-1.7 1.7"/></symbol>
+  <symbol id="fx-moon" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/></symbol>
+  <symbol id="fx-go-to-line" viewBox="0 0 24 24"><path d="M4 6h11M4 12h9M4 18h11"/><path class="fx-a" d="M19 8.5 21.5 12 19 15.5M17 12h-2"/></symbol>
+  <symbol id="fx-breadcrumb" viewBox="0 0 24 24"><path d="M3 12h4.5"/><path class="fx-a" d="M10 8.5 13.5 12 10 15.5"/><path d="M16 12h5"/><path class="fx-f" d="M3.5 10.5h2v3h-2z"/></symbol>
+  <symbol id="fx-outline" viewBox="0 0 24 24"><path d="M7 5h13M10 10h10M10 15h7M13 20h7"/><path class="fx-f" d="M4 4h3v3H4z"/><path class="fx-a" d="M7 10h.01M7 15h.01"/></symbol>
+  <symbol id="fx-minimap" viewBox="0 0 24 24"><path d="M9 3h6l2 2v14l-2 2H9l-2-2V5z"/><path stroke-width="1.4" d="M10 7h4M10 10h4M10 13h3M10 16h4"/><path class="fx-a" d="M5.5 9h13v6h-13z"/></symbol>
+  <symbol id="fx-go-to-definition" viewBox="0 0 24 24"><path d="M8 4H5v16h3M16 4h3v16h-3"/><path class="fx-a" d="M19.5 4.5 12 12M12 12l-2.5-1M12 12l1-2.5"/></symbol>
+  <symbol id="fx-find-references" viewBox="0 0 24 24"><path d="M8 4H5v16h3M16 4h3v16h-3"/><path class="fx-a" d="M12 12 19.5 4.5M18 4.5h1.5V6"/><path class="fx-f" d="M10.5 10.5h3v3h-3z"/></symbol>
+  <symbol id="fx-history" viewBox="0 0 24 24"><path d="M8 3h8l3 3v8l-3 3H8l-3-3V6z"/><path class="fx-a" d="M12 7.5V12l3.5 2"/></symbol>
+  <symbol id="fx-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path class="fx-a" d="M20 3.5V7h-3.5"/></symbol>
+  <symbol id="fx-download" viewBox="0 0 24 24"><path d="M4 15v4l2 2h12l2-2v-4"/><path class="fx-a" d="M12 3v11M8 10l4 4 4-4"/></symbol>
+  <symbol id="fx-upload" viewBox="0 0 24 24"><path d="M4 15v4l2 2h12l2-2v-4"/><path class="fx-a" d="M12 14V3M8 7l4-4 4 4"/></symbol>
+  <symbol id="fx-external-link" viewBox="0 0 24 24"><path d="M10 5H6l-2 2v11l2 2h11l2-2v-4"/><path class="fx-a" d="M14 4h6v6M20 4l-9 9"/></symbol>
+  <symbol id="fx-focus" viewBox="0 0 24 24"><path class="fx-a" d="M4 12h16"/><path d="M7 7h10M7 17h10" opacity=".45"/><path d="M4 7h.01M4 17h.01M20 7h.01M20 17h.01"/></symbol>
+  <symbol id="fx-error" viewBox="0 0 24 24"><path d="M8 3h8l3 3v8l-3 3H8l-3-3V6z"/><path class="fx-a" d="M9.5 9.5l5 5M14.5 9.5l-5 5"/></symbol>
+  <symbol id="fx-warning" viewBox="0 0 24 24"><path d="M10.5 4h3L21 18.5 19.5 21h-15L3 18.5z"/><path class="fx-a" d="M12 9v4.5M12 17h.01"/></symbol>
+  <symbol id="fx-info" viewBox="0 0 24 24"><path d="M8 3h8l3 3v8l-3 3H8l-3-3V6z"/><path class="fx-a" d="M12 11v4.5M12 7.5h.01"/></symbol>
+  <symbol id="fx-hint" viewBox="0 0 24 24"><path d="M9.5 17a6.5 6.5 0 1 1 5 0v2.5h-5z"/><path d="M10.5 22h3"/><circle class="fx-f" cx="12" cy="10" r="1.4"/><path class="fx-a" d="M12 11.5V15"/></symbol>
+  <symbol id="fx-breakpoint" viewBox="0 0 24 24"><path d="M6 3.5v17"/><path class="fx-f" d="M11 9h6l2.5 3-2.5 3h-6l-2.5-3z"/></symbol>
+  <symbol id="fx-debug-start" viewBox="0 0 24 24"><path class="fx-a" d="M6 5l9 5v4l-9 5z"/><path d="M18.5 7.5 21 5M18.5 16.5 21 19"/></symbol>
+  <symbol id="fx-debug-pause" viewBox="0 0 24 24"><path class="fx-a" d="M8.5 5h2v14h-2zM13.5 5h2v14h-2z"/></symbol>
+  <symbol id="fx-debug-stop" viewBox="0 0 24 24"><path class="fx-a" d="M7 5h10l2 2v10l-2 2H7l-2-2V7z"/></symbol>
+  <symbol id="fx-step-over" viewBox="0 0 24 24"><path d="M5 17a7 7 0 0 1 14 0"/><path class="fx-a" d="M19 17h-9M13 14.5 10.5 17l2.5 2.5"/><circle class="fx-f" cx="5" cy="17" r="1.8"/></symbol>
+  <symbol id="fx-step-into" viewBox="0 0 24 24"><path class="fx-a" d="M12 3v10M9 10l3 3 3-3"/><path d="M5 16v3l2 2h10l2-2v-3"/></symbol>
+  <symbol id="fx-step-out" viewBox="0 0 24 24"><path class="fx-a" d="M12 17V7M9 10l3-3 3 3"/><path d="M5 16v3l2 2h10l2-2v-3"/></symbol>
+  <symbol id="fx-console" viewBox="0 0 24 24"><path d="M5 3h14l2 2v14l-2 2H5l-2-2V5z"/><path class="fx-a" d="M7 7.5l2.5 2.5L7 12.5"/><path d="M12 10h6M7 16h11"/></symbol>
+  <symbol id="fx-stack-trace" viewBox="0 0 24 24"><path class="fx-a" d="M6 4h12v4H6z"/><path d="M7.5 11h12v4h-12z"/><path d="M9 18h12v4H9z"/></symbol>
+  <symbol id="fx-profile" viewBox="0 0 24 24"><path d="M12 3c3.5 4 6 6.5 6 10.5A6 6 0 0 1 6 13.5C6 11 7.5 8.5 9.5 6.5c0 2 .8 3.2 2 4 .2-3 .2-5.5.5-7.5z"/><path class="fx-a" d="M12 13c1.4 1.6 2 2.6 2 4a2 2 0 0 1-4 0c0-1 .6-2.2 2-4z"/></symbol>
+  <symbol id="fx-watch" viewBox="0 0 24 24"><path d="M8 4h8l3 3v7l-3 3H8l-3-3V7z"/><path class="fx-a" d="M7.5 11h2l1.5-3 2 6 1.5-3h2"/></symbol>
+  <symbol id="fx-problems" viewBox="0 0 24 24"><path class="fx-a" d="M4.5 5 7 7.5M7 5 4.5 7.5"/><path d="M10 6.2h10"/><path class="fx-a" d="M4.5 11h3l1 1.2-1 1.3h-3L3.5 12.2z"/><path d="M10 12.2h10"/><circle class="fx-f" cx="6" cy="18.2" r="1.6"/><path d="M10 18.2h7"/></symbol>
+  <symbol id="fx-coverage" viewBox="0 0 24 24"><path d="M5 8h14l2 2v4l-2 2H5l-2-2v-4z"/><path class="fx-t" d="M5 10h9v4H5z"/><path class="fx-a" d="M14 8v8"/></symbol>
+  <symbol id="fx-git-branch" viewBox="0 0 24 24"><path d="M7 9v6"/><path d="M17 9c0 6-10 3-10 6"/><path d="M6 5h2l2 2-2 2H6L4 7z"/><path d="M6 15h2l2 2-2 2H6l-2-2z"/><path class="fx-a" d="M16 5h2l2 2-2 2h-2l-2-2z"/></symbol>
+  <symbol id="fx-git-commit" viewBox="0 0 24 24"><path d="M3 12h4M17 12h4"/><path class="fx-a" d="M10 9h4l3 3-3 3h-4l-3-3z"/></symbol>
+  <symbol id="fx-git-merge" viewBox="0 0 24 24"><path d="M7 9v4c0 3 3 3 5 4"/><path d="M17 9v4c0 3-3 3-5 4"/><path d="M6 5h2l2 2-2 2H6L4 7z"/><path class="fx-a" d="M16 5h2l2 2-2 2h-2l-2-2z"/><path d="M11 17h2l2 2-2 2h-2l-2-2z"/></symbol>
+  <symbol id="fx-git-compare" viewBox="0 0 24 24"><path class="fx-a" d="M8 7.5h10M15.5 5 18 7.5 15.5 10M16 16.5H6M8.5 14 6 16.5 8.5 19"/><path d="M4 5.5h2l1.5 2L6 9.5H4L2.5 7.5z"/><path d="M18 14.5h2l1.5 2-1.5 2h-2l-1.5-2z"/></symbol>
+  <symbol id="fx-git-sync" viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M6 15h2l2 2-2 2H6l-2-2z"/><path class="fx-a" d="M14 4v8M11 9l3 3 3-3"/><path d="M16 15h2l2 2-2 2h-2l-2-2z"/></symbol>
+  <symbol id="fx-version-history" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="M11 5h2l2 2-2 2h-2l-2-2z"/><path class="fx-a" d="M11 10h2l2 2-2 2h-2l-2-2z"/><path d="M11 15h2l2 2-2 2h-2l-2-2z"/><path class="fx-a" d="M6 8a7 7 0 0 0 0 8M6 8 4.5 9.5M6 8l1.5 1.5"/></symbol>
+  <symbol id="fx-tag" viewBox="0 0 24 24"><path d="M4 4h8l8 8-8 8-8-8z"/><circle class="fx-a" cx="8.5" cy="8.5" r="1.6"/></symbol>
+  <symbol id="fx-repo" viewBox="0 0 24 24"><path d="M3 7l2-2h5l2 2h7l2 2v9l-2 2H5l-2-2z"/><path d="M9 11v5"/><path class="fx-a" d="M8 9.5h2l1.5 1.5L10 12.5H8L6.5 11z"/><path d="M8 15h2l1.5 1.5-1.5 1.5H8l-1.5-1.5z"/></symbol>
+  <symbol id="fx-commit-list" viewBox="0 0 24 24"><path d="M6 4v16"/><path class="fx-a" d="M5 5h2l1.5 1.5L7 8H5L3.5 6.5z"/><path d="M11 6.5h9"/><path d="M5 11h2l1.5 1.5L7 14H5l-1.5-1.5z"/><path d="M11 12.5h7"/><path class="fx-a" d="M5 17h2l1.5 1.5L7 20H5l-1.5-1.5z"/><path d="M11 18.5h9"/></symbol>
+  <symbol id="fx-conflict" viewBox="0 0 24 24"><path d="M4 8h6M8 5.5 10.5 8 8 10.5"/><path d="M20 16h-6M16 13.5 13.5 16l2.5 2.5"/><path class="fx-a" d="M12 5v4M10 7h4M12 15v4M10 17h4"/></symbol>
+  <symbol id="fx-stash" viewBox="0 0 24 24"><path class="fx-t" d="M5 4h14v3H5z"/><path d="M5 4h14v3H5z"/><path d="M6 10h12v3H6z"/><path d="M7 16h10v3H7z"/></symbol>
+  <symbol id="fx-diff" viewBox="0 0 24 24"><path d="M5 3h14l2 2v14l-2 2H5l-2-2V5z"/><path d="M12 3v18"/><path class="fx-a" d="M16.5 8v5M14 10.5h5"/><path d="M7 10.5h4"/></symbol>
+  <symbol id="fx-ai-spark" viewBox="0 0 24 24"><path class="fx-a" d="M11 3l2 5.5L18.5 10 13 12l-2 5.5L9 12 3.5 10 9 8.5z"/><path d="M17.5 14.5l1 2.7 2.8 1-2.8 1-1 2.8-1-2.8-2.8-1 2.8-1z"/></symbol>
+  <symbol id="fx-ai-complete" viewBox="0 0 24 24"><path d="M4 6h9M4 11h6M4 16h8M4 20h5"/><path class="fx-a" d="M15 12.5l1.2 3.3 3.3 1.2-3.3 1.2-1.2 3.3-1.2-3.3-3.3-1.2 3.3-1.2z"/></symbol>
+  <symbol id="fx-ai-chat" viewBox="0 0 24 24"><path d="M6 4h12l2 2v8l-2 2h-7l-4 4v-4H6l-2-2V6z"/><path class="fx-a" d="M12 6.5l1.1 3 3 1.1-3 1.1-1.1 3-1.1-3-3-1.1 3-1.1z"/></symbol>
+  <symbol id="fx-ai-refactor" viewBox="0 0 24 24"><path class="fx-a" d="M12 7l1.2 3.3L16.5 11.5l-3.3 1.2L12 16l-1.2-3.3L7.5 11.5l3.3-1.2z"/><path d="M19 8a8 8 0 0 0-13-2M5 16a8 8 0 0 0 13 2"/><path d="M19 4v4h-4M5 20v-4h4"/></symbol>
+  <symbol id="fx-ai-explain" viewBox="0 0 24 24"><path d="M12 10c-2-1.6-4.5-2-8-2v10c3.5 0 6 .4 8 2 2-1.6 4.5-2 8-2V8c-3.5 0-6 .4-8 2z"/><path d="M12 10v10"/><path class="fx-a" d="M12 2l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8z"/></symbol>
+  <symbol id="fx-ai-fix" viewBox="0 0 24 24"><path class="fx-a" d="M8 3l1.3 3.7L13 8l-3.7 1.3L8 13 6.7 9.3 3 8l3.7-1.3z"/><path d="M12.5 12.5 19 19M20 12a4.5 4.5 0 0 1-6 4.2L11 19l-2-2 2.8-3A4.5 4.5 0 0 1 16 8z"/></symbol>
+  <symbol id="fx-ai-diff" viewBox="0 0 24 24"><path class="fx-a" d="M7 3l1.3 3.7L12 8l-3.7 1.3L7 13 5.7 9.3 2 8l3.7-1.3z"/><path d="M18 4.5v5M15.5 7h5"/><path d="M15.5 16.5h5"/></symbol>
+  <symbol id="fx-robot" viewBox="0 0 24 24"><path d="M7 8h10l2 2v7l-2 2H7l-2-2v-7z"/><path d="M12 8V5.5"/><circle class="fx-f" cx="12" cy="4" r="1.4"/><path class="fx-a" d="M9.5 12.5h.01M14.5 12.5h.01"/><path d="M9.5 16h5"/></symbol>
+  <symbol id="fx-chevron-down" viewBox="0 0 24 24"><path d="M6 9.5 12 15.5 18 9.5"/></symbol>
+  <symbol id="fx-chevron-up" viewBox="0 0 24 24"><path d="M6 14.5 12 8.5 18 14.5"/></symbol>
+  <symbol id="fx-chevron-left" viewBox="0 0 24 24"><path d="M14.5 6 8.5 12l6 6"/></symbol>
+  <symbol id="fx-chevron-right" viewBox="0 0 24 24"><path d="M9.5 6 15.5 12l-6 6"/></symbol>
+  <symbol id="fx-arrow-left" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></symbol>
+  <symbol id="fx-arrow-right" viewBox="0 0 24 24"><path d="M4 12h16M14 6l6 6-6 6"/></symbol>
+  <symbol id="fx-arrow-up" viewBox="0 0 24 24"><path d="M12 20V4M6 10l6-6 6 6"/></symbol>
+  <symbol id="fx-arrow-down" viewBox="0 0 24 24"><path d="M12 4v16M6 14l6 6 6-6"/></symbol>
+  <symbol id="fx-check" viewBox="0 0 24 24"><path d="M4.5 12.5 9.5 18 19.5 6.5"/></symbol>
+  <symbol id="fx-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="fx-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="fx-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="fx-more-h" viewBox="0 0 24 24"><path class="fx-f" d="M4 10.5h3v3H4zM10.5 10.5h3v3h-3zM17 10.5h3v3h-3z"/></symbol>
+  <symbol id="fx-more-v" viewBox="0 0 24 24"><path class="fx-f" d="M10.5 4h3v3h-3zM10.5 10.5h3v3h-3zM10.5 17h3v3h-3z"/></symbol>
+  <symbol id="fx-grip" viewBox="0 0 24 24"><path class="fx-f" d="M8.5 5h2.5v2.5H8.5zM13 5h2.5v2.5H13zM8.5 10.75h2.5v2.5H8.5zM13 10.75h2.5v2.5H13zM8.5 16.5h2.5V19H8.5zM13 16.5h2.5V19H13z"/></symbol>
+  <symbol id="fx-settings" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><path class="fx-a" d="M8 5h2.5l2 2-2 2H8L6 7z"/><path class="fx-a" d="M14 10h2.5l2 2-2 2H14l-2-2z"/><path class="fx-a" d="M10 15h2.5l2 2-2 2H10l-2-2z"/></symbol>
+  <symbol id="fx-bell" viewBox="0 0 24 24"><path d="M9 5h6l2 4v4l2.5 3.5h-15L7 13V9z"/><path class="fx-a" d="M10 19.5a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="fx-star" viewBox="0 0 24 24"><path d="M12 3.5 14.4 9l5.6.5-4.3 3.9 1.3 5.6L12 16l-5 3 1.3-5.6L4 9.5 9.6 9z"/></symbol>
+  <symbol id="fx-filter" viewBox="0 0 24 24"><path d="M4 4h16l-1 3-5 6v6l-4 2v-8L5 7z"/></symbol>
+  <symbol id="fx-sort" viewBox="0 0 24 24"><path d="M8 19V5M5 8l3-3 3 3"/><path class="fx-a" d="M16 5v14M13 16l3 3 3-3"/></symbol>
+  <symbol id="fx-user" viewBox="0 0 24 24"><path d="M10 4h4l2 2v3l-2 2h-4l-2-2V6z"/><path d="M4.5 20c.8-4.2 3.8-6 7.5-6s6.7 1.8 7.5 6"/></symbol>
+  <symbol id="fx-zap" viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11L9.5 22 19 10.5h-6.5z"/></symbol>
+  <symbol id="fx-flag" viewBox="0 0 24 24"><path d="M5 21V4"/><path class="fx-a" d="M5 4h12l-2 3.5 2 3.5H5"/></symbol>
+  <symbol id="fx-shield" viewBox="0 0 24 24"><path d="M6 4h12l2 2v6c0 5-4 8-8 10-4-2-8-5-8-10V6z"/><path class="fx-a" d="M9 11.5l2.2 2.5L15.5 9"/></symbol>
+  <symbol id="fx-cloud" viewBox="0 0 24 24"><path d="M7 18h11l2-2v-3l-2-2h-1l-1-4-2-2H9L7 7l-1 4H5l-2 2v3z"/></symbol>
+  <symbol id="fx-circle-oct" viewBox="0 0 24 24"><path d="M8 4h8l4 4v8l-4 4H8l-4-4V8z"/></symbol>
+  <symbol id="fx-dot" viewBox="0 0 24 24"><path class="fx-f" d="M9 8h6l3 4-3 4H9l-3-4z"/></symbol>
+  <symbol id="fx-home" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7"/><path d="M6 10v9l2 2h8l2-2v-9"/><path class="fx-a" d="M10 21v-6h4v6"/></symbol>
+</svg>
