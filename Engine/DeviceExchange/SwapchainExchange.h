@@ -13,6 +13,8 @@
 #include "RayTracingCapabilitySet.h"
 #include "OrientationClassifier.h"
 #include "VisibilityExchange.h"
+#include <imgui.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -224,6 +226,15 @@ public:
     [[nodiscard]] uint32_t      QueryInstanceCount() const noexcept { return Visibility.QueryInstanceCount(); }
     void                        UploadTextures(const TextureIndex& Textures) noexcept;   // R4a bindless table → binding 18 (last since R6)
     void                        DestroyTextures() noexcept;
+    // Development editor: the celestial outline's SVG icon sheet (RGBA32 top-down rows) becomes resident
+    //    once, mipmapped on the CPU and registered with the ImGui Vulkan backend. The returned id is what
+    //    the outline draws with; the null id when the rows, the extent, or the device is missing — the
+    //    outline then draws iconless rather than wrong.
+    [[nodiscard]] ImTextureID   UploadIconSheet(const unsigned char* Rgba, uint32_t Width, uint32_t Height) noexcept;
+    // Development editor: the live render target, registered with the ImGui Vulkan backend for the viewport
+    //    panel. The registration follows the storage view across swapchain rebuilds, so the game re-queries
+    //    every tick and the id is always fresh. The null id when the device or the view is missing.
+    [[nodiscard]] ImTextureID   QueryRenderTargetView() noexcept;
     void                        UploadShadingTables(const float* Energy, const float* Sheen, uint32_t Resolution) noexcept;   // R4b: two RGBA32F Resolution² planes (ShadingTableCodec bake) → bindings 13 / 14, once
     void                        UploadTraversal(const TraversalIndex& Traversal) noexcept;   // R3 CWBVH blobs → bindings 8-9
 

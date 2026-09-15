@@ -33,6 +33,7 @@
 #include "../../../Engine/ContentInterchange/ShaderBallStructure.h"
 #include "ShowroomStructure.h"
 #include "EditorFeedSequence.h"
+#include "CelestialFeedSequence.h"
 #include "../../../Engine/DeviceExchange/InterfaceExchange.h"
 #include "../../../Engine/SpatialInterface/InterfaceSequence.h"
 #include "../../../Engine/SpatialInterface/InterfacePointerProjection.h"
@@ -581,9 +582,13 @@ int main(int argc, char** argv)
                                  "Catalogue empty or missing — the night sky renders starless.");
         }
     }
-    uint32_t CelestialFirstRow = Frontier::kNoEditorInstance;
-
     Panel.ApplyTheme();
+
+#ifdef FRONTIER_DEVELOPMENT
+    // The outline's SVG icon sheet becomes resident once; the id below is what the rows draw with.
+    Panel.AssignIconSheetTexture(Surface.UploadIconSheet(Panel.QueryIconSheetRgba(),
+                                 Panel.QueryIconSheetWidth(), Panel.QueryIconSheetHeight()));
+#endif
 
     //──────────────────────────────────────────────────────────────────────────
     // Control Centre — top notch + pull-down shade (engine overlay, drawn above every ImGui window)
@@ -1081,10 +1086,6 @@ int main(int argc, char** argv)
         if (!SceneReady)
         {
             SceneRowCount = Feed.FillRoster(SceneInstances, Level);
-            // The celestial entities follow the scene's own rows, under their own folder. Appended rather
-            //    than merged so the scene walk stays exactly what it was.
-            CelestialFirstRow = SceneRowCount;
-            SceneRowCount += Celestial.AppendRoster(SceneInstances, SceneRowCount, Frontier::kMaxEditorInstances);
             Frontier::ViewportOrbit Home;
             float Middle[3] = { 0.0f, 0.0f, 0.0f };
             Frontier::ProjectZero::QueryLevelCentre(Level, Middle);
@@ -1101,40 +1102,23 @@ int main(int argc, char** argv)
             AppliedOrbit = 0u;
             SceneReady   = true;
         }
+        // The celestial block registers its rich rows every tick (icons, accents, metas, pills, footer);
+        //    the scene roster above adapts beside them, so every world entry reads in one outline.
+        {
+            const Frontier::Vector3 Eye = Camera.Convert<Frontier::Vector3>();
+            const float Station[3] = { Eye.x, Eye.y, Eye.z };
+            Frontier::ProjectZero::FillCelestialOutliner(Panel, Celestial,
+                Telemetry.QueryAverageFramesPerSecond(), ControlCentre.QuerySettings().Quality, Station);
+        }
+        // The viewport's live render target, re-queried every tick so swapchain rebuilds stay fresh.
+        Panel.AssignViewTexture(Surface.QueryRenderTargetView(),
+                                Surface.QueryWidth(), Surface.QueryHeight());
         const uint32_t PickedNow = Panel.QueryPickedInstance();
-        Frontier::ProjectZero::CelestialEntity PickedCelestial{};
-        const bool CelestialPicked = CelestialFirstRow != Frontier::kNoEditorInstance
-                                  && Celestial.Owns(PickedNow, CelestialFirstRow, PickedCelestial);
         if (PickedNow != SheetFor)
         {
-            if (CelestialPicked)
-            {
-                Celestial.BuildSheet(PickedCelestial, PickedSheet);
-                TintMirror = nullptr;   // celestial rows carry no folder tint to mirror back
-            }
-            else
-            {
-                TintMirror = Feed.BuildSheet(PickedNow, SceneInstances, SceneRowCount, &PickedSheet,
-                                             Camera, Level, AnimatedInstances);
-            }
+            TintMirror = Feed.BuildSheet(PickedNow, SceneInstances, SceneRowCount, &PickedSheet,
+                                         Camera, Level, AnimatedInstances);
             SheetFor   = PickedNow;
-        }
-        else if (CelestialPicked)
-        {
-            // The panel edits the sheet in place, so the write-back happens every tick the row stays picked.
-            //    Read-outs are then refreshed from the state the edit just changed.
-            Celestial.ApplySheet(PickedCelestial, PickedSheet);
-            Celestial.BuildSheet(PickedCelestial, PickedSheet);
-        }
-        // The outliner's eye toggles live on the rows; carry them back so hiding a row hides the thing.
-        if (CelestialFirstRow != Frontier::kNoEditorInstance)
-        {
-            Celestial.Enabled = SceneInstances[CelestialFirstRow].Visible;
-            for (uint32_t E = 0; E < Frontier::ProjectZero::kCelestialEntityCount; ++E)
-            {
-                const uint32_t Row = CelestialFirstRow + 1u + E;
-                if (Row < SceneRowCount) Celestial.Shown[E] = SceneInstances[Row].Visible;
-            }
         }
 #else
         (void)SceneReady; (void)SceneRowCount; (void)SheetFor; (void)TintMirror; (void)AppliedOrbit;
@@ -1167,6 +1151,9 @@ int main(int argc, char** argv)
                       });
 
 #ifdef FRONTIER_DEVELOPMENT
+        // ②d' The outline read-back: eye flips land on the scene roster and the celestial sequence,
+        //     so hiding a row hides the thing.
+        Frontier::ProjectZero::ApplyOutlinerToWorld(Panel, Celestial, SceneInstances, SceneRowCount);
         // ②d The tint write-back: a folder tint edited in the sheet lands back on its row.
         if (TintMirror != nullptr && PickedNow < SceneRowCount)
         {

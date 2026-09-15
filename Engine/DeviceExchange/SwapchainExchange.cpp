@@ -216,6 +216,11 @@ struct SwapchainExchange::VulkanRecord
     VkDescriptorPool         ImGuiDescriptorPool   = VK_NULL_HANDLE;
     VkRenderPass             ImGuiRenderPass       = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> ImGuiFramebuffers;
+    // ── Development editor: the celestial outline's SVG icon sheet (resident once, CPU-mipmapped) ───────────────────
+    ResidentTexture          IconSheet;
+    VkDescriptorSet          IconSheetSet          = VK_NULL_HANDLE;
+    VkImageView              RenderTargetView      = VK_NULL_HANDLE;   // the storage view the set below was cut for
+    VkDescriptorSet          RenderTargetSet       = VK_NULL_HANDLE;   // the viewport panel's live render target
 
     // ── Cycle slots (one fence + two semaphores per slot) ────────────────────────────────────────────────────────────
     std::array<VkSemaphore, kCycleSlotCount> AcquireSemaphores = {};
@@ -484,6 +489,18 @@ void SwapchainExchange::Retire() noexcept
     if (!Vulkan || !Vulkan->Device) return;
 
     vkDeviceWaitIdle(Vulkan->Device);
+
+    if (Vulkan->IconSheetSet != VK_NULL_HANDLE)
+        ImGui_ImplVulkan_RemoveTexture(Vulkan->IconSheetSet);
+    Vulkan->IconSheetSet = VK_NULL_HANDLE;
+    if (Vulkan->IconSheet.View)   vkDestroyImageView(Vulkan->Device, Vulkan->IconSheet.View, nullptr);
+    if (Vulkan->IconSheet.Image)  vkDestroyImage    (Vulkan->Device, Vulkan->IconSheet.Image, nullptr);
+    if (Vulkan->IconSheet.Memory) vkFreeMemory      (Vulkan->Device, Vulkan->IconSheet.Memory, nullptr);
+    Vulkan->IconSheet = VulkanRecord::ResidentTexture{};
+    if (Vulkan->RenderTargetSet != VK_NULL_HANDLE)
+        ImGui_ImplVulkan_RemoveTexture(Vulkan->RenderTargetSet);
+    Vulkan->RenderTargetSet  = VK_NULL_HANDLE;
+    Vulkan->RenderTargetView = VK_NULL_HANDLE;
 
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
@@ -2118,6 +2135,171 @@ void SwapchainExchange::DestroyTextures() noexcept
     Vulkan->Textures.clear();
 }
 
+ImTextureID SwapchainExchange::UploadIconSheet(const unsigned char* Rgba, uint32_t Width, uint32_t Height) noexcept
+{
+    // Call after bring-up: the id below is registered with the ImGui Vulkan backend, which BringImGui owns.
+    if (Vulkan->IconSheetSet != VK_NULL_HANDLE)
+        return reinterpret_cast<ImTextureID>(Vulkan->IconSheetSet);
+    if (!Vulkan->Device || Rgba == nullptr || Width == 0u || Height == 0u)
+        return static_cast<ImTextureID>(0);
+    vkDeviceWaitIdle(Vulkan->Device);
+
+    // CPU mip chain: the sheet minifies ~7x onto a 14px glyph, so bilinear sampling without mips would
+    //    shimmer. Box-filtered levels back to back, the TextureIndex layout the copy below already speaks.
+    uint32_t LevelCount = 1u;
+    for (uint32_t Longest = Width > Height ? Width : Height; Longest > 1u; Longest >>= 1u)
+        ++LevelCount;
+    std::vector<std::vector<unsigned char>> Levels(static_cast<size_t>(LevelCount));
+    Levels[0].assign(Rgba, Rgba + static_cast<size_t>(Width) * Height * 4u);
+    uint32_t LevelW = Width, LevelH = Height;
+    for (uint32_t L = 1u; L < LevelCount; ++L)
+    {
+        const uint32_t NextW = std::max(1u, LevelW >> 1u);
+        const uint32_t NextH = std::max(1u, LevelH >> 1u);
+        Levels[L].resize(static_cast<size_t>(NextW) * NextH * 4u);
+        for (uint32_t Y = 0u; Y < NextH; ++Y)
+        {
+            for (uint32_t X = 0u; X < NextW; ++X)
+            {
+                for (uint32_t C = 0u; C < 4u; ++C)
+                {
+                    uint32_t Sum = 0u;
+                    for (uint32_t Ky = 0u; Ky < 2u; ++Ky)
+                    {
+                        for (uint32_t Kx = 0u; Kx < 2u; ++Kx)
+                        {
+                            const uint32_t Sx = std::min(X * 2u + Kx, LevelW - 1u);
+                            const uint32_t Sy = std::min(Y * 2u + Ky, LevelH - 1u);
+                            Sum += Levels[L - 1u][(static_cast<size_t>(Sy) * LevelW + Sx) * 4u + C];
+                        }
+                    }
+                    Levels[L][(static_cast<size_t>(Y) * NextW + X) * 4u + C] =
+                        static_cast<unsigned char>((Sum + 2u) / 4u);
+                }
+            }
+        }
+        LevelW = NextW;
+        LevelH = NextH;
+    }
+
+    VkDeviceSize StagingBytes = 0u;
+    std::vector<VkDeviceSize> LevelOffsets(static_cast<size_t>(LevelCount));
+    for (uint32_t L = 0u; L < LevelCount; ++L)
+    {
+        LevelOffsets[L] = StagingBytes;
+        StagingBytes += static_cast<VkDeviceSize>(Levels[L].size());
+    }
+    VkBuffer Staging = VK_NULL_HANDLE; VkDeviceMemory StagingMemory = VK_NULL_HANDLE;
+    AllocateBuffer(Vulkan->Device, Vulkan->MemoryProperties, std::max<VkDeviceSize>(StagingBytes, 16u),
+                   VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                   Staging, StagingMemory);
+    {
+        void* Mapped = nullptr;
+        (void)vkMapMemory(Vulkan->Device, StagingMemory, 0u, VK_WHOLE_SIZE, 0u, &Mapped);
+        for (uint32_t L = 0u; L < LevelCount; ++L)
+        {
+            if (Mapped && !Levels[L].empty())
+                std::memcpy(static_cast<uint8_t*>(Mapped) + LevelOffsets[L], Levels[L].data(),
+                            Levels[L].size());
+        }
+        if (Mapped)
+            vkUnmapMemory(Vulkan->Device, StagingMemory);
+    }
+
+    VulkanRecord::ResidentTexture& R = Vulkan->IconSheet;
+    VkImageCreateInfo ImageInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+    ImageInfo.imageType = VK_IMAGE_TYPE_2D; ImageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+    ImageInfo.extent = { Width, Height, 1u }; ImageInfo.mipLevels = LevelCount; ImageInfo.arrayLayers = 1u;
+    ImageInfo.samples = VK_SAMPLE_COUNT_1_BIT; ImageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    ImageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    ImageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; ImageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    if (vkCreateImage(Vulkan->Device, &ImageInfo, nullptr, &R.Image) != VK_SUCCESS)
+        return static_cast<ImTextureID>(0);
+    VkMemoryRequirements Requirements{};
+    vkGetImageMemoryRequirements(Vulkan->Device, R.Image, &Requirements);
+    VkMemoryAllocateInfo Allocate{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+    Allocate.allocationSize = Requirements.size;
+    for (uint32_t M = 0u; M < Vulkan->MemoryProperties.memoryTypeCount; ++M)
+    {
+        if ((Requirements.memoryTypeBits & (1u << M))
+            && (Vulkan->MemoryProperties.memoryTypes[M].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+        {
+            Allocate.memoryTypeIndex = M;
+            break;
+        }
+    }
+    (void)vkAllocateMemory(Vulkan->Device, &Allocate, nullptr, &R.Memory);
+    (void)vkBindImageMemory(Vulkan->Device, R.Image, R.Memory, 0u);
+    VkImageViewCreateInfo ViewInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+    ViewInfo.image = R.Image; ViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; ViewInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+    ViewInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0u, LevelCount, 0u, 1u };
+    (void)vkCreateImageView(Vulkan->Device, &ViewInfo, nullptr, &R.View);
+
+    VkCommandBufferAllocateInfo CommandInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+    CommandInfo.commandPool = Vulkan->ComputeCommandPool; CommandInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    CommandInfo.commandBufferCount = 1u;
+    VkCommandBuffer Command = VK_NULL_HANDLE;
+    (void)vkAllocateCommandBuffers(Vulkan->Device, &CommandInfo, &Command);
+    VkCommandBufferBeginInfo Begin{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    Begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    (void)vkBeginCommandBuffer(Command, &Begin);
+    VkImageMemoryBarrier ToTransfer{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    ToTransfer.srcAccessMask = 0u; ToTransfer.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    ToTransfer.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; ToTransfer.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    ToTransfer.srcQueueFamilyIndex = ToTransfer.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    ToTransfer.image = R.Image;
+    ToTransfer.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0u, LevelCount, 0u, 1u };
+    vkCmdPipelineBarrier(Command, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u,
+                         nullptr, 0u, nullptr, 1u, &ToTransfer);
+    std::vector<VkBufferImageCopy> Copies(LevelCount);
+    LevelW = Width;
+    LevelH = Height;
+    for (uint32_t L = 0u; L < LevelCount; ++L)
+    {
+        VkBufferImageCopy& C = Copies[L];
+        C.bufferOffset = LevelOffsets[L];
+        C.imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, L, 0u, 1u };
+        C.imageExtent = { LevelW, LevelH, 1u };
+        LevelW = std::max(1u, LevelW >> 1u);
+        LevelH = std::max(1u, LevelH >> 1u);
+    }
+    vkCmdCopyBufferToImage(Command, Staging, R.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, LevelCount,
+                           Copies.data());
+    VkImageMemoryBarrier ToShader = ToTransfer;
+    ToShader.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT; ToShader.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    ToShader.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    ToShader.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    vkCmdPipelineBarrier(Command, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u, 0u,
+                         nullptr, 0u, nullptr, 1u, &ToShader);
+    (void)vkEndCommandBuffer(Command);
+    VkSubmitInfo Submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    Submit.commandBufferCount = 1u; Submit.pCommandBuffers = &Command;
+    (void)vkQueueSubmit(Vulkan->ComputeQueue, 1u, &Submit, VK_NULL_HANDLE);
+    (void)vkQueueWaitIdle(Vulkan->ComputeQueue);
+    vkFreeCommandBuffers(Vulkan->Device, Vulkan->ComputeCommandPool, 1u, &Command);
+    vkDestroyBuffer(Vulkan->Device, Staging, nullptr);
+    vkFreeMemory(Vulkan->Device, StagingMemory, nullptr);
+
+    Vulkan->IconSheetSet = ImGui_ImplVulkan_AddTexture(R.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    return reinterpret_cast<ImTextureID>(Vulkan->IconSheetSet);
+}
+
+ImTextureID SwapchainExchange::QueryRenderTargetView() noexcept
+{
+    if (!Vulkan->Device || Vulkan->StorageImageView == VK_NULL_HANDLE)
+        return static_cast<ImTextureID>(0);
+    if (Vulkan->RenderTargetView != Vulkan->StorageImageView)
+    {
+        if (Vulkan->RenderTargetSet != VK_NULL_HANDLE)
+            ImGui_ImplVulkan_RemoveTexture(Vulkan->RenderTargetSet);
+        Vulkan->RenderTargetView = Vulkan->StorageImageView;
+        Vulkan->RenderTargetSet =
+            ImGui_ImplVulkan_AddTexture(Vulkan->RenderTargetView, VK_IMAGE_LAYOUT_GENERAL);
+    }
+    return reinterpret_cast<ImTextureID>(Vulkan->RenderTargetSet);
+}
+
 void SwapchainExchange::UploadTextures(const TextureIndex& Textures) noexcept
 {
     if (!Vulkan->Device || !Vulkan->DescriptorIndexing) return;
@@ -2991,6 +3173,27 @@ void SwapchainExchange::RecordComputeCommands(uint32_t ImageOrdinal, const Dispa
         Vulkan->StorageImage,                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
         Vulkan->SwapchainImages[ImageOrdinal],   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         1u, &BlitRegion, Upscaling ? VK_FILTER_LINEAR : VK_FILTER_NEAREST);
+
+#ifdef FRONTIER_DEVELOPMENT
+    // ⑤b Storage image → GENERAL for the viewport panel, which samples the live render target while ImGui
+    //    records. The next frame re-transitions from UNDEFINED (step ① discards), so no barrier back is owed.
+    //    Ship builds skip this: nobody samples the target there, and the submit stays byte-identical.
+    {
+        VkImageMemoryBarrier ToGeneral{};
+        ToGeneral.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        ToGeneral.oldLayout                       = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        ToGeneral.newLayout                       = VK_IMAGE_LAYOUT_GENERAL;
+        ToGeneral.image                           = Vulkan->StorageImage;
+        ToGeneral.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        ToGeneral.subresourceRange.levelCount     = 1u;
+        ToGeneral.subresourceRange.layerCount     = 1u;
+        ToGeneral.srcAccessMask                   = VK_ACCESS_TRANSFER_READ_BIT;
+        ToGeneral.dstAccessMask                   = VK_ACCESS_SHADER_READ_BIT;
+        vkCmdPipelineBarrier(Command,
+            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            0u, 0u, nullptr, 0u, nullptr, 1u, &ToGeneral);
+    }
+#endif
 
     // ⑥ Swapchain image → COLOR_ATTACHMENT_OPTIMAL for ImGui
     {

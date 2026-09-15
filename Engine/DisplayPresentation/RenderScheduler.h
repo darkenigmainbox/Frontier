@@ -10,7 +10,7 @@
 #endif
 
 #include "ReSTIRIntegrator.h"
-#include "../Editor/EditorHost.h"
+#include "../Editor/CelestialEditorHost.h"
 #include "../../Projects/Project-Zero/Source/FlyThroughSolver.h"
 #include "../../Projects/Project-Zero/Source/RayTracingSolver.h"
 #include <cstdint>
@@ -62,8 +62,34 @@ public:
     //    picked, or when the build carries no editor at all.
     [[nodiscard]] uint32_t QueryPickedInstance() const noexcept;
 
+    // The primary pick as an outline id — "" when nothing is picked.
+    [[nodiscard]] const char* QueryPickedEntry() const noexcept;
+
     // Drives the pick from the game.
     void PickInstance(uint32_t Index) noexcept;
+    void PickEntry(const char* Id) noexcept;
+
+    // The per-tick project feed into the celestial outline: full-fidelity rows staged before Present,
+    //    the filter pills, and the footer figures. Mute without the define.
+    void RegisterWorldEntry(const WorldEntry& Entry) noexcept;
+    void RegisterPill(const WorldEntryPill& Pill) noexcept;
+    void AssignFooter(const OutlinerFooterFigures& Footer) noexcept;
+    void AssignScenePillBit(uint32_t Bit) noexcept;
+
+    // The outline's registered rows, read back after Present — the eye flips and drag re-seats land here.
+    [[nodiscard]] uint32_t QueryOutlineEntryCount() const noexcept;
+    [[nodiscard]] const WorldEntry* QueryOutlineEntryAt(uint32_t Slot) const noexcept;
+
+    // The icon sheet's RGBA32 rows for the Vulkan upload, and the bound sheet id once uploaded.
+    [[nodiscard]] const unsigned char* QueryIconSheetRgba() const noexcept;
+    [[nodiscard]] uint32_t QueryIconSheetWidth() const noexcept;
+    [[nodiscard]] uint32_t QueryIconSheetHeight() const noexcept;
+    void AssignIconSheetTexture(ImTextureID Id) noexcept;
+
+    // Seats the viewport's scene texture (the engine build's render target) and reads back the view rect.
+    void AssignViewTexture(ImTextureID View, uint32_t Width, uint32_t Height) noexcept;
+    [[nodiscard]] float QueryViewWidth() const noexcept;
+    [[nodiscard]] float QueryViewHeight() const noexcept;
 
 
     // The viewport's orbit in and out: the game seats home from the fly camera, and reads the pose back to
@@ -75,7 +101,7 @@ private:
     bool QuitRequested = false;     // [-]  quit button pressed
 
 #ifdef FRONTIER_DEVELOPMENT
-    EditorHost Editor_;
+    CelestialEditorHost Editor_;
 #endif
 
     void SectionCamera  (const ProjectZero::FlyThroughSolver& Camera) noexcept;

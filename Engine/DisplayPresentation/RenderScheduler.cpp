@@ -78,8 +78,8 @@ void RenderScheduler::Present(
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    // 🔴 The development editor owns the dockspace: EditorHost records a fullscreen host window, the
-    //    dockspace, and the three docked panels (outliner / viewport / inspector) with the trapezoidal tabs
+    // 🔴 The development editor owns the dockspace: CelestialEditorHost records a fullscreen host
+    //    window, the dockspace, and the two docked panels (outliner / viewport) with the trapezoidal tabs
     //    Patches A/B/C switch on. Without FRONTIER_DEVELOPMENT there is no dockspace and no editor — the F3
     //    popup below still floats, and the Control Centre overlay still records through the hook.
 #ifdef FRONTIER_DEVELOPMENT
@@ -127,6 +127,145 @@ void RenderScheduler::PickInstance(uint32_t Index) noexcept
     Editor_.PickInstance(Index);
 #else
     (void)Index;
+#endif
+}
+
+const char* RenderScheduler::QueryPickedEntry() const noexcept
+{
+#ifdef FRONTIER_DEVELOPMENT
+    return Editor_.QueryPickedEntry();
+#else
+    return "";
+#endif
+}
+
+void RenderScheduler::PickEntry(const char* Id) noexcept
+{
+#ifdef FRONTIER_DEVELOPMENT
+    Editor_.PickEntry(Id);
+#else
+    (void)Id;
+#endif
+}
+
+void RenderScheduler::RegisterWorldEntry(const WorldEntry& Entry) noexcept
+{
+#ifdef FRONTIER_DEVELOPMENT
+    Editor_.RegisterWorldEntry(Entry);
+#else
+    (void)Entry;
+#endif
+}
+
+void RenderScheduler::RegisterPill(const WorldEntryPill& Pill) noexcept
+{
+#ifdef FRONTIER_DEVELOPMENT
+    Editor_.RegisterPill(Pill);
+#else
+    (void)Pill;
+#endif
+}
+
+void RenderScheduler::AssignFooter(const OutlinerFooterFigures& Footer) noexcept
+{
+#ifdef FRONTIER_DEVELOPMENT
+    Editor_.AssignFooter(Footer);
+#else
+    (void)Footer;
+#endif
+}
+
+void RenderScheduler::AssignScenePillBit(uint32_t Bit) noexcept
+{
+#ifdef FRONTIER_DEVELOPMENT
+    Editor_.AssignScenePillBit(Bit);
+#else
+    (void)Bit;
+#endif
+}
+
+uint32_t RenderScheduler::QueryOutlineEntryCount() const noexcept
+{
+#ifdef FRONTIER_DEVELOPMENT
+    return Editor_.QueryOutlineEntryCount();
+#else
+    return 0u;
+#endif
+}
+
+const WorldEntry* RenderScheduler::QueryOutlineEntryAt(uint32_t Slot) const noexcept
+{
+#ifdef FRONTIER_DEVELOPMENT
+    const WorldEntry* Entry = nullptr;
+    return Editor_.QueryOutlineEntryAt(Slot, &Entry) != kNoWorldEntry ? Entry : nullptr;
+#else
+    (void)Slot;
+    return nullptr;
+#endif
+}
+
+const unsigned char* RenderScheduler::QueryIconSheetRgba() const noexcept
+{
+#ifdef FRONTIER_DEVELOPMENT
+    return Editor_.QueryIconSheetRgba();
+#else
+    return nullptr;
+#endif
+}
+
+uint32_t RenderScheduler::QueryIconSheetWidth() const noexcept
+{
+#ifdef FRONTIER_DEVELOPMENT
+    return Editor_.QueryIconSheetWidth();
+#else
+    return 0u;
+#endif
+}
+
+uint32_t RenderScheduler::QueryIconSheetHeight() const noexcept
+{
+#ifdef FRONTIER_DEVELOPMENT
+    return Editor_.QueryIconSheetHeight();
+#else
+    return 0u;
+#endif
+}
+
+void RenderScheduler::AssignIconSheetTexture(ImTextureID Id) noexcept
+{
+#ifdef FRONTIER_DEVELOPMENT
+    Editor_.AssignIconSheetTexture(Id);
+#else
+    (void)Id;
+#endif
+}
+
+void RenderScheduler::AssignViewTexture(ImTextureID View, uint32_t Width, uint32_t Height) noexcept
+{
+#ifdef FRONTIER_DEVELOPMENT
+    Editor_.AssignViewTexture(View, Width, Height);
+#else
+    (void)View;
+    (void)Width;
+    (void)Height;
+#endif
+}
+
+float RenderScheduler::QueryViewWidth() const noexcept
+{
+#ifdef FRONTIER_DEVELOPMENT
+    return Editor_.QueryViewWidth();
+#else
+    return 0.0f;
+#endif
+}
+
+float RenderScheduler::QueryViewHeight() const noexcept
+{
+#ifdef FRONTIER_DEVELOPMENT
+    return Editor_.QueryViewHeight();
+#else
+    return 0.0f;
 #endif
 }
 

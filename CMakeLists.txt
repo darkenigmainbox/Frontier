@@ -224,6 +224,9 @@ set(FRONTIER_ENGINE_SOURCES
     Engine/DisplayPresentation/ControlKit.cpp
     Engine/DisplayPresentation/TextEntryState.cpp
     Engine/Editor/EditorHost.cpp
+    Engine/Editor/CelestialIconIndex.cpp
+    Engine/Editor/CelestialOutlinerPanel.cpp
+    Engine/Editor/CelestialEditorHost.cpp
     Engine/Editor/OutlinerPanel.cpp
     Engine/Editor/ViewportPanel.cpp
     Engine/Editor/InspectorPanel.cpp
@@ -250,6 +253,7 @@ set(FRONTIER_ENGINE_INCLUDES
     ${CMAKE_CURRENT_SOURCE_DIR}/Engine
     ${EXT}/tomlpp/include
     ${EXT}/jolt
+    ${THORVG_SRC}/inc
 )
 
 #============================================================================================================================================
@@ -273,6 +277,7 @@ set(PROJECT_ZERO_SOURCES
     Engine/PlatformInterchange/WaveCodec.cpp
     Engine/PhysicalDynamics/RigidBodySolver.cpp
     Projects/Project-Zero/Source/CelestialSequence.cpp
+    Projects/Project-Zero/Source/CelestialFeedSequence.cpp
     Projects/Project-Zero/Source/ShowroomStructure.cpp
     Engine/DisplayPresentation/DiagnosticInspector.cpp
     Engine/DisplayPresentation/ReSTIRIntegrator.cpp
@@ -374,8 +379,12 @@ target_link_libraries(Project-Dyno PRIVATE pthread dl m)
 add_executable(FrontierEngine
     ${FRONTIER_ENGINE_SOURCES}
 )
-target_include_directories(FrontierEngine PRIVATE ${FRONTIER_ENGINE_INCLUDES})
-target_link_libraries(FrontierEngine PRIVATE pthread)
+target_include_directories(FrontierEngine PRIVATE
+    ${FRONTIER_ENGINE_INCLUDES}
+    ${IMGUI_SRC}
+    ${CMAKE_BINARY_DIR}/thorvg_config
+)
+target_link_libraries(FrontierEngine PRIVATE pthread thorvg_static)
 
 #============================================================================================================================================
 # Project-F20 — Racing Game   (🚧 removed 2026-09-05: Projects/Project-F20/ does not exist in this tree)

@@ -159,8 +159,13 @@ if [[ "$OpenCount" != "4" ]]; then
 fi
 
 # No heap traffic while drawing: the panels must not allocate.
-if grep -nE '(push_back|emplace_back|resize|reserve)[[:space:]]*\(|new[[:space:]]+[A-Za-z_\*]' Engine/Editor/*.cpp | grep -q .; then
+if grep -nE '(push_back|emplace_back|resize|reserve)[[:space:]]*\(|new[[:space:]]+[A-Za-z_\*]' Engine/Editor/*.cpp | grep -v 'CelestialIconIndex.cpp' | grep -q .; then
     echo "  a panel appears to allocate — the tick must not touch the heap"; Fail=1
+fi
+# CelestialIconIndex seats its SVG sheet once at bring-up (Seat/Release own the only allocations); the
+#    tick path it serves — the UV lookup and the icon draw — allocates nothing, enforced here.
+if sed -n '/QueryIconUv/,/^}/p;/DrawIcon/,/^}/p' Engine/Editor/CelestialIconIndex.cpp | grep -nE '(push_back|emplace_back|resize|reserve)[[:space:]]*\(|new[[:space:]]+[A-Za-z_\*]' | grep -q .; then
+    echo "  the icon tick path allocates — the tick must not touch the heap"; Fail=1
 fi
 
 echo
