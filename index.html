@@ -3,54 +3,28 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#f4f3f0" />
-  <title>Folder icon lab · Frontier Editor</title>
+  <meta name="theme-color" content="#121212" />
+  <title>Graphite folder studies · Editor icon set</title>
   <style>
     :root {
-      color-scheme: light;
-      --bg: #f4f3f0;
-      --bg-soft: #eeece8;
-      --panel: #ffffff;
-      --panel-2: #f8f8f7;
-      --ink: #17171c;
-      --ink-soft: #4e4d56;
-      --muted: #85838d;
-      --line: #dedde1;
-      --line-strong: #c8c6ce;
-      --violet: #6559df;
-      --violet-dark: #5045c4;
-      --violet-pale: #e9e6ff;
-      --coral: #ec765f;
-      --teal: #1aa994;
-      --yellow: #f2bc55;
-      --green: #19866e;
-      --shadow: 0 16px 44px rgba(28, 25, 42, .08), 0 2px 6px rgba(28, 25, 42, .04);
-      --shadow-soft: 0 8px 24px rgba(28, 25, 42, .06);
-      --radius-lg: 22px;
-      --radius-md: 15px;
-      --radius-sm: 10px;
-    }
-
-    [data-theme="dark"] {
       color-scheme: dark;
-      --bg: #17171a;
-      --bg-soft: #212126;
-      --panel: #242429;
-      --panel-2: #1f1f24;
-      --ink: #f4f2f8;
-      --ink-soft: #c8c6d1;
-      --muted: #9896a4;
-      --line: #393840;
-      --line-strong: #51505b;
-      --violet: #9a8fff;
-      --violet-dark: #b2aaff;
-      --violet-pale: #302d4d;
-      --coral: #ff8f78;
-      --teal: #47ceb5;
-      --yellow: #f5c969;
-      --green: #64d0b4;
-      --shadow: 0 18px 48px rgba(0, 0, 0, .28), 0 2px 6px rgba(0, 0, 0, .18);
-      --shadow-soft: 0 10px 26px rgba(0, 0, 0, .2);
+      --canvas: #121212;
+      --canvas-deep: #0f0f0f;
+      --surface: #191919;
+      --surface-raised: #202020;
+      --surface-soft: #181818;
+      --border: rgba(255,255,255,.105);
+      --border-strong: rgba(255,255,255,.18);
+      --text: #efefef;
+      --text-soft: #b8b8b8;
+      --muted: #707070;
+      --muted-2: #505050;
+      --violet: #aaa3ff;
+      --mint: #78c8ad;
+      --amber: #c7a366;
+      --rose: #d88a7e;
+      --shadow: 0 26px 80px rgba(0,0,0,.46), 0 3px 10px rgba(0,0,0,.32);
+      --small-shadow: 0 14px 35px rgba(0,0,0,.3), 0 2px 5px rgba(0,0,0,.28);
     }
 
     * { box-sizing: border-box; }
@@ -59,804 +33,424 @@
       min-height: 100vh;
       margin: 0;
       background:
-        radial-gradient(circle at 8% 2%, rgba(101, 89, 223, .075), transparent 24rem),
-        radial-gradient(circle at 91% 19%, rgba(236, 118, 95, .06), transparent 22rem),
-        var(--bg);
-      color: var(--ink);
+        radial-gradient(circle at 50% -18%, rgba(255,255,255,.055), transparent 34rem),
+        radial-gradient(circle at 8% 33%, rgba(93,85,143,.07), transparent 25rem),
+        var(--canvas);
+      color: var(--text);
       font: 14px/1.5 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      letter-spacing: -.01em;
+      letter-spacing: -.012em;
     }
-
+    body::before {
+      position: fixed;
+      z-index: -1;
+      inset: 0;
+      content: "";
+      pointer-events: none;
+      opacity: .18;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.07'/%3E%3C/svg%3E");
+      mix-blend-mode: screen;
+    }
     button, input, textarea, select { font: inherit; }
     button { color: inherit; }
-    button:focus-visible, input:focus-visible, textarea:focus-visible {
-      outline: 3px solid rgba(101, 89, 223, .34);
-      outline-offset: 2px;
-    }
-    a { color: inherit; }
-    .page { width: min(1480px, calc(100% - 48px)); margin: 0 auto; padding: 24px 0 54px; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--violet); outline-offset: 3px; }
+    code { color: var(--text-soft); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+    .svg-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+    .page { width: min(1450px, calc(100% - 64px)); margin: 0 auto; padding: 25px 0 60px; }
 
-    .topbar {
-      height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-      margin-bottom: 46px;
-    }
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 11px;
-      color: var(--ink);
-      text-decoration: none;
-      font-weight: 750;
-      letter-spacing: -.035em;
-      font-size: 15px;
-    }
-    .brand-mark {
-      position: relative;
-      display: inline-block;
-      width: 30px;
-      height: 30px;
-      border-radius: 9px;
-      background: var(--ink);
-      overflow: hidden;
-    }
-    .brand-mark::before, .brand-mark::after {
-      content: "";
-      position: absolute;
-      background: var(--violet);
-      border-radius: 4px;
-      transform: rotate(45deg);
-    }
-    .brand-mark::before { width: 12px; height: 12px; top: 3px; left: 3px; }
-    .brand-mark::after { width: 11px; height: 11px; right: 4px; bottom: 4px; background: var(--coral); }
-    .topbar-right { display: flex; align-items: center; gap: 10px; }
-    .small-link {
-      border: 0;
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      padding: 8px 9px;
-      border-radius: 9px;
-      transition: color .18s ease, background .18s ease;
-    }
-    .small-link:hover { background: var(--bg-soft); color: var(--ink); }
-    .theme-button {
-      border: 1px solid var(--line);
-      background: var(--panel);
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 24px; height: 42px; margin-bottom: 84px; }
+    .wordmark { display: inline-flex; align-items: center; gap: 11px; text-decoration: none; color: var(--text); font-size: 12px; font-weight: 760; letter-spacing: .08em; text-transform: uppercase; }
+    .wordmark-mark { position: relative; width: 26px; height: 26px; border: 1px solid rgba(255,255,255,.22); border-radius: 8px; background: linear-gradient(145deg, #3f3f3f, #191919); box-shadow: inset 0 1px rgba(255,255,255,.12), 0 5px 16px rgba(0,0,0,.36); }
+    .wordmark-mark::before { position: absolute; content: ""; left: 5px; top: 7px; width: 15px; height: 10px; border-radius: 4px 5px 4px 4px; background: linear-gradient(180deg, #a7a7a7, #4b4b4b); box-shadow: inset 0 1px rgba(255,255,255,.3); }
+    .wordmark-mark::after { position: absolute; content: ""; left: 7px; top: 5px; width: 7px; height: 4px; border-radius: 2px 2px 0 0; background: #878787; }
+    .topbar-right { display: flex; align-items: center; gap: 9px; }
+    .topbar-note { color: var(--muted); font-size: 11px; letter-spacing: .03em; }
+    .contrast-button, .jump-button {
+      border: 1px solid var(--border);
       border-radius: 999px;
-      padding: 7px 11px 7px 9px;
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      color: var(--ink-soft);
-      cursor: pointer;
-      box-shadow: 0 2px 4px rgba(0,0,0,.025);
-    }
-    .theme-button:hover { border-color: var(--line-strong); color: var(--ink); }
-    .theme-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--violet); box-shadow: 0 0 0 3px var(--violet-pale); }
-
-    .eyebrow {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      color: var(--violet);
-      text-transform: uppercase;
-      letter-spacing: .16em;
-      font-size: 10px;
-      line-height: 1.2;
-      font-weight: 800;
-    }
-    .eyebrow::before { content: ""; width: 22px; height: 1px; background: currentColor; opacity: .7; }
-    .hero {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 360px;
-      align-items: end;
-      gap: 44px;
-      margin-bottom: 32px;
-    }
-    h1 {
-      max-width: 790px;
-      margin: 14px 0 14px;
-      font-size: clamp(41px, 5.2vw, 76px);
-      line-height: .98;
-      letter-spacing: -.072em;
-      font-weight: 790;
-    }
-    .hero-copy {
-      max-width: 690px;
-      color: var(--ink-soft);
-      font-size: 16px;
-      line-height: 1.62;
-      margin: 0;
-    }
-    .hero-copy strong { color: var(--ink); font-weight: 700; }
-    .hero-note {
-      padding: 19px 20px 18px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-md);
-      background: rgba(255,255,255,.42);
-      box-shadow: var(--shadow-soft);
-    }
-    [data-theme="dark"] .hero-note { background: rgba(255,255,255,.025); }
-    .hero-note-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
-    .hero-note-title { font-size: 12px; font-weight: 780; letter-spacing: .07em; text-transform: uppercase; }
-    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 0 4px rgba(26,169,148,.14); }
-    .hero-note p { margin: 0; color: var(--ink-soft); font-size: 13px; line-height: 1.55; }
-    .hero-note p strong { color: var(--ink); }
-
-    .summary-strip {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      border-top: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
-      margin-bottom: 34px;
-    }
-    .summary-item {
-      position: relative;
-      display: flex;
-      align-items: baseline;
-      gap: 12px;
-      padding: 18px 20px 19px 0;
-    }
-    .summary-item + .summary-item { padding-left: 24px; border-left: 1px solid var(--line); }
-    .summary-number { font-size: 28px; line-height: 1; font-weight: 770; letter-spacing: -.06em; }
-    .summary-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; font-weight: 740; }
-    .summary-accent { color: var(--violet); }
-    .summary-coral { color: var(--coral); }
-    .summary-teal { color: var(--teal); }
-    .summary-yellow { color: var(--yellow); }
-
-    .workspace {
-      display: grid;
-      grid-template-columns: 206px minmax(0, 1fr);
-      gap: 32px;
-      align-items: start;
-    }
-    .sidebar { position: sticky; top: 18px; }
-    .sidebar-heading { color: var(--muted); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; font-weight: 800; margin: 0 0 11px; }
-    .review-nav { display: grid; gap: 3px; }
-    .review-option {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      border: 0;
-      border-radius: 9px;
-      background: transparent;
-      padding: 9px 10px;
-      text-align: left;
-      color: var(--ink-soft);
-      cursor: pointer;
-      transition: color .18s ease, background .18s ease;
-    }
-    .review-option:hover { background: var(--bg-soft); color: var(--ink); }
-    .review-option.active { background: var(--violet-pale); color: var(--violet-dark); font-weight: 700; }
-    .review-option-label { display: inline-flex; align-items: center; gap: 9px; }
-    .review-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); }
-    .review-dot.keep { background: var(--teal); }
-    .review-dot.refine { background: var(--yellow); }
-    .review-dot.pass { background: var(--coral); }
-    .review-dot.reference { background: var(--violet); }
-    .review-count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-    .review-option.active .review-count { color: inherit; opacity: .75; }
-    .side-rule { height: 1px; background: var(--line); margin: 24px 0; }
-    .audit-card {
-      padding: 14px;
-      border: 1px dashed var(--line-strong);
-      border-radius: var(--radius-sm);
-      background: rgba(255,255,255,.2);
-    }
-    [data-theme="dark"] .audit-card { background: rgba(255,255,255,.025); }
-    .audit-card-title { display: flex; align-items: center; gap: 8px; font-weight: 730; font-size: 12px; margin-bottom: 7px; }
-    .audit-check { width: 19px; height: 19px; display: grid; place-items: center; border-radius: 6px; background: var(--teal); color: white; font-size: 12px; font-weight: 900; }
-    .audit-card p { color: var(--muted); font-size: 11px; line-height: 1.5; margin: 0; }
-    .audit-card p strong { color: var(--ink-soft); }
-    .sidebar-actions { display: grid; gap: 8px; margin-top: 24px; }
-    .text-button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 7px;
-      min-height: 35px;
-      border: 1px solid var(--line);
-      border-radius: 9px;
-      padding: 7px 10px;
-      background: var(--panel);
-      color: var(--ink-soft);
-      font-size: 12px;
-      font-weight: 680;
-      cursor: pointer;
-      transition: border-color .18s ease, color .18s ease, background .18s ease, transform .18s ease;
-    }
-    .text-button:hover { border-color: var(--violet); color: var(--violet-dark); background: var(--violet-pale); }
-    .text-button:active { transform: translateY(1px); }
-    .text-button.primary { border-color: var(--violet); background: var(--violet); color: white; }
-    .text-button.primary:hover { background: var(--violet-dark); border-color: var(--violet-dark); color: white; }
-
-    .content { min-width: 0; }
-    .toolbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      flex-wrap: wrap;
-      margin-bottom: 18px;
-    }
-    .filter-group { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
-    .filter-button {
-      border: 1px solid transparent;
-      background: transparent;
-      color: var(--muted);
-      border-radius: 999px;
+      background: rgba(255,255,255,.035);
+      color: var(--text-soft);
       padding: 7px 11px;
-      font-size: 12px;
-      font-weight: 700;
       cursor: pointer;
-      transition: color .18s ease, background .18s ease, border-color .18s ease;
+      font-size: 11px;
+      transition: border-color .18s ease, background .18s ease, color .18s ease;
     }
-    .filter-button:hover { color: var(--ink); background: var(--bg-soft); }
-    .filter-button.active { border-color: var(--line); background: var(--panel); color: var(--ink); box-shadow: 0 2px 5px rgba(0,0,0,.035); }
-    .filter-button .filter-count { color: var(--muted); margin-left: 3px; font-variant-numeric: tabular-nums; }
-    .toolbar-tools { display: flex; align-items: center; gap: 8px; }
+    .contrast-button:hover, .jump-button:hover { border-color: var(--border-strong); background: rgba(255,255,255,.07); color: var(--text); }
+
+    .eyebrow { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 10px; font-weight: 750; letter-spacing: .19em; text-transform: uppercase; }
+    .eyebrow::before { content: ""; width: 21px; height: 1px; background: var(--muted-2); }
+    .hero { display: grid; grid-template-columns: minmax(0, 1fr) 335px; gap: 70px; align-items: end; margin-bottom: 70px; }
+    h1 { max-width: 790px; margin: 18px 0 18px; font-size: clamp(45px, 6.1vw, 84px); line-height: .93; letter-spacing: -.075em; font-weight: 650; }
+    .hero-copy { max-width: 650px; margin: 0; color: var(--text-soft); font-size: 15px; line-height: 1.65; }
+    .hero-copy strong { color: var(--text); font-weight: 600; }
+    .direction-card { padding: 18px 20px; border: 1px solid var(--border); border-radius: 13px; background: linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)); box-shadow: var(--small-shadow); }
+    .direction-title { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 15px; color: var(--text); font-size: 11px; font-weight: 720; letter-spacing: .11em; text-transform: uppercase; }
+    .direction-light { width: 6px; height: 6px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 0 4px rgba(120,200,173,.1), 0 0 14px rgba(120,200,173,.4); }
+    .direction-card p { margin: 0; color: var(--text-soft); font-size: 12px; line-height: 1.6; }
+    .direction-card p strong { color: var(--text); font-weight: 650; }
+    .hero-stats { display: flex; align-items: center; gap: 18px; margin-top: 18px; color: var(--muted); font-size: 10px; letter-spacing: .11em; text-transform: uppercase; }
+    .hero-stat { display: inline-flex; align-items: center; gap: 6px; }
+    .hero-stat::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--muted-2); }
+    .hero-stat:first-child::before { background: var(--violet); }
+    .hero-stat:last-child::before { background: var(--amber); }
+
+    .review-summary { display: flex; align-items: center; justify-content: space-between; gap: 18px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 15px 0; margin-bottom: 30px; }
+    .summary-intro { display: flex; align-items: center; gap: 10px; color: var(--text-soft); font-size: 12px; }
+    .summary-intro strong { color: var(--text); font-weight: 650; }
+    .summary-rule { width: 1px; height: 16px; background: var(--border-strong); }
+    .summary-counts { display: flex; align-items: center; gap: 17px; color: var(--muted); font-size: 11px; }
+    .summary-count { display: inline-flex; align-items: center; gap: 6px; }
+    .summary-count b { color: var(--text-soft); font-weight: 650; font-variant-numeric: tabular-nums; }
+    .summary-count .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted-2); }
+    .summary-count.keep .dot { background: var(--mint); }
+    .summary-count.fix .dot { background: var(--amber); }
+    .summary-count.pass .dot { background: var(--rose); }
+    .summary-count.flag .dot { background: var(--violet); }
+
+    .workbench { display: grid; grid-template-columns: 194px minmax(0, 1fr); gap: 34px; align-items: start; }
+    .sidebar { position: sticky; top: 18px; }
+    .side-label { color: var(--muted); font-size: 10px; font-weight: 750; letter-spacing: .16em; text-transform: uppercase; margin: 0 0 11px; }
+    .side-nav { display: grid; gap: 3px; }
+    .side-filter { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 7px; border: 0; border-radius: 8px; padding: 9px 9px; background: transparent; color: var(--text-soft); text-align: left; cursor: pointer; font-size: 12px; transition: color .18s ease, background .18s ease; }
+    .side-filter:hover { background: rgba(255,255,255,.045); color: var(--text); }
+    .side-filter.active { color: var(--text); background: rgba(255,255,255,.085); box-shadow: inset 0 1px rgba(255,255,255,.07); }
+    .side-filter-label { display: inline-flex; align-items: center; gap: 8px; }
+    .side-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted-2); }
+    .side-dot.keep { background: var(--mint); }
+    .side-dot.fix { background: var(--amber); }
+    .side-dot.pass { background: var(--rose); }
+    .side-dot.flag { background: var(--violet); }
+    .side-count { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .side-filter.active .side-count { color: var(--text-soft); }
+    .side-separator { height: 1px; margin: 22px 0; background: var(--border); }
+    .source-note { padding: 13px 12px; border: 1px solid var(--border); border-radius: 10px; background: rgba(255,255,255,.025); color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .source-note-title { display: flex; align-items: center; gap: 7px; color: var(--text-soft); font-size: 10px; font-weight: 740; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 7px; }
+    .source-note-mark { display: grid; place-items: center; width: 17px; height: 17px; border-radius: 5px; color: var(--mint); background: rgba(120,200,173,.11); font-size: 10px; }
+    .source-note p { margin: 0; }
+    .side-actions { display: grid; gap: 7px; margin-top: 20px; }
+    .button { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; background: rgba(255,255,255,.045); color: var(--text-soft); cursor: pointer; font-size: 11px; font-weight: 650; transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease; }
+    .button:hover { border-color: var(--border-strong); background: rgba(255,255,255,.09); color: var(--text); }
+    .button:active { transform: translateY(1px); }
+    .button.primary { color: #171717; border-color: #d0d0d0; background: #d0d0d0; }
+    .button.primary:hover { border-color: #fff; background: #fff; color: #101010; }
+
+    .gallery { min-width: 0; }
+    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+    .style-filters { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .style-filter { border: 1px solid transparent; border-radius: 999px; padding: 6px 10px; background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 650; }
+    .style-filter:hover { color: var(--text-soft); background: rgba(255,255,255,.04); }
+    .style-filter.active { border-color: var(--border); color: var(--text); background: rgba(255,255,255,.07); }
+    .toolbar-tools { display: flex; align-items: center; gap: 7px; }
     .search-wrap { position: relative; }
-    .search-wrap::before { content: "⌕"; position: absolute; left: 12px; top: 5px; color: var(--muted); font-size: 21px; transform: rotate(-15deg); pointer-events: none; }
-    .search {
-      width: 190px;
-      border: 1px solid var(--line);
-      border-radius: 9px;
-      background: var(--panel);
-      color: var(--ink);
-      padding: 8px 11px 8px 33px;
-      font-size: 12px;
-    }
+    .search-wrap::before { position: absolute; left: 11px; top: 5px; content: "⌕"; color: var(--muted); font-size: 19px; transform: rotate(-16deg); pointer-events: none; }
+    .search { width: 180px; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px 7px 31px; background: rgba(255,255,255,.035); color: var(--text); font-size: 11px; }
     .search::placeholder { color: var(--muted); }
-    .sort-select {
-      border: 1px solid var(--line);
-      border-radius: 9px;
-      background: var(--panel);
-      color: var(--ink-soft);
-      padding: 8px 28px 8px 10px;
-      font-size: 12px;
-      cursor: pointer;
-    }
-    .board-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 25px; margin-bottom: 12px; }
-    .board-title { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; font-weight: 780; }
-    .board-help { color: var(--muted); font-size: 11px; }
-    .board-help kbd { border: 1px solid var(--line); border-bottom-width: 2px; background: var(--panel); padding: 1px 5px; border-radius: 4px; color: var(--ink-soft); }
+    .sort-select { border: 1px solid var(--border); border-radius: 8px; padding: 7px 24px 7px 9px; background: rgba(255,255,255,.035); color: var(--text-soft); font-size: 11px; cursor: pointer; }
+    .gallery-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+    .gallery-heading-title { color: var(--muted); font-size: 10px; font-weight: 760; letter-spacing: .15em; text-transform: uppercase; }
+    .gallery-heading-help { color: var(--muted); font-size: 10px; }
+    .gallery-heading-help kbd { border: 1px solid var(--border); border-bottom-color: var(--border-strong); border-radius: 4px; padding: 1px 4px; color: var(--text-soft); background: rgba(255,255,255,.04); }
+    .icon-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; }
+    .icon-card { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: linear-gradient(145deg, rgba(255,255,255,.042), rgba(255,255,255,.015)); box-shadow: 0 4px 13px rgba(0,0,0,.18); transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease; }
+    .icon-card:hover { border-color: var(--border-strong); transform: translateY(-2px); box-shadow: var(--small-shadow); }
+    .icon-card[data-status="keep"] { border-color: rgba(120,200,173,.5); }
+    .icon-card[data-status="refine"] { border-color: rgba(199,163,102,.64); }
+    .icon-card[data-status="pass"] { border-color: rgba(216,138,126,.5); opacity: .76; }
+    .artboard { position: relative; display: grid; place-items: center; min-height: 220px; overflow: hidden; background: radial-gradient(circle at 50% 45%, rgba(255,255,255,.038), transparent 63%), #161616; }
+    .artboard::before { position: absolute; content: ""; width: 225px; height: 100px; left: 50%; bottom: -90px; transform: translateX(-50%); border-radius: 50%; background: rgba(0,0,0,.5); filter: blur(22px); }
+    .artboard::after { position: absolute; content: ""; inset: 0; border-top: 1px solid rgba(255,255,255,.032); pointer-events: none; }
+    .folder-art { position: relative; z-index: 1; width: 248px; height: 186px; overflow: visible; filter: drop-shadow(0 17px 11px rgba(0,0,0,.36)); transition: transform .28s ease; }
+    .icon-card:hover .folder-art { transform: scale(1.035) translateY(-2px); }
+    .inspect-button { position: absolute; z-index: 2; right: 9px; bottom: 9px; border: 1px solid rgba(255,255,255,.16); border-radius: 999px; padding: 5px 8px; background: rgba(20,20,20,.76); color: var(--text-soft); cursor: pointer; font-size: 10px; opacity: 0; transform: translateY(4px); transition: opacity .18s ease, transform .18s ease, color .18s ease, border-color .18s ease; }
+    .icon-card:hover .inspect-button, .inspect-button:focus-visible { opacity: 1; transform: translateY(0); }
+    .inspect-button:hover { color: var(--text); border-color: var(--border-strong); }
+    .card-body { padding: 13px 13px 12px; }
+    .card-topline { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+    .card-number { color: var(--muted-2); font-size: 9px; font-weight: 760; letter-spacing: .16em; }
+    .source-badge { color: var(--mint); font-size: 9px; font-weight: 760; letter-spacing: .1em; }
+    .source-badge.flagged { color: var(--violet); }
+    .card-title { margin: 0 0 3px; color: var(--text); font-size: 16px; font-weight: 650; letter-spacing: -.035em; }
+    .card-description { min-height: 35px; margin: 0 0 9px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .tag-row { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; min-height: 20px; margin-bottom: 11px; }
+    .tag { border: 1px solid var(--border); border-radius: 999px; padding: 3px 6px; color: var(--muted); font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
+    .tag.dim { color: #8a8a8a; }
+    .tag.colour { color: var(--violet); border-color: rgba(170,163,255,.22); }
+    .tag.layer { color: var(--amber); border-color: rgba(199,163,102,.22); }
+    .card-actions { display: flex; align-items: center; gap: 4px; border-top: 1px solid var(--border); padding-top: 9px; }
+    .card-review-label { margin-right: auto; color: var(--muted-2); font-size: 10px; }
+    .mark-button { min-width: 28px; height: 26px; border: 1px solid var(--border); border-radius: 6px; padding: 0 7px; background: rgba(255,255,255,.028); color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 650; }
+    .mark-button:hover { border-color: var(--border-strong); color: var(--text-soft); }
+    .mark-button.active.keep { color: var(--mint); border-color: rgba(120,200,173,.46); background: rgba(120,200,173,.09); }
+    .mark-button.active.refine { color: var(--amber); border-color: rgba(199,163,102,.55); background: rgba(199,163,102,.1); }
+    .mark-button.active.pass { color: var(--rose); border-color: rgba(216,138,126,.45); background: rgba(216,138,126,.08); }
+    .mark-button.active.flag { color: var(--violet); border-color: rgba(170,163,255,.44); background: rgba(170,163,255,.08); }
+    .card-note { display: block; width: 100%; min-height: 29px; margin-top: 8px; padding: 7px 0 0; border: 0; border-top: 1px solid var(--border); resize: vertical; background: transparent; color: var(--text-soft); font-size: 10px; line-height: 1.45; }
+    .card-note::placeholder { color: var(--muted-2); }
+    .empty-state { grid-column: 1 / -1; padding: 60px 20px; border: 1px dashed var(--border-strong); border-radius: 12px; color: var(--muted); text-align: center; }
+    .empty-state strong { display: block; color: var(--text); margin-bottom: 5px; }
 
-    .icon-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-    }
-    .icon-card {
-      min-width: 0;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-md);
-      background: var(--panel);
-      overflow: hidden;
-      box-shadow: 0 2px 4px rgba(20,18,28,.02);
-      transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
-    }
-    .icon-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow-soft); transform: translateY(-2px); }
-    .icon-card[data-status="keep"] { border-color: rgba(26,169,148,.56); }
-    .icon-card[data-status="refine"] { border-color: rgba(242,188,85,.76); }
-    .icon-card[data-status="pass"] { border-color: rgba(236,118,95,.6); }
-    .card-art {
-      position: relative;
-      display: grid;
-      place-items: center;
-      min-height: 182px;
-      overflow: hidden;
-      background: var(--preview-bg, #f0effe);
-      isolation: isolate;
-    }
-    .card-art::before, .card-art::after { content: ""; position: absolute; border-radius: 50%; pointer-events: none; z-index: -1; }
-    .card-art::before { width: 145px; height: 145px; left: -60px; bottom: -74px; background: var(--preview-glow, rgba(255,255,255,.35)); }
-    .card-art::after { width: 75px; height: 75px; right: -28px; top: -23px; border: 1px solid rgba(255,255,255,.35); }
-    .candidate-svg { width: 128px; height: 128px; overflow: visible; filter: drop-shadow(0 9px 8px rgba(28,25,42,.08)); transition: transform .25s ease; }
-    .icon-card:hover .candidate-svg { transform: scale(1.045) rotate(-1deg); }
-    .preview-open {
-      position: absolute;
-      right: 10px;
-      bottom: 10px;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      border: 1px solid rgba(255,255,255,.58);
-      border-radius: 999px;
-      background: rgba(255,255,255,.68);
-      color: #35323e;
-      backdrop-filter: blur(8px);
-      padding: 5px 8px;
-      font-size: 10px;
-      font-weight: 780;
-      cursor: pointer;
-      opacity: 0;
-      transform: translateY(4px);
-      transition: opacity .18s ease, transform .18s ease;
-    }
-    .icon-card:hover .preview-open, .preview-open:focus-visible { opacity: 1; transform: translateY(0); }
-    [data-theme="dark"] .preview-open { background: rgba(30,29,36,.7); color: #f2eff9; border-color: rgba(255,255,255,.2); }
-    .card-content { padding: 14px 14px 13px; }
-    .card-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
-    .card-number { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .14em; }
-    .source-badge {
-      max-width: 120px;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-      color: var(--green);
-      font-size: 9px;
-      font-weight: 850;
-      letter-spacing: .1em;
-    }
-    .source-badge.reference { color: var(--violet); }
-    .card-title { margin: 0 0 3px; font-size: 17px; letter-spacing: -.035em; line-height: 1.1; font-weight: 780; }
-    .card-description { min-height: 39px; color: var(--muted); font-size: 11px; line-height: 1.45; margin: 0 0 10px; }
-    .tag-row { min-height: 21px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-bottom: 12px; }
-    .tag { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); padding: 3px 7px; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; font-weight: 790; }
-    .tag.colour { border-color: rgba(26,169,148,.28); color: var(--teal); }
-    .tag.solid { border-color: rgba(236,118,95,.28); color: var(--coral); }
-    .tag.utility { color: var(--violet-dark); border-color: rgba(101,89,223,.25); }
-    .card-review {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      padding-top: 10px;
-      border-top: 1px solid var(--line);
-    }
-    .review-label { color: var(--muted); font-size: 10px; font-weight: 680; margin-right: auto; }
-    .mark-button {
-      min-width: 28px;
-      height: 27px;
-      border: 1px solid var(--line);
-      border-radius: 7px;
-      padding: 0 7px;
-      background: var(--panel-2);
-      color: var(--muted);
-      font-size: 10px;
-      font-weight: 730;
-      cursor: pointer;
-      transition: color .17s ease, border-color .17s ease, background .17s ease;
-    }
-    .mark-button:hover { color: var(--ink); border-color: var(--line-strong); }
-    .mark-button.active.keep { color: var(--green); background: rgba(26,169,148,.1); border-color: rgba(26,169,148,.45); }
-    .mark-button.active.refine { color: #a87513; background: rgba(242,188,85,.15); border-color: rgba(242,188,85,.62); }
-    .mark-button.active.pass { color: var(--coral); background: rgba(236,118,95,.1); border-color: rgba(236,118,95,.45); }
-    [data-theme="dark"] .mark-button.active.refine { color: var(--yellow); }
-    .mark-button.reference-toggle.active { color: var(--violet-dark); background: var(--violet-pale); border-color: rgba(101,89,223,.45); }
-    .card-note {
-      display: block;
-      width: 100%;
-      min-height: 31px;
-      resize: vertical;
-      border: 0;
-      border-top: 1px solid var(--line);
-      border-radius: 0;
-      margin-top: 10px;
-      padding: 9px 0 1px;
-      background: transparent;
-      color: var(--ink-soft);
-      font-size: 11px;
-      line-height: 1.4;
-    }
-    .card-note::placeholder { color: var(--muted); opacity: .8; }
-    .empty-state {
-      grid-column: 1 / -1;
-      padding: 48px 22px;
-      border: 1px dashed var(--line-strong);
-      border-radius: var(--radius-md);
-      color: var(--muted);
-      text-align: center;
-    }
-    .empty-state strong { display: block; color: var(--ink); margin-bottom: 6px; }
-
-    .inspector-backdrop {
-      position: fixed;
-      z-index: 20;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      padding: 22px;
-      background: rgba(20,19,25,.42);
-      backdrop-filter: blur(8px);
-    }
+    .inspector-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.72); backdrop-filter: blur(9px); }
     .inspector-backdrop[hidden] { display: none; }
-    .inspector {
-      width: min(920px, 100%);
-      max-height: min(760px, calc(100vh - 44px));
-      overflow: auto;
-      display: grid;
-      grid-template-columns: minmax(280px, .9fr) minmax(320px, 1.1fr);
-      border: 1px solid rgba(255,255,255,.4);
-      border-radius: 22px;
-      background: var(--panel);
-      box-shadow: 0 32px 90px rgba(12,11,20,.28);
-    }
-    .inspector-art {
-      position: relative;
-      min-height: 440px;
-      display: grid;
-      place-items: center;
-      overflow: hidden;
-      background: var(--preview-bg, #f0effe);
-    }
-    .inspector-art::before { content: ""; position: absolute; width: 260px; height: 260px; border-radius: 50%; left: -100px; bottom: -120px; background: var(--preview-glow, rgba(255,255,255,.3)); }
-    .inspector-art::after { content: "SVG / ORIGINAL GEOMETRY"; position: absolute; left: 22px; bottom: 20px; color: rgba(24,24,31,.48); font-size: 9px; font-weight: 850; letter-spacing: .14em; }
-    [data-theme="dark"] .inspector-art::after { color: rgba(255,255,255,.5); }
-    .inspector-art .candidate-svg { width: min(245px, 62%); height: auto; filter: drop-shadow(0 18px 12px rgba(28,25,42,.13)); }
-    .inspector-details { padding: 30px 31px 28px; position: relative; }
-    .close-button {
-      position: absolute;
-      top: 18px;
-      right: 18px;
-      width: 31px;
-      height: 31px;
-      display: grid;
-      place-items: center;
-      border: 1px solid var(--line);
-      border-radius: 50%;
-      background: var(--panel);
-      color: var(--muted);
-      font-size: 18px;
-      line-height: 1;
-      cursor: pointer;
-    }
-    .close-button:hover { color: var(--ink); border-color: var(--line-strong); }
-    .inspector-details h2 { max-width: 350px; margin: 12px 48px 8px 0; font-size: 36px; line-height: 1; letter-spacing: -.065em; }
-    .inspector-description { color: var(--ink-soft); line-height: 1.58; margin: 0 0 18px; max-width: 460px; }
-    .inspector-specs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 23px; }
-    .inspector-spec { color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; font-size: 10px; font-weight: 740; }
-    .inspector-source { display: flex; align-items: flex-start; gap: 9px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 13px 0; margin-bottom: 20px; color: var(--ink-soft); font-size: 11px; line-height: 1.45; }
-    .inspector-source-mark { flex: 0 0 auto; width: 19px; height: 19px; border-radius: 6px; display: grid; place-items: center; background: rgba(26,169,148,.13); color: var(--teal); font-size: 11px; font-weight: 900; }
-    .inspector-source.is-reference .inspector-source-mark { background: var(--violet-pale); color: var(--violet); }
-    .inspector-source strong { color: var(--ink); }
-    .decision-label { display: block; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; margin-bottom: 8px; }
-    .decision-row { display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 6px; margin-bottom: 19px; }
-    .decision-button { min-height: 34px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink-soft); font-size: 11px; font-weight: 720; cursor: pointer; }
-    .decision-button:hover { border-color: var(--line-strong); color: var(--ink); }
-    .decision-button.active.keep { background: rgba(26,169,148,.1); color: var(--green); border-color: rgba(26,169,148,.46); }
-    .decision-button.active.refine { background: rgba(242,188,85,.14); color: #a87513; border-color: rgba(242,188,85,.62); }
-    .decision-button.active.pass { background: rgba(236,118,95,.1); color: var(--coral); border-color: rgba(236,118,95,.46); }
-    .decision-button.reference { width: 34px; padding: 0; font-size: 15px; }
-    .decision-button.reference.active { background: var(--violet-pale); color: var(--violet-dark); border-color: rgba(101,89,223,.45); }
-    [data-theme="dark"] .decision-button.active.refine { color: var(--yellow); }
-    .inspector-note-label { display: block; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; margin-bottom: 8px; }
-    .inspector-note {
-      display: block;
-      width: 100%;
-      min-height: 71px;
-      resize: vertical;
-      border: 1px solid var(--line);
-      border-radius: 9px;
-      background: var(--panel-2);
-      color: var(--ink);
-      padding: 10px 11px;
-      font-size: 12px;
-      line-height: 1.5;
-      margin-bottom: 14px;
-    }
+    .inspector { width: min(930px, 100%); max-height: calc(100vh - 40px); overflow: auto; display: grid; grid-template-columns: minmax(360px, 1fr) minmax(320px, .9fr); border: 1px solid var(--border-strong); border-radius: 15px; background: #1b1b1b; box-shadow: 0 35px 120px rgba(0,0,0,.7); }
+    .inspector-artboard { position: relative; min-height: 490px; display: grid; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 42%, rgba(255,255,255,.05), transparent 60%), #151515; }
+    .inspector-artboard::after { position: absolute; left: 20px; bottom: 18px; content: "DARK GLASS / SVG STUDY"; color: var(--muted-2); font-size: 9px; font-weight: 750; letter-spacing: .15em; }
+    .inspector-artboard .folder-art { width: min(400px, 83%); height: auto; filter: drop-shadow(0 24px 20px rgba(0,0,0,.55)); }
+    .inspector-details { position: relative; padding: 31px 30px 28px; }
+    .close-button { position: absolute; top: 17px; right: 17px; width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; background: rgba(255,255,255,.04); color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; }
+    .close-button:hover { border-color: var(--border-strong); color: var(--text); }
+    .inspector-details h2 { max-width: 330px; margin: 15px 40px 8px 0; color: var(--text); font-size: 38px; line-height: .97; letter-spacing: -.065em; font-weight: 620; }
+    .inspector-description { max-width: 390px; margin: 0 0 17px; color: var(--text-soft); font-size: 13px; line-height: 1.6; }
+    .inspector-tags { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-bottom: 20px; }
+    .inspector-tag { border: 1px solid var(--border); border-radius: 999px; padding: 4px 8px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .07em; }
+    .inspector-audit { display: flex; align-items: flex-start; gap: 8px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 12px 0; margin-bottom: 19px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .audit-mark { flex: 0 0 auto; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 5px; color: var(--mint); background: rgba(120,200,173,.1); font-size: 10px; }
+    .inspector-audit.flagged .audit-mark { color: var(--violet); background: rgba(170,163,255,.1); }
+    .inspector-audit strong { color: var(--text-soft); font-weight: 650; }
+    .decision-label, .note-label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 10px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
+    .decision-row { display: grid; grid-template-columns: repeat(3, 1fr) 34px; gap: 5px; margin-bottom: 19px; }
+    .decision-button { min-height: 34px; border: 1px solid var(--border); border-radius: 7px; background: rgba(255,255,255,.035); color: var(--text-soft); cursor: pointer; font-size: 11px; font-weight: 650; }
+    .decision-button:hover { border-color: var(--border-strong); color: var(--text); }
+    .decision-button.active.keep { color: var(--mint); border-color: rgba(120,200,173,.46); background: rgba(120,200,173,.09); }
+    .decision-button.active.refine { color: var(--amber); border-color: rgba(199,163,102,.55); background: rgba(199,163,102,.1); }
+    .decision-button.active.pass { color: var(--rose); border-color: rgba(216,138,126,.45); background: rgba(216,138,126,.08); }
+    .decision-button.flag { font-size: 15px; }
+    .decision-button.flag.active { color: var(--violet); border-color: rgba(170,163,255,.44); background: rgba(170,163,255,.08); }
+    .inspector-note { display: block; width: 100%; min-height: 75px; resize: vertical; margin-bottom: 13px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,.035); color: var(--text); font-size: 11px; line-height: 1.5; }
     .inspector-note::placeholder { color: var(--muted); }
-    .inspector-actions { display: flex; align-items: center; gap: 8px; }
-    .inspector-actions .text-button { flex: 1; }
-    .toast {
-      position: fixed;
-      z-index: 50;
-      left: 50%;
-      bottom: 24px;
-      transform: translate(-50%, 18px);
-      opacity: 0;
-      pointer-events: none;
-      padding: 10px 14px;
-      border: 1px solid rgba(255,255,255,.16);
-      border-radius: 999px;
-      background: #202027;
-      color: #fff;
-      box-shadow: var(--shadow);
-      font-size: 12px;
-      font-weight: 680;
-      transition: opacity .2s ease, transform .2s ease;
-    }
+    .inspector-actions { display: flex; gap: 7px; }
+    .inspector-actions .button { flex: 1; }
+    .toast { position: fixed; z-index: 40; left: 50%; bottom: 22px; max-width: calc(100% - 30px); transform: translate(-50%, 14px); opacity: 0; pointer-events: none; padding: 9px 13px; border: 1px solid rgba(255,255,255,.12); border-radius: 999px; background: #282828; color: var(--text); box-shadow: var(--shadow); font-size: 11px; font-weight: 650; transition: opacity .2s ease, transform .2s ease; }
     .toast.show { opacity: 1; transform: translate(-50%, 0); }
-    .footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
-      border-top: 1px solid var(--line);
-      margin-top: 38px;
-      padding-top: 18px;
-      color: var(--muted);
-      font-size: 11px;
-    }
-    .footer strong { color: var(--ink-soft); }
-    .footer-right { display: inline-flex; align-items: center; gap: 8px; }
-    .footer-mark { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); }
+    .footer { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 47px; padding-top: 17px; border-top: 1px solid var(--border); color: var(--muted); font-size: 10px; }
+    .footer strong { color: var(--text-soft); font-weight: 650; }
+    .footer-status { display: inline-flex; align-items: center; gap: 7px; }
+    .footer-status::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 10px rgba(120,200,173,.35); }
+    [data-contrast="high"] .artboard, [data-contrast="high"] .inspector-artboard { background: radial-gradient(circle at 50% 42%, rgba(255,255,255,.08), transparent 60%), #191919; }
+    [data-contrast="high"] .folder-art { filter: drop-shadow(0 18px 11px rgba(0,0,0,.5)) contrast(1.08); }
+    [data-contrast="high"] .artboard::after { border-top-color: rgba(255,255,255,.065); }
 
-    @media (max-width: 1120px) {
+    @media (max-width: 1180px) {
+      .hero { grid-template-columns: minmax(0, 1fr) 285px; gap: 42px; }
       .icon-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .hero { grid-template-columns: minmax(0, 1fr) 300px; gap: 26px; }
     }
-    @media (max-width: 840px) {
-      .page { width: min(100% - 32px, 680px); padding-top: 16px; }
-      .topbar { margin-bottom: 34px; }
-      .hero { display: block; }
-      .hero-note { max-width: 420px; margin-top: 25px; }
-      .summary-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .summary-item:nth-child(3) { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); }
-      .summary-item:nth-child(4) { border-top: 1px solid var(--line); }
-      .workspace { display: block; }
-      .sidebar { position: static; display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, .8fr); gap: 16px 22px; margin-bottom: 25px; }
-      .sidebar-heading { grid-column: 1 / -1; margin-bottom: -7px; }
-      .side-rule { display: none; }
-      .audit-card { align-self: start; }
-      .sidebar-actions { margin-top: 0; align-self: end; }
-      .sidebar-actions .text-button { min-height: 34px; }
-      .icon-grid { gap: 12px; }
-      .inspector { grid-template-columns: 1fr; max-height: calc(100vh - 28px); }
-      .inspector-art { min-height: 260px; }
-      .inspector-details { padding: 24px 23px 23px; }
+    @media (max-width: 820px) {
+      .page { width: min(100% - 34px, 650px); padding-top: 18px; }
+      .topbar { margin-bottom: 57px; }
+      .topbar-note { display: none; }
+      .hero { display: block; margin-bottom: 48px; }
+      .direction-card { max-width: 370px; margin-top: 25px; }
+      .workbench { display: block; }
+      .sidebar { position: static; display: grid; grid-template-columns: minmax(0, 1fr) minmax(210px, .8fr); gap: 16px 22px; margin-bottom: 25px; }
+      .side-label { grid-column: 1 / -1; margin-bottom: -6px; }
+      .side-separator { display: none; }
+      .source-note { align-self: start; }
+      .side-actions { margin-top: 0; align-self: end; }
+      .inspector { grid-template-columns: 1fr; max-height: calc(100vh - 24px); }
+      .inspector-artboard { min-height: 290px; }
     }
     @media (max-width: 560px) {
-      .page { width: calc(100% - 24px); padding-bottom: 32px; }
-      .topbar { margin-bottom: 27px; }
-      .topbar-right .small-link { display: none; }
-      h1 { font-size: 46px; }
+      .page { width: calc(100% - 24px); padding-bottom: 35px; }
+      .topbar { margin-bottom: 47px; }
+      .jump-button { display: none; }
+      h1 { font-size: 49px; }
       .hero-copy { font-size: 14px; }
-      .summary-number { font-size: 24px; }
-      .summary-item { padding-right: 10px; }
-      .summary-item + .summary-item { padding-left: 14px; }
+      .hero-stats { gap: 11px; font-size: 9px; }
+      .review-summary { display: block; }
+      .summary-counts { margin-top: 13px; gap: 12px; flex-wrap: wrap; }
       .sidebar { grid-template-columns: 1fr; }
-      .sidebar-actions { display: grid; grid-template-columns: 1fr 1fr; }
+      .side-actions { grid-template-columns: 1fr 1fr; }
       .toolbar { align-items: flex-start; }
       .toolbar-tools { width: 100%; }
       .search-wrap, .search { width: 100%; }
-      .sort-select { flex: 0 0 auto; }
-      .board-help { display: none; }
       .icon-grid { grid-template-columns: 1fr; }
-      .card-art { min-height: 205px; }
-      .preview-open { opacity: 1; transform: none; }
+      .artboard { min-height: 242px; }
+      .inspect-button { opacity: 1; transform: none; }
+      .gallery-heading-help { display: none; }
       .footer { display: block; }
-      .footer-right { margin-top: 8px; }
-      .inspector-backdrop { padding: 10px; }
-      .decision-row { grid-template-columns: repeat(3, 1fr) 34px; }
+      .footer-status { margin-top: 8px; }
+      .inspector-backdrop { padding: 9px; }
+      .inspector-details { padding: 25px 21px 22px; }
     }
   </style>
 </head>
-<body>
+<body data-contrast="soft">
+  <svg class="svg-defs" aria-hidden="true" width="0" height="0" viewBox="0 0 1 1">
+    <defs>
+      <linearGradient id="folderBody" x1="0" y1="0" x2="0.8" y2="1"><stop offset="0" stop-color="#606060"/><stop offset=".42" stop-color="#424242"/><stop offset="1" stop-color="#252525"/></linearGradient>
+      <linearGradient id="folderFace" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#505050"/><stop offset=".16" stop-color="#454545"/><stop offset="1" stop-color="#282828"/></linearGradient>
+      <linearGradient id="folderEdge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#777777"/><stop offset=".4" stop-color="#4b4b4b"/><stop offset="1" stop-color="#292929"/></linearGradient>
+      <linearGradient id="paperLight" x1="0" y1="0" x2="0.8" y2="1"><stop offset="0" stop-color="#f0f0f0"/><stop offset=".42" stop-color="#b5b5b5"/><stop offset="1" stop-color="#6e6e6e"/></linearGradient>
+      <linearGradient id="paperDim" x1="0" y1="0" x2="0.8" y2="1"><stop offset="0" stop-color="#8a8a8a"/><stop offset=".5" stop-color="#4c4c4c"/><stop offset="1" stop-color="#252525"/></linearGradient>
+      <linearGradient id="glassBlue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#707b86"/><stop offset=".45" stop-color="#4b535c"/><stop offset="1" stop-color="#25282b"/></linearGradient>
+      <linearGradient id="greenBadge" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d5e6df"/><stop offset=".5" stop-color="#77b69f"/><stop offset="1" stop-color="#315c54"/></linearGradient>
+      <linearGradient id="violetBadge" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d5d1ff"/><stop offset=".55" stop-color="#8179c9"/><stop offset="1" stop-color="#403d70"/></linearGradient>
+      <linearGradient id="amberBadge" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f0dcae"/><stop offset=".52" stop-color="#b79359"/><stop offset="1" stop-color="#55432d"/></linearGradient>
+      <filter id="softShadow" x="-40%" y="-40%" width="180%" height="200%"><feDropShadow dx="0" dy="11" stdDeviation="8" flood-color="#000000" flood-opacity=".5"/></filter>
+      <filter id="tinyShadow" x="-40%" y="-40%" width="180%" height="200%"><feDropShadow dx="0" dy="5" stdDeviation="3.5" flood-color="#000000" flood-opacity=".6"/></filter>
+      <filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="5"/></filter>
+    </defs>
+  </svg>
+
   <main class="page">
     <header class="topbar">
-      <a class="brand" href="#top" aria-label="Frontier Editor icon lab">
-        <span class="brand-mark" aria-hidden="true"></span>
-        <span>Frontier / Editor</span>
-      </a>
-      <div class="topbar-right">
-        <button class="small-link" id="jumpToBoard" type="button">Review board <span aria-hidden="true">↘</span></button>
-        <button class="theme-button" id="themeButton" type="button" aria-label="Switch colour theme"><span class="theme-dot" aria-hidden="true"></span><span id="themeLabel">Dim canvas</span></button>
-      </div>
+      <a class="wordmark" href="#top" aria-label="Folder icon studies"><span class="wordmark-mark" aria-hidden="true"></span><span>Editor / folder studies</span></a>
+      <div class="topbar-right"><span class="topbar-note">dark glass direction · round 02</span><button class="jump-button" id="jumpButton" type="button">Review board ↘</button><button class="contrast-button" id="contrastButton" type="button">Crisp contrast</button></div>
     </header>
 
     <section class="hero" id="top" aria-labelledby="pageTitle">
       <div>
-        <div class="eyebrow">Editor symbols / folder study 01</div>
-        <h1 id="pageTitle">A folder system with a point of view.</h1>
-        <p class="hero-copy">A first pass at <strong>18 original inline SVG explorations</strong> for the Editor. Quiet enough to sit beside text, distinct enough to become a system. Mark what earns a place, what needs a correction, and what should leave the board.</p>
+        <div class="eyebrow">Folder icon set / visual direction</div>
+        <h1 id="pageTitle">Folders with weight, depth, and a little signal.</h1>
+        <p class="hero-copy">A focused set of <strong>dark, dimensional folder studies</strong> for the Editor. They follow the supplied direction: graphite surfaces, layered papers, soft highlights, rounded corners, and small app or data cues instead of bright cartoon colour.</p>
+        <div class="hero-stats"><span class="hero-stat">12 original studies</span><span class="hero-stat">dark glass language</span><span class="hero-stat">inline SVG</span></div>
       </div>
-      <aside class="hero-note" aria-label="Icon provenance">
-        <div class="hero-note-top"><span class="hero-note-title">Original geometry audit</span><span class="live-dot" aria-hidden="true"></span></div>
-        <p>No icon package or Lucide path is imported here. <strong>Every tab, cutout, curve, and accent is drawn in this file</strong> so you can audit the set while choosing.</p>
+      <aside class="direction-card" aria-label="Visual direction">
+        <div class="direction-title"><span>Reference language</span><span class="direction-light" aria-hidden="true"></span></div>
+        <p><strong>Low-key surfaces.</strong> Each candidate is built from layered geometry so it can work as a large empty-state object or a small Editor symbol. Flag anything that feels too close to the reference, then mark the ones worth refining.</p>
       </aside>
     </section>
 
-    <section class="summary-strip" aria-label="Review summary">
-      <div class="summary-item"><span class="summary-number" id="summaryTotal">18</span><span class="summary-label">explorations</span></div>
-      <div class="summary-item"><span class="summary-number summary-accent" id="summaryOriginal">18</span><span class="summary-label">original</span></div>
-      <div class="summary-item"><span class="summary-number summary-teal" id="summaryKeep">0</span><span class="summary-label">kept</span></div>
-      <div class="summary-item"><span class="summary-number summary-yellow" id="summaryRefine">0</span><span class="summary-label">need correction</span></div>
+    <section class="review-summary" aria-label="Review summary">
+      <div class="summary-intro"><strong id="summaryTotal">12</strong> candidates <span class="summary-rule" aria-hidden="true"></span><span id="summaryOpen">12 unreviewed</span></div>
+      <div class="summary-counts"><span class="summary-count keep"><span class="dot"></span>Keep <b id="summaryKeep">0</b></span><span class="summary-count fix"><span class="dot"></span>Correction <b id="summaryFix">0</b></span><span class="summary-count pass"><span class="dot"></span>Pass <b id="summaryPass">0</b></span><span class="summary-count flag"><span class="dot"></span>Reference check <b id="summaryFlag">0</b></span></div>
     </section>
 
-    <section class="workspace" id="board" aria-label="Icon review board">
+    <section class="workbench" id="board" aria-label="Folder icon review board">
       <aside class="sidebar">
-        <h2 class="sidebar-heading">Review board</h2>
-        <nav class="review-nav" aria-label="Review status filters">
-          <button class="review-option active" type="button" data-review-filter="all"><span class="review-option-label"><span class="review-dot"></span>All candidates</span><span class="review-count" id="countAll">18</span></button>
-          <button class="review-option" type="button" data-review-filter="keep"><span class="review-option-label"><span class="review-dot keep"></span>Keep</span><span class="review-count" id="countKeep">0</span></button>
-          <button class="review-option" type="button" data-review-filter="refine"><span class="review-option-label"><span class="review-dot refine"></span>Needs correction</span><span class="review-count" id="countRefine">0</span></button>
-          <button class="review-option" type="button" data-review-filter="pass"><span class="review-option-label"><span class="review-dot pass"></span>Not this one</span><span class="review-count" id="countPass">0</span></button>
-          <button class="review-option" type="button" data-review-filter="reference"><span class="review-option-label"><span class="review-dot reference"></span>Copied / reference flag</span><span class="review-count" id="countReference">0</span></button>
+        <h2 class="side-label">Review board</h2>
+        <nav class="side-nav" aria-label="Review filters">
+          <button class="side-filter active" type="button" data-review-filter="all"><span class="side-filter-label"><span class="side-dot"></span>All studies</span><span class="side-count" id="countAll">12</span></button>
+          <button class="side-filter" type="button" data-review-filter="keep"><span class="side-filter-label"><span class="side-dot keep"></span>Keep</span><span class="side-count" id="countKeep">0</span></button>
+          <button class="side-filter" type="button" data-review-filter="refine"><span class="side-filter-label"><span class="side-dot fix"></span>Needs correction</span><span class="side-count" id="countFix">0</span></button>
+          <button class="side-filter" type="button" data-review-filter="pass"><span class="side-filter-label"><span class="side-dot pass"></span>Not good</span><span class="side-count" id="countPass">0</span></button>
+          <button class="side-filter" type="button" data-review-filter="flag"><span class="side-filter-label"><span class="side-dot flag"></span>Reference / copied check</span><span class="side-count" id="countFlag">0</span></button>
         </nav>
-        <div class="side-rule" aria-hidden="true"></div>
-        <div class="audit-card">
-          <div class="audit-card-title"><span class="audit-check" aria-hidden="true">✓</span>Source is visible</div>
-          <p>Green <strong>ORIGINAL</strong> means the geometry is authored here. Use the purple flag only if you want to mark a shape for reference review.</p>
-        </div>
-        <div class="sidebar-actions">
-          <button class="text-button primary" id="exportButton" type="button"><span aria-hidden="true">↓</span> Export review</button>
-          <button class="text-button" id="resetButton" type="button"><span aria-hidden="true">↺</span> Reset labels</button>
-        </div>
+        <div class="side-separator" aria-hidden="true"></div>
+        <div class="source-note"><div class="source-note-title"><span class="source-note-mark" aria-hidden="true">✓</span>Source audit</div><p>Every silhouette on this board is drawn in this file. Use the purple flag if a candidate needs a closer copied/reference comparison.</p></div>
+        <div class="side-actions"><button class="button primary" id="exportButton" type="button">↓&nbsp; Export review</button><button class="button" id="resetButton" type="button">↺&nbsp; Reset labels</button></div>
       </aside>
 
-      <div class="content">
+      <div class="gallery">
         <div class="toolbar">
-          <div class="filter-group" aria-label="Style filters">
-            <button class="filter-button active" type="button" data-style-filter="all">All <span class="filter-count">18</span></button>
-            <button class="filter-button" type="button" data-style-filter="line">Line</button>
-            <button class="filter-button" type="button" data-style-filter="solid">Solid</button>
-            <button class="filter-button" type="button" data-style-filter="multi">Multi-colour</button>
-          </div>
-          <div class="toolbar-tools">
-            <label class="search-wrap"><span class="sr-only">Search icons</span><input class="search" id="searchInput" type="search" placeholder="Search explorations" autocomplete="off" /></label>
-            <label><span class="sr-only">Sort icons</span><select class="sort-select" id="sortSelect"><option value="default">Sort: number</option><option value="name">Sort: name</option><option value="review">Sort: review</option></select></label>
-          </div>
+          <div class="style-filters" aria-label="Style filters"><button class="style-filter active" type="button" data-style-filter="all">All</button><button class="style-filter" type="button" data-style-filter="folder">Folders</button><button class="style-filter" type="button" data-style-filter="stack">Stacks</button><button class="style-filter" type="button" data-style-filter="window">Windows</button><button class="style-filter" type="button" data-style-filter="colour">Colour accents</button></div>
+          <div class="toolbar-tools"><label class="search-wrap"><span class="sr-only">Search studies</span><input class="search" id="searchInput" type="search" placeholder="Search studies" autocomplete="off" /></label><label><span class="sr-only">Sort studies</span><select class="sort-select" id="sortSelect"><option value="number">Sort: number</option><option value="name">Sort: name</option><option value="review">Sort: review</option></select></label></div>
         </div>
-        <div class="board-line"><div class="board-title" id="boardTitle">All / 18 candidates</div><div class="board-help">Click the art for a larger inspection · <kbd>Esc</kbd> closes it</div></div>
+        <div class="gallery-heading"><div class="gallery-heading-title" id="galleryTitle">All / 12 studies</div><div class="gallery-heading-help">Open a frame for a larger view · <kbd>Esc</kbd> closes</div></div>
         <div class="icon-grid" id="iconGrid" aria-live="polite"></div>
       </div>
     </section>
 
-    <footer class="footer">
-      <span><strong>Folder study 01</strong> · built as a reviewable HTML board, not a library import.</span>
-      <span class="footer-right"><span class="footer-mark" aria-hidden="true"></span> Your labels stay in this browser</span>
-    </footer>
+    <footer class="footer"><span><strong>Folder studies / round 02</strong> · graphite surfaces, paper layers, quiet signals.</span><span class="footer-status">Review labels save in this browser</span></footer>
   </main>
 
   <div class="inspector-backdrop" id="inspectorBackdrop" hidden>
     <section class="inspector" role="dialog" aria-modal="true" aria-labelledby="inspectorTitle">
-      <div class="inspector-art" id="inspectorArt"></div>
+      <div class="inspector-artboard" id="inspectorArtboard"></div>
       <div class="inspector-details">
-        <button class="close-button" id="closeInspector" type="button" aria-label="Close icon inspection">×</button>
-        <div class="eyebrow" id="inspectorEyebrow">Candidate 01</div>
-        <h2 id="inspectorTitle">Quiet outline</h2>
+        <button class="close-button" id="closeInspector" type="button" aria-label="Close study">×</button>
+        <div class="eyebrow" id="inspectorEyebrow">Study 01</div>
+        <h2 id="inspectorTitle">Import stack</h2>
         <p class="inspector-description" id="inspectorDescription"></p>
-        <div class="inspector-specs" id="inspectorSpecs"></div>
-        <div class="inspector-source" id="inspectorSource">
-          <span class="inspector-source-mark" aria-hidden="true">✓</span>
-          <span><strong>Original geometry.</strong> This candidate is authored inline in <code>index.html</code>; there is no Lucide path behind it.</span>
-        </div>
+        <div class="inspector-tags" id="inspectorTags"></div>
+        <div class="inspector-audit" id="inspectorAudit"><span class="audit-mark" aria-hidden="true">✓</span><span><strong>Original geometry.</strong> This study is authored directly in the HTML as inline SVG.</span></div>
         <span class="decision-label">Your decision</span>
-        <div class="decision-row" id="inspectorDecisions">
-          <button class="decision-button" type="button" data-inspector-status="keep">Keep</button>
-          <button class="decision-button" type="button" data-inspector-status="refine">Refine</button>
-          <button class="decision-button" type="button" data-inspector-status="pass">Pass</button>
-          <button class="decision-button reference" type="button" data-inspector-reference="true" aria-label="Mark as copied or reference">⚑</button>
-        </div>
-        <label class="inspector-note-label" for="inspectorNote">Correction note</label>
-        <textarea class="inspector-note" id="inspectorNote" placeholder="What should change? Proportion, tab, stroke, colour…"></textarea>
-        <div class="inspector-actions">
-          <button class="text-button primary" id="copySvgButton" type="button"><span aria-hidden="true">▣</span> Copy standalone SVG</button>
-          <button class="text-button" id="closeInspectorBottom" type="button">Done</button>
-        </div>
+        <div class="decision-row" id="decisionRow"><button class="decision-button" type="button" data-inspector-status="keep">Keep</button><button class="decision-button" type="button" data-inspector-status="refine">Correct</button><button class="decision-button" type="button" data-inspector-status="pass">Pass</button><button class="decision-button flag" type="button" data-inspector-flag="true" aria-label="Flag for reference or copied check">⚑</button></div>
+        <label class="note-label" for="inspectorNote">Correction note</label>
+        <textarea class="inspector-note" id="inspectorNote" placeholder="What should change? Folder weight, paper layers, glow, proportions…"></textarea>
+        <div class="inspector-actions"><button class="button primary" id="copySvgButton" type="button">▣&nbsp; Copy SVG</button><button class="button" id="doneButton" type="button">Done</button></div>
       </div>
     </section>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script>
-    // These are deliberately hand-authored shapes. The board does not import an icon package.
+    // This set is intentionally self-contained: the forms below are hand-authored SVG geometry.
+    const defsMarkup = `<linearGradient id="folderBody" x1="0" y1="0" x2="0.8" y2="1"><stop offset="0" stop-color="#606060"/><stop offset=".42" stop-color="#424242"/><stop offset="1" stop-color="#252525"/></linearGradient><linearGradient id="folderFace" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#505050"/><stop offset=".16" stop-color="#454545"/><stop offset="1" stop-color="#282828"/></linearGradient><linearGradient id="folderEdge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#777777"/><stop offset=".4" stop-color="#4b4b4b"/><stop offset="1" stop-color="#292929"/></linearGradient><linearGradient id="paperLight" x1="0" y1="0" x2="0.8" y2="1"><stop offset="0" stop-color="#f0f0f0"/><stop offset=".42" stop-color="#b5b5b5"/><stop offset="1" stop-color="#6e6e6e"/></linearGradient><linearGradient id="paperDim" x1="0" y1="0" x2="0.8" y2="1"><stop offset="0" stop-color="#8a8a8a"/><stop offset=".5" stop-color="#4c4c4c"/><stop offset="1" stop-color="#252525"/></linearGradient><linearGradient id="glassBlue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#707b86"/><stop offset=".45" stop-color="#4b535c"/><stop offset="1" stop-color="#25282b"/></linearGradient><linearGradient id="greenBadge" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d5e6df"/><stop offset=".5" stop-color="#77b69f"/><stop offset="1" stop-color="#315c54"/></linearGradient><linearGradient id="violetBadge" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d5d1ff"/><stop offset=".55" stop-color="#8179c9"/><stop offset="1" stop-color="#403d70"/></linearGradient><linearGradient id="amberBadge" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f0dcae"/><stop offset=".52" stop-color="#b79359"/><stop offset="1" stop-color="#55432d"/></linearGradient><filter id="softShadow" x="-40%" y="-40%" width="180%" height="200%"><feDropShadow dx="0" dy="11" stdDeviation="8" flood-color="#000000" flood-opacity=".5"/></filter><filter id="tinyShadow" x="-40%" y="-40%" width="180%" height="200%"><feDropShadow dx="0" dy="5" stdDeviation="3.5" flood-color="#000000" flood-opacity=".6"/></filter><filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="5"/></filter>`;
+
     const icons = [
       {
-        id: "ridge", number: "01", name: "Ridge", kind: "line", tags: ["line", "utility"],
-        description: "A quiet everyday folder with an asymmetric shoulder and a small signal dot.",
-        palette: { primary: "#5c55d8", secondary: "#1f2030", accent: "#ec765f", surface: "#ffffff", preview: "#eeedff", glow: "rgba(255,255,255,.42)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Ridge folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M12 34.2c0-5.6 4.5-10.2 10.2-10.2h15.6l8.7 8.8H74c5.5 0 10 4.5 10 10v21c0 5.5-4.5 10-10 10H22c-5.5 0-10-4.5-10-10Z" fill="none" stroke="var(--icon-primary)" stroke-width="5" stroke-linejoin="round"/><path d="M12.5 40.8h71" stroke="var(--icon-secondary)" stroke-width="3.5" stroke-linecap="round"/><path d="M28 54h22M28 63h13" stroke="var(--icon-secondary)" stroke-width="4" stroke-linecap="round"/><circle cx="68" cy="58" r="5" fill="var(--icon-accent)"/></svg>`
+        id: "import-stack", number: "01", name: "Import stack", kind: "stack", colour: false,
+        tags: ["dark glass", "layered", "data cue"],
+        description: "A document-led stack for imported spreadsheets, records, and source files.",
+        svg: `<svg class="folder-art" viewBox="0 0 320 240" role="img" aria-label="Import stack folder study" xmlns="http://www.w3.org/2000/svg"><ellipse cx="160" cy="202" rx="91" ry="15" fill="#000" opacity=".34"/><g filter="url(#tinyShadow)" opacity=".58" transform="rotate(-13 130 125)"><path d="M75 67a12 12 0 0 1 12-12h63l18 19v93a12 12 0 0 1-12 12H87a12 12 0 0 1-12-12Z" fill="url(#paperDim)" stroke="#777" stroke-opacity=".22"/><path d="M150 56v23h18" fill="none" stroke="#a0a0a0" stroke-opacity=".22" stroke-width="2"/><path d="M91 91h47m-47 12h34m-34 12h51" stroke="#d0d0d0" stroke-opacity=".15" stroke-width="4" stroke-linecap="round"/></g><g filter="url(#tinyShadow)" opacity=".7" transform="rotate(11 185 126)"><path d="M143 61a12 12 0 0 1 12-12h61l18 19v99a12 12 0 0 1-12 12h-79a12 12 0 0 1-12-12Z" fill="url(#paperDim)" stroke="#898989" stroke-opacity=".22"/><path d="M218 50v24h18" fill="none" stroke="#b5b5b5" stroke-opacity=".23" stroke-width="2"/><path d="M160 89h53m-53 12h37m-37 12h55" stroke="#d4d4d4" stroke-opacity=".16" stroke-width="4" stroke-linecap="round"/></g><g filter="url(#softShadow)"><path d="M97 49a12 12 0 0 1 12-12h45l18 18h49a12 12 0 0 1 12 12v105a12 12 0 0 1-12 12h-112a12 12 0 0 1-12-12Z" fill="url(#paperLight)" stroke="#dedede" stroke-opacity=".14"/><path d="M154 38v24h20" fill="none" stroke="#5d5d5d" stroke-opacity=".45" stroke-width="2"/><rect x="119" y="99" width="81" height="59" rx="7" fill="#505050" fill-opacity=".7" stroke="#292929" stroke-opacity=".65"/><path d="M119 117h81M119 136h81M146 99v59M173 99v59" stroke="#cfcfcf" stroke-opacity=".16" stroke-width="2"/><rect x="130" y="108" width="22" height="26" rx="4" fill="#797979" fill-opacity=".75"/><text x="141" y="127" text-anchor="middle" fill="#1f1f1f" font-size="18" font-family="Arial,sans-serif" font-weight="700">X</text></g></svg>`
       },
       {
-        id: "pocket", number: "02", name: "Pocket", kind: "solid", tags: ["solid", "utility"],
-        description: "A compact filled silhouette for dense lists, with a calm inset handle.",
-        palette: { primary: "#27243b", secondary: "#f7f5ff", accent: "#f2bc55", surface: "#ffffff", preview: "#f9eddc", glow: "rgba(255,255,255,.5)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Pocket folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M10 31.5c0-5.4 4.4-9.8 9.8-9.8h18.3l8.4 8.9h29.7c5.4 0 9.8 4.4 9.8 9.8v26.1c0 5.4-4.4 9.8-9.8 9.8H19.8c-5.4 0-9.8-4.4-9.8-9.8Z" fill="var(--icon-primary)"/><path d="M10.5 40.2h75" stroke="var(--icon-secondary)" stroke-width="3.5" stroke-linecap="round" opacity=".9"/><path d="M28 54.5h25" stroke="var(--icon-secondary)" stroke-width="4.5" stroke-linecap="round"/><rect x="64" y="52" width="10" height="6" rx="3" fill="var(--icon-accent)"/></svg>`
+        id: "onboarding", number: "02", name: "Onboarding", kind: "folder", colour: true,
+        tags: ["folder", "app cues", "soft edge"],
+        description: "A generous main folder with paper layers and small source badges tucked into the face.",
+        svg: `<svg class="folder-art" viewBox="0 0 320 240" role="img" aria-label="Onboarding folder study" xmlns="http://www.w3.org/2000/svg"><ellipse cx="160" cy="203" rx="112" ry="16" fill="#000" opacity=".42"/><g filter="url(#tinyShadow)" opacity=".82"><path d="M105 67a10 10 0 0 1 10-10h48l15 17h52a10 10 0 0 1 10 10v74a10 10 0 0 1-10 10h-105a10 10 0 0 1-10-10Z" fill="url(#paperLight)" stroke="#fff" stroke-opacity=".14"/><path d="M164 58v21h18" fill="none" stroke="#797979" stroke-width="2" stroke-opacity=".6"/><path d="M127 101h65m-65 12h43" stroke="#6b6b6b" stroke-opacity=".42" stroke-width="4" stroke-linecap="round"/></g><g filter="url(#tinyShadow)" opacity=".88"><path d="M88 80a10 10 0 0 1 10-10h45l16 17h54a10 10 0 0 1 10 10v76a10 10 0 0 1-10 10H98a10 10 0 0 1-10-10Z" fill="url(#paperDim)" stroke="#aaa" stroke-opacity=".22"/><path d="M142 71v20h18" fill="none" stroke="#d0d0d0" stroke-opacity=".35" stroke-width="2"/></g><g filter="url(#softShadow)"><path d="M60 79a22 22 0 0 1 22-22h49l17 17h88a22 22 0 0 1 22 22v74a22 22 0 0 1-22 22H82a22 22 0 0 1-22-22Z" fill="url(#folderFace)" stroke="#888" stroke-opacity=".34" stroke-width="1.5"/><path d="M63 81a19 19 0 0 1 19-19h47l17 17h90" fill="none" stroke="#b1b1b1" stroke-opacity=".36" stroke-width="3" stroke-linecap="round"/><path d="M63 97h193" stroke="#171717" stroke-opacity=".4" stroke-width="2"/><path d="M79 111h98m-98 13h67" stroke="#858585" stroke-opacity=".11" stroke-width="5" stroke-linecap="round"/><g filter="url(#tinyShadow)"><circle cx="93" cy="167" r="14" fill="url(#greenBadge)" stroke="#d9eee6" stroke-opacity=".25"/><path d="m86 167 7-9 7 9-7 7Z" fill="#effaf5" fill-opacity=".9"/><circle cx="126" cy="167" r="14" fill="url(#violetBadge)" stroke="#eeeaff" stroke-opacity=".25"/><rect x="119" y="160" width="14" height="14" rx="3" fill="#111" fill-opacity=".78"/><path d="M122 163h8m-8 4h8m-8 4h5" stroke="#f4f2ff" stroke-opacity=".85" stroke-width="1.5"/></g></g></svg>`
       },
       {
-        id: "fold", number: "03", name: "Fold", kind: "line", tags: ["line", "editorial"],
-        description: "A paper-like corner gives this outline a more editorial, document-first voice.",
-        palette: { primary: "#df6c59", secondary: "#28252a", accent: "#5c55d8", surface: "#ffffff", preview: "#fff0ea", glow: "rgba(255,255,255,.45)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Fold folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M12 34c0-5.5 4.5-10 10-10h37l15 15v25c0 5.5-4.5 10-10 10H22c-5.5 0-10-4.5-10-10Z" fill="none" stroke="var(--icon-primary)" stroke-width="5" stroke-linejoin="round"/><path d="M59 24v16h15" fill="none" stroke="var(--icon-primary)" stroke-width="5" stroke-linejoin="round"/><path d="M27 54h26" stroke="var(--icon-secondary)" stroke-width="4" stroke-linecap="round"/><path d="M27 63h16" stroke="var(--icon-accent)" stroke-width="4" stroke-linecap="round"/></svg>`
+        id: "sync-panels", number: "03", name: "Sync panels", kind: "window", colour: false,
+        tags: ["windows", "sync cue", "utility"],
+        description: "Two quiet data windows with a floating connector for synced or paired sources.",
+        svg: `<svg class="folder-art" viewBox="0 0 320 240" role="img" aria-label="Sync panels folder study" xmlns="http://www.w3.org/2000/svg"><ellipse cx="160" cy="198" rx="103" ry="13" fill="#000" opacity=".38"/><g filter="url(#softShadow)" opacity=".74"><rect x="126" y="44" width="142" height="119" rx="11" fill="url(#glassBlue)" stroke="#949494" stroke-opacity=".2"/><path d="M126 69h142" stroke="#d4d4d4" stroke-opacity=".18" stroke-width="2"/><circle cx="138" cy="57" r="3" fill="#dbdbdb" fill-opacity=".45"/><circle cx="148" cy="57" r="3" fill="#dbdbdb" fill-opacity=".3"/><circle cx="158" cy="57" r="3" fill="#dbdbdb" fill-opacity=".2"/><path d="M143 89h52m-52 16h72m-72 16h61" stroke="#d0d0d0" stroke-opacity=".2" stroke-width="4" stroke-linecap="round"/><path d="M143 137h110M175 87v61M207 87v61M229 87v61" stroke="#e5e5e5" stroke-opacity=".1" stroke-width="2"/></g><g filter="url(#softShadow)" opacity=".8"><rect x="54" y="81" width="146" height="111" rx="11" fill="url(#glassBlue)" stroke="#989898" stroke-opacity=".2"/><path d="M54 106h146" stroke="#d5d5d5" stroke-opacity=".18" stroke-width="2"/><circle cx="66" cy="94" r="3" fill="#dedede" fill-opacity=".45"/><circle cx="76" cy="94" r="3" fill="#dedede" fill-opacity=".3"/><circle cx="86" cy="94" r="3" fill="#dedede" fill-opacity=".2"/><path d="M71 126h52m-52 16h73m-73 16h57" stroke="#ddd" stroke-opacity=".19" stroke-width="4" stroke-linecap="round"/><path d="M71 173h114M104 124v64M136 124v64M159 124v64" stroke="#f1f1f1" stroke-opacity=".1" stroke-width="2"/></g><g filter="url(#tinyShadow)"><rect x="128" y="82" width="70" height="70" rx="8" fill="#333" stroke="#eee" stroke-opacity=".45" stroke-width="2" stroke-dasharray="5 4"/><path d="M143 117h39m-31-9 9 9-9 9m23-18-9 9 9 9" fill="none" stroke="#f1f1f1" stroke-opacity=".88" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`
       },
       {
-        id: "split", number: "04", name: "Split", kind: "line", tags: ["line", "shared"],
-        description: "Two small shoulders turn a familiar folder into a clear shared-space cue.",
-        palette: { primary: "#1c9d8e", secondary: "#193532", accent: "#f2bc55", surface: "#ffffff", preview: "#e3f5ef", glow: "rgba(255,255,255,.5)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Split folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M11 34c0-5.5 4.5-10 10-10h13l6 7h8l6-7h11c5.5 0 10 4.5 10 10v30c0 5.5-4.5 10-10 10H21c-5.5 0-10-4.5-10-10Z" fill="none" stroke="var(--icon-primary)" stroke-width="5" stroke-linejoin="round"/><path d="M11.5 40h73" stroke="var(--icon-secondary)" stroke-width="3.5" stroke-linecap="round"/><circle cx="35" cy="57" r="5" fill="var(--icon-accent)"/><circle cx="60" cy="57" r="5" fill="var(--icon-primary)"/><path d="M41 57h13" stroke="var(--icon-secondary)" stroke-width="3" stroke-linecap="round"/></svg>`
+        id: "paper-pocket", number: "04", name: "Paper pocket", kind: "folder", colour: false,
+        tags: ["folder", "paper layers", "quiet"],
+        description: "A softer, lower folder for general project spaces with a small layered-paper reveal.",
+        svg: `<svg class="folder-art" viewBox="0 0 320 240" role="img" aria-label="Paper pocket folder study" xmlns="http://www.w3.org/2000/svg"><ellipse cx="160" cy="204" rx="108" ry="15" fill="#000" opacity=".45"/><g filter="url(#tinyShadow)" opacity=".73"><path d="M102 62a10 10 0 0 1 10-10h53l15 17h50a10 10 0 0 1 10 10v75a10 10 0 0 1-10 10h-118a10 10 0 0 1-10-10Z" fill="url(#paperLight)" stroke="#fff" stroke-opacity=".15"/><path d="M165 53v21h18" fill="none" stroke="#6d6d6d" stroke-opacity=".45" stroke-width="2"/></g><g filter="url(#softShadow)"><path d="M57 83a20 20 0 0 1 20-20h55l19 18h92a20 20 0 0 1 20 20v76a20 20 0 0 1-20 20H77a20 20 0 0 1-20-20Z" fill="url(#folderBody)" stroke="#8a8a8a" stroke-opacity=".33" stroke-width="1.5"/><path d="M61 84a17 17 0 0 1 17-17h52l18 17h91" fill="none" stroke="#b9b9b9" stroke-opacity=".31" stroke-width="3" stroke-linecap="round"/><path d="M75 109h165" stroke="#202020" stroke-opacity=".45" stroke-width="2"/><rect x="91" y="125" width="84" height="43" rx="8" fill="#202020" fill-opacity=".3" stroke="#969696" stroke-opacity=".13"/><path d="M105 140h44m-44 12h29" stroke="#bdbdbd" stroke-opacity=".18" stroke-width="4" stroke-linecap="round"/><circle cx="222" cy="145" r="9" fill="#686868" fill-opacity=".85"/><circle cx="222" cy="145" r="3" fill="#c7c7c7" fill-opacity=".65"/></g></svg>`
       },
       {
-        id: "stack", number: "05", name: "Stack", kind: "line", tags: ["line", "system"],
-        description: "Layered backs imply depth without turning the folder into a literal pile.",
-        palette: { primary: "#6559df", secondary: "#35314d", accent: "#ec765f", surface: "#ffffff", preview: "#eeeafa", glow: "rgba(255,255,255,.45)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Stack folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M18 31c0-4.4 3.6-8 8-8h17l7 7h24c4.4 0 8 3.6 8 8v21c0 4.4-3.6 8-8 8H26c-4.4 0-8-3.6-8-8Z" fill="var(--icon-secondary)" opacity=".22" stroke="var(--icon-secondary)" stroke-width="4" stroke-linejoin="round"/><path d="M12 39c0-4.8 3.9-8.7 8.7-8.7h16l7.4 7.5h28.2c4.8 0 8.7 3.9 8.7 8.7v17.5c0 4.8-3.9 8.7-8.7 8.7H20.7c-4.8 0-8.7-3.9-8.7-8.7Z" fill="var(--icon-primary)" fill-opacity=".12" stroke="var(--icon-primary)" stroke-width="5" stroke-linejoin="round"/><path d="M13 45h67" stroke="var(--icon-primary)" stroke-width="3" stroke-linecap="round"/><circle cx="68" cy="59" r="4.5" fill="var(--icon-accent)"/></svg>`
+        id: "archive-drawer", number: "05", name: "Archive drawer", kind: "stack", colour: false,
+        tags: ["stack", "archive", "heavy"],
+        description: "A dense drawer-like shape for closed projects, old imports, or stored references.",
+        svg: `<svg class="folder-art" viewBox="0 0 320 240" role="img" aria-label="Archive drawer folder study" xmlns="http://www.w3.org/2000/svg"><ellipse cx="160" cy="202" rx="105" ry="15" fill="#000" opacity=".43"/><g filter="url(#tinyShadow)" opacity=".5"><path d="M75 75h158a13 13 0 0 1 13 13v70a13 13 0 0 1-13 13H75a13 13 0 0 1-13-13V88a13 13 0 0 1 13-13Z" fill="#626262" stroke="#aaa" stroke-opacity=".2"/><path d="M82 93h144" stroke="#e1e1e1" stroke-opacity=".15" stroke-width="4" stroke-linecap="round"/><path d="M91 113h79m-79 14h111" stroke="#171717" stroke-opacity=".35" stroke-width="5" stroke-linecap="round"/></g><g filter="url(#tinyShadow)" opacity=".7"><path d="M65 68h162a13 13 0 0 1 13 13v71a13 13 0 0 1-13 13H65a13 13 0 0 1-13-13V81a13 13 0 0 1 13-13Z" fill="#4a4a4a" stroke="#999" stroke-opacity=".22"/><path d="M72 87h148" stroke="#e2e2e2" stroke-opacity=".18" stroke-width="4" stroke-linecap="round"/><rect x="93" y="105" width="72" height="12" rx="6" fill="#282828" stroke="#aaa" stroke-opacity=".19"/></g><g filter="url(#softShadow)"><path d="M58 83a17 17 0 0 1 17-17h49l17 17h106a17 17 0 0 1 17 17v66a17 17 0 0 1-17 17H75a17 17 0 0 1-17-17Z" fill="url(#folderFace)" stroke="#9a9a9a" stroke-opacity=".28"/><path d="M62 86a14 14 0 0 1 14-14h48l16 16h108" fill="none" stroke="#c3c3c3" stroke-opacity=".28" stroke-width="3" stroke-linecap="round"/><rect x="93" y="123" width="136" height="22" rx="11" fill="#191919" fill-opacity=".46" stroke="#b2b2b2" stroke-opacity=".16"/><path d="M119 134h84" stroke="#d0d0d0" stroke-opacity=".26" stroke-width="3" stroke-linecap="round"/><rect x="131" y="160" width="60" height="7" rx="3.5" fill="#d1d1d1" fill-opacity=".1"/></g></svg>`
       },
       {
-        id: "vault", number: "06", name: "Vault", kind: "solid", tags: ["solid", "protected"],
-        description: "A solid storage shape with a tiny keyhole for protected or private workspaces.",
-        palette: { primary: "#463f9c", secondary: "#faf8ff", accent: "#f2bc55", surface: "#ffffff", preview: "#e9e8ff", glow: "rgba(255,255,255,.5)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Vault folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M10 32c0-5.1 4.1-9.2 9.2-9.2h18.4l8.1 8.6h31.1c5.1 0 9.2 4.1 9.2 9.2v25.2c0 5.1-4.1 9.2-9.2 9.2H19.2c-5.1 0-9.2-4.1-9.2-9.2Z" fill="var(--icon-primary)"/><path d="M10.5 40h75" stroke="var(--icon-secondary)" stroke-width="3.5" stroke-linecap="round" opacity=".86"/><circle cx="48" cy="57" r="8" fill="var(--icon-secondary)"/><path d="M48 56v9" stroke="var(--icon-primary)" stroke-width="3.5" stroke-linecap="round"/><circle cx="48" cy="57" r="2.1" fill="var(--icon-accent)"/></svg>`
+        id: "shared-space", number: "06", name: "Shared space", kind: "folder", colour: true,
+        tags: ["folder", "people cue", "shared"],
+        description: "A communal folder with three low-key identity lights instead of bright avatar stickers.",
+        svg: `<svg class="folder-art" viewBox="0 0 320 240" role="img" aria-label="Shared space folder study" xmlns="http://www.w3.org/2000/svg"><ellipse cx="160" cy="204" rx="109" ry="15" fill="#000" opacity=".44"/><g filter="url(#tinyShadow)" opacity=".65"><path d="M103 67a10 10 0 0 1 10-10h48l16 17h48a10 10 0 0 1 10 10v65a10 10 0 0 1-10 10H113a10 10 0 0 1-10-10Z" fill="url(#paperDim)" stroke="#b3b3b3" stroke-opacity=".18"/><path d="M166 58v22h19" fill="none" stroke="#eee" stroke-opacity=".22" stroke-width="2"/></g><g filter="url(#softShadow)"><path d="M57 82a21 21 0 0 1 21-21h51l18 18h91a21 21 0 0 1 21 21v74a21 21 0 0 1-21 21H78a21 21 0 0 1-21-21Z" fill="url(#folderBody)" stroke="#919191" stroke-opacity=".34"/><path d="M61 84a17 17 0 0 1 17-17h49l18 17h90" fill="none" stroke="#c3c3c3" stroke-opacity=".3" stroke-width="3" stroke-linecap="round"/><path d="M76 111h166" stroke="#191919" stroke-opacity=".46" stroke-width="2"/><path d="M92 139h82m-82 12h53" stroke="#b8b8b8" stroke-opacity=".12" stroke-width="5" stroke-linecap="round"/><g filter="url(#tinyShadow)"><circle cx="207" cy="150" r="13" fill="url(#greenBadge)"/><circle cx="232" cy="150" r="13" fill="url(#violetBadge)"/><circle cx="219" cy="169" r="13" fill="url(#amberBadge)" stroke="#252525" stroke-width="3"/></g></g></svg>`
       },
       {
-        id: "bloom", number: "07", name: "Bloom", kind: "multi", tags: ["multi", "featured"],
-        description: "A soft folder outline paired with a four-petal mark for creative or featured spaces.",
-        palette: { primary: "#e26f5d", secondary: "#2e2932", accent: "#6559df", surface: "#ffffff", preview: "#fff0eb", glow: "rgba(255,255,255,.48)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Bloom folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M11 34c0-5.5 4.5-10 10-10h17l7 7h28c5.5 0 10 4.5 10 10v23c0 5.5-4.5 10-10 10H21c-5.5 0-10-4.5-10-10Z" fill="none" stroke="var(--icon-primary)" stroke-width="5" stroke-linejoin="round"/><path d="M12 41h72" stroke="var(--icon-secondary)" stroke-width="3.5" stroke-linecap="round"/><path d="M62 57c0-6 7-8 9-2 2-6 9-4 7 2 5-2 8 5 2 8 3 5-3 9-7 5-4 4-10 0-7-5-6-3-3-10 2-8-2-6 5-8 7-2Z" fill="var(--icon-accent)"/><circle cx="69" cy="62" r="3" fill="var(--icon-secondary)"/></svg>`
+        id: "media-shelf", number: "07", name: "Media shelf", kind: "folder", colour: true,
+        tags: ["folder", "media", "accent"],
+        description: "A folder with a recessed thumbnail shelf for images, clips, or visual references.",
+        svg: `<svg class="folder-art" viewBox="0 0 320 240" role="img" aria-label="Media shelf folder study" xmlns="http://www.w3.org/2000/svg"><ellipse cx="160" cy="204" rx="108" ry="15" fill="#000" opacity=".44"/><g filter="url(#softShadow)"><path d="M57 80a20 20 0 0 1 20-20h53l18 18h91a20 20 0 0 1 20 20v77a20 20 0 0 1-20 20H77a20 20 0 0 1-20-20Z" fill="url(#folderFace)" stroke="#969696" stroke-opacity=".35"/><path d="M61 83a17 17 0 0 1 17-17h50l18 17h91" fill="none" stroke="#c6c6c6" stroke-opacity=".34" stroke-width="3" stroke-linecap="round"/><path d="M78 110h164" stroke="#1b1b1b" stroke-opacity=".48" stroke-width="2"/><rect x="87" y="126" width="54" height="43" rx="8" fill="#2d3639" stroke="#bbb" stroke-opacity=".15"/><path d="m94 161 16-18 10 10 9-12 10 20Z" fill="url(#greenBadge)" fill-opacity=".75"/><circle cx="119" cy="139" r="5" fill="#d6d2ff" fill-opacity=".7"/><rect x="151" y="126" width="75" height="43" rx="8" fill="#222" stroke="#b7b7b7" stroke-opacity=".12"/><path d="M164 139h47m-47 11h33m-33 10h42" stroke="#ccc" stroke-opacity=".24" stroke-width="4" stroke-linecap="round"/><circle cx="210" cy="145" r="6" fill="url(#amberBadge)"/></g></svg>`
       },
       {
-        id: "orbit", number: "08", name: "Orbit", kind: "line", tags: ["line", "linked"],
-        description: "A looping orbit turns the folder into a cue for linked, cloud, or moving content.",
-        palette: { primary: "#277fa3", secondary: "#24343d", accent: "#ec765f", surface: "#ffffff", preview: "#e3f3f8", glow: "rgba(255,255,255,.52)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Orbit folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M12 35c0-5.8 4.7-10.5 10.5-10.5h15l8.5 8.8h28c5.8 0 10.5 4.7 10.5 10.5v20.7C84.5 70.3 79.8 75 74 75H22c-5.5 0-10-4.5-10-10Z" fill="none" stroke="var(--icon-primary)" stroke-width="5" stroke-linejoin="round"/><path d="M12.5 41h71" stroke="var(--icon-secondary)" stroke-width="3.5" stroke-linecap="round"/><ellipse cx="49" cy="58" rx="17" ry="7" fill="none" stroke="var(--icon-accent)" stroke-width="3" transform="rotate(-17 49 58)"/><circle cx="63.8" cy="52.5" r="4" fill="var(--icon-accent)"/></svg>`
+        id: "command-folder", number: "08", name: "Command folder", kind: "folder", colour: true,
+        tags: ["folder", "command", "import"],
+        description: "A folder silhouette carrying a simple transfer mark for command or import actions.",
+        svg: `<svg class="folder-art" viewBox="0 0 320 240" role="img" aria-label="Command folder study" xmlns="http://www.w3.org/2000/svg"><ellipse cx="160" cy="203" rx="110" ry="15" fill="#000" opacity=".44"/><g filter="url(#tinyShadow)" opacity=".74"><path d="M103 65a10 10 0 0 1 10-10h48l16 17h45a10 10 0 0 1 10 10v68a10 10 0 0 1-10 10H113a10 10 0 0 1-10-10Z" fill="url(#paperDim)" stroke="#bcbcbc" stroke-opacity=".2"/><path d="M168 56v22h18" fill="none" stroke="#eee" stroke-opacity=".26" stroke-width="2"/></g><g filter="url(#softShadow)"><path d="M57 82a20 20 0 0 1 20-20h50l18 18h92a20 20 0 0 1 20 20v75a20 20 0 0 1-20 20H77a20 20 0 0 1-20-20Z" fill="url(#folderBody)" stroke="#919191" stroke-opacity=".35"/><path d="M61 84a17 17 0 0 1 17-17h49l18 17h92" fill="none" stroke="#c8c8c8" stroke-opacity=".33" stroke-width="3" stroke-linecap="round"/><path d="M76 111h166" stroke="#181818" stroke-opacity=".46" stroke-width="2"/><rect x="95" y="130" width="127" height="39" rx="10" fill="#1c1c1c" fill-opacity=".48" stroke="#bcbcbc" stroke-opacity=".12"/><path d="M122 149h58m-10-10 10 10-10 10" fill="none" stroke="#dedede" stroke-opacity=".72" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="109" cy="149" r="5" fill="url(#violetBadge)"/><circle cx="206" cy="149" r="5" fill="url(#greenBadge)"/></g></svg>`
       },
       {
-        id: "archive", number: "09", name: "Archive", kind: "solid", tags: ["solid", "utility"],
-        description: "A heavier body and low horizontal slot make this one read as stored, not active.",
-        palette: { primary: "#d96252", secondary: "#fff8f3", accent: "#6559df", surface: "#ffffff", preview: "#ffebe3", glow: "rgba(255,255,255,.5)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Archive folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M11 31.5c0-5 4-9 9-9h17l8 8h31c5 0 9 4 9 9v27c0 5-4 9-9 9H20c-5 0-9-4-9-9Z" fill="var(--icon-primary)"/><path d="M11.5 40h73" stroke="var(--icon-secondary)" stroke-width="3.5" stroke-linecap="round"/><path d="M27 58h42" stroke="var(--icon-secondary)" stroke-width="7" stroke-linecap="round"/><path d="M43 58h10" stroke="var(--icon-accent)" stroke-width="3.5" stroke-linecap="round"/></svg>`
+        id: "window-folder", number: "09", name: "Window folder", kind: "window", colour: false,
+        tags: ["window", "workspace", "dense"],
+        description: "A compact folder-window hybrid for a dashboard, data room, or editor workspace.",
+        svg: `<svg class="folder-art" viewBox="0 0 320 240" role="img" aria-label="Window folder study" xmlns="http://www.w3.org/2000/svg"><ellipse cx="160" cy="201" rx="108" ry="14" fill="#000" opacity=".45"/><g filter="url(#softShadow)"><path d="M57 78a19 19 0 0 1 19-19h53l18 18h94a19 19 0 0 1 19 19v77a19 19 0 0 1-19 19H76a19 19 0 0 1-19-19Z" fill="url(#folderFace)" stroke="#969696" stroke-opacity=".33"/><path d="M61 83a16 16 0 0 1 16-16h51l18 17h94" fill="none" stroke="#c1c1c1" stroke-opacity=".29" stroke-width="3" stroke-linecap="round"/><rect x="84" y="116" width="151" height="56" rx="8" fill="#202020" fill-opacity=".74" stroke="#b6b6b6" stroke-opacity=".15"/><path d="M84 135h151M111 116v56M151 116v56M193 116v56" stroke="#dadada" stroke-opacity=".14" stroke-width="2"/><path d="M96 126h34m11 0h28m13 0h28" stroke="#dedede" stroke-opacity=".24" stroke-width="4" stroke-linecap="round"/><path d="M96 148h7m9 0h26m11 0h10m10 0h33M96 160h36m11 0h31" stroke="#aaa" stroke-opacity=".18" stroke-width="4" stroke-linecap="round"/></g></svg>`
       },
       {
-        id: "mesh", number: "10", name: "Mesh", kind: "line", tags: ["line", "collection"],
-        description: "A four-window core gives a collection folder a modular, system-oriented accent.",
-        palette: { primary: "#6657c9", secondary: "#292735", accent: "#1aa994", surface: "#ffffff", preview: "#eeecff", glow: "rgba(255,255,255,.5)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Mesh folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M12 34c0-5.5 4.5-10 10-10h16l8 8h27c5.5 0 10 4.5 10 10v23c0 5.5-4.5 10-10 10H22c-5.5 0-10-4.5-10-10Z" fill="none" stroke="var(--icon-primary)" stroke-width="5" stroke-linejoin="round"/><path d="M12.5 41h71" stroke="var(--icon-secondary)" stroke-width="3.5" stroke-linecap="round"/><rect x="29" y="51" width="10" height="10" rx="2" fill="var(--icon-accent)"/><rect x="44" y="51" width="10" height="10" rx="2" fill="var(--icon-primary)" opacity=".65"/><rect x="59" y="51" width="10" height="10" rx="2" fill="var(--icon-secondary)" opacity=".8"/><rect x="29" y="65" width="10" height="5" rx="2.5" fill="var(--icon-secondary)" opacity=".7"/><rect x="44" y="65" width="25" height="5" rx="2.5" fill="var(--icon-primary)" opacity=".35"/></svg>`
+        id: "new-folder", number: "10", name: "New folder", kind: "folder", colour: true,
+        tags: ["folder", "new", "signal"],
+        description: "A clean everyday body with one low-key plus signal for creating something new.",
+        svg: `<svg class="folder-art" viewBox="0 0 320 240" role="img" aria-label="New folder study" xmlns="http://www.w3.org/2000/svg"><ellipse cx="160" cy="203" rx="109" ry="15" fill="#000" opacity=".44"/><g filter="url(#softShadow)"><path d="M57 81a20 20 0 0 1 20-20h51l18 18h92a20 20 0 0 1 20 20v75a20 20 0 0 1-20 20H77a20 20 0 0 1-20-20Z" fill="url(#folderBody)" stroke="#969696" stroke-opacity=".35"/><path d="M61 84a17 17 0 0 1 17-17h50l18 17h92" fill="none" stroke="#cacaca" stroke-opacity=".34" stroke-width="3" stroke-linecap="round"/><path d="M76 111h166" stroke="#171717" stroke-opacity=".48" stroke-width="2"/><circle cx="160" cy="146" r="27" fill="#232323" fill-opacity=".56" stroke="#c1c1c1" stroke-opacity=".17"/><path d="M160 132v28m-14-14h28" stroke="url(#violetBadge)" stroke-width="5" stroke-linecap="round"/><circle cx="224" cy="104" r="6" fill="url(#amberBadge)"/><circle cx="239" cy="115" r="3" fill="url(#greenBadge)"/></g></svg>`
       },
       {
-        id: "branch", number: "11", name: "Branch", kind: "line", tags: ["line", "tree"],
-        description: "A short connector and three nodes turn a folder into a component-tree marker.",
-        palette: { primary: "#2b9b81", secondary: "#203931", accent: "#ec765f", surface: "#ffffff", preview: "#e5f5ee", glow: "rgba(255,255,255,.48)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Branch folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M11 34c0-5.5 4.5-10 10-10h16l7 7h30c5.5 0 10 4.5 10 10v23c0 5.5-4.5 10-10 10H21c-5.5 0-10-4.5-10-10Z" fill="none" stroke="var(--icon-primary)" stroke-width="5" stroke-linejoin="round"/><path d="M11.5 41h73" stroke="var(--icon-secondary)" stroke-width="3.5" stroke-linecap="round"/><path d="M48 52v12m0-6h14m-14 0H34" fill="none" stroke="var(--icon-secondary)" stroke-width="3" stroke-linecap="round"/><circle cx="48" cy="52" r="4.5" fill="var(--icon-accent)"/><circle cx="32" cy="66" r="4.5" fill="var(--icon-primary)"/><circle cx="64" cy="66" r="4.5" fill="var(--icon-primary)"/></svg>`
+        id: "team-stack", number: "11", name: "Team stack", kind: "stack", colour: true,
+        tags: ["stack", "team", "layered"],
+        description: "Offset folder planes and a small team signal for shared project collections.",
+        svg: `<svg class="folder-art" viewBox="0 0 320 240" role="img" aria-label="Team stack folder study" xmlns="http://www.w3.org/2000/svg"><ellipse cx="160" cy="204" rx="111" ry="15" fill="#000" opacity=".44"/><g filter="url(#tinyShadow)" opacity=".52" transform="translate(11 -5)"><path d="M60 83a18 18 0 0 1 18-18h50l17 17h93a18 18 0 0 1 18 18v71a18 18 0 0 1-18 18H78a18 18 0 0 1-18-18Z" fill="#6c6c6c" stroke="#bcbcbc" stroke-opacity=".22"/></g><g filter="url(#tinyShadow)" opacity=".66" transform="translate(-10 3)"><path d="M60 83a18 18 0 0 1 18-18h50l17 17h93a18 18 0 0 1 18 18v71a18 18 0 0 1-18 18H78a18 18 0 0 1-18-18Z" fill="#3f3f3f" stroke="#aaa" stroke-opacity=".25"/></g><g filter="url(#softShadow)"><path d="M57 82a20 20 0 0 1 20-20h50l18 18h92a20 20 0 0 1 20 20v75a20 20 0 0 1-20 20H77a20 20 0 0 1-20-20Z" fill="url(#folderFace)" stroke="#999" stroke-opacity=".35"/><path d="M61 84a17 17 0 0 1 17-17h49l18 17h92" fill="none" stroke="#c7c7c7" stroke-opacity=".32" stroke-width="3" stroke-linecap="round"/><path d="M76 111h166" stroke="#171717" stroke-opacity=".46" stroke-width="2"/><path d="M105 151h63" stroke="#bcbcbc" stroke-opacity=".17" stroke-width="5" stroke-linecap="round"/><circle cx="204" cy="146" r="10" fill="url(#greenBadge)"/><circle cx="223" cy="146" r="10" fill="url(#violetBadge)"/><circle cx="213" cy="162" r="10" fill="url(#amberBadge)" stroke="#272727" stroke-width="3"/></g></svg>`
       },
       {
-        id: "code", number: "12", name: "Code", kind: "solid", tags: ["solid", "developer"],
-        description: "A strong folder body with offset angle marks for source, components, or snippets.",
-        palette: { primary: "#25283a", secondary: "#f4f1ff", accent: "#9a8fff", surface: "#ffffff", preview: "#e8e9f5", glow: "rgba(255,255,255,.48)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Code folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M10 32c0-5.2 4.2-9.4 9.4-9.4h18.1l8.1 8.6h31c5.2 0 9.4 4.2 9.4 9.4v25c0 5.2-4.2 9.4-9.4 9.4H19.4c-5.2 0-9.4-4.2-9.4-9.4Z" fill="var(--icon-primary)"/><path d="M10.5 40.5h75" stroke="var(--icon-accent)" stroke-width="3.5" stroke-linecap="round"/><path d="m38 53-9 8 9 8m20-16 9 8-9 8" fill="none" stroke="var(--icon-secondary)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="m53 51-9 21" stroke="var(--icon-accent)" stroke-width="3.5" stroke-linecap="round"/></svg>`
-      },
-      {
-        id: "palette", number: "13", name: "Palette", kind: "multi", tags: ["multi", "creative"],
-        description: "A warm two-tone body and three colour wells for design assets or visual work.",
-        palette: { primary: "#ef795f", secondary: "#392d35", accent: "#6559df", surface: "#ffffff", preview: "#fff1e9", glow: "rgba(255,255,255,.5)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Palette folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M11 34c0-5.5 4.5-10 10-10h16l8 8h29c5.5 0 10 4.5 10 10v23c0 5.5-4.5 10-10 10H21c-5.5 0-10-4.5-10-10Z" fill="var(--icon-secondary)"/><path d="M11 34c0-5.5 4.5-10 10-10h16l8 8h29c5.5 0 10 4.5 10 10v5H11Z" fill="var(--icon-primary)"/><path d="M11.5 41h73" stroke="var(--icon-secondary)" stroke-width="3.5" stroke-linecap="round"/><circle cx="31" cy="57" r="5" fill="var(--icon-primary)"/><circle cx="47" cy="57" r="5" fill="var(--icon-accent)"/><circle cx="63" cy="57" r="5" fill="var(--icon-secondary)" stroke="var(--icon-primary)" stroke-width="2"/></svg>`
-      },
-      {
-        id: "signal", number: "14", name: "Signal", kind: "line", tags: ["line", "live"],
-        description: "An active waveform sits inside a generous outline for live or recently changed content.",
-        palette: { primary: "#d86a5c", secondary: "#372b30", accent: "#1aa994", surface: "#ffffff", preview: "#ffede9", glow: "rgba(255,255,255,.52)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Signal folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M12 34c0-5.5 4.5-10 10-10h16l8 8h28c5.5 0 10 4.5 10 10v23c0 5.5-4.5 10-10 10H22c-5.5 0-10-4.5-10-10Z" fill="none" stroke="var(--icon-primary)" stroke-width="5" stroke-linejoin="round"/><path d="M12.5 41h71" stroke="var(--icon-secondary)" stroke-width="3.5" stroke-linecap="round"/><path d="M28 59h8l4-9 7 17 6-13 5 5h10" fill="none" stroke="var(--icon-accent)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
-      },
-      {
-        id: "canyon", number: "15", name: "Canyon", kind: "multi", tags: ["multi", "media"],
-        description: "A split-color face and deep diagonal cut make this the most expressive media candidate.",
-        palette: { primary: "#f0b54e", secondary: "#3f3042", accent: "#e56766", surface: "#ffffff", preview: "#fff2d8", glow: "rgba(255,255,255,.48)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Canyon folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M11 34c0-5.5 4.5-10 10-10h17l7 7h29c5.5 0 10 4.5 10 10v23c0 5.5-4.5 10-10 10H21c-5.5 0-10-4.5-10-10Z" fill="var(--icon-secondary)"/><path d="M11 34c0-5.5 4.5-10 10-10h17l7 7h29c5.5 0 10 4.5 10 10v7H11Z" fill="var(--icon-primary)"/><path d="M12 41h72" stroke="var(--icon-accent)" stroke-width="3.5" stroke-linecap="round"/><path d="m40 50 10 22" stroke="var(--icon-accent)" stroke-width="5" stroke-linecap="round"/><path d="m54 51 8 17" stroke="var(--icon-primary)" stroke-width="3" stroke-linecap="round" opacity=".7"/></svg>`
-      },
-      {
-        id: "beacon", number: "16", name: "Beacon", kind: "line", tags: ["line", "pinned"],
-        description: "A small top beacon gives pinned, favourite, or attention-worthy folders a signal.",
-        palette: { primary: "#6253c8", secondary: "#2b2937", accent: "#f2bc55", surface: "#ffffff", preview: "#f0ecff", glow: "rgba(255,255,255,.5)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Beacon folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M12 35c0-5.5 4.5-10 10-10h15l8 8h29c5.5 0 10 4.5 10 10v22c0 5.5-4.5 10-10 10H22c-5.5 0-10-4.5-10-10Z" fill="none" stroke="var(--icon-primary)" stroke-width="5" stroke-linejoin="round"/><path d="M12.5 42h71" stroke="var(--icon-secondary)" stroke-width="3.5" stroke-linecap="round"/><path d="M64 21v-5m-8 7 3-4m13 4-3-4" stroke="var(--icon-accent)" stroke-width="3.2" stroke-linecap="round"/><path d="M58 25h12l-2 8H60Z" fill="var(--icon-accent)" stroke="var(--icon-secondary)" stroke-width="2.5" stroke-linejoin="round"/><circle cx="64" cy="58" r="6" fill="var(--icon-accent)"/><path d="m61 58 2 2 4-5" fill="none" stroke="var(--icon-secondary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
-      },
-      {
-        id: "duo", number: "17", name: "Duo", kind: "multi", tags: ["multi", "team"],
-        description: "Two offset folders make a simple, readable mark for team or two-pane work.",
-        palette: { primary: "#37a993", secondary: "#3750a3", accent: "#ec765f", surface: "#ffffff", preview: "#e5f2f5", glow: "rgba(255,255,255,.5)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Duo folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M20 28c0-4.4 3.6-8 8-8h15l7 7h22c4.4 0 8 3.6 8 8v20c0 4.4-3.6 8-8 8H28c-4.4 0-8-3.6-8-8Z" fill="var(--icon-secondary)" opacity=".18" stroke="var(--icon-secondary)" stroke-width="4" stroke-linejoin="round"/><path d="M11 39c0-5.1 4.1-9.2 9.2-9.2h15.3l7.6 8h31.7c5.1 0 9.2 4.1 9.2 9.2v16.8c0 5.1-4.1 9.2-9.2 9.2H20.2c-5.1 0-9.2-4.1-9.2-9.2Z" fill="var(--icon-primary)" fill-opacity=".16" stroke="var(--icon-primary)" stroke-width="5" stroke-linejoin="round"/><path d="M12 46h71" stroke="var(--icon-accent)" stroke-width="3.5" stroke-linecap="round"/><circle cx="35" cy="59" r="4" fill="var(--icon-primary)"/><circle cx="61" cy="59" r="4" fill="var(--icon-accent)"/></svg>`
-      },
-      {
-        id: "spark", number: "18", name: "Spark", kind: "line", tags: ["line", "new"],
-        description: "The most celebratory outline: a clean folder with a small four-point newness marker.",
-        palette: { primary: "#ec765f", secondary: "#332b31", accent: "#6559df", surface: "#ffffff", preview: "#fff0ed", glow: "rgba(255,255,255,.52)" },
-        svg: `<svg class="candidate-svg" viewBox="0 0 96 96" role="img" aria-label="Spark folder icon" xmlns="http://www.w3.org/2000/svg"><path d="M11 34c0-5.5 4.5-10 10-10h16l8 8h29c5.5 0 10 4.5 10 10v23c0 5.5-4.5 10-10 10H21c-5.5 0-10-4.5-10-10Z" fill="none" stroke="var(--icon-primary)" stroke-width="5" stroke-linejoin="round"/><path d="M12 41h72" stroke="var(--icon-secondary)" stroke-width="3.5" stroke-linecap="round"/><path d="M66 48c1.6 6.2 3.7 8.3 10 10-6.3 1.6-8.4 3.7-10 10-1.6-6.3-3.7-8.4-10-10 6.3-1.7 8.4-3.8 10-10Z" fill="var(--icon-accent)"/><path d="M47 52v13M40.5 58.5h13" stroke="var(--icon-secondary)" stroke-width="3" stroke-linecap="round"/></svg>`
+        id: "focus-folder", number: "12", name: "Focus folder", kind: "folder", colour: false,
+        tags: ["folder", "focus", "minimal"],
+        description: "The quietest silhouette in the set: one strong face, one inset focus mark, no decoration.",
+        svg: `<svg class="folder-art" viewBox="0 0 320 240" role="img" aria-label="Focus folder study" xmlns="http://www.w3.org/2000/svg"><ellipse cx="160" cy="205" rx="111" ry="15" fill="#000" opacity=".47"/><g filter="url(#softShadow)"><path d="M56 81a20 20 0 0 1 20-20h51l18 18h93a20 20 0 0 1 20 20v76a20 20 0 0 1-20 20H76a20 20 0 0 1-20-20Z" fill="url(#folderFace)" stroke="#9c9c9c" stroke-opacity=".36"/><path d="M60 84a17 17 0 0 1 17-17h50l18 17h93" fill="none" stroke="#d1d1d1" stroke-opacity=".35" stroke-width="3" stroke-linecap="round"/><path d="M75 111h168" stroke="#171717" stroke-opacity=".48" stroke-width="2"/><rect x="118" y="129" width="84" height="39" rx="19.5" fill="#1e1e1e" fill-opacity=".56" stroke="#c4c4c4" stroke-opacity=".15"/><circle cx="149" cy="148.5" r="6" fill="#c8c8c8" fill-opacity=".52"/><path d="M169 148.5h18" stroke="#c8c8c8" stroke-opacity=".28" stroke-width="4" stroke-linecap="round"/></g></svg>`
       }
     ];
 
-    const STORAGE_KEY = "frontier-folder-review-v1";
+    const STORAGE_KEY = "frontier-folder-study-02";
     let reviewState = {};
     try { reviewState = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch (error) { reviewState = {}; }
+    if (!reviewState || typeof reviewState !== "object") reviewState = {};
     let selectedId = null;
     let reviewFilter = "all";
     let styleFilter = "all";
     let searchTerm = "";
-    let sortMode = "default";
+    let sortMode = "number";
     let toastTimer;
 
     const $ = (selector, parent = document) => parent.querySelector(selector);
@@ -865,61 +459,27 @@
     const backdrop = $("#inspectorBackdrop");
 
     function recordFor(id) {
-      if (!reviewState[id] || typeof reviewState[id] !== "object") reviewState[id] = { status: "", reference: false, note: "" };
+      if (!reviewState[id] || typeof reviewState[id] !== "object") reviewState[id] = { status: "", flag: false, note: "" };
       if (!("status" in reviewState[id])) reviewState[id].status = "";
-      if (!("reference" in reviewState[id])) reviewState[id].reference = false;
+      if (!("flag" in reviewState[id])) reviewState[id].flag = false;
       if (!("note" in reviewState[id])) reviewState[id].note = "";
       return reviewState[id];
     }
-
-    function saveState() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(reviewState));
-    }
-
-    function escapeHTML(value) {
-      return String(value).replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" }[character]));
-    }
-
-    function paletteStyle(icon) {
-      return `--icon-primary:${icon.palette.primary};--icon-secondary:${icon.palette.secondary};--icon-accent:${icon.palette.accent};--icon-surface:${icon.palette.surface};--preview-bg:${icon.palette.preview};--preview-glow:${icon.palette.glow};`;
-    }
-
-    function standaloneSVG(icon) {
-      return icon.svg
-        .replaceAll("var(--icon-primary)", icon.palette.primary)
-        .replaceAll("var(--icon-secondary)", icon.palette.secondary)
-        .replaceAll("var(--icon-accent)", icon.palette.accent)
-        .replaceAll("var(--icon-surface)", icon.palette.surface)
-        .replace("class=\"candidate-svg\"", `class="candidate-svg" data-frontier-icon="${icon.id}"`);
-    }
-
-    function tagMarkup(icon) {
-      return icon.tags.map(tag => {
-        const className = tag === "multi" ? "colour" : tag === "solid" ? "solid" : tag === "utility" ? "utility" : "";
-        return `<span class="tag ${className}">${escapeHTML(tag === "multi" ? "multi-colour" : tag)}</span>`;
-      }).join("");
-    }
+    function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(reviewState)); }
+    function escapeHTML(value) { return String(value).replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" }[character])); }
+    function standaloneSVG(icon) { return icon.svg.replace("<svg", `<svg xmlns="http://www.w3.org/2000/svg"`).replace(/xmlns="http:\/\/www.w3.org\/2000\/svg"\s+/, "").replace(">", `><defs>${defsMarkup}</defs>`); }
+    function tagMarkup(icon, inspector = false) { return icon.tags.map(tag => `<span class="${inspector ? "inspector-tag" : "tag"} ${tag === "colour" ? "colour" : ""} ${tag === "layered" ? "layer" : ""}">${escapeHTML(tag)}</span>`).join(""); }
 
     function cardMarkup(icon) {
       const record = recordFor(icon.id);
-      const sourceLabel = record.reference ? "REFERENCE FLAG" : "ORIGINAL";
-      return `<article class="icon-card" data-id="${icon.id}" data-kind="${icon.kind}" data-status="${record.status}" style="${paletteStyle(icon)}">
-        <div class="card-art">
-          ${icon.svg}
-          <button class="preview-open" type="button" data-open-inspector="${icon.id}">Inspect <span aria-hidden="true">↗</span></button>
-        </div>
-        <div class="card-content">
-          <div class="card-meta"><span class="card-number">${icon.number} / FOLDER</span><span class="source-badge ${record.reference ? "reference" : ""}">${sourceLabel}</span></div>
+      return `<article class="icon-card" data-id="${icon.id}" data-kind="${icon.kind}" data-colour="${icon.colour}" data-status="${record.status}">
+        <div class="artboard">${icon.svg}<button class="inspect-button" type="button" data-open-inspector="${icon.id}">Open large ↗</button></div>
+        <div class="card-body">
+          <div class="card-topline"><span class="card-number">${icon.number} / FOLDER STUDY</span><span class="source-badge ${record.flag ? "flagged" : ""}">${record.flag ? "REFERENCE CHECK" : "NEW SHAPE"}</span></div>
           <h3 class="card-title">${escapeHTML(icon.name)}</h3>
           <p class="card-description">${escapeHTML(icon.description)}</p>
           <div class="tag-row">${tagMarkup(icon)}</div>
-          <div class="card-review">
-            <span class="review-label">Review</span>
-            <button class="mark-button ${record.status === "keep" ? "active keep" : ""}" type="button" data-status="keep" title="Keep ${escapeHTML(icon.name)}">Keep</button>
-            <button class="mark-button ${record.status === "refine" ? "active refine" : ""}" type="button" data-status="refine" title="Needs correction">Fix</button>
-            <button class="mark-button ${record.status === "pass" ? "active pass" : ""}" type="button" data-status="pass" title="Pass on ${escapeHTML(icon.name)}">Pass</button>
-            <button class="mark-button reference-toggle ${record.reference ? "active" : ""}" type="button" data-reference="true" title="Mark as copied or reference">⚑</button>
-          </div>
+          <div class="card-actions"><span class="card-review-label">Review</span><button class="mark-button ${record.status === "keep" ? "active keep" : ""}" type="button" data-status="keep" title="Keep this study">Keep</button><button class="mark-button ${record.status === "refine" ? "active refine" : ""}" type="button" data-status="refine" title="Needs correction">Fix</button><button class="mark-button ${record.status === "pass" ? "active pass" : ""}" type="button" data-status="pass" title="Pass on this study">Pass</button><button class="mark-button ${record.flag ? "active flag" : ""}" type="button" data-flag="true" title="Flag for copied or reference check">⚑</button></div>
           <textarea class="card-note" data-note="true" rows="1" placeholder="Add a correction note…" aria-label="Correction note for ${escapeHTML(icon.name)}">${escapeHTML(record.note)}</textarea>
         </div>
       </article>`;
@@ -929,253 +489,119 @@
       const record = recordFor(icon.id);
       const haystack = `${icon.name} ${icon.description} ${icon.tags.join(" ")}`.toLowerCase();
       const matchesSearch = !searchTerm || haystack.includes(searchTerm.toLowerCase());
-      const matchesStyle = styleFilter === "all" || icon.kind === styleFilter;
-      const matchesReview = reviewFilter === "all" || (reviewFilter === "reference" ? record.reference : record.status === reviewFilter);
+      let matchesStyle = styleFilter === "all" || icon.kind === styleFilter;
+      if (styleFilter === "colour") matchesStyle = icon.colour;
+      const matchesReview = reviewFilter === "all" || (reviewFilter === "flag" ? record.flag : record.status === reviewFilter);
       return matchesSearch && matchesStyle && matchesReview;
     }
-
     function visibleIcons() {
       const result = icons.filter(matchesFilters);
       if (sortMode === "name") result.sort((a, b) => a.name.localeCompare(b.name));
-      if (sortMode === "review") result.sort((a, b) => {
-        const rank = { keep: 0, refine: 1, pass: 2, "": 3 };
-        return (rank[recordFor(a.id).status] - rank[recordFor(b.id).status]) || Number(a.number) - Number(b.number);
-      });
+      if (sortMode === "review") { const rank = { keep: 0, refine: 1, pass: 2, "": 3 }; result.sort((a, b) => (rank[recordFor(a.id).status] - rank[recordFor(b.id).status]) || Number(a.number) - Number(b.number)); }
       return result;
     }
-
+    function updateGalleryTitle(count) {
+      const reviewName = reviewFilter === "all" ? "All" : reviewFilter === "keep" ? "Keep" : reviewFilter === "refine" ? "Needs correction" : reviewFilter === "pass" ? "Not good" : "Reference / copied check";
+      const styleName = styleFilter === "all" ? "" : ` · ${styleFilter === "colour" ? "colour accents" : styleFilter}`;
+      $("#galleryTitle").textContent = `${reviewName}${styleName} / ${count} stud${count === 1 ? "y" : "ies"}`;
+    }
     function renderGrid() {
       const visible = visibleIcons();
-      grid.innerHTML = visible.length ? visible.map(cardMarkup).join("") : `<div class="empty-state"><strong>No candidates match that view.</strong>Clear a filter or try another search term.</div>`;
-      $$("[data-note]", grid).forEach(note => {
-        note.addEventListener("input", event => {
-          const card = event.target.closest("[data-id]");
-          if (!card) return;
-          recordFor(card.dataset.id).note = event.target.value;
-          saveState();
-          if (selectedId === card.dataset.id && $("#inspectorNote")) $("#inspectorNote").value = event.target.value;
-        });
-      });
+      grid.innerHTML = visible.length ? visible.map(cardMarkup).join("") : `<div class="empty-state"><strong>No studies match this view.</strong>Clear a filter or search for another folder direction.</div>`;
+      $$('[data-note]', grid).forEach(note => note.addEventListener("input", event => { const card = event.target.closest("[data-id]"); if (!card) return; recordFor(card.dataset.id).note = event.target.value; saveState(); }));
       updateCounts();
-      updateBoardTitle(visible.length);
+      updateGalleryTitle(visible.length);
     }
-
-    function updateBoardTitle(visibleCount) {
-      const reviewName = reviewFilter === "all" ? "All" : reviewFilter === "reference" ? "Copied / reference" : reviewFilter === "refine" ? "Needs correction" : reviewFilter === "keep" ? "Keep" : "Not this one";
-      const styleName = styleFilter === "all" ? "" : ` · ${styleFilter === "multi" ? "multi-colour" : styleFilter}`;
-      $("#boardTitle").textContent = `${reviewName}${styleName} / ${visibleCount} candidate${visibleCount === 1 ? "" : "s"}`;
-    }
-
     function updateCounts() {
-      const counts = { all: icons.length, keep: 0, refine: 0, pass: 0, reference: 0 };
-      icons.forEach(icon => {
-        const record = recordFor(icon.id);
-        if (record.status) counts[record.status]++;
-        if (record.reference) counts.reference++;
-      });
+      const counts = { all: icons.length, keep: 0, refine: 0, pass: 0, flag: 0 };
+      icons.forEach(icon => { const record = recordFor(icon.id); if (record.status) counts[record.status]++; if (record.flag) counts.flag++; });
+      const reviewed = counts.keep + counts.refine + counts.pass;
       $("#summaryTotal").textContent = icons.length;
-      $("#summaryOriginal").textContent = icons.length - counts.reference;
+      $("#summaryOpen").textContent = `${icons.length - reviewed} unreviewed`;
       $("#summaryKeep").textContent = counts.keep;
-      $("#summaryRefine").textContent = counts.refine;
+      $("#summaryFix").textContent = counts.refine;
+      $("#summaryPass").textContent = counts.pass;
+      $("#summaryFlag").textContent = counts.flag;
       $("#countAll").textContent = counts.all;
       $("#countKeep").textContent = counts.keep;
-      $("#countRefine").textContent = counts.refine;
+      $("#countFix").textContent = counts.refine;
       $("#countPass").textContent = counts.pass;
-      $("#countReference").textContent = counts.reference;
-      $$("[data-review-filter]").forEach(button => button.classList.toggle("active", button.dataset.reviewFilter === reviewFilter));
+      $("#countFlag").textContent = counts.flag;
+      $$('[data-review-filter]').forEach(button => button.classList.toggle("active", button.dataset.reviewFilter === reviewFilter));
     }
-
     function syncCard(card) {
       if (!card) return;
       const record = recordFor(card.dataset.id);
       card.dataset.status = record.status;
-      $$("[data-status]", card).forEach(button => {
-        const status = button.dataset.status;
-        button.classList.toggle("active", status === record.status);
-      });
-      const referenceButton = $("[data-reference]", card);
-      if (referenceButton) referenceButton.classList.toggle("active", record.reference);
-      const source = $(".source-badge", card);
-      if (source) {
-        source.textContent = record.reference ? "REFERENCE FLAG" : "ORIGINAL";
-        source.classList.toggle("reference", record.reference);
-      }
-      const note = $("[data-note]", card);
-      if (note && document.activeElement !== note) note.value = record.note;
+      $$('[data-status]', card).forEach(button => button.classList.toggle("active", button.dataset.status === record.status));
+      const flagButton = $('[data-flag]', card); if (flagButton) flagButton.classList.toggle("active", record.flag);
+      const badge = $(".source-badge", card); if (badge) { badge.textContent = record.flag ? "REFERENCE CHECK" : "NEW SHAPE"; badge.classList.toggle("flagged", record.flag); }
+      const note = $('[data-note]', card); if (note && document.activeElement !== note) note.value = record.note;
     }
-
-    function setStatus(id, status) {
-      const record = recordFor(id);
-      record.status = record.status === status ? "" : status;
-      saveState();
-      syncCard($(`[data-id="${id}"]`, grid));
-      updateCounts();
-      syncInspector();
-    }
-
-    function toggleReference(id) {
-      const record = recordFor(id);
-      record.reference = !record.reference;
-      saveState();
-      syncCard($(`[data-id="${id}"]`, grid));
-      updateCounts();
-      syncInspector();
-    }
+    function setStatus(id, status) { const record = recordFor(id); record.status = record.status === status ? "" : status; saveState(); syncCard($(`[data-id="${id}"]`, grid)); updateCounts(); syncInspector(); }
+    function toggleFlag(id) { const record = recordFor(id); record.flag = !record.flag; saveState(); syncCard($(`[data-id="${id}"]`, grid)); updateCounts(); syncInspector(); }
 
     function openInspector(id) {
-      const icon = icons.find(candidate => candidate.id === id);
-      if (!icon) return;
+      const icon = icons.find(candidate => candidate.id === id); if (!icon) return;
       selectedId = id;
       const record = recordFor(id);
-      $("#inspectorArt").setAttribute("style", paletteStyle(icon));
-      $("#inspectorArt").innerHTML = icon.svg;
-      $("#inspectorEyebrow").textContent = `Candidate ${icon.number}`;
+      $("#inspectorArtboard").innerHTML = icon.svg;
+      $("#inspectorEyebrow").textContent = `Study ${icon.number}`;
       $("#inspectorTitle").textContent = icon.name;
       $("#inspectorDescription").textContent = icon.description;
-      $("#inspectorSpecs").innerHTML = tagMarkup(icon) + `<span class="inspector-spec">inline SVG</span>`;
+      $("#inspectorTags").innerHTML = tagMarkup(icon, true);
       $("#inspectorNote").value = record.note;
       syncInspector();
       backdrop.hidden = false;
       document.body.style.overflow = "hidden";
       $("#closeInspector").focus();
     }
-
-    function closeInspector() {
-      backdrop.hidden = true;
-      document.body.style.overflow = "";
-      selectedId = null;
-    }
-
+    function closeInspector() { backdrop.hidden = true; document.body.style.overflow = ""; selectedId = null; }
     function syncInspector() {
       if (!selectedId || backdrop.hidden) return;
       const record = recordFor(selectedId);
-      $$("[data-inspector-status]").forEach(button => button.classList.toggle("active", button.dataset.inspectorStatus === record.status));
-      $("[data-inspector-reference]").classList.toggle("active", record.reference);
-      const source = $("#inspectorSource");
-      source.classList.toggle("is-reference", record.reference);
-      source.innerHTML = record.reference
-        ? `<span class="inspector-source-mark" aria-hidden="true">⚑</span><span><strong>Reference flag added.</strong> Keep this candidate visible while you compare it with the supplied direction.</span>`
-        : `<span class="inspector-source-mark" aria-hidden="true">✓</span><span><strong>Original geometry.</strong> This candidate is authored inline in <code>index.html</code>; there is no Lucide path behind it.</span>`;
+      $$('[data-inspector-status]').forEach(button => button.classList.toggle("active", button.dataset.inspectorStatus === record.status));
+      $('[data-inspector-flag]').classList.toggle("active", record.flag);
+      const audit = $("#inspectorAudit"); audit.classList.toggle("flagged", record.flag);
+      audit.innerHTML = record.flag ? `<span class="audit-mark" aria-hidden="true">⚑</span><span><strong>Reference check added.</strong> Keep this study visible while comparing its silhouette with the supplied direction.</span>` : `<span class="audit-mark" aria-hidden="true">✓</span><span><strong>Original geometry.</strong> This study is authored directly in the HTML as inline SVG.</span>`;
     }
-
-    function showToast(message) {
-      const toast = $("#toast");
-      toast.textContent = message;
-      toast.classList.add("show");
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => toast.classList.remove("show"), 2400);
-    }
-
-    async function copyIcon(id) {
-      const icon = icons.find(candidate => candidate.id === id);
-      if (!icon) return;
+    function showToast(message) { const toast = $("#toast"); toast.textContent = message; toast.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove("show"), 2200); }
+    async function copySVG(id) {
+      const icon = icons.find(candidate => candidate.id === id); if (!icon) return;
       const markup = standaloneSVG(icon);
-      try {
-        await navigator.clipboard.writeText(markup);
-        showToast(`${icon.name} SVG copied to clipboard`);
-      } catch (error) {
-        const helper = document.createElement("textarea");
-        helper.value = markup;
-        document.body.appendChild(helper);
-        helper.select();
-        document.execCommand("copy");
-        helper.remove();
-        showToast(`${icon.name} SVG copied to clipboard`);
-      }
+      try { await navigator.clipboard.writeText(markup); } catch (error) { const helper = document.createElement("textarea"); helper.value = markup; document.body.appendChild(helper); helper.select(); document.execCommand("copy"); helper.remove(); }
+      showToast(`${icon.name} SVG copied`);
     }
-
     function exportReview() {
-      const payload = {
-        project: "Frontier Editor · Folder study 01",
-        exportedAt: new Date().toISOString(),
-        note: "Original inline SVG explorations. Review labels are local to this browser.",
-        candidates: icons.map(icon => ({ id: icon.id, number: icon.number, name: icon.name, kind: icon.kind, status: recordFor(icon.id).status || "unreviewed", reference: !!recordFor(icon.id).reference, note: recordFor(icon.id).note || "" }))
-      };
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "frontier-folder-review.json";
-      link.click();
-      URL.revokeObjectURL(url);
-      showToast("Review board exported");
+      const payload = { project: "Editor folder studies · dark glass direction", exportedAt: new Date().toISOString(), candidates: icons.map(icon => { const record = recordFor(icon.id); return { id: icon.id, number: icon.number, name: icon.name, status: record.status || "unreviewed", referenceCheck: !!record.flag, note: record.note || "" }; }) };
+      const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })); link.download = "folder-studies-review.json"; link.click(); showToast("Review exported");
     }
 
-    // Board interactions.
     document.addEventListener("click", event => {
       const statusButton = event.target.closest("[data-status]");
-      if (statusButton && statusButton.closest(".icon-card")) {
-        event.stopPropagation();
-        setStatus(statusButton.closest("[data-id]").dataset.id, statusButton.dataset.status);
-        return;
-      }
-      const referenceButton = event.target.closest("[data-reference]");
-      if (referenceButton && referenceButton.closest(".icon-card")) {
-        event.stopPropagation();
-        toggleReference(referenceButton.closest("[data-id]").dataset.id);
-        return;
-      }
+      if (statusButton && statusButton.closest(".icon-card")) { event.stopPropagation(); setStatus(statusButton.closest("[data-id]").dataset.id, statusButton.dataset.status); return; }
+      const flagButton = event.target.closest("[data-flag]");
+      if (flagButton && flagButton.closest(".icon-card")) { event.stopPropagation(); toggleFlag(flagButton.closest("[data-id]").dataset.id); return; }
       const openButton = event.target.closest("[data-open-inspector]");
-      if (openButton) {
-        event.stopPropagation();
-        openInspector(openButton.dataset.openInspector);
-        return;
-      }
+      if (openButton) { event.stopPropagation(); openInspector(openButton.dataset.openInspector); return; }
       const card = event.target.closest(".icon-card");
       if (card && !event.target.closest("button, textarea, input")) openInspector(card.dataset.id);
     });
-
-    $$("[data-review-filter]").forEach(button => button.addEventListener("click", () => {
-      reviewFilter = button.dataset.reviewFilter;
-      renderGrid();
-    }));
-    $$("[data-style-filter]").forEach(button => button.addEventListener("click", () => {
-      styleFilter = button.dataset.styleFilter;
-      $$("[data-style-filter]").forEach(item => item.classList.toggle("active", item === button));
-      renderGrid();
-    }));
+    $$('[data-review-filter]').forEach(button => button.addEventListener("click", () => { reviewFilter = button.dataset.reviewFilter; renderGrid(); }));
+    $$('[data-style-filter]').forEach(button => button.addEventListener("click", () => { styleFilter = button.dataset.styleFilter; $$('[data-style-filter]').forEach(item => item.classList.toggle("active", item === button)); renderGrid(); }));
     $("#searchInput").addEventListener("input", event => { searchTerm = event.target.value.trim(); renderGrid(); });
     $("#sortSelect").addEventListener("change", event => { sortMode = event.target.value; renderGrid(); });
-    $("#jumpToBoard").addEventListener("click", () => $("#board").scrollIntoView({ behavior: "smooth", block: "start" }));
-
-    $("#inspectorDecisions").addEventListener("click", event => {
-      const statusButton = event.target.closest("[data-inspector-status]");
-      if (statusButton && selectedId) { setStatus(selectedId, statusButton.dataset.inspectorStatus); return; }
-      const referenceButton = event.target.closest("[data-inspector-reference]");
-      if (referenceButton && selectedId) toggleReference(selectedId);
-    });
-    $("#inspectorNote").addEventListener("input", event => {
-      if (!selectedId) return;
-      recordFor(selectedId).note = event.target.value;
-      saveState();
-      const cardNote = $(`[data-id="${selectedId}"] [data-note]`, grid);
-      if (cardNote && document.activeElement !== cardNote) cardNote.value = event.target.value;
-    });
-    $("#copySvgButton").addEventListener("click", () => { if (selectedId) copyIcon(selectedId); });
+    $("#jumpButton").addEventListener("click", () => $("#board").scrollIntoView({ behavior: "smooth", block: "start" }));
+    $("#decisionRow").addEventListener("click", event => { const statusButton = event.target.closest("[data-inspector-status]"); if (statusButton && selectedId) { setStatus(selectedId, statusButton.dataset.inspectorStatus); return; } const flagButton = event.target.closest("[data-inspector-flag]"); if (flagButton && selectedId) toggleFlag(selectedId); });
+    $("#inspectorNote").addEventListener("input", event => { if (!selectedId) return; recordFor(selectedId).note = event.target.value; saveState(); const cardNote = $(`[data-id="${selectedId}"] [data-note]`, grid); if (cardNote && document.activeElement !== cardNote) cardNote.value = event.target.value; });
+    $("#copySvgButton").addEventListener("click", () => { if (selectedId) copySVG(selectedId); });
     $("#closeInspector").addEventListener("click", closeInspector);
-    $("#closeInspectorBottom").addEventListener("click", closeInspector);
+    $("#doneButton").addEventListener("click", closeInspector);
     backdrop.addEventListener("click", event => { if (event.target === backdrop) closeInspector(); });
     document.addEventListener("keydown", event => { if (event.key === "Escape" && !backdrop.hidden) closeInspector(); });
-
     $("#exportButton").addEventListener("click", exportReview);
-    $("#resetButton").addEventListener("click", () => {
-      if (!confirm("Reset every review label and correction note?")) return;
-      reviewState = {};
-      saveState();
-      renderGrid();
-      showToast("Review labels reset");
-    });
-
-    const savedTheme = localStorage.getItem("frontier-folder-theme");
-    if (savedTheme === "dark") document.documentElement.dataset.theme = "dark";
-    function updateThemeLabel() { $("#themeLabel").textContent = document.documentElement.dataset.theme === "dark" ? "Light canvas" : "Dim canvas"; }
-    updateThemeLabel();
-    $("#themeButton").addEventListener("click", () => {
-      const isDark = document.documentElement.dataset.theme === "dark";
-      document.documentElement.dataset.theme = isDark ? "light" : "dark";
-      localStorage.setItem("frontier-folder-theme", isDark ? "light" : "dark");
-      updateThemeLabel();
-    });
+    $("#resetButton").addEventListener("click", () => { if (!confirm("Reset all review labels and notes?")) return; reviewState = {}; saveState(); renderGrid(); showToast("Review reset"); });
+    $("#contrastButton").addEventListener("click", () => { const high = document.body.dataset.contrast !== "high"; document.body.dataset.contrast = high ? "high" : "soft"; $("#contrastButton").textContent = high ? "Soft contrast" : "Crisp contrast"; });
 
     renderGrid();
   </script>
