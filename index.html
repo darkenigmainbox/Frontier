@@ -214,6 +214,27 @@
 
 <div id="err"><div class="card"><h2 style="color:#ff9a9a">Initialization failed</h2><p id="errMsg"></p></div></div>
 
+<script>
+/* ABYSSAL boot guard (classic script: runs before the module below) */
+window.__ABYSSAL_BOOTED = false;
+window.__abyssalFatal = function(msg){
+  var e = document.getElementById('err'), m = document.getElementById('errMsg');
+  if(e && m){ m.textContent = String(msg).slice(0, 500); e.style.display = 'flex'; }
+  var l = document.getElementById('loader'); if(l) l.classList.add('done');
+};
+window.addEventListener('error', function(ev){
+  if(!window.__ABYSSAL_BOOTED){ window.__abyssalFatal('Failed to start: ' + (ev.message || 'unknown error')); }
+}, true);
+window.addEventListener('unhandledrejection', function(ev){
+  if(!window.__ABYSSAL_BOOTED){ var r = ev.reason; window.__abyssalFatal('Failed to start: ' + ((r && r.message) || r)); }
+});
+setTimeout(function(){
+  if(!window.__ABYSSAL_BOOTED){
+    var t = document.querySelector('#loader .tech');
+    if(t) t.textContent = 'STILL LOADING \u2014 CHECK CONNECTION (three.js CDN) AND WEBGL2 SUPPORT';
+  }
+}, 20000);
+</script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -349,6 +370,11 @@ renderer.toneMappingExposure = 1.08;
 renderer.autoClear = false; // we manage clears explicitly across sim passes
 renderer.info.autoReset = false; // accumulate all passes; reset manually per frame
 $('app').appendChild(renderer.domElement);
+renderer.domElement.addEventListener('webglcontextlost', (e)=>{
+  e.preventDefault();
+  if(window.__abyssalFatal) window.__abyssalFatal('GPU context was lost \u2014 reloading the demo\u2026');
+  setTimeout(()=>location.reload(), 1800);
+});
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xbcd9ea, 260, 2500);
@@ -988,7 +1014,7 @@ const depShadeGeo = depGeo; // alias for clarity
 const SPRAY_MAX = 8000;
 const S = {
   pos: new Float32Array(SPRAY_MAX*3), alpha: new Float32Array(SPRAY_MAX),
-  size: new Float32Ary(SPRAY_MAX),
+  size: new Float32Array(SPRAY_MAX), rot: new Float32Array(SPRAY_MAX),
   shade: new Float32Array(SPRAY_MAX),
   vel: new Float32Array(SPRAY_MAX*3), age: new Float32Array(SPRAY_MAX),
   maxLife: new Float32Array(SPRAY_MAX).fill(1), size0: new Float32Array(SPRAY_MAX),
@@ -1460,69 +1486,8 @@ requestAnimationFrame(()=>requestAnimationFrame(()=>{
     updateFoam(dt); updateSpray(dt);
     stepRipple(dt); stepTrail(dt);
   }
+  window.__ABYSSAL_BOOTED = true;
   $('loader').classList.add('done');
-}));
-</script>
-</body>
-</html>
-stepTrail(dt);
-  }
-  $('loader').classList.add('done');
-}));
-</script>
-</body>
-</html>
-er').classList.add('done');
-}));
-</script>
-</body>
-</html>
-('done');
-}));
-</script>
-</body>
-</html>
-er').classList.add('done');
-}));
-</script>
-</body>
-</html>
-e');
-}));
-</script>
-</body>
-</html>
-t); stepTrail(dt);
-  }
-  $('loader').classList.add('done');
-}));
-</script>
-</body>
-</html>
-stepTrail(dt);
-  }
-  $('loader').classList.add('done');
-}));
-</script>
-</body>
-</html>
-er').classList.add('done');
-}));
-</script>
-</body>
-</html>
-('done');
-}));
-</script>
-</body>
-</html>
-er').classList.add('done');
-}));
-</script>
-</body>
-</html>
-l>
-er').classList.add('done');
 }));
 </script>
 </body>
