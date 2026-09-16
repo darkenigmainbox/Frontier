@@ -1,18 +1,19 @@
-import { HybridSDFTerrain } from "./hybrid-terrain.js";
-import { RealisticGaeaErosion } from "./gaea-erosion.js";
-import { HighDefTerrainRenderer } from "./highdef-renderer.js";
+import { PureVolumetricSDF } from "./pure-sdf.js";
+import { VolumetricErosion } from "./volumetric-erosion.js";
+import { PureSDFRaymarcher } from "./pure-sdf-renderer.js";
+import { STAMP_TYPES } from "./stamps.js";
 
-// Initialize system with 256x256 high-res crisp terrain
+// Pure 100% Volumetric 3D Signed Distance Field (No mesh geometry)
 const container = document.getElementById("canvas-container");
-const terrain = new HybridSDFTerrain(256);
-const erosion = new RealisticGaeaErosion(terrain);
-const renderer = new HighDefTerrainRenderer(container, terrain);
+const sdf = new PureVolumetricSDF([160, 96, 160]);
+const erosion = new VolumetricErosion(sdf);
+const renderer = new PureSDFRaymarcher(container, sdf);
 
 let isSimulating = false;
 let totalCycles = 0;
 let lastParticles = [];
 
-// UI Elements
+// UI Bindings
 const btnPlay = document.getElementById("btn-play");
 const btnStep = document.getElementById("btn-step");
 const btnBurst = document.getElementById("btn-burst");
@@ -20,21 +21,21 @@ const btnReset = document.getElementById("btn-reset");
 const statCycles = document.getElementById("stat-cycles");
 const presetSelect = document.getElementById("preset-select");
 
-// Hydraulic Controls
+// Hydraulic Sliders
 const sliderErosion = document.getElementById("slider-erosion");
 const sliderDeposition = document.getElementById("slider-deposition");
 const sliderCapacity = document.getElementById("slider-capacity");
 const sliderRadius = document.getElementById("slider-radius");
 
-// Micro-Erosion Detail
+// Micro-Erosion Sliders
 const sliderMicroScale = document.getElementById("slider-micro-scale");
 const sliderMicroStrength = document.getElementById("slider-micro-strength");
 
-// Wind Abrasion & Direction
+// Wind Sliders
 const sliderWind = document.getElementById("slider-wind");
 const sliderWindAngle = document.getElementById("slider-wind-angle");
 
-// Water & Particles
+// Water & Droplets
 const checkWater = document.getElementById("check-water");
 const sliderWaterLevel = document.getElementById("slider-water");
 const checkParticles = document.getElementById("check-particles");
@@ -48,11 +49,11 @@ function updateStats() {
   statCycles.innerText = `${totalCycles} passes`;
 }
 
-function runOnePass(drops = 3000) {
+function runOnePass(drops = 2200) {
   lastParticles = erosion.simulateCycle(drops);
   totalCycles++;
   updateStats();
-  renderer.updateGeometry();
+  renderer.updateVolumeTexture();
   if (checkParticles.checked) {
     renderer.updateParticles(lastParticles);
   }
@@ -65,49 +66,50 @@ btnPlay.addEventListener("click", () => {
 });
 
 btnStep.addEventListener("click", () => {
-  runOnePass(3500);
+  runOnePass(2800);
 });
 
 btnBurst.addEventListener("click", () => {
-  for (let i = 0; i < 6; i++) {
-    lastParticles = erosion.simulateCycle(3000);
+  for (let i = 0; i < 5; i++) {
+    lastParticles = erosion.simulateCycle(2000);
     totalCycles++;
   }
   updateStats();
-  renderer.updateGeometry();
+  renderer.updateVolumeTexture();
   if (checkParticles.checked) {
     renderer.updateParticles(lastParticles);
   }
 });
 
 btnReset.addEventListener("click", () => {
-  terrain.stamps = [];
-  terrain.initTerrain(presetSelect.value);
+  sdf.stamps = [];
+  sdf.initTerrain(presetSelect.value);
   totalCycles = 0;
   updateStats();
-  renderer.updateGeometry();
+  renderer.updateVolumeTexture();
   renderer.updateParticles([]);
 });
 
 presetSelect.addEventListener("change", (e) => {
-  terrain.stamps = [];
-  terrain.initTerrain(e.target.value);
+  sdf.stamps = [];
+  sdf.initTerrain(e.target.value);
   totalCycles = 0;
   updateStats();
-  renderer.updateGeometry();
+  renderer.updateVolumeTexture();
   renderer.updateParticles([]);
 });
 
 function syncParams() {
+  const angleRad = (parseFloat(sliderWindAngle.value) * Math.PI) / 180;
   erosion.setParameters({
     erosionRate: parseFloat(sliderErosion.value),
     depositionRate: parseFloat(sliderDeposition.value),
     capacityFactor: parseFloat(sliderCapacity.value),
-    erosionRadius: parseInt(sliderRadius.value, 10),
-    microDetailFreq: parseFloat(sliderMicroScale.value),
-    microDetailStrength: parseFloat(sliderMicroStrength.value),
-    windStrength: parseFloat(sliderWind.value),
-    windAngle: (parseFloat(sliderWindAngle.value) * Math.PI) / 180,
+    carveRadius: parseFloat(sliderRadius.value),
+    microErosionScale: parseFloat(sliderMicroScale.value),
+    microCarveStrength: parseFloat(sliderMicroStrength.value),
+    windAbrasion: parseFloat(sliderWind.value) * 0.1,
+    windDirection: [Math.cos(angleRad), 0.1, Math.sin(angleRad)],
   });
 }
 
@@ -122,22 +124,16 @@ function syncParams() {
   sliderWindAngle,
 ].forEach((el) => el.addEventListener("input", syncParams));
 
-// Stamp Tool application
 btnApplyStamp.addEventListener("click", () => {
   const type = stampSelect.value;
   const mode = stampModeSelect.value;
 
-  const posX = (Math.random() - 0.5) * 12.0;
-  const posZ = (Math.random() - 0.5) * 12.0;
-  const posY = 5.0;
+  const posX = (Math.random() - 0.5) * 8.0;
+  const posZ = (Math.random() - 0.5) * 8.0;
+  const posY = type === STAMP_TYPES.ARCH || type === STAMP_TYPES.SPIRE ? 4.5 : 7.0;
 
-  terrain.addStamp(type, [posX, posY, posZ], [1.4, 1.4, 1.4], mode, {
-    height: 8.0,
-    span: 7.0,
-    radius: 3.5,
-  });
-
-  renderer.updateGeometry();
+  sdf.addStamp(type, [posX, posY, posZ], [1.3, 1.3, 1.3], mode);
+  renderer.updateVolumeTexture();
 });
 
 checkWater.addEventListener("change", (e) => {
@@ -158,9 +154,9 @@ function animate() {
   requestAnimationFrame(animate);
 
   const now = performance.now();
-  if (isSimulating && now - lastTime > 65) {
+  if (isSimulating && now - lastTime > 75) {
     lastTime = now;
-    runOnePass(2000);
+    runOnePass(1500);
   }
 
   renderer.render();
