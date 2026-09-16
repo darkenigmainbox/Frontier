@@ -203,7 +203,7 @@
     <p>Depth-absorbed body color over an analytic island shelf, Schlick Fresnel into an analytic sky, dual-lobe sun glitter, and crest-subsurface translucency (lighting only — never foam). ACES tone mapping, matched fog, and a time-of-day sun complete the GTA-grade look at a fraction of AAA GPU cost.</p>
     <h4>PERFORMANCE ENVELOPE (GTX 1060 CLASS)</h4>
     <ul>
-      <li>Ocean mesh 280×280 (≈157k tris) — vertex waves only</li>
+      <li>Ocean mesh 384×384 center-weighted grid (≈295k tris) — vertex waves only</li>
       <li>≤40k foam + 8k spray instanced billboards — 2 draw calls</li>
       <li>512² foam persistence + 256² ripple sim — 4 fullscreen passes</li>
       <li>No post-processing chain, no shadow maps, capped pixel ratio</li>
@@ -503,8 +503,8 @@ scene.add(skyMesh);
 
 /* ---------------- ocean ---------------- */
 function buildWaveGLSL(){
-  // LONG bands only (210m -> 29m). The 8.6m mesh grid cannot resolve shorter
-  // waves — displacing them in the vertex stage aliases into "puddle" blobs.
+  // LONG bands only (210m -> 29m). The mesh grid (up to ~8m cells at the rim)
+  // cannot resolve shorter waves everywhere — vertex displacement would alias.
   // Short bands are injected as exact analytic slopes in the fragment stage.
   let s='';
   WAVES.slice(0,5).forEach((w,i)=>{
@@ -688,8 +688,19 @@ const oceanMat = new THREE.ShaderMaterial({
       #include <dithering_fragment>
     }`
 });
-const oceanGeo = new THREE.PlaneGeometry(2400, 2400, 280, 280);
+// Center-weighted grid: ~1.8m cells near the action, ~8m at the fogged rim.
+// Single draw call, zero LOD seams — the surface is an exact function of (x,z).
+const oceanGeo = new THREE.PlaneGeometry(2400, 2400, 384, 384);
 oceanGeo.rotateX(-Math.PI/2);
+{
+  const p = oceanGeo.attributes.position;
+  const P = 1.25, H = 1200;
+  for(let i=0;i<p.count;i++){
+    const x = p.getX(i), z = p.getZ(i);
+    p.setX(i, Math.sign(x)*H*Math.pow(Math.abs(x)/H, P));
+    p.setZ(i, Math.sign(z)*H*Math.pow(Math.abs(z)/H, P));
+  }
+}
 const oceanMesh = new THREE.Mesh(oceanGeo, oceanMat);
 oceanMesh.frustumCulled = false;
 scene.add(oceanMesh);

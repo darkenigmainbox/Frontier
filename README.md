@@ -33,7 +33,7 @@ space = pause. Full sea/sky/particle controls live in the SEA CONTROL panel.
 
 ## GTX performance envelope
 
-- 280×280 ocean mesh, vertex waves only (~157k tris)
+- 384×384 center-weighted ocean grid (~1.8m cells near-field, ≈295k tris)
 - 2 instanced billboard draw calls for all foam/spray; 4 tiny fullscreen sim passes
 - No post chain, no shadow maps, pixel ratio capped at 1.5, one-step auto-quality fallback
 - Default 26k particle budget; ≤30k recommended for GTX 1060-class hardware
