@@ -3,15 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Frontier Terrain & GAEA-Style SDF Erosion Studio</title>
+  <title>Frontier Pure Volumetric SDF Erosion & Stamp Studio</title>
   <style>
     :root {
-      --bg: #0e1218;
-      --panel-bg: rgba(18, 24, 34, 0.88);
-      --panel-border: rgba(255, 255, 255, 0.1);
-      --accent: #e67e33;
-      --accent-hover: #ff9144;
-      --text: #e2e8f0;
+      --bg: #0b0f14;
+      --panel-bg: rgba(14, 20, 30, 0.90);
+      --panel-border: rgba(255, 255, 255, 0.12);
+      --accent: #f26d21;
+      --accent-hover: #ff833b;
+      --accent-cyan: #00d2d3;
+      --text: #f1f5f9;
       --text-muted: #94a3b8;
     }
 
@@ -25,7 +26,7 @@
     body {
       background-color: var(--bg);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       overflow: hidden;
       width: 100vw;
       height: 100vh;
@@ -40,21 +41,20 @@
       z-index: 1;
     }
 
-    /* Floating Studio Toolbar */
     #ui-panel {
       position: absolute;
       top: 20px;
       left: 20px;
-      width: 340px;
+      width: 350px;
       max-height: calc(100vh - 40px);
       overflow-y: auto;
       background: var(--panel-bg);
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(14px);
       border: 1px solid var(--panel-border);
       border-radius: 12px;
       padding: 18px;
       z-index: 10;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.6);
     }
 
     #ui-panel::-webkit-scrollbar {
@@ -73,28 +73,38 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     .badge {
-      font-size: 0.7rem;
+      font-size: 0.68rem;
       background: var(--accent);
       color: #fff;
       padding: 2px 6px;
       border-radius: 4px;
-      font-weight: 600;
+      font-weight: 700;
       text-transform: uppercase;
     }
 
+    .badge-cyan {
+      font-size: 0.68rem;
+      background: rgba(0, 210, 211, 0.2);
+      color: var(--accent-cyan);
+      border: 1px solid var(--accent-cyan);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
     p.subtitle {
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       color: var(--text-muted);
-      margin-bottom: 16px;
+      margin-bottom: 14px;
       line-height: 1.3;
     }
 
     .section-title {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       text-transform: uppercase;
       letter-spacing: 1px;
       font-weight: 700;
@@ -109,20 +119,20 @@
       display: flex;
       flex-direction: column;
       gap: 4px;
-      margin-bottom: 10px;
+      margin-bottom: 9px;
     }
 
     .control-label {
       display: flex;
       justify-content: space-between;
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       color: var(--text);
     }
 
     input[type="range"] {
       -webkit-appearance: none;
       width: 100%;
-      height: 5px;
+      height: 4px;
       background: rgba(255, 255, 255, 0.15);
       border-radius: 4px;
       outline: none;
@@ -130,8 +140,8 @@
 
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 14px;
-      height: 14px;
+      width: 13px;
+      height: 13px;
       border-radius: 50%;
       background: var(--accent);
       cursor: pointer;
@@ -147,8 +157,8 @@
       color: var(--text);
       border: 1px solid var(--panel-border);
       border-radius: 6px;
-      padding: 8px 12px;
-      font-size: 0.82rem;
+      padding: 7px 11px;
+      font-size: 0.8rem;
       cursor: pointer;
       width: 100%;
       transition: all 0.2s;
@@ -171,7 +181,7 @@
     }
 
     button.primary.active {
-      background: #dc3545;
+      background: #e11d48;
     }
 
     .button-grid {
@@ -185,8 +195,8 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 0.8rem;
-      margin-bottom: 8px;
+      font-size: 0.78rem;
+      margin-bottom: 7px;
     }
 
     .stats-bar {
@@ -195,7 +205,7 @@
       border-top: 1px solid var(--panel-border);
       display: flex;
       justify-content: space-between;
-      font-size: 0.75rem;
+      font-size: 0.74rem;
       color: var(--text-muted);
     }
 
@@ -203,12 +213,14 @@
       position: absolute;
       bottom: 20px;
       left: 20px;
-      color: rgba(255, 255, 255, 0.6);
+      color: rgba(255, 255, 255, 0.75);
       font-size: 0.75rem;
       z-index: 10;
-      background: rgba(0, 0, 0, 0.4);
-      padding: 6px 12px;
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(6px);
+      padding: 7px 14px;
       border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
       pointer-events: none;
     }
   </style>
@@ -217,59 +229,105 @@
   <div id="canvas-container"></div>
 
   <div id="ui-panel">
-    <h1>FRONTIER <span class="badge">GAEA SDF</span></h1>
-    <p class="subtitle">Hydraulic & Aeolian (Wind) Terrain Weathering with high-precision dendritic erosion & canyon spires.</p>
+    <h1>FRONTIER <span class="badge">SDF RAYMARCH</span></h1>
+    <p class="subtitle">100% Volumetric 3D Signed Distance Field (No polygonal mesh). Real 3D undercuts, arches, spires & micro-erosion in XY/Z.</p>
 
     <div class="control-row">
-      <div class="control-label">Terrain Geological Preset</div>
+      <div class="control-label">Geological Terrain Type</div>
       <select id="preset-select">
-        <option value="canyon" selected>Meandering Canyon & Terraced Plateau</option>
-        <option value="spires">Canyon Spire Hoodoos & Pinnacles</option>
-        <option value="mountain">Alpine Ridges & Peaks</option>
+        <option value="canyon" selected>Meandering Canyon with Cave Undercuts</option>
+        <option value="spires">Monument Valley / Bryce Canyon Spire Needles</option>
+        <option value="mountain">Alpine Jagged Ridges</option>
         <option value="mesa">Desert Butte & Flat Mesa</option>
       </select>
     </div>
 
-    <div class="section-title">Hydraulic Erosion</div>
+    <!-- Volumetric Stamps -->
+    <div class="section-title">
+      <span>Volumetric SDF Stamps</span>
+      <span class="badge-cyan">3D CSG</span>
+    </div>
 
     <div class="control-row">
-      <div class="control-label">Erosion Rate (Carve Power)</div>
-      <input type="range" id="slider-erosion" min="0.02" max="0.35" step="0.01" value="0.14" />
+      <div class="control-label">Stamp Feature</div>
+      <select id="stamp-select">
+        <option value="arch">Natural Rock Arch / Bridge</option>
+        <option value="spire">Weathered Rock Spire / Needle</option>
+        <option value="canyon_cut">Canyon Trench Carve</option>
+        <option value="cave_alcove">Hollow Cave / Overhang Alcove</option>
+        <option value="crater">Meteor Crater / Basin</option>
+        <option value="boulder">Massive Rock Boulder</option>
+      </select>
+    </div>
+
+    <div class="control-row">
+      <div class="control-label">CSG Operation</div>
+      <select id="stamp-mode-select">
+        <option value="union">Union (Add Rock Solid)</option>
+        <option value="subtract">Subtract (Carve Void / Arch Hole)</option>
+        <option value="smooth_union">Smooth Blend Union</option>
+        <option value="smooth_subtract">Smooth Carve Subtract</option>
+      </select>
+    </div>
+
+    <button id="btn-apply-stamp" style="background: rgba(0, 210, 211, 0.25); border-color: #00d2d3; color: #fff; font-weight: 600;">
+      + Apply 3D Volumetric Stamp
+    </button>
+
+    <!-- Micro-Erosion -->
+    <div class="section-title">
+      <span>Micro-Erosion & Fine Detail</span>
+      <span class="badge-cyan">High-Res</span>
+    </div>
+
+    <div class="control-row">
+      <div class="control-label">Micro-Rill Frequency (Detail Scale)</div>
+      <input type="range" id="slider-micro-scale" min="0.8" max="4.0" step="0.1" value="2.0" />
+    </div>
+
+    <div class="control-row">
+      <div class="control-label">Micro-Incision Carve Strength</div>
+      <input type="range" id="slider-micro-strength" min="0.0" max="0.3" step="0.01" value="0.1" />
+    </div>
+
+    <!-- 3D Hydraulic Erosion -->
+    <div class="section-title">3D Hydraulic Erosion</div>
+
+    <div class="control-row">
+      <div class="control-label">Erosion Power (Carve Rate)</div>
+      <input type="range" id="slider-erosion" min="0.04" max="0.35" step="0.01" value="0.16" />
     </div>
 
     <div class="control-row">
       <div class="control-label">Deposition Rate (Valley Fill)</div>
-      <input type="range" id="slider-deposition" min="0.02" max="0.3" step="0.01" value="0.12" />
+      <input type="range" id="slider-deposition" min="0.02" max="0.3" step="0.01" value="0.14" />
     </div>
 
     <div class="control-row">
-      <div class="control-label">Carrying Capacity (Stream Power)</div>
-      <input type="range" id="slider-capacity" min="1.0" max="8.0" step="0.2" value="4.5" />
+      <div class="control-label">Sediment Transport Capacity</div>
+      <input type="range" id="slider-capacity" min="1.0" max="8.0" step="0.2" value="4.8" />
     </div>
 
     <div class="control-row">
-      <div class="control-label">Kernel Radius (Brush Size)</div>
-      <input type="range" id="slider-radius" min="1" max="5" step="1" value="3" />
+      <div class="control-label">3D Carve Radius (Voxel Brush)</div>
+      <input type="range" id="slider-radius" min="0.8" max="3.5" step="0.2" value="1.8" />
     </div>
 
-    <div class="section-title">Wind & Talus Scree Weathering</div>
+    <!-- 3D Wind Abrasion -->
+    <div class="section-title">Aeolian (Wind) & Spire Formation</div>
 
     <div class="control-row">
-      <div class="control-label">Wind Abrasion (Spire Sculptor)</div>
+      <div class="control-label">Wind Abrasion (Cliff Carve)</div>
       <input type="range" id="slider-wind" min="0.0" max="1.0" step="0.05" value="0.4" />
     </div>
 
     <div class="control-row">
-      <div class="control-label">Wind Direction (Deg)</div>
+      <div class="control-label">Wind Vector Angle (Deg)</div>
       <input type="range" id="slider-wind-angle" min="0" max="360" step="5" value="45" />
     </div>
 
-    <div class="control-row">
-      <div class="control-label">Talus Scree Angle-of-Repose</div>
-      <input type="range" id="slider-talus" min="0.0" max="0.4" step="0.02" value="0.15" />
-    </div>
-
-    <div class="section-title">Water & Visuals</div>
+    <!-- Visuals -->
+    <div class="section-title">Water & Droplets</div>
 
     <div class="checkbox-row">
       <input type="checkbox" id="check-water" checked />
@@ -277,25 +335,26 @@
     </div>
 
     <div class="control-row">
-      <div class="control-label">Water Basin Level</div>
-      <input type="range" id="slider-water" min="0.5" max="8.0" step="0.1" value="1.8" />
+      <div class="control-label">Water Basin Height</div>
+      <input type="range" id="slider-water" min="0.0" max="8.0" step="0.1" value="1.8" />
     </div>
 
     <div class="checkbox-row">
       <input type="checkbox" id="check-particles" checked />
-      <label for="check-particles">Show Active Water Droplets</label>
+      <label for="check-particles">Show 3D Rain Droplets</label>
     </div>
 
-    <div class="section-title">Simulation Controls</div>
+    <!-- Run Controls -->
+    <div class="section-title">Simulation Passes</div>
 
     <button id="btn-play" class="primary">▶ Start Continuous Erosion</button>
 
     <div class="button-grid">
       <button id="btn-step">Step 1 Pass</button>
-      <button id="btn-burst">⚡ Burst 6 Passes</button>
+      <button id="btn-burst">⚡ Burst 5 Passes</button>
     </div>
 
-    <button id="btn-reset" style="margin-top: 8px;">↺ Reset Terrain</button>
+    <button id="btn-reset" style="margin-top: 8px;">↺ Reset Terrain & Stamps</button>
 
     <div class="stats-bar">
       <span>Simulation State:</span>
@@ -303,7 +362,7 @@
     </div>
   </div>
 
-  <div id="hint">Left-drag to Orbit | Right-drag to Pan | Scroll to Zoom</div>
+  <div id="hint">Pure Volumetric Raymarching: Left-drag Orbit | Right-drag Pan | Scroll Zoom</div>
 
   <script type="module" src="/src/main.js"></script>
 </body>
