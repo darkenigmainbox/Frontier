@@ -412,7 +412,7 @@ const SH = {
   uCloud:     { value: state.clouds },
   uRipple:    { value: null },
   uRippleRect:{ value: new THREE.Vector4(-260,-260,520,520) },
-  uRippleAmp: { value: 0.30 },
+  uRippleAmp: { value: 0.45 },
   uFoamTrail: { value: null },
   uFoamRect:  { value: new THREE.Vector4(-800,-800,1600,1600) },
   uFoamBright:{ value: new THREE.Color(0xffffff) },
@@ -584,8 +584,8 @@ const oceanMat = new THREE.ShaderMaterial({
         float hY = texture2D(uRipple, ruv+vec2(0.0,e)).r;
         float mpt = uRippleRect.z/512.0;
         p.y += hC*uRippleAmp;
-        nrm.x -= (hX-hC)/mpt*uRippleAmp*0.5;
-        nrm.z += (hY-hC)/mpt*uRippleAmp*0.5;
+        nrm.x -= (hX-hC)/mpt*uRippleAmp*0.8;
+        nrm.z += (hY-hC)/mpt*uRippleAmp*0.8;
       }
       vWorld = p; vNormalW = normalize(nrm); vCrest = crest; vHeight = disp.y;
       vec4 mvPosition = viewMatrix * vec4(p, 1.0);
@@ -622,11 +622,11 @@ const oceanMat = new THREE.ShaderMaterial({
       mat2 R2 = mat2(c,-s,s,c);
       vec2 g = vec2(0.0);
       ${buildSlopeGLSL()}
-      float capFade = 1.0 - smoothstep(25.0, 70.0, camDist);
+      float capFade = 1.0 - smoothstep(20.0, 55.0, camDist);
       if(capFade > 0.001){
         vec2 cw = wxz - uWindDir*t*3.0;
-        g.x += (cos(cw.x*12.0+t*2.2)*0.5 + cos((cw.x+cw.y)*17.0-t*2.8)*0.35)*uMicroAmp*3.0*capFade;
-        g.y += (cos(cw.y*13.0-t*2.5)*0.5 + cos((cw.x-cw.y)*15.0+t*2.4)*0.35)*uMicroAmp*3.0*capFade;
+        g.x += (cos(cw.x*12.0+t*2.2)*0.5 + cos((cw.x+cw.y)*17.0-t*2.8)*0.35)*uMicroAmp*1.6*capFade;
+        g.y += (cos(cw.y*13.0-t*2.5)*0.5 + cos((cw.x-cw.y)*15.0+t*2.4)*0.35)*uMicroAmp*1.6*capFade;
       }
       return g;
     }
@@ -660,16 +660,16 @@ const oceanMat = new THREE.ShaderMaterial({
       // dual-lobe sun glitter
       vec3 H = normalize(V + uSunDir);
       float ndh = max(dot(N,H), 0.0);
-      col += uSunColor * (pow(ndh,950.0)*3.2 + pow(ndh,90.0)*0.35 + pow(ndh,24.0)*0.06) * uSunI;
+      col += uSunColor * (pow(ndh,950.0)*2.6 + pow(ndh,90.0)*0.35 + pow(ndh,24.0)*0.06) * uSunI;
       // sun glitter path across the swell
       {
         vec2 sunH = uSunDir.xz/max(length(uSunDir.xz),1e-3);
         vec2 refH = R.xz/max(length(R.xz),1e-3);
         float path = pow(max(dot(refH,sunH),0.0), 28.0);
         float band = exp(-abs(R.y-0.10)*8.0);
-        float glFade = 1.0 - smoothstep(60.0, 260.0, camDist);
-        float sparkle = 0.5 + 0.5*sin(vWorld.x*6.3+uTime*2.6)*sin(vWorld.z*5.7-uTime*2.2);
-        col += uSunColor * path * band * (0.16+0.24*sparkle*glFade) * uSunI * (1.0-fm);
+        // slope-coherent shimmer: glitter follows the real wave slopes, never a grid
+        float shimmer = clamp(length(sg)*2.5, 0.0, 1.0);
+        col += uSunColor * path * band * (0.14+0.30*shimmer) * uSunI * (1.0-fm);
       }
       // crest subsurface translucency — pure lighting term, teal-green, never white
       float toward = pow(clamp(-dot(V,uSunDir)*0.5+0.5, 0.0, 1.0), 3.0);
@@ -685,6 +685,7 @@ const oceanMat = new THREE.ShaderMaterial({
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
       #include <fog_fragment>
+      #include <dithering_fragment>
     }`
 });
 const oceanGeo = new THREE.PlaneGeometry(2400, 2400, 280, 280);
@@ -855,7 +856,7 @@ const simPass = fsScene(`
     gl_FragColor = vec4(clamp(next*e.x*e.y, -4.0, 4.0), 0.0, 0.0, 1.0);
   }`, {
   uCurr:{value:null}, uPrev:{value:null}, uSrc:{value:null},
-  uTexel:{value:new THREE.Vector2(1/512,1/512)}, uDamp:{value:0.996}, uSrcGain:{value:1.0}, uRate:{value:0.25} });
+  uTexel:{value:new THREE.Vector2(1/512,1/512)}, uDamp:{value:0.996}, uSrcGain:{value:1.0}, uRate:{value:0.35} });
 const ripSrc = makeRT(RIP.size); clearRT(ripSrc);
 // stamps: rain + wake + click splashes rendered additively into source buffer
 const MAXS = 128;
@@ -1329,17 +1330,17 @@ function stepRipple(dt){
     const drops=Math.floor(52*state.rain);
     for(let k=0;k<drops && n<MAXS;k++,n++){
       stampPos[n*3]=(rand()*2-1)*250; stampPos[n*3+1]=0; stampPos[n*3+2]=(rand()*2-1)*250;
-      stampSize[n]=1.4+rand()*1.2; stampVal[n]=(rand()<0.5?-1:1)*(0.5+rand()*0.6);
+      stampSize[n]=1.6+rand()*1.4; stampVal[n]=(rand()<0.5?-1:1)*(0.7+rand()*0.8);
     }
   }
-  if(n<MAXS){ stampPos[n*3]=sternW.x; stampPos[n*3+1]=0; stampPos[n*3+2]=sternW.z; stampSize[n]=7; stampVal[n]=-1.6; n++; }
-  if(n<MAXS){ stampPos[n*3]=bowW.x; stampPos[n*3+1]=0; stampPos[n*3+2]=bowW.z; stampSize[n]=5; stampVal[n]=1.1; n++; }
+  if(n<MAXS){ stampPos[n*3]=sternW.x; stampPos[n*3+1]=0; stampPos[n*3+2]=sternW.z; stampSize[n]=7; stampVal[n]=-2.0; n++; }
+  if(n<MAXS){ stampPos[n*3]=bowW.x; stampPos[n*3+1]=0; stampPos[n*3+2]=bowW.z; stampSize[n]=5; stampVal[n]=1.4; n++; }
   for(let i=clickStamps.length-1;i>=0;i--){
     const cs=clickStamps[i]; cs.age+=dt;
     if(cs.age>0.5){ clickStamps.splice(i,1); continue; }
     if(n>=MAXS) break;
     stampPos[n*3]=cs.x; stampPos[n*3+1]=0; stampPos[n*3+2]=cs.z;
-    stampSize[n]=8+cs.age*70; stampVal[n]=3.2*(1-cs.age/0.5); n++;
+    stampSize[n]=10+cs.age*80; stampVal[n]=4.0*(1-cs.age/0.5); n++;
   }
   stampGeo.setDrawRange(0,n);
   stampGeo.attributes.position.needsUpdate=true;
