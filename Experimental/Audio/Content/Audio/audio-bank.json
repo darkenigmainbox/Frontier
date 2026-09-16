@@ -1,0 +1,683 @@
+{
+  "bank": "Frontier Experimental Audio",
+  "version": 1,
+  "sampleRate": 44100,
+  "channels": 1,
+  "format": "wav16",
+  "note": "Procedural, royalty-free. Regenerate with GenerateAudio.py (deterministic seeds).",
+  "categories": [
+    {
+      "id": "ambience",
+      "title": "Ambience",
+      "folder": "Ambience"
+    },
+    {
+      "id": "wind",
+      "title": "Wind",
+      "folder": "Wind"
+    },
+    {
+      "id": "vegetation",
+      "title": "Vegetation",
+      "folder": "Vegetation"
+    },
+    {
+      "id": "surfaces",
+      "title": "Surfaces",
+      "folder": "Surfaces"
+    },
+    {
+      "id": "tyres",
+      "title": "Tyres",
+      "folder": "Tyres"
+    },
+    {
+      "id": "impacts",
+      "title": "Impacts",
+      "folder": "Impacts"
+    }
+  ],
+  "sounds": [
+    {
+      "id": "amb_cloud",
+      "file": "Ambience/Ambience_CloudDrift.wav",
+      "title": "Cloud Drift",
+      "category": "ambience",
+      "kind": "loop",
+      "seconds": 8.0,
+      "seed": 1000,
+      "desc": "High, airy sky bed. Soft slow swells for calm weather.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -14.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.15,
+        "speed_link": 0.0
+      }
+    },
+    {
+      "id": "amb_thunder",
+      "file": "Ambience/Ambience_DistantThunder.wav",
+      "title": "Distant Thunder",
+      "category": "ambience",
+      "kind": "oneshot",
+      "seconds": 6.0,
+      "seed": 1001,
+      "desc": "Far storm rumble with sub weight. Trigger for drama.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -8.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": false,
+        "fade_in_s": 0.005,
+        "fade_out_s": 0.05,
+        "speed_link": 0.0
+      }
+    },
+    {
+      "id": "wind_breeze",
+      "file": "Wind/Wind_Breeze_Light.wav",
+      "title": "Light Breeze",
+      "category": "wind",
+      "kind": "loop",
+      "seconds": 8.0,
+      "seed": 1002,
+      "desc": "Gentle airy breeze with a leafy shimmer.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -12.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.15,
+        "speed_link": 0.0
+      }
+    },
+    {
+      "id": "wind_gusty",
+      "file": "Wind/Wind_Gusty_Meadow.wav",
+      "title": "Gusty Meadow",
+      "category": "wind",
+      "kind": "loop",
+      "seconds": 10.0,
+      "seed": 1003,
+      "desc": "Medium gusts rolling through; meadow / open field.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -12.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.15,
+        "speed_link": 0.0
+      }
+    },
+    {
+      "id": "wind_gale",
+      "file": "Wind/Wind_Gale_Strong.wav",
+      "title": "Strong Gale",
+      "category": "wind",
+      "kind": "loop",
+      "seconds": 8.0,
+      "seed": 1004,
+      "desc": "Hard howling gale. Coastal / storm exposure.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -13.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.15,
+        "speed_link": 0.0
+      }
+    },
+    {
+      "id": "wind_desert",
+      "file": "Wind/Wind_Desert_Dry.wav",
+      "title": "Desert Dry",
+      "category": "wind",
+      "kind": "loop",
+      "seconds": 8.0,
+      "seed": 1005,
+      "desc": "Dry sandy hiss with a thin whistle. Desert stages.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -13.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.15,
+        "speed_link": 0.0
+      }
+    },
+    {
+      "id": "wind_night",
+      "file": "Wind/Wind_Night_Calm.wav",
+      "title": "Night Calm",
+      "category": "wind",
+      "kind": "loop",
+      "seconds": 10.0,
+      "seed": 1006,
+      "desc": "Barely-there night air with faint crickets.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -16.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.15,
+        "speed_link": 0.0
+      }
+    },
+    {
+      "id": "wind_pass",
+      "file": "Wind/Wind_Pass_Whistle.wav",
+      "title": "Mountain Pass",
+      "category": "wind",
+      "kind": "loop",
+      "seconds": 8.0,
+      "seed": 1007,
+      "desc": "Resonant pass whistle. Ridge / altitude stages.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -13.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.15,
+        "speed_link": 0.0
+      }
+    },
+    {
+      "id": "wind_buffet",
+      "file": "Wind/Wind_Cabin_Buffet.wav",
+      "title": "Cabin Buffet",
+      "category": "wind",
+      "kind": "loop",
+      "seconds": 4.0,
+      "seed": 1008,
+      "desc": "In-car high-speed buffeting. Speed-link it.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -12.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.1,
+        "speed_link": 0.8
+      }
+    },
+    {
+      "id": "veg_trees",
+      "file": "Vegetation/Vegetation_Trees_Rustle.wav",
+      "title": "Trees Rustle",
+      "category": "vegetation",
+      "kind": "loop",
+      "seconds": 8.0,
+      "seed": 1009,
+      "desc": "Leaves working in the trees over a soft wind bed.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -13.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.15,
+        "speed_link": 0.0
+      }
+    },
+    {
+      "id": "veg_sway",
+      "file": "Vegetation/Vegetation_Grass_Sway.wav",
+      "title": "Grass Sway",
+      "category": "vegetation",
+      "kind": "loop",
+      "seconds": 8.0,
+      "seed": 1010,
+      "desc": "A grass field breathing in the wind.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -14.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.15,
+        "speed_link": 0.0
+      }
+    },
+    {
+      "id": "veg_shuffle",
+      "file": "Vegetation/Vegetation_Grass_Shuffle.wav",
+      "title": "Grass Shuffle",
+      "category": "vegetation",
+      "kind": "loop",
+      "seconds": 6.0,
+      "seed": 1011,
+      "desc": "Shuffling / walking through dry grass. Footsteps.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -10.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.15,
+        "speed_link": 0.0
+      }
+    },
+    {
+      "id": "surf_tarmac",
+      "file": "Surfaces/Surface_Tarmac_Roll.wav",
+      "title": "Tarmac Roll",
+      "category": "surfaces",
+      "kind": "loop",
+      "seconds": 4.0,
+      "seed": 1012,
+      "desc": "Smooth asphalt tyre roll with a faint whine.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -11.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.1,
+        "speed_link": 1.0
+      }
+    },
+    {
+      "id": "surf_gravel",
+      "file": "Surfaces/Surface_Gravel_Roll.wav",
+      "title": "Gravel Roll",
+      "category": "surfaces",
+      "kind": "loop",
+      "seconds": 4.0,
+      "seed": 1013,
+      "desc": "Loose gravel: roll bed + pebble chatter.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -11.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.1,
+        "speed_link": 1.0
+      }
+    },
+    {
+      "id": "surf_sand",
+      "file": "Surfaces/Surface_Sand_Roll.wav",
+      "title": "Sand Roll",
+      "category": "surfaces",
+      "kind": "loop",
+      "seconds": 4.0,
+      "seed": 1014,
+      "desc": "Soft sand hiss under the tyres. Dunes.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -12.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.1,
+        "speed_link": 1.0
+      }
+    },
+    {
+      "id": "surf_dirt",
+      "file": "Surfaces/Surface_Dirt_Roll.wav",
+      "title": "Dirt Roll",
+      "category": "surfaces",
+      "kind": "loop",
+      "seconds": 4.0,
+      "seed": 1015,
+      "desc": "Packed dirt with texture and odd stones.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -11.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.1,
+        "speed_link": 1.0
+      }
+    },
+    {
+      "id": "surf_wet",
+      "file": "Surfaces/Surface_WetAsphalt_Roll.wav",
+      "title": "Wet Asphalt Roll",
+      "category": "surfaces",
+      "kind": "loop",
+      "seconds": 4.0,
+      "seed": 1016,
+      "desc": "Wet asphalt spray and sizzle. Rain stages.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -12.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.1,
+        "speed_link": 1.0
+      }
+    },
+    {
+      "id": "surf_cobble",
+      "file": "Surfaces/Surface_Cobble_Roll.wav",
+      "title": "Cobble Roll",
+      "category": "surfaces",
+      "kind": "loop",
+      "seconds": 4.0,
+      "seed": 1017,
+      "desc": "Rhythmic cobble thumps. Old town / plaza.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -11.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.1,
+        "speed_link": 1.0
+      }
+    },
+    {
+      "id": "tyre_skid_s",
+      "file": "Tyres/Tyre_Skid_Short.wav",
+      "title": "Skid Short",
+      "category": "tyres",
+      "kind": "oneshot",
+      "seconds": 1.8,
+      "seed": 1018,
+      "desc": "Single rubber screech. Corners, braking.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -9.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": false,
+        "fade_in_s": 0.005,
+        "fade_out_s": 0.05,
+        "speed_link": 0.0
+      }
+    },
+    {
+      "id": "tyre_skid_l",
+      "file": "Tyres/Tyre_Skid_Long.wav",
+      "title": "Skid Long",
+      "category": "tyres",
+      "kind": "loop",
+      "seconds": 3.5,
+      "seed": 1019,
+      "desc": "Sustained screech; loops for drifts.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -10.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.15,
+        "speed_link": 0.0
+      }
+    },
+    {
+      "id": "tyre_spray",
+      "file": "Tyres/Tyre_Gravel_Spray.wav",
+      "title": "Gravel Spray",
+      "category": "tyres",
+      "kind": "loop",
+      "seconds": 3.0,
+      "seed": 1020,
+      "desc": "Stones thrown up behind the car.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -12.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": true,
+        "fade_in_s": 0.05,
+        "fade_out_s": 0.15,
+        "speed_link": 0.0
+      }
+    },
+    {
+      "id": "imp_crash",
+      "file": "Impacts/Impact_Crash_Heavy.wav",
+      "title": "Crash Heavy",
+      "category": "impacts",
+      "kind": "oneshot",
+      "seconds": 3.0,
+      "seed": 1021,
+      "desc": "Full car crash: burst, crunch, metal, sub.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -6.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": false,
+        "fade_in_s": 0.005,
+        "fade_out_s": 0.05,
+        "speed_link": 0.0
+      }
+    },
+    {
+      "id": "imp_hit",
+      "file": "Impacts/Impact_Hit_Body.wav",
+      "title": "Body Hit",
+      "category": "impacts",
+      "kind": "oneshot",
+      "seconds": 1.2,
+      "seed": 1022,
+      "desc": "Panel thump. Scrapes, bumps, contact.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -8.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": false,
+        "fade_in_s": 0.005,
+        "fade_out_s": 0.05,
+        "speed_link": 0.0
+      }
+    },
+    {
+      "id": "imp_scrape",
+      "file": "Impacts/Impact_Scrape_Metal.wav",
+      "title": "Metal Scrape",
+      "category": "impacts",
+      "kind": "oneshot",
+      "seconds": 2.0,
+      "seed": 1023,
+      "desc": "Barrier / guardrail scrape with judder.",
+      "params": {
+        "pitch_semi": 0.0,
+        "gain_db": -9.0,
+        "pan": 0.0,
+        "lp_hz": 20000.0,
+        "hp_hz": 20.0,
+        "rev_send": 0.0,
+        "loop": false,
+        "fade_in_s": 0.005,
+        "fade_out_s": 0.05,
+        "speed_link": 0.0
+      }
+    }
+  ],
+  "scenes": [
+    {
+      "id": "scene_desert",
+      "title": "Desert Rally",
+      "desc": "Desert wind + sand roll + buffet.",
+      "layers": [
+        {
+          "sound": "wind_desert",
+          "gain_db": 0.0
+        },
+        {
+          "sound": "surf_sand",
+          "gain_db": 0.0
+        },
+        {
+          "sound": "wind_buffet",
+          "gain_db": -6.0
+        },
+        {
+          "sound": "tyre_spray",
+          "gain_db": -10.0
+        }
+      ]
+    },
+    {
+      "id": "scene_forest",
+      "title": "Forest Stage",
+      "desc": "Trees + grass + dirt roll, day.",
+      "layers": [
+        {
+          "sound": "veg_trees",
+          "gain_db": 0.0
+        },
+        {
+          "sound": "wind_gusty",
+          "gain_db": -6.0
+        },
+        {
+          "sound": "veg_sway",
+          "gain_db": -4.0
+        },
+        {
+          "sound": "surf_dirt",
+          "gain_db": 0.0
+        }
+      ]
+    },
+    {
+      "id": "scene_night",
+      "title": "Night Town",
+      "desc": "Night calm + cobble + distant storm.",
+      "layers": [
+        {
+          "sound": "wind_night",
+          "gain_db": 0.0
+        },
+        {
+          "sound": "surf_cobble",
+          "gain_db": -2.0
+        },
+        {
+          "sound": "amb_cloud",
+          "gain_db": -6.0
+        }
+      ]
+    },
+    {
+      "id": "scene_coast",
+      "title": "Coastal Gale",
+      "desc": "Gale + wet asphalt sprint.",
+      "layers": [
+        {
+          "sound": "wind_gale",
+          "gain_db": 0.0
+        },
+        {
+          "sound": "surf_wet",
+          "gain_db": 0.0
+        },
+        {
+          "sound": "wind_buffet",
+          "gain_db": -8.0
+        },
+        {
+          "sound": "amb_thunder",
+          "gain_db": -10.0
+        }
+      ]
+    },
+    {
+      "id": "scene_circuit",
+      "title": "Circuit Hotlap",
+      "desc": "Tarmac + breeze + buffet.",
+      "layers": [
+        {
+          "sound": "surf_tarmac",
+          "gain_db": 0.0
+        },
+        {
+          "sound": "wind_breeze",
+          "gain_db": -4.0
+        },
+        {
+          "sound": "wind_buffet",
+          "gain_db": -10.0
+        },
+        {
+          "sound": "amb_cloud",
+          "gain_db": -8.0
+        }
+      ]
+    }
+  ]
+}
