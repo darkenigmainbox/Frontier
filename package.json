@@ -1,0 +1,9 @@
+{
+  "name": "frontier-sdf-terrain",
+  "version": "1.0.0",
+  "type": "module",
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/*": "./vendor/*"
+  }
+}
