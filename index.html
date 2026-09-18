@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Frontier · SDF Terrain Generator</title>
+<link rel="stylesheet" href="./src/app/style.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- ============================ left panel ============================ -->
+  <aside id="panel-left" class="panel">
+    <header class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>Frontier</h1>
+        <p>SDF terrain generator</p>
+      </div>
+    </header>
+
+    <section class="group">
+      <h2>Landform</h2>
+      <label class="row"><span>Shape</span>
+        <select data-param="shape">
+          <option value="island">Island massif</option>
+          <option value="plateau">Plateau</option>
+          <option value="ridges">Ridges</option>
+          <option value="mesa">Mesa</option>
+          <option value="basin">Basin</option>
+          <option value="dunes">Dunes</option>
+        </select>
+      </label>
+      <label class="row"><span>Seed</span>
+        <input type="number" data-param="seed" step="1" />
+        <button class="icon" data-action="reroll" title="New seed (R)">↻</button>
+      </label>
+      <label class="row"><span>Grid</span>
+        <select data-param="resolution">
+          <option value="draft">Draft · 80³</option>
+          <option value="standard">Standard · 112×72×112</option>
+          <option value="high">High · 160×96×160</option>
+          <option value="ultra">Ultra · 224×136×224</option>
+        </select>
+      </label>
+      <label class="row"><span>Relief</span><input type="range" data-param="relief" min="3" max="16" step="0.5" /><output></output></label>
+      <label class="row"><span>Radius</span><input type="range" data-param="radius" min="8" max="24" step="0.5" /><output></output></label>
+      <label class="row"><span>Fractal detail</span><input type="range" data-param="rough" min="0" max="0.7" step="0.01" /><output></output></label>
+      <label class="row"><span>Ridge blend</span><input type="range" data-param="ridged" min="0" max="1" step="0.01" /><output></output></label>
+      <label class="row"><span>Peak sharpness</span><input type="range" data-param="peakSharp" min="0" max="1" step="0.01" /><output></output></label>
+      <label class="row"><span>Summit plateau</span><input type="range" data-param="summitPlateau" min="0" max="0.8" step="0.01" /><output></output></label>
+      <label class="row"><span>Sub-peaks</span><input type="range" data-param="subPeaks" min="0" max="6" step="1" /><output></output></label>
+      <label class="row"><span>Warp</span><input type="range" data-param="warp" min="0" max="1" step="0.01" /><output></output></label>
+      <label class="row"><span>Flank tilt</span><input type="range" data-param="tilt" min="0" max="1" step="0.01" /><output></output></label>
+      <label class="row"><span>Sea level</span><input type="range" data-param="seaLevel" min="-6" max="6" step="0.1" /><output></output></label>
+      <details class="sub">
+        <summary>Advanced landform</summary>
+        <label class="row"><span>Noise freq</span><input type="range" data-param="freq" min="0.02" max="0.14" step="0.002" /><output></output></label>
+        <label class="row"><span>Octaves</span><input type="range" data-param="octaves" min="3" max="8" step="1" /><output></output></label>
+        <label class="row"><span>Gain</span><input type="range" data-param="gain" min="0.3" max="0.7" step="0.01" /><output></output></label>
+        <label class="row"><span>Lacunarity</span><input type="range" data-param="lacunarity" min="1.5" max="3" step="0.05" /><output></output></label>
+        <label class="row"><span>Warp scale</span><input type="range" data-param="warpScale" min="0.005" max="0.06" step="0.001" /><output></output></label>
+        <label class="row"><span>Canyon attractor</span><input type="range" data-param="canyon" min="0" max="1" step="0.02" /><output></output></label>
+        <label class="row"><span>Canyon width</span><input type="range" data-param="canyonWidth" min="1" max="8" step="0.1" /><output></output></label>
+        <label class="row"><span>Canyon meander</span><input type="range" data-param="canyonMeander" min="0" max="1" step="0.02" /><output></output></label>
+      </details>
+    </section>
+
+    <section class="group">
+      <h2>Geology</h2>
+      <label class="row"><span>Rock hardness</span><input type="range" data-param="hardness" min="0" max="1" step="0.02" /><output></output></label>
+      <label class="row"><span>Strata contrast</span><input type="range" data-param="strata" min="0" max="1" step="0.02" /><output></output></label>
+      <label class="row"><span>Strata frequency</span><input type="range" data-param="strataFreq" min="0.4" max="4" step="0.05" /><output></output></label>
+      <label class="row"><span>Soil depth (m)</span><input type="range" data-param="soilDepth" min="0.2" max="4" step="0.1" /><output></output></label>
+    </section>
+
+    <section class="group">
+      <h2>Erosion</h2>
+      <label class="check"><input type="checkbox" data-param="erosion.enabled" /><span>Enable erosion</span></label>
+      <label class="row"><span>Iterations</span><input type="range" data-param="erosion.iterations" min="0" max="320" step="5" /><output></output></label>
+      <label class="row"><span>Maturity (diffusion)</span><input type="range" data-param="erosion.diffusionAcross" min="0" max="0.25" step="0.005" /><output></output></label>
+      <label class="row"><span>Channel survival</span><input type="range" data-param="erosion.channelProtectA" min="2" max="120" step="1" /><output></output></label>
+      <label class="row"><span>Erodibility K</span><input type="range" data-param="erosion.K" min="0.001" max="0.03" step="0.0005" /><output></output></label>
+      <label class="row"><span>Discharge m</span><input type="range" data-param="erosion.m" min="0.2" max="0.8" step="0.01" /><output></output></label>
+      <label class="row"><span>Slope n</span><input type="range" data-param="erosion.n" min="0.6" max="1.8" step="0.02" /><output></output></label>
+      <label class="row"><span>Max cut / iter (m)</span><input type="range" data-param="erosion.maxCut" min="0.01" max="0.2" step="0.005" /><output></output></label>
+      <label class="row"><span>Talus angle</span><input type="range" data-param="erosion.talus" min="0.3" max="2" step="0.02" /><output></output></label>
+      <label class="row"><span>Sediment</span><input type="range" data-param="erosion.deposition" min="0" max="1" step="0.02" /><output></output></label>
+      <label class="row"><span>Flow concentration</span><input type="range" data-param="erosion.flowExponent" min="1" max="4" step="0.05" /><output></output></label>
+      <label class="row"><span>Meander</span><input type="range" data-param="erosion.meander" min="0" max="1" step="0.02" /><output></output></label>
+
+      <details class="sub" open>
+        <summary>Particle stage (the "looks real" half)</summary>
+        <label class="check"><input type="checkbox" data-param="erosion.particles" /><span>Run particles</span></label>
+        <label class="row"><span>Droplets</span><input type="range" data-param="erosion.particleCount" min="2000" max="120000" step="1000" /><output></output></label>
+        <label class="row"><span>Steps / droplet</span><input type="range" data-param="erosion.particleSteps" min="8" max="96" step="2" /><output></output></label>
+        <label class="row"><span>Capacity</span><input type="range" data-param="erosion.particleCapacity" min="0.5" max="6" step="0.1" /><output></output></label>
+        <label class="row"><span>Max load</span><input type="range" data-param="erosion.particleMaxLoad" min="0.01" max="0.3" step="0.005" /><output></output></label>
+        <label class="row"><span>Cut per step (m)</span><input type="range" data-param="erosion.cutPerStep" min="0.005" max="0.08" step="0.001" /><output></output></label>
+        <label class="row"><span>Inertia</span><input type="range" data-param="erosion.particleInertia" min="0" max="0.4" step="0.01" /><output></output></label>
+        <label class="row"><span>Evaporation</span><input type="range" data-param="erosion.particleEvaporate" min="0" max="0.08" step="0.002" /><output></output></label>
+        <label class="row"><span>Deposit rate</span><input type="range" data-param="erosion.particleDeposit" min="0.05" max="1" step="0.02" /><output></output></label>
+        <label class="row"><span>Max aggradation</span><input type="range" data-param="erosion.maxAggradation" min="0.05" max="1.5" step="0.05" /><output></output></label>
+        <div class="note ok">Hard limits: per-column incision budget, per-step penetration cap,
+          stop-slope gate, wall guard, per-column aggradation budget and a rock floor.
+          A channel cannot become a hole.</div>
+        <label class="row"><span>Max incision (m)</span><input type="range" data-param="erosion.maxIncision" min="0.3" max="6" step="0.1" /><output></output></label>
+        <label class="row"><span>Stop slope</span><input type="range" data-param="erosion.stopSlope" min="0" max="0.15" step="0.005" /><output></output></label>
+        <label class="row"><span>Cliff guard</span><input type="range" data-param="erosion.cliffSlope" min="0.3" max="2" step="0.05" /><output></output></label>
+        <label class="row"><span>Armouring</span><input type="range" data-param="erosion.armouring" min="0" max="1" step="0.02" /><output></output></label>
+      </details>
+
+      <details class="sub">
+        <summary>Detail stage (the anti-blur pass)</summary>
+        <label class="check"><input type="checkbox" data-param="erosion.detail" /><span>Run detail</span></label>
+        <label class="row"><span>Rills</span><input type="range" data-param="erosion.rills" min="0" max="1" step="0.02" /><output></output></label>
+        <label class="row"><span>Sharpen</span><input type="range" data-param="erosion.sharpen" min="0" max="1" step="0.02" /><output></output></label>
+        <label class="row"><span>Ledges</span><input type="range" data-param="erosion.ledge" min="0" max="1" step="0.02" /><output></output></label>
+        <label class="row"><span>Alluvium</span><input type="range" data-param="erosion.sand" min="0" max="1" step="0.02" /><output></output></label>
+        <label class="row"><span>Scree</span><input type="range" data-param="erosion.talusDetail" min="0" max="1" step="0.02" /><output></output></label>
+        <label class="row"><span>Surface grain (m)</span><input type="range" data-param="erosion.grain" min="0" max="0.2" step="0.005" /><output></output></label>
+      </details>
+
+      <div class="actions">
+        <button data-action="generate" class="primary">Generate (G)</button>
+        <button data-action="erode">Re-erode (E)</button>
+        <button data-action="full" class="primary">Full pipeline (P)</button>
+      </div>
+    </section>
+  </aside>
+
+  <!-- ============================ viewport ============================ -->
+  <main id="stage">
+    <canvas id="gl"></canvas>
+    <div id="hud-top">
+      <div class="chip" id="chip-fps">– fps</div>
+      <div class="chip" id="chip-grid">–</div>
+      <div class="chip" id="chip-probe">hover the terrain</div>
+      <div class="spacer"></div>
+      <div class="chip" id="chip-stage">idle</div>
+    </div>
+    <div id="toolbar">
+      <div class="toolgroup" id="toolgroup">
+        <button data-tool="orbit" class="active" title="Orbit the camera">Navigate</button>
+      </div>
+      <div class="toolgroup" data-brushes>
+        <button data-tool="raise" title="Add rock along the normal">Raise</button>
+        <button data-tool="carve" title="Cut rock">Carve</button>
+        <button data-tool="smooth" title="Relax the surface">Smooth</button>
+        <button data-tool="flatten" title="Flatten to the clicked plane">Flatten</button>
+        <button data-tool="pinch" title="Sharpen into a ridge">Pinch</button>
+        <button data-tool="inflate" title="Push the surface outward">Inflate</button>
+        <button data-tool="noise" title="Fractal surface detail">Detail</button>
+        <button data-tool="terrace" title="Horizontal benches">Terrace</button>
+        <button data-tool="erode" title="Local weathering">Weather</button>
+        <button data-tool="deposit" title="Drop sediment">Deposit</button>
+        <button data-tool="stamp" title="Stamp a fractal primitive">Stamp</button>
+        <button data-tool="path" title="Grade a road along the painted path">Path</button>
+        <button data-tool="wind" title="Advect loose material downwind">Wind</button>
+      </div>
+      <div class="toolgroup" id="brushsettings">
+        <label class="mini"><span>Size</span><input type="range" data-brush="radius" min="0.5" max="10" step="0.1" /><output></output></label>
+        <label class="mini"><span>Strength</span><input type="range" data-brush="strength" min="0.05" max="1" step="0.05" /><output></output></label>
+        <label class="mini"><span>Softness</span><input type="range" data-brush="falloff" min="0" max="1" step="0.05" /><output></output></label>
+        <label class="mini"><span>Depth</span><input type="range" data-brush="depth" min="0.15" max="3" step="0.05" /><output></output></label>
+        <label class="mini" id="stampkind"><span>Stamp</span>
+          <select data-brush="stamp">
+            <option value="rock">Rock</option>
+            <option value="boulder">Boulder</option>
+            <option value="crater">Crater</option>
+            <option value="dune">Dune</option>
+            <option value="mesa">Mesa</option>
+            <option value="arch">Arch</option>
+          </select>
+        </label>
+      </div>
+      <div class="spacer"></div>
+      <div class="toolgroup">
+        <button data-action="undo" title="Undo (Ctrl+Z)">Undo</button>
+        <button data-action="redo" title="Redo (Ctrl+Shift+Z)">Redo</button>
+      </div>
+    </div>
+    <div id="hud-bottom">
+      <div class="progress" id="progress"><div class="bar"></div><span></span></div>
+      <div class="chips" id="stats"></div>
+    </div>
+  </main>
+
+  <!-- ============================ right panel ============================ -->
+  <aside id="panel-right" class="panel">
+    <section class="group">
+      <h2>View</h2>
+      <label class="check"><input type="checkbox" data-param="water" /><span>Water surface</span></label>
+      <label class="check"><input type="checkbox" data-param="wireframe" /><span>Wireframe mesh</span></label>
+      <label class="check"><input type="checkbox" data-param="showFlow" /><span>Highlight rivers</span></label>
+      <label class="row"><span>Fog</span><input type="range" data-param="fog" min="0" max="2" step="0.05" /><output></output></label>
+      <label class="row"><span>Sun azimuth</span><input type="range" data-param="sunAzimuth" min="0" max="360" step="1" /><output></output></label>
+      <label class="row"><span>Snow line (m)</span><input type="range" data-param="snowLine" min="2" max="16" step="0.1" /><output></output></label>
+      <label class="row"><span>Channel preview</span>
+        <select data-param="channelPreview">
+          <option value="none">Materials</option>
+          <option value="height">Height</option>
+          <option value="slope">Slope</option>
+          <option value="curvature">Curvature</option>
+          <option value="flow">Flow / drainage</option>
+          <option value="erosion">Erosion</option>
+          <option value="deposit">Deposition</option>
+          <option value="wet">Wetness</option>
+          <option value="exposure">Rock exposure</option>
+        </select>
+      </label>
+      <div class="legend" id="preview-legend"></div>
+    </section>
+
+    <section class="group">
+      <h2>Materials</h2>
+      <div class="matgrid" id="materials"></div>
+      <label class="row"><span>Texture size</span>
+        <select data-param="texSize">
+          <option value="256">256²</option>
+          <option value="512">512²</option>
+        </select>
+      </label>
+      <div class="note">Five procedural layers (grass, dirt, rock, sand, snow) are baked on the CPU
+        and blended triplanar in the shader, so cliff faces keep their grain.</div>
+    </section>
+
+    <section class="group">
+      <h2>Export</h2>
+      <div class="actions wrap">
+        <button data-action="export-sdf">SDF volume (.frontier)</button>
+        <button data-action="export-obj">Mesh (.obj + .mtl)</button>
+        <button data-action="export-stl">Mesh (.stl)</button>
+        <button data-action="export-height">Heightmap (16-bit PNG)</button>
+        <button data-action="export-splat">Splatmaps (PNG)</button>
+        <button data-action="export-recipe">Recipe (.json)</button>
+        <button data-action="import-recipe">Load recipe…</button>
+        <button data-action="shot">Save viewport PNG</button>
+      </div>
+      <div class="note">The SDF volume is the terrain; the mesh is a derived view. Ingest
+        the volume to keep CSG, caves and runtime sculpting.</div>
+    </section>
+
+    <section class="group">
+      <h2>Stats</h2>
+      <table class="stats" id="stats-table"></table>
+      <canvas id="histogram" width="256" height="90"></canvas>
+      <div class="note">Elevation histogram with the waterline and snow line marked.</div>
+    </section>
+
+    <section class="group">
+      <h2>Erosion passes</h2>
+      <div class="passes" id="passes"></div>
+      <div class="note">Run passes one at a time on the current terrain — exactly like a
+        layer stack. They compose: every pass reads and writes the same SDF field.</div>
+    </section>
+  </aside>
+</div>
+<div id="toast"></div>
+<script type="module" src="./src/app/main.js"></script>
+</body>
+</html>
