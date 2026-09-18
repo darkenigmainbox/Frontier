@@ -50,6 +50,7 @@ function activateTab(name) {
 $$(".tab").forEach(el => el.addEventListener("click", () => activateTab(el.dataset.tab)));
 $("#inspector-switch").onclick = () => $("#inspector-menu").togglePopover?.();
 
+$("#stampMode").addEventListener("change", e => { state.stampMode = Number(e.target.value); });
 $$("input[type=range]").forEach(input => input.addEventListener("input", () => {
   params[input.id] = Number(input.value);
   syncControls();

@@ -10,6 +10,18 @@ failure modes.
 | **Particle branch** (`arena/01a07d57` lineage) | Live GPU particle erosion — rain / runoff / river / wind / rockfall / chemical agents carrying sediment. Looked *real*. | Particles trapped in depressions dug **deep holes without stopping** (unconditional minimum demand + capacity that grew unbounded with speed + no pit fill). | **Anti-runaway controller** (below) — headless A/B: a trapped pool converges to *0.0 m* additional depth where the ancestor keeps drilling. |
 | **Algorithm branch** (`arena/01a0af62` lineage) | Volumetric SDF authoring: CSG stamps (arch / spire / butte / cavern / crater…), strata hardness, micro-detail. | Erosion added wide smooth deltas (r = 1.8 m ≈ 5-voxel kernel, linear falloff) straight into the distance field — a low-pass filter. Result: **blurry, mushy terrain**. | **Compact shell carving + redistancing** (below) — headless A/B at equal removed volume: ~3× deeper pits, tight footprint, ~12× more surface texture. |
 
+## Visual proof (headless, CPU mirror)
+
+```bash
+node test/render-headless.mjs renders   # writes the A/B panels below
+```
+
+| Panel | Left | Right | Numbers |
+|---|---|---|---|
+| `ab-runaway-left-hybrid-right-legacyA.png` | hybrid: trapped pool **+0.00 m** | ancestor-A: **+0.50 m** and still drilling | 48 particles, closed bowl, 80 ticks |
+| `ab-blur-left-hybrid-right-legacyB.png` | hybrid: **1.13 m** deep, tight pit | ancestor-B: **0.38 m** deep smear over 4× the area | equal removed volume |
+| `terrain-t000.png` / `terrain-t180-hybrid.png` | formation | after 180 ticks (rock loss < 6%) | ledger closure **0.0%** |
+
 ## Run
 
 ```bash

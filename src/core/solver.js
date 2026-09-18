@@ -187,11 +187,16 @@ export class Solver {
 
       // expiry
       const load = this.cargo[i * 4];
+      const pending = this.cargo[i * 4 + 1];
       const out =
         age + dt > life || this.vel[i * 4 + 3] < 0.008 || load > 12 ||
         x < v.min[0] + 0.25 || x > v.max[0] - 0.25 ||
         z < v.min[2] + 0.25 || z > v.max[2] - 0.25 || y < v.min[1] + 0.25;
-      if (out) { this.pos[i * 4 + 3] = -1; this.ledger.retired += load * this.vol.voxelVolume; this.cargo[i * 4] = 0; }
+      if (out) {
+        this.pos[i * 4 + 3] = -1;
+        this.ledger.retired += (load + pending) * this.vol.voxelVolume;
+        this.cargo[i * 4] = 0; this.cargo[i * 4 + 1] = 0;
+      }
     }
   }
 
