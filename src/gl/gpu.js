@@ -46,8 +46,13 @@ export class GPUErosion {
     this.activeCount = 1024;
     this.sculpted = false;
     this.ledger = { eroded: 0, deposited: 0, carried: 0, retired: 0 };
-    if (!gl.getExtension("EXT_color_buffer_float")) throw new Error("EXT_color_buffer_float required");
-    this.floatBlend = !!gl.getExtension("EXT_float_blend");
+    // Render-to-float ladder: RGBA32F preferred; RGBA16F (half) as fallback.
+    // Neither -> caller falls back to CPU mirror mode.
+    this.floatRender = !!gl.getExtension("EXT_color_buffer_float");
+    if (!this.floatRender && !gl.getExtension("EXT_color_buffer_half_float"))
+      throw new Error("No renderable float format (EXT_color_buffer_float / EXT_color_buffer_half_float)");
+    this.texFmt = this.floatRender ? gl.RGBA32F : gl.RGBA16F;
+    this.floatBlend = this.floatRender && !!gl.getExtension("EXT_float_blend");
     if (gl.getParameter(gl.MAX_TEXTURE_SIZE) < WIDTH) throw new Error(`Texture size too small (need ${WIDTH})`);
     this.fbo = gl.createFramebuffer();
     this.vao = gl.createVertexArray();
@@ -93,7 +98,7 @@ export class GPUErosion {
   makeTex(w, h, fmt) {
     const gl = this.gl, t = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, t);
-    gl.texStorage2D(gl.TEXTURE_2D, 1, fmt || gl.RGBA32F, w, h);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, fmt || this.texFmt, w, h);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -150,7 +155,7 @@ export class GPUErosion {
     }
     for (const [name, v] of Object.entries(vals)) {
       const l = uniLoc(gl, prog, name); if (l === null) continue;
-      if (typeof v === "number") { if (name === "tool" || name === "sweepSign" || name === "visualMode") gl.uniform1f(l, v); else gl.uniform1f(l, v); }
+      if (typeof v === "number") gl.uniform1f(l, v);
       else if (v.length === 3) gl.uniform3fv(l, v);
       else gl.uniform4fv(l, v);
     }

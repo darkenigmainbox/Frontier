@@ -340,11 +340,12 @@ async function init() {
     bindCanvas();
     state.ready = true;
     $("#loading").classList.add("hidden");
-    $("#renderer-label").textContent = renderer.gpu ? "WebGL2 · hybrid GPU" : "WebGL2";
-    if (!renderer.gpu) { $("#run").disabled = true; $("#step").disabled = true; toast(renderer.erosionError, 12000); }
+    $("#renderer-label").textContent = renderer.gpu ? "WebGL2 · hybrid GPU" : renderer.cpuMode ? "WebGL2 · CPU mirror" : "WebGL2";
+    if (!renderer.canStep) { $("#run").disabled = true; $("#step").disabled = true; toast(renderer.erosionError, 12000); }
+    else if (renderer.cpuMode) toast("GPU float rendering unavailable here — running the CPU mirror (identical physics, slower).", 9000);
     requestAnimationFrame(frame);
     window.frontier = {
-      get backend() { return renderer.gpu ? "webgl2-hybrid" : "none"; },
+      get backend() { return renderer.gpu ? "webgl2-hybrid" : renderer.cpuMode ? "cpu-mirror" : "none"; },
       get iterations() { return state.iterations; },
       get settings() { return structuredClone(params); },
       readVolume: () => renderer.readVolume(),
