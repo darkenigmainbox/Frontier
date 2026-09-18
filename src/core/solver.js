@@ -316,10 +316,12 @@ export class Solver {
     const idxs = [], wSolid = [], wAir = [];
     for (let z = i0[2]; z <= i1[2]; z++) for (let y = i0[1]; y <= i1[1]; y++) for (let x = i0[0]; x <= i1[0]; x++) {
       v.worldAt(x, y, z, tmp3);
-      // squash the kernel along the surface normal -> gouges, not round bowls
+      // squash the kernel along the surface normal -> flat gouges, not round
+      // bowls: tangent extent stays r, normal extent is compressed
       const qx = tmp3[0] - c[0], qy = tmp3[1] - c[1], qz = tmp3[2] - c[2];
       const qn = qx * n[0] + qy * n[1] + qz * n[2];
-      const dist = Math.hypot(qx - n[0] * qn * 0.45, qy - n[1] * qn * 0.45, qz - n[2] * qn * 0.45 + qn * 1.35);
+      const qt = Math.hypot(qx - n[0] * qn, qy - n[1] * qn, qz - n[2] * qn);
+      const dist = Math.hypot(qt, qn * 1.8);
       if (dist > r) continue;
       // grain modulation: stochastic kernel roughness breaks the smooth-blob look
       const grain = 0.55 + 0.9 * hash3(x, y, z, pid + (this.tick & 1023) * 131);
@@ -353,7 +355,7 @@ export class Solver {
     const v = this.vol;
     const [nx, ny, nz] = v.dims;
     const vol = v.voxelVolume;
-    let acceptedErode = 0, acceptedDeposit = 0;
+    let acceptedErode = 0, acceptedDeposit = 0, requestedErode = 0, requestedDeposit = 0;
     for (let z = 0; z < nz; z++) for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
       const idx4 = v.index(x, y, z), idx = idx4 / 4;
       const re = this.reqErode[idx], rd = this.reqDeposit[idx];
@@ -374,17 +376,21 @@ export class Solver {
         v.data[idx4 + 2] += dVol * vol; // loose sediment (m³)
         v.data[idx4 + 1] = Math.min(1, v.data[idx4 + 1] + this.reqWet[idx]);
       }
+      requestedErode += re; requestedDeposit += rd;
       acceptedErode += eVol; acceptedDeposit += dVol;
       this.reqErode[idx] = 0; this.reqDeposit[idx] = 0; this.reqWet[idx] = 0;
     }
     const V = vol;
     this.ledger.eroded += acceptedErode * V;
     this.ledger.deposited += acceptedDeposit * V;
-    // particles pick up / drop the accepted amounts
+    // particles pick up / drop the *accepted* amounts (exact conservation:
+    // volume lost to per-voxel caps never enters anyone's cargo)
+    const eRatio = requestedErode > 1e-9 ? acceptedErode / requestedErode : 0;
+    const dRatio = requestedDeposit > 1e-9 ? acceptedDeposit / requestedDeposit : 0;
     for (let i = 0; i < this.N; i++) {
       const e = this.cargo[i * 4 + 1], d = this.cargo[i * 4 + 2];
-      if (e > 0) { this.cargo[i * 4] += e * 0.9; this.cargo[i * 4 + 1] = 0; }
-      if (d > 0) { this.cargo[i * 4] = Math.max(0, this.cargo[i * 4] - d); this.cargo[i * 4 + 2] = 0; }
+      if (e > 0) { this.cargo[i * 4] += e * eRatio; this.cargo[i * 4 + 1] = 0; }
+      if (d > 0) { this.cargo[i * 4] = Math.max(0, this.cargo[i * 4] - d * dRatio); this.cargo[i * 4 + 2] = 0; }
     }
   }
 

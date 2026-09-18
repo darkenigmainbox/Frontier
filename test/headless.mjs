@@ -157,8 +157,9 @@ console.log(`Frontier headless — world ${DIMS.join("x")} (${(DIMS[0]*DIMS[1]*D
 
   // merged-style: 500 compact shell events (same equations as GPU splat)
   const s = new Solver(a, { ...BASE, particleCount: 64 });
-  for (let k = 0; k < 500; k++) {
-    s.applyRequest([0.5, 0.02, 0.5], [0, 1, 0], 0.66, 0, 0.1, 0);
+  for (let k = 0; k < 1300; k++) {
+    const yy = 0.02 - 0.55 * (k % 3); // the agent follows the pit floor down
+    s.applyRequest([0.5, yy, 0.5], [0, 1, 0], 0.66, 0, 0.1, 0);
     s.apply();
   }
   redistanceVolume(a, 2);
