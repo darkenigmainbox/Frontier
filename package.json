@@ -1,9 +1,16 @@
 {
-  "name": "frontier-sdf-terrain",
+  "name": "frontier-terrain-studio",
   "version": "1.0.0",
+  "description": "Frontier — hybrid SDF terrain generator: GPU particle erosion + CSG stamps + stable carving + proper sculpting",
+  "private": true,
   "type": "module",
-  "imports": {
-    "three": "./vendor/three.module.js",
-    "three/addons/*": "./vendor/*"
+  "scripts": {
+    "start": "python3 -m http.server 5173",
+    "dev": "python3 -m http.server 5173",
+    "serve": "python3 -m http.server 5173",
+    "test": "node test/headless.mjs",
+    "test:glsl": "node test/glsl-check.mjs",
+    "test:alt": "node alt/tests/test-unified-engine.js",
+    "renders": "node test/render-headless.mjs renders"
   }
 }
