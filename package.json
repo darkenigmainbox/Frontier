@@ -1,0 +1,23 @@
+{
+  "name": "frontier-terrain",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Frontier — SDF terrain generator: macro fluvial evolution + guarded particle erosion + real SDF sculpting, on one shared signed-distance volume.",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "serve": "python3 -m http.server 8080",
+    "test": "node --test \"tests/**/*.test.js\"",
+    "gen": "node tools/generate.mjs",
+    "shot": "node tools/preview-png.mjs"
+  },
+  "dependencies": {
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10"
+  }
+}
