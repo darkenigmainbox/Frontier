@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="theme-color" content="#000"/>
+<title>Frontier — Hybrid SDF Terrain Generator</title>
+<link rel="stylesheet" href="/src/css/style.css"/>
+</head>
+<body>
+<div id="app">
+<header class="header">
+  <a class="brand" href="./"><svg viewBox="0 0 34 34" fill="none"><path d="M3 27 L12 7 L17 18 L21 9 L31 27 H3Z" stroke="currentColor" stroke-width="1.6"/><path d="M5 23 H29 M7 19 H14 M20 19 H27" stroke="currentColor" stroke-width="1.1"/></svg><span>FRONTIER</span></a>
+  <span class="header-tag">HYBRID SDF · particles + CSG · stable carve</span>
+  <div class="header-actions">
+    <button class="button primary" id="run"><span class="play-icon">▶</span><span id="run-label">Run erosion</span></button>
+    <button class="button" id="export">Export</button>
+    <button class="icon-button" id="help">?</button>
+  </div>
+</header>
+
+<aside class="outliner">
+  <div class="sidebar-heading"><span>Scene</span><span class="panel-caption">OUTLINER</span></div>
+  <div class="scene-actions">
+    <button class="button" id="new-scene">New scene</button>
+    <button class="button primary" id="randomize">⟲ Seed</button>
+  </div>
+  <div id="scene-tree">
+    <div class="tree-item active"><span class="tree-icon">◈</span><span>FrontierTerrain</span></div>
+  </div>
+  <div class="mono object-count" id="object-count">1 OBJECT · 2.1M VOX SDF</div>
+  <div class="outliner-bottom">
+    <p class="control-note"><strong>Merged pipeline.</strong> Live particle erosion (rain/runoff/river/wind/rock/chem) with a stabilized budget — no runaway holes — and compact CSG carving + redistancing — no blur. Sculpt with brushes or library stamps.</p>
+  </div>
+</aside>
+
+<main class="viewport" id="viewport">
+  <canvas id="scene" tabindex="0" aria-label="SDF terrain"></canvas>
+  <div class="viewport-top">
+    <div class="view-label"><span class="live-dot"></span><span id="view-mode-label">Lit view</span><span class="viewport-separator">·</span><span id="renderer-label">WebGL2</span></div>
+    <div class="viewport-actions">
+      <button class="glass-button" id="view-mode"><span>Lit</span></button>
+      <button class="glass-button icon-only" id="reset-camera" title="Reset camera">⌂</button>
+      <button class="glass-button icon-only" id="fullscreen" title="Fullscreen">⛶</button>
+    </div>
+  </div>
+  <div class="brush-hint hidden" id="brush-hint">CARVE <span>Click + drag</span></div>
+  <div class="toast hidden" id="toast"></div>
+  <div class="loading" id="loading"><div class="loading-mark">F</div><strong>Forming landscape</strong><span>Building SDF volume…</span></div>
+  <div class="simulation-bar">
+    <div class="simulation-state"><span class="sim-state-dot"></span><div><strong id="simulation-label">Erosion ready</strong><span><span id="iterations">0</span> ticks · <span id="sim-detail">Hybrid GPU solver</span></span></div></div>
+    <div class="simulation-buttons">
+      <button class="step-button" id="step" title="Step"><svg viewBox="0 0 20 20"><path d="M5 4 L13 10 L5 16 V4 Z M14 4 V16"/></svg></button>
+      <button class="button primary" id="run2"><span id="run-label2">Run</span></button>
+    </div>
+  </div>
+</main>
+
+<aside class="sidebar" id="scene-properties" data-panel="terrain">
+  <div class="inspector-heading"><button id="inspector-switch"><span id="inspector-mode-label">Terrain</span><span>⌄</span></button></div>
+  <div id="inspector-title">Desert canyon</div>
+  <div class="tab-list" id="inspector-menu" popover>
+    <button class="tab active" data-tab="terrain" aria-checked="true">Object</button>
+    <button class="tab" data-tab="sculpt">Sculpt</button>
+    <button class="tab" data-tab="erosion">Erosion</button>
+    <button class="tab" data-tab="water">Water</button>
+  </div>
+  <div class="panels">
+    <section class="panel" id="panel-terrain">
+      <div class="section-label">FORMATION</div>
+      <div class="control"><label for="relief">Relief <output id="relief-value"></output></label><input id="relief" type="range" min="7" max="18" step="0.1" value="12"/></div>
+      <div class="control"><label for="strata">Strata <output id="strata-value"></output></label><input id="strata" type="range" min="0" max="1" step="0.01" value="0.65"/></div>
+      <div class="control"><label for="roughness">Roughness <output id="roughness-value"></output></label><input id="roughness" type="range" min="0" max="1" step="0.01" value="0.48"/></div>
+      <div class="control"><label for="canyonWidth">Canyon gap <output id="canyonWidth-value"></output></label><input id="canyonWidth" type="range" min="3" max="16" step="0.1" value="6.1"/></div>
+      <div class="control"><label for="canyonMeander">Meander <output id="canyonMeander-value"></output></label><input id="canyonMeander" type="range" min="0" max="2" step="0.05" value="1"/></div>
+      <div class="control"><label for="canyonFlare">Flare <output id="canyonFlare-value"></output></label><input id="canyonFlare" type="range" min="0" max="0.25" step="0.005" value="0.105"/></div>
+      <div class="seed-row"><label>Seed</label><input id="seed" type="number" min="1" max="99999" value="4821"/><button id="reseed">↻</button></div>
+      <div class="section-line"></div>
+      <div class="section-label">PRESETS</div>
+      <div class="presets" style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="preset active" data-preset="0"><strong>Canyon</strong></button>
+        <button class="preset" data-preset="1"><strong>Badlands</strong></button>
+        <button class="preset" data-preset="2"><strong>Monuments</strong></button>
+        <button class="preset" data-preset="3"><strong>Plot</strong></button>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="panel-sculpt">
+      <div class="section-label">SCULPT <span class="hint">SDF CSG + redistancing</span></div>
+      <div class="sculpt-tools unified-tools">
+        <button class="sculpt-tool active" data-tool="orbit"><span>Orbit</span></button>
+        <button class="sculpt-tool" data-tool="carve"><span>Carve</span></button>
+        <button class="sculpt-tool" data-tool="build"><span>Build</span></button>
+        <button class="sculpt-tool" data-tool="smooth"><span>Smooth</span></button>
+        <button class="sculpt-tool" data-tool="flatten"><span>Flatten</span></button>
+        <button class="sculpt-tool" data-tool="paint"><span>Harden</span></button>
+      </div>
+      <div class="control"><label for="radius">Radius <output id="radius-value"></output></label><input id="radius" type="range" min="0.5" max="5" step="0.1" value="1.8"/></div>
+      <div class="control"><label for="brushStrength">Strength <output id="brushStrength-value"></output></label><input id="brushStrength" type="range" min="0.05" max="1" step="0.05" value="0.45"/></div>
+      <div class="section-line"></div>
+      <div class="section-label">LIBRARY STAMPS <span class="hint">click viewport to place</span></div>
+      <div class="stamp-grid">
+        <button class="sculpt-tool stamp" data-stamp="1"><span>Dome</span></button>
+        <button class="sculpt-tool stamp" data-stamp="2"><span>Arch</span></button>
+        <button class="sculpt-tool stamp" data-stamp="3"><span>Spire</span></button>
+        <button class="sculpt-tool stamp" data-stamp="4"><span>Butte</span></button>
+        <button class="sculpt-tool stamp" data-stamp="5"><span>Trench</span></button>
+        <button class="sculpt-tool stamp" data-stamp="6"><span>Cavern</span></button>
+        <button class="sculpt-tool stamp" data-stamp="7"><span>Crater</span></button>
+        <button class="sculpt-tool stamp" data-stamp="8"><span>Boulder</span></button>
+      </div>
+      <div class="control"><label for="stampScale">Stamp scale <output id="stampScale-value"></output></label><input id="stampScale" type="range" min="0.5" max="2.5" step="0.1" value="1.2"/></div>
+      <div class="control"><label for="stampMode">Stamp mode</label><select id="stampMode">
+        <option value="0">Union (add rock)</option>
+        <option value="1">Carve (remove)</option>
+        <option value="2" selected>Smooth union</option>
+        <option value="3">Smooth carve</option>
+      </select></div>
+      <p class="control-note">Stamps are analytic SDFs blended with smooth CSG — every stroke is re-distanced so the volume stays a valid signed distance field (no lumps, no broken raymarching).</p>
+    </section>
+
+    <section class="panel hidden" id="panel-erosion">
+      <div class="section-label">HYBRID EROSION <span class="tiny-tag">STABLE</span></div>
+      <p class="control-note" style="background:#111;padding:10px;border-radius:8px;border:1px solid #222">Sediment is conserved and carving is budgeted: every particle can only erode as much as it can carry, worn rock armors, stalled water dumps its load. Pits converge instead of drilling <em>deep without stopping</em>.</p>
+      <div class="section-label">EMITTER</div>
+      <div class="source-tools weather-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:12px">
+        <button class="active" data-source="0">Rain</button>
+        <button data-source="1">Runoff</button>
+        <button data-source="2">River</button>
+        <button data-source="3">Wind</button>
+        <button data-source="4">Rock</button>
+        <button data-source="5">Chem</button>
+      </div>
+      <p class="control-note" id="weather-description">Rain → runoff → river. Wind carves spires.</p>
+
+      <div class="control"><label for="particleCount">Particles <output id="particleCount-value"></output></label><input id="particleCount" type="range" min="256" max="2048" step="256" value="1024"/></div>
+      <div class="control"><label for="footprint">Agent footprint <output id="footprint-value"></output></label><input id="footprint" type="range" min="0.5" max="2.5" step="0.1" value="1.2"/></div>
+      <div class="control"><label for="rainfall">Intensity <output id="rainfall-value"></output></label><input id="rainfall" type="range" min="0" max="1" step="0.01" value="0.65"/></div>
+      <div class="control"><label for="erosion">Erosion rate <output id="erosion-value"></output></label><input id="erosion" type="range" min="0" max="1" step="0.01" value="0.62"/></div>
+      <div class="control"><label for="hardness">Hardness <output id="hardness-value"></output></label><input id="hardness" type="range" min="0" max="1" step="0.01" value="0.45"/></div>
+      <div class="control"><label for="deposition">Deposition <output id="deposition-value"></output></label><input id="deposition" type="range" min="0" max="1" step="0.01" value="0.35"/></div>
+      <div class="control"><label for="capacity">Capacity <output id="capacity-value"></output></label><input id="capacity" type="range" min="0" max="1" step="0.01" value="0.65"/></div>
+      <div class="control"><label for="stability">Stability <output id="stability-value"></output></label><input id="stability" type="range" min="0" max="1" step="0.05" value="0.5"/></div>
+      <p class="control-note">Stability scales the armor feedback: 0 = aggressive legacy-style digging (still budgeted), 1 = bedrock armor, incision always converges.</p>
+      <div class="control"><label for="grainSize">Grain size <output id="grainSize-value"></output></label><input id="grainSize" type="range" min="0.03" max="0.5" step="0.01" value="0.25"/></div>
+      <div class="control"><label for="wind">Wind drift <output id="wind-value"></output></label><input id="wind" type="range" min="0" max="1" step="0.01" value="0.25"/></div>
+      <div class="control"><label for="agentDiameter">Agent dia <output id="agentDiameter-value"></output></label><input id="agentDiameter" type="range" min="0.5" max="80" step="0.5" value="5"/></div>
+
+      <details open class="process-details"><summary>Hydraulic controls</summary>
+        <div class="control"><label for="riverSpeed">River speed <output id="riverSpeed-value"></output></label><input id="riverSpeed" type="range" min="0" max="8" step="0.1" value="3.2"/></div>
+        <div class="control"><label for="riverWidth">River width <output id="riverWidth-value"></output></label><input id="riverWidth" type="range" min="0.8" max="8" step="0.1" value="3.5"/></div>
+        <div class="control"><label for="riverDepth">Source depth <output id="riverDepth-value"></output></label><input id="riverDepth" type="range" min="0.1" max="2" step="0.1" value="0.6"/></div>
+        <div class="control"><label for="thermal">Thermal talus <output id="thermal-value"></output></label><input id="thermal" type="range" min="0" max="1" step="0.05" value="0.35"/></div>
+        <p class="control-note">Talus slumps columns steeper than the angle of repose (hardness-scaled), fills pits back, and never touches arch spans or floating sheets.</p>
+      </details>
+
+      <details class="process-details"><summary>Wind → canyon spires</summary>
+        <div class="control"><label for="windSpeed">Wind speed <output id="windSpeed-value"></output></label><input id="windSpeed" type="range" min="0" max="12" step="0.1" value="6.5"/></div>
+        <div class="control"><label for="windDirection">Wind dir <output id="windDirection-value"></output></label><input id="windDirection" type="range" min="0" max="360" step="1" value="0"/></div>
+        <div class="control"><label for="windHeight">Height <output id="windHeight-value"></output></label><input id="windHeight" type="range" min="0.5" max="18" step="0.1" value="7"/></div>
+        <p class="control-note">Wind abrades windward faces (dot(n, −wind)); combined with hydraulic valleys and strata → hoodoos.</p>
+      </details>
+
+      <div class="toggle-row"><div><strong>Show agents</strong><span>Water / sand / wind grains</span></div><button class="switch on" id="particle-toggle"><span></span></button></div>
+      <div class="toggle-row"><div><strong>Sediment plume</strong><span>Carried load visualization</span></div><button class="switch on" id="sediment-toggle"><span></span></button></div>
+      <button class="button wide" id="audit-erosion">Audit balance</button>
+      <pre class="erosion-audit hidden" id="erosion-audit"></pre>
+      <div class="control"><label for="speed">Time scale <output id="speed-value"></output></label><input id="speed" type="range" min="1" max="5" step="1" value="1"/></div>
+      <button class="text-button wide" id="reset-erosion">Reset erosion & sculpt</button>
+    </section>
+
+    <section class="panel hidden" id="panel-water">
+      <div class="section-label">WATER & LIGHT</div>
+      <div class="control"><label for="waterLevel">Water level <output id="waterLevel-value"></output></label><input id="waterLevel" type="range" min="0.1" max="5" step="0.1" value="0.7"/></div>
+      <div class="control"><label for="sun">Sun <output id="sun-value"></output></label><input id="sun" type="range" min="0" max="360" step="1" value="135"/></div>
+      <div class="control"><label for="haze">Haze <output id="haze-value"></output></label><input id="haze" type="range" min="0" max="1" step="0.01" value="0.25"/></div>
+      <div class="toggle-row"><div><strong>Water plane</strong><span>River surface & refraction</span></div><button class="switch on" id="water-toggle"><span></span></button></div>
+    </section>
+  </div>
+</aside>
+</div>
+
+<dialog id="help-dialog">
+  <h2>Frontier — Hybrid SDF Terrain Generator</h2>
+  <p><strong>What merged:</strong> the particle-branch's live GPU agents (rain / runoff / river / wind / rockfall / chemical) with the algorithmic branch's volumetric SDF authoring (CSG stamps, strata hardness, micro-detail) — plus fixes for both ancestors' failure modes.</p>
+  <p><strong>No more runaway holes:</strong> erosion demand is strictly bounded by the particle's free sediment capacity (budget), worn rock accumulates <em>armor</em> (integral feedback), stalled water dumps its load into pits, and a thin-wall guard avoids puncturing fins and arches. Headless A/B: trapped particles converge to <em>0.0 m</em> additional depth where the ancestor kept drilling.</p>
+  <p><strong>No more blur:</strong> carving uses compact, normal-squashed surface-shell kernels with stochastic grain modulation — not wide smooth deltas — and the volume is re-distanced (Eikonal + Lipschitz clamp) continuously. Headless A/B at equal removed volume: ~3× deeper pits, ~12× more surface texture.</p>
+  <p><strong>Proper sculpting:</strong> CSG carve/build/smooth/flatten brushes + a stamp library (arch, spire, butte, trench, cavern, crater, boulder, dome) with smooth-union modes — every stroke is followed by redistancing so the SDF stays valid.</p>
+  <dl>
+    <dt>Space</dt><dd>Run/pause erosion</dd>
+    <dt>Drag</dt><dd>Orbit</dd>
+    <dt>RMB drag</dt><dd>Look, WASD+QE fly</dd>
+    <dt>1-6</dt><dd>Sculpt tools</dd>
+    <dt>Alt+drag</dt><dd>Orbit while sculpting</dd>
+  </dl>
+  <pre id="renderer-diagnostics"></pre>
+  <button class="button" id="close-help">Close</button>
+</dialog>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
