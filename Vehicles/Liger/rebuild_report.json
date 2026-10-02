@@ -1,0 +1,88 @@
+{
+  "source": "Vehicles/Liger/mesh/Body_Main_Shell.npz",
+  "source_vertices": 70590,
+  "source_triangles": 139792,
+  "units": "cm source; metres in SolidArc",
+  "y_mirror_plane_source_cm": -47.858985900878906,
+  "x_extent_cm": [
+    -179.827,
+    258.173
+  ],
+  "section_spacing_cm": 3.0,
+  "valid_section_count": 145,
+  "interpolated_degenerate_sections": 2,
+  "surface_fit": {
+    "control_poles": [
+      60,
+      37
+    ],
+    "section_samples": [
+      147,
+      81
+    ],
+    "fit_max_at": {
+      "station_x_cm": 210.173,
+      "section_sample_index": 9
+    },
+    "fit_mean_cm": 0.4532667795182344,
+    "fit_rms_cm": 0.8559304889985349,
+    "fit_p95_cm": 1.922689992257058,
+    "fit_max_cm": 7.726323413656452
+  },
+  "body_representation": "single open one-face B-rep surface shell; not a closed solid",
+  "wheel_centres_cm": [
+    [
+      "F_Pos",
+      175.0688,
+      94.3266,
+      43.8138
+    ],
+    [
+      "F_Neg",
+      175.0688,
+      -94.3266,
+      43.8138
+    ],
+    [
+      "R_Pos",
+      -107.0,
+      97.958,
+      44.1095
+    ],
+    [
+      "R_Neg",
+      -107.0,
+      -97.958,
+      44.1095
+    ]
+  ],
+  "wheel_envelope_cm": {
+    "diameter": 82.6,
+    "width": 32.12
+  },
+  "parts": [
+    "fitted Body_Main_Shell surface",
+    "fair upper Front_Cowl patch; lower cowl boundaries retained as hidden curves",
+    "six open Roof_Glass_Frame rails",
+    "four parametric tire/rim/hub/spoke assemblies"
+  ],
+  "scope_note": "Unglazed exterior body-shell display assembly; no chassis, suspension, interior, or drivetrain.",
+  "solidarc_journal": "Vehicles/Liger/Liger_Rebuild.arc",
+  "solidarc_render_journal": "Vehicles/Liger/SolidArc/render_rebuild.arc",
+  "solidarc_validation": {
+    "modeling_command_refusals": 0,
+    "body_shell": {
+      "classification": "sheet",
+      "vertices": 4,
+      "edges": 4,
+      "faces": 1,
+      "loops": 1,
+      "hulls": 1,
+      "closed": false,
+      "manifold": true,
+      "oriented": true,
+      "volume_m3": 0.0,
+      "area_m2": 11.977384
+    }
+  }
+}
