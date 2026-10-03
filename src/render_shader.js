@@ -260,8 +260,8 @@ fn fs_obstacle(in: ObsVertexOutput) -> @location(0) vec4<f32> {
   let h = normalize(l + v);
   let spec = pow(max(dot(n, h), 0.0), 32.0);
 
-  let ref = reflect(-v, n);
-  let env = sampleEnvironment(ref);
+  let reflectedDir = reflect(-v, n);
+  let env = sampleEnvironment(reflectedDir);
 
   let col = in.color * (nDotL * 0.7 + 0.3) + env * 0.35 + spec * 0.4;
   return vec4<f32>(col, 1.0);

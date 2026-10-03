@@ -256,8 +256,22 @@ class FluidEngine {
 
     const simModule = device.createShaderModule({ code: SIMULATION_WGSL });
 
+    // Explicit Bind Group Layout for compute simulation
+    this.simBindGroupLayout = device.createBindGroupLayout({
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } }
+      ]
+    });
+
+    const simPipelineLayout = device.createPipelineLayout({
+      bindGroupLayouts: [this.simBindGroupLayout]
+    });
+
     this.densityPipeline = device.createComputePipeline({
-      layout: 'auto',
+      layout: simPipelineLayout,
       compute: {
         module: simModule,
         entryPoint: 'computeDensity'
@@ -265,7 +279,7 @@ class FluidEngine {
     });
 
     this.forcesPipeline = device.createComputePipeline({
-      layout: 'auto',
+      layout: simPipelineLayout,
       compute: {
         module: simModule,
         entryPoint: 'computeForcesAndIntegrate'
@@ -273,7 +287,7 @@ class FluidEngine {
     });
 
     this.simBindGroupA = device.createBindGroup({
-      layout: this.densityPipeline.getBindGroupLayout(0),
+      layout: this.simBindGroupLayout,
       entries: [
         { binding: 0, resource: { buffer: this.simParamsBuffer } },
         { binding: 1, resource: { buffer: this.particleBufferA } },
@@ -283,7 +297,7 @@ class FluidEngine {
     });
 
     this.simBindGroupB = device.createBindGroup({
-      layout: this.densityPipeline.getBindGroupLayout(0),
+      layout: this.simBindGroupLayout,
       entries: [
         { binding: 0, resource: { buffer: this.simParamsBuffer } },
         { binding: 1, resource: { buffer: this.particleBufferB } },
@@ -294,8 +308,22 @@ class FluidEngine {
 
     const renderModule = device.createShaderModule({ code: RENDER_WGSL });
 
+    // Explicit Bind Group Layout for rendering
+    this.renderBindGroupLayout = device.createBindGroupLayout({
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+        { binding: 2, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+        { binding: 3, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } }
+      ]
+    });
+
+    const renderPipelineLayout = device.createPipelineLayout({
+      bindGroupLayouts: [this.renderBindGroupLayout]
+    });
+
     this.fluidPipeline = device.createRenderPipeline({
-      layout: 'auto',
+      layout: renderPipelineLayout,
       vertex: {
         module: renderModule,
         entryPoint: 'vs_splat'
@@ -331,7 +359,7 @@ class FluidEngine {
     });
 
     this.obstaclePipeline = device.createRenderPipeline({
-      layout: 'auto',
+      layout: renderPipelineLayout,
       vertex: {
         module: renderModule,
         entryPoint: 'vs_obstacle',
@@ -363,7 +391,7 @@ class FluidEngine {
     });
 
     this.gridPipeline = device.createRenderPipeline({
-      layout: 'auto',
+      layout: renderPipelineLayout,
       vertex: {
         module: renderModule,
         entryPoint: 'vs_grid'
@@ -385,7 +413,7 @@ class FluidEngine {
 
     // Cache Render Bind Groups
     this.renderBindGroup = device.createBindGroup({
-      layout: this.fluidPipeline.getBindGroupLayout(0),
+      layout: this.renderBindGroupLayout,
       entries: [
         { binding: 0, resource: { buffer: this.cameraBuffer } },
         { binding: 1, resource: { buffer: this.materialBuffer } },

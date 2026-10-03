@@ -98,6 +98,11 @@ fn computeDensity(@builtin(global_invocation_id) global_id: vec3<u32>) {
   let p = particlesIn[idx];
   let h = params.smoothingLength;
   var density = poly6Kernel(0.0, h);
+  
+  // Keep obstacles referenced so bind layout matches forces pass
+  if (params.numObstacles > 0u && obstacles[0].radius < 0.0) {
+    density += 0.00001;
+  }
 
   // SPH neighborhood sampling
   // In dense grid or uniform pass, sample neighbors
