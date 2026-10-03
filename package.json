@@ -1,0 +1,24 @@
+{
+  "name": "frontier",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/darkenigmainbox/Frontier.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/darkenigmainbox/Frontier/issues"
+  },
+  "homepage": "https://github.com/darkenigmainbox/Frontier#readme",
+  "devDependencies": {
+    "vite": "^8.3.2"
+  }
+}

@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebGPU Real-time Fluid Simulation</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0d0f12;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #e2e8f0;
+    }
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+    /* Sleek Unreal Engine / Modern Studio Dark UI */
+    #ui-overlay {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 10;
+      width: 320px;
+      background: rgba(18, 22, 29, 0.88);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+    }
+    #ui-overlay::-webkit-scrollbar {
+      width: 6px;
+    }
+    #ui-overlay::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+    }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 10px;
+    }
+    .panel-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      font-size: 10px;
+      background: rgba(56, 189, 248, 0.18);
+      color: #38bdf8;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .stats-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .stat-label {
+      color: #94a3b8;
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+    .stat-val {
+      font-weight: 700;
+      color: #f1f5f9;
+      font-family: monospace;
+    }
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #94a3b8;
+      letter-spacing: 0.8px;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+    .preset-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .preset-btn {
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #e2e8f0;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .preset-btn:hover {
+      background: #334155;
+      border-color: #38bdf8;
+    }
+    .preset-btn.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: #38bdf8;
+      color: #38bdf8;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+    }
+    .color-swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .control-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 12px;
+    }
+    .control-header {
+      display: flex;
+      justify-content: space-between;
+      color: #cbd5e1;
+    }
+    input[type=range] {
+      width: 100%;
+      height: 5px;
+      background: #334155;
+      border-radius: 4px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #38bdf8;
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(56, 189, 248, 0.5);
+    }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+    .action-btn {
+      flex: 1;
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .action-btn:hover {
+      background: #1d4ed8;
+    }
+    .action-btn.secondary {
+      background: #334155;
+      color: #f1f5f9;
+    }
+    .action-btn.secondary:hover {
+      background: #475569;
+    }
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #334155;
+      transition: .3s;
+      border-radius: 20px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #38bdf8;
+    }
+    input:checked + .slider:before {
+      transform: translateX(16px);
+    }
+    #error-banner {
+      display: none;
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ef4444;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      z-index: 100;
+      font-size: 14px;
+      max-width: 80%;
+      text-align: center;
+    }
+    #render-mode-badge {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 12px;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 10;
+    }
+    .indicator-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 8px #22c55e;
+    }
+    .tooltip-help {
+      font-size: 11px;
+      color: #94a3b8;
+      line-height: 1.4;
+      background: rgba(0,0,0,0.25);
+      padding: 6px 8px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container">
+    <canvas id="simulation-canvas"></canvas>
+  </div>
+
+  <div id="error-banner"></div>
+
+  <div id="ui-overlay">
+    <div class="panel-header">
+      <div class="panel-title">
+        <span>⚡ RAD FLUIDS</span>
+        <span class="badge" id="backend-badge">WebGPU</span>
+      </div>
+      <span style="font-size: 11px; color: #64748b;">3D SPH SIM</span>
+    </div>
+
+    <!-- Live Performance Metrics -->
+    <div class="stats-row">
+      <div class="stat-item">
+        <span class="stat-label">Frame Rate</span>
+        <span class="stat-val" id="stat-fps">60 FPS</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Active Particles</span>
+        <span class="stat-val" id="stat-particles">24,576</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Internal Res</span>
+        <span class="stat-val" id="stat-res">100%</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Physics Step</span>
+        <span class="stat-val" id="stat-simtime">1.8 ms</span>
+      </div>
+    </div>
+
+    <!-- Liquid Material Presets -->
+    <div class="section-title">Fluid Material Preset</div>
+    <div class="preset-grid">
+      <button class="preset-btn active" data-preset="water">
+        <span class="color-swatch" style="background: #38bdf8; box-shadow: 0 0 6px #38bdf8;"></span>
+        <span>Water</span>
+      </button>
+      <button class="preset-btn" data-preset="milk">
+        <span class="color-swatch" style="background: #f8fafc; box-shadow: 0 0 6px #f8fafc;"></span>
+        <span>Milk</span>
+      </button>
+      <button class="preset-btn" data-preset="chocolate">
+        <span class="color-swatch" style="background: #5a2c14; box-shadow: 0 0 6px #78350f;"></span>
+        <span>Chocolate</span>
+      </button>
+      <button class="preset-btn" data-preset="mud">
+        <span class="color-swatch" style="background: #3b271a; box-shadow: 0 0 6px #451a03;"></span>
+        <span>Thick Mud</span>
+      </button>
+    </div>
+
+    <!-- Dynamic Resolution Scaling (Unreal Engine style DRS) -->
+    <div class="section-title">Dynamic Resolution (DRS)</div>
+    <div class="toggle-row">
+      <span>Auto Dynamic Scaling</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-drs" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="control-row">
+      <div class="control-header">
+        <span>Render Scale:</span>
+        <span id="label-scale">1.00x</span>
+      </div>
+      <input type="range" id="slider-scale" min="0.4" max="1.5" step="0.05" value="1.0">
+    </div>
+
+    <!-- Fluid Properties Sliders -->
+    <div class="section-title">Physical Properties</div>
+    <div class="control-row">
+      <div class="control-header">
+        <span>Viscosity:</span>
+        <span id="label-viscosity">0.05</span>
+      </div>
+      <input type="range" id="slider-viscosity" min="0.005" max="1.2" step="0.005" value="0.05">
+    </div>
+    <div class="control-row">
+      <div class="control-header">
+        <span>Surface Tension / Adhesion:</span>
+        <span id="label-adhesion">0.50</span>
+      </div>
+      <input type="range" id="slider-adhesion" min="0.0" max="1.0" step="0.02" value="0.5">
+    </div>
+    <div class="control-row">
+      <div class="control-header">
+        <span>Surface Sticking (Adsorption):</span>
+        <span id="label-stick">0.60</span>
+      </div>
+      <input type="range" id="slider-stick" min="0.0" max="1.0" step="0.02" value="0.6">
+    </div>
+    <div class="control-row">
+      <div class="control-header">
+        <span>Gravity:</span>
+        <span id="label-gravity">-9.8</span>
+      </div>
+      <input type="range" id="slider-gravity" min="-25.0" max="5.0" step="0.5" value="-9.8">
+    </div>
+
+    <!-- 3D Colliders & Interaction -->
+    <div class="section-title">Colliders & Interactions</div>
+    <div class="toggle-row">
+      <span>Dynamic Obstacles</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-obstacles" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span>Surface Sticking Effect</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-sticking" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span>Screenspace Screen Raymarch</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-ssfluid" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <!-- Actions -->
+    <div class="btn-row">
+      <button class="action-btn" id="btn-pour">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+        Continuous Pour
+      </button>
+      <button class="action-btn secondary" id="btn-reset">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+        Splash Reset
+      </button>
+    </div>
+
+    <div class="tooltip-help">
+      🖱️ <strong>Left Click + Drag:</strong> Orbit camera<br>
+      🖱️ <strong>Right Click / Shift + Drag:</strong> Pan camera<br>
+      🛞 <strong>Mouse Wheel:</strong> Zoom in / out<br>
+      ⚡ <strong>Spacebar:</strong> Spawn liquid burst into colliders!
+    </div>
+  </div>
+
+  <div id="render-mode-badge">
+    <div class="indicator-dot"></div>
+    <span id="engine-status">WebGPU High Performance Simulation</span>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
