@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="theme-color" content="#08090b"/><title>Frontier — Tread Lab</title></head>
+<body class="designer-mode">
+<div id="app">
+  <header class="header">
+    <a class="brand" href="./" aria-label="Frontier home"><span class="brand-symbol">F</span>FRONTIER<span class="brand-dot">®</span></a>
+    <div class="header-divider"></div><div class="product-name">Tread Lab <span>07</span></div>
+    <div class="workspace-switch" role="group" aria-label="Workspace mode"><button data-workspace="designer" aria-pressed="true">✧ Designer</button><button data-workspace="viewer" aria-pressed="false">◎ Viewer</button></div>
+    <div class="header-right"><span class="local-badge"><i></i> LOCAL WORKSPACE</span><button id="about" class="icon-button" title="About this workspace" aria-label="About this workspace">?</button><a class="source-link" href="https://gist.github.com/SultanAladin/b9585bb30c92c916fbab8c740f85de37" target="_blank" rel="noreferrer">Reference ↗</a></div>
+  </header>
+  <main class="workspace">
+    <aside class="library">
+      <div class="section-eyebrow">01 / PATTERN LIBRARY</div>
+      <h1>Built for the ground.</h1><p class="intro">Eight patterns. Real geometry.<br>Editable reference studies.</p>
+      <div id="pattern-filters" class="pattern-filters" role="group" aria-label="Filter pattern library"></div>
+      <div id="patterns" class="pattern-list"></div>
+      <div class="library-note"><span class="cube-icon">◇</span><div><strong>Mesh, not a material.</strong><p>Every block, groove and sipe is modeled in 3D. No texture maps.</p></div></div>
+      <button id="blueprint" class="text-button">Blueprint & references <span>↗</span></button>
+    </aside>
+    <section class="stage" aria-label="Interactive 3D tread viewer">
+      <div id="viewport"></div>
+      <div class="stage-heading"><div class="section-eyebrow">GEOMETRY WORKSPACE / REV 07</div><h2 id="model-title">Rugged terrain<span> / 03</span></h2><p id="model-subtitle">285 mm · 32 repeats · 16 mm depth</p></div>
+      <div class="mesh-badge"><i></i> LIVE MESH</div>
+      <div class="stage-actions"><button id="reset-camera" class="icon-button" title="Fit model (F)" aria-label="Fit model">⤢</button><button id="rotate" class="icon-button" title="Auto-rotate" aria-label="Toggle auto-rotate" aria-pressed="false">⟳</button></div>
+      <div class="axis-widget" aria-hidden="true"><span class="axis-y">Y</span><span class="axis-z">Z</span><span class="axis-x">X</span><i></i></div>
+      <div class="view-dock"><div class="segmented" id="view-control"><button data-view="tire" class="active">◎ <span>Wrapped tire</span></button><button data-view="flat">▤ <span>Flat tread</span></button></div><span class="dock-divider"></span><button id="wireframe" class="wire-button" aria-pressed="false"><span>▧</span> Wireframe</button></div>
+      <div class="viewer-hint"><span>DRAG</span> orbit <b>·</b><span>SCROLL</span> zoom <b>·</b><span>RIGHT DRAG</span> pan</div>
+      <div id="loading" class="loading" hidden>Building geometry…</div>
+      <div id="error" class="error" hidden></div>
+    </section>
+    <aside class="inspector">
+      <div class="inspector-heading"><div class="section-eyebrow">02 / MESH PARAMETERS</div><button id="reset-settings" class="text-button" title="Reset selected pattern">Reset ↺</button></div>
+      <section class="control-section"><h3>Dimensions <span>mm</span></h3>
+        <label class="slider-label" for="width">Tread width <output id="width-value">285</output></label><input id="width" type="range" min="180" max="360" step="5" value="285"/><div class="range-ends"><span>180</span><span>360</span></div>
+        <label class="slider-label" for="radius">Tire radius <output id="radius-value">340</output></label><input id="radius" type="range" min="250" max="500" step="5" value="340"/><div class="range-ends"><span>250</span><span>500</span></div>
+        <label class="slider-label" for="depth">Tread depth <output id="depth-value">16</output></label><input id="depth" type="range" min="4" max="26" step="1" value="16"/><div class="range-ends"><span>4</span><span>26</span></div>
+      </section>
+      <section class="control-section"><h3>Pattern construction</h3>
+        <label class="slider-label" for="repeats">Circumference repeats <output id="repeats-value">32</output></label><input id="repeats" type="range" min="20" max="72" step="2" value="32"/><div class="range-ends"><span>20</span><span>72</span></div>
+        <label class="slider-label" for="gap">Groove spacing <output id="gap-value">1.00×</output></label><input id="gap" type="range" min="0.65" max="1.6" step="0.05" value="1"/><div class="range-ends"><span>Tighter</span><span>Wider</span></div>
+        <label class="toggle-row"><span>Geometric sipes<small>Recessed cuts, not painted lines</small></span><input type="checkbox" id="sipes" checked/><span class="toggle"></span></label>
+        <label class="toggle-row"><span>Include carcass<small>Base tire / backing mesh</small></span><input type="checkbox" id="casing" checked/><span class="toggle"></span></label>
+      </section>
+      <section class="mesh-summary"><div class="summary-title"><span class="section-eyebrow">MESH DATA</span><span class="small-tag">POLYGONAL</span></div><div><span>Tread blocks</span><strong id="block-count">—</strong></div><div><span>Triangles</span><strong id="triangle-count">—</strong></div><div><span>Maps / displacement</span><strong>None</strong></div></section>
+      <div class="export-section"><div class="export-options"><label for="export-format">Export geometry</label><select id="export-format"><option value="obj">.OBJ</option><option value="stl">.STL</option></select></div><button id="export" class="export-button"><span>↓</span> Download mesh <span>↗</span></button><p>Current view · millimeters · mesh assembly</p></div>
+    </aside>
+  </main>
+  <footer><span><i></i> <span id="status">Geometry engine ready</span></span><span class="footer-center">REFERENCE-BASED / PROCEDURAL MESHES</span><span>FRONTIER <b>/</b> TREAD LAB 1.6</span></footer>
+</div>
+<dialog id="info-dialog"><button id="close-dialog" class="icon-button dialog-close" aria-label="Close dialog">×</button><div id="dialog-content"></div></dialog>
+<div id="toast" role="status"></div>
+<script type="module" src="/src/main.js"></script>
+</body></html>
