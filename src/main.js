@@ -3,6 +3,7 @@ import { SIMULATION_WGSL } from './simulation_shader.js';
 import { RENDER_WGSL } from './render_shader.js';
 import { createSphereGeometry, createBoxGeometry } from './geometry.js';
 import { FLUID_PRESETS } from './presets.js';
+import { WebGLFluidEngine } from './webgl_fallback.js';
 
 class FluidEngine {
   constructor(canvas) {
@@ -78,7 +79,7 @@ class FluidEngine {
 
   async init() {
     if (!navigator.gpu) {
-      throw new Error("WebGPU is not supported by your browser or platform. Please enable WebGPU in Chrome / Edge / Firefox Nightly flags.");
+      throw new Error("WebGPU is not supported by your browser or platform.");
     }
 
     const adapter = await navigator.gpu.requestAdapter({
@@ -127,33 +128,27 @@ class FluidEngine {
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC
     });
 
-    // 2. Obstacles Storage Buffer
-    // Obstacle: pos(3), radius(1), vel(3), shapeType(1), halfExtents(3), stickiness(1) = 12 floats = 48 bytes
-    const obstacleData = new Float32Array(this.obstacles.length * 12);
-    this.updateObstacleBufferData(obstacleData);
-
-    this.obstacleBuffer = device.createBuffer({
-      size: obstacleData.byteLength,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-    });
-    device.queue.writeBuffer(this.obstacleBuffer, 0, obstacleData);
-
-    // 3. SimParams Uniform Buffer
-    // 20 floats / ints = 80 bytes (aligned to 96 bytes)
+    // 2. Simulation Uniform Parameters
     this.simParamsBuffer = device.createBuffer({
       size: 96,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     });
 
+    // 3. Obstacle Storage Buffer
+    // Each obstacle struct = 12 floats = 48 bytes
+    const obstacleBufferSize = Math.max(this.obstacles.length * 48, 64);
+    this.obstacleBuffer = device.createBuffer({
+      size: obstacleBufferSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+    });
+
     // 4. Camera Uniform Buffer
-    // view(16), proj(16), invProj(16), invView(16), eyePos(3), aspect(1), screenSize(2), renderScale(1), time(1) = 72 floats = 288 bytes
     this.cameraBuffer = device.createBuffer({
       size: 320,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     });
 
     // 5. Material Uniform Buffer
-    // baseColor(4), subsurfaceColor(4), roughness(1), metallic(1), ior(1), opacity(1), stickingColor(4), attenuation(1), specPower(1), sssInt(1), foam(1) = 20 floats = 80 bytes
     this.materialBuffer = device.createBuffer({
       size: 96,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
@@ -181,7 +176,7 @@ class FluidEngine {
     });
     device.queue.writeBuffer(this.sphereIndexBuffer, 0, sphere.indices);
 
-    // Create Depth Texture for 3D sorting and screen rendering
+    // Initial depth texture
     this.recreateDepthTexture();
   }
 
@@ -189,8 +184,8 @@ class FluidEngine {
     if (this.depthTexture) {
       this.depthTexture.destroy();
     }
-    const width = Math.max(1, Math.floor(this.canvas.width * this.renderScale));
-    const height = Math.max(1, Math.floor(this.canvas.height * this.renderScale));
+    const width = Math.max(1, this.canvas.width);
+    const height = Math.max(1, this.canvas.height);
 
     this.depthTexture = this.device.createTexture({
       size: [width, height],
@@ -223,7 +218,6 @@ class FluidEngine {
 
   resetFluidParticles() {
     const data = new Float32Array(this.numParticles * 8);
-    // Initialize particles in a falling stream & pool block above the colliders
     let idx = 0;
     const side = Math.cbrt(this.numParticles);
     const spacing = 0.11;
@@ -234,7 +228,6 @@ class FluidEngine {
           if (idx >= this.numParticles) break;
           const pIndex = idx * 8;
 
-          // Jittered block placement centered above obstacles
           const px = (x - side / 2) * spacing + (Math.random() - 0.5) * 0.02;
           const py = 0.8 + y * spacing + (Math.random() - 0.5) * 0.02;
           const pz = (z - side / 2) * spacing + (Math.random() - 0.5) * 0.02;
@@ -242,12 +235,12 @@ class FluidEngine {
           data[pIndex + 0] = px;
           data[pIndex + 1] = py;
           data[pIndex + 2] = pz;
-          data[pIndex + 3] = 0.0; // Sticking weight
+          data[pIndex + 3] = 0.0;
 
-          data[pIndex + 4] = (Math.random() - 0.5) * 0.1; // vx
-          data[pIndex + 5] = -0.5 - Math.random() * 0.5;  // vy downward initial velocity
-          data[pIndex + 6] = (Math.random() - 0.5) * 0.1; // vz
-          data[pIndex + 7] = this.params.density;         // initial density
+          data[pIndex + 4] = (Math.random() - 0.5) * 0.1;
+          data[pIndex + 5] = -0.5 - Math.random() * 0.5;
+          data[pIndex + 6] = (Math.random() - 0.5) * 0.1;
+          data[pIndex + 7] = this.params.density;
 
           idx++;
         }
@@ -261,10 +254,8 @@ class FluidEngine {
   initPipelines() {
     const device = this.device;
 
-    // Simulation Shader Module
     const simModule = device.createShaderModule({ code: SIMULATION_WGSL });
 
-    // 1. Density Pipeline
     this.densityPipeline = device.createComputePipeline({
       layout: 'auto',
       compute: {
@@ -273,7 +264,6 @@ class FluidEngine {
       }
     });
 
-    // 2. Forces & Collision Integration Pipeline
     this.forcesPipeline = device.createComputePipeline({
       layout: 'auto',
       compute: {
@@ -282,7 +272,6 @@ class FluidEngine {
       }
     });
 
-    // Create Compute Bind Groups (Ping-Pong A -> B, and B -> A)
     this.simBindGroupA = device.createBindGroup({
       layout: this.densityPipeline.getBindGroupLayout(0),
       entries: [
@@ -303,10 +292,8 @@ class FluidEngine {
       ]
     });
 
-    // Render Shader Module
     const renderModule = device.createShaderModule({ code: RENDER_WGSL });
 
-    // Fluid Splat Rendering Pipeline with Alpha Blending
     this.fluidPipeline = device.createRenderPipeline({
       layout: 'auto',
       vertex: {
@@ -343,7 +330,6 @@ class FluidEngine {
       }
     });
 
-    // Obstacle Mesh Rendering Pipeline
     this.obstaclePipeline = device.createRenderPipeline({
       layout: 'auto',
       vertex: {
@@ -376,7 +362,6 @@ class FluidEngine {
       }
     });
 
-    // Grid Floor Pipeline
     this.gridPipeline = device.createRenderPipeline({
       layout: 'auto',
       vertex: {
@@ -397,6 +382,17 @@ class FluidEngine {
         format: 'depth24plus'
       }
     });
+
+    // Cache Render Bind Groups
+    this.renderBindGroup = device.createBindGroup({
+      layout: this.fluidPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.cameraBuffer } },
+        { binding: 1, resource: { buffer: this.materialBuffer } },
+        { binding: 2, resource: { buffer: this.particleBufferA } },
+        { binding: 3, resource: { buffer: this.obstacleBuffer } }
+      ]
+    });
   }
 
   updateSimulationParams() {
@@ -413,17 +409,15 @@ class FluidEngine {
     f32[6] = this.params.sticking;
     f32[7] = this.params.gravity;
 
-    // boxMin: vec3(-2.0, -1.4, -2.0)
     f32[8] = -2.0; f32[9] = -1.4; f32[10] = -2.0;
     u32[11] = this.numParticles;
 
-    // boxMax: vec3(2.0, 2.0, 2.0)
     f32[12] = 2.0; f32[13] = 2.0; f32[14] = 2.0;
     u32[15] = this.obstaclesEnabled ? this.obstacles.length : 0;
 
     f32[16] = this.simTime;
     f32[17] = this.pourEnabled ? 1.0 : 0.0;
-    f32[18] = 1.0; // pourRate
+    f32[18] = 1.0;
     f32[19] = this.enableSticking ? 1.0 : 0.0;
 
     this.device.queue.writeBuffer(this.simParamsBuffer, 0, f32);
@@ -467,9 +461,7 @@ class FluidEngine {
     const mat = this.params;
     const f32 = new Float32Array(24);
 
-    // baseColor (vec4)
     f32[0] = mat.baseColor[0]; f32[1] = mat.baseColor[1]; f32[2] = mat.baseColor[2]; f32[3] = mat.baseColor[3];
-    // subsurfaceColor (vec4)
     f32[4] = mat.subsurfaceColor[0]; f32[5] = mat.subsurfaceColor[1]; f32[6] = mat.subsurfaceColor[2]; f32[7] = mat.subsurfaceColor[3];
 
     f32[8] = mat.roughness;
@@ -477,7 +469,6 @@ class FluidEngine {
     f32[10] = mat.ior;
     f32[11] = mat.opacity;
 
-    // stickingColor (vec4)
     f32[12] = mat.stickingColor[0]; f32[13] = mat.stickingColor[1]; f32[14] = mat.stickingColor[2]; f32[15] = mat.stickingColor[3];
 
     f32[16] = mat.attenuationDistance;
@@ -488,7 +479,6 @@ class FluidEngine {
     this.device.queue.writeBuffer(this.materialBuffer, 0, f32);
   }
 
-  // Unreal Engine style Dynamic Resolution Scaling (DRS) algorithm
   updateDynamicResolution(frameDeltaMs) {
     if (!this.drsAuto) return;
 
@@ -498,7 +488,6 @@ class FluidEngine {
     const avgFps = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
     this.currentFps = Math.round(avgFps);
 
-    // DRS Adjustment logic
     let newScale = this.renderScale;
     if (avgFps < 52.0 && this.renderScale > 0.5) {
       newScale = Math.max(0.5, this.renderScale - 0.02);
@@ -521,24 +510,25 @@ class FluidEngine {
     }
   }
 
+  splashBurst() {
+    this.resetFluidParticles();
+  }
+
   render(currentTime) {
     const deltaMs = currentTime - this.lastFrameTime;
     this.lastFrameTime = currentTime;
     this.simTime += 0.016;
 
-    // 1. Dynamic Resolution evaluation
     this.updateDynamicResolution(deltaMs);
 
-    // Handle canvas dimensions
-    const displayWidth = this.canvas.clientWidth;
-    const displayHeight = this.canvas.clientHeight;
+    const displayWidth = Math.max(1, Math.floor(this.canvas.clientWidth * this.renderScale));
+    const displayHeight = Math.max(1, Math.floor(this.canvas.clientHeight * this.renderScale));
     if (this.canvas.width !== displayWidth || this.canvas.height !== displayHeight) {
       this.canvas.width = displayWidth;
       this.canvas.height = displayHeight;
       this.recreateDepthTexture();
     }
 
-    // 2. Animate Dynamic Obstacles slightly for realistic fluid splash & surface adherence
     const obsSin = Math.sin(this.simTime * 1.5) * 0.15;
     this.obstacles[0].pos[0] = obsSin;
     this.obstacles[0].vel[0] = Math.cos(this.simTime * 1.5) * 0.15 * 1.5;
@@ -547,7 +537,6 @@ class FluidEngine {
     this.updateObstacleBufferData(obsData);
     this.device.queue.writeBuffer(this.obstacleBuffer, 0, obsData);
 
-    // 3. Update Uniforms
     this.updateSimulationParams();
     this.updateCameraUniforms();
     this.updateMaterialUniforms();
@@ -555,14 +544,12 @@ class FluidEngine {
     const tStartSim = performance.now();
     const commandEncoder = this.device.createCommandEncoder();
 
-    // 4. Compute Pass 1: Compute Density (Buffer A -> Buffer B)
     const computePass1 = commandEncoder.beginComputePass();
     computePass1.setPipeline(this.densityPipeline);
     computePass1.setBindGroup(0, this.simBindGroupA);
     computePass1.dispatchWorkgroups(Math.ceil(this.numParticles / 64));
     computePass1.end();
 
-    // 5. Compute Pass 2: Compute SPH Forces & Collision Integration (Buffer B -> Buffer A)
     const computePass2 = commandEncoder.beginComputePass();
     computePass2.setPipeline(this.forcesPipeline);
     computePass2.setBindGroup(0, this.simBindGroupB);
@@ -571,7 +558,6 @@ class FluidEngine {
 
     this.physicsStepMs = (performance.now() - tStartSim).toFixed(2);
 
-    // 6. Graphics Render Pass
     const currentView = this.context.getCurrentTexture().createView();
     const renderPass = commandEncoder.beginRenderPass({
       colorAttachments: [{
@@ -590,51 +576,26 @@ class FluidEngine {
 
     // Draw Floor Grid
     renderPass.setPipeline(this.gridPipeline);
-    renderPass.setBindGroup(0, this.device.createBindGroup({
-      layout: this.gridPipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: this.cameraBuffer } },
-        { binding: 1, resource: { buffer: this.materialBuffer } },
-        { binding: 2, resource: { buffer: this.particleBufferA } },
-        { binding: 3, resource: { buffer: this.obstacleBuffer } }
-      ]
-    }));
+    renderPass.setBindGroup(0, this.renderBindGroup);
     renderPass.draw(6);
 
     // Draw Obstacles
     if (this.obstaclesEnabled) {
       renderPass.setPipeline(this.obstaclePipeline);
-      renderPass.setBindGroup(0, this.device.createBindGroup({
-        layout: this.obstaclePipeline.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: { buffer: this.cameraBuffer } },
-          { binding: 1, resource: { buffer: this.materialBuffer } },
-          { binding: 2, resource: { buffer: this.particleBufferA } },
-          { binding: 3, resource: { buffer: this.obstacleBuffer } }
-        ]
-      }));
+      renderPass.setBindGroup(0, this.renderBindGroup);
       renderPass.setVertexBuffer(0, this.spherePosBuffer);
       renderPass.setVertexBuffer(1, this.sphereNormalBuffer);
       renderPass.setIndexBuffer(this.sphereIndexBuffer, 'uint16');
       renderPass.drawIndexed(this.sphereVertCount, this.obstacles.length);
     }
 
-    // Draw 3D Fluid Particles with Screen Space Splats & Shaders
+    // Draw 3D Fluid Particles
     renderPass.setPipeline(this.fluidPipeline);
-    renderPass.setBindGroup(0, this.device.createBindGroup({
-      layout: this.fluidPipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: this.cameraBuffer } },
-        { binding: 1, resource: { buffer: this.materialBuffer } },
-        { binding: 2, resource: { buffer: this.particleBufferA } },
-        { binding: 3, resource: { buffer: this.obstacleBuffer } }
-      ]
-    }));
+    renderPass.setBindGroup(0, this.renderBindGroup);
     renderPass.draw(4, this.numParticles);
 
     renderPass.end();
 
-    // Submit Work to GPU
     this.device.queue.submit([commandEncoder.finish()]);
   }
 
@@ -652,8 +613,6 @@ class FluidEngine {
       this.camera.isDragging = false;
     });
 
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-
     window.addEventListener('mousemove', (e) => {
       if (!this.camera.isDragging) return;
       const dx = e.clientX - this.camera.lastMouseX;
@@ -665,177 +624,196 @@ class FluidEngine {
         this.camera.target[0] -= dx * 0.005;
         this.camera.target[1] += dy * 0.005;
       } else {
-        this.camera.orbitY += dx * 0.008;
+        this.camera.orbitY -= dx * 0.008;
         this.camera.orbitX = Math.max(-1.4, Math.min(1.4, this.camera.orbitX + dy * 0.008));
       }
     });
 
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      this.camera.distance = Math.max(1.5, Math.min(12.0, this.camera.distance + e.deltaY * 0.004));
+      this.camera.distance = Math.max(1.5, Math.min(12.0, this.camera.distance + e.deltaY * 0.005));
     }, { passive: false });
 
-    // Keyboard trigger for splash burst
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space') {
-        e.preventDefault();
         this.splashBurst();
       }
     });
   }
-
-  splashBurst() {
-    this.resetFluidParticles();
-  }
 }
 
-// -------------------------------------------------------------
-// UI Integration and Application Bootstrap
-// -------------------------------------------------------------
 async function bootstrap() {
   const canvas = document.getElementById('simulation-canvas');
-  const errorBanner = document.getElementById('error-banner');
+  const backendBadge = document.getElementById('backend-badge');
+  const engineStatus = document.getElementById('engine-status');
 
+  let engine = null;
+  let backendName = 'WebGPU';
+
+  // Attempt WebGPU first; if unavailable, fallback gracefully to high-performance WebGL2
   try {
-    const engine = new FluidEngine(canvas);
-    await engine.init();
-
-    // Hook UI elements
-    const statFps = document.getElementById('stat-fps');
-    const statParticles = document.getElementById('stat-particles');
-    const statRes = document.getElementById('stat-res');
-    const statSimTime = document.getElementById('stat-simtime');
-
-    const toggleDrs = document.getElementById('toggle-drs');
-    const sliderScale = document.getElementById('slider-scale');
-    const labelScale = document.getElementById('label-scale');
-
-    const sliderViscosity = document.getElementById('slider-viscosity');
-    const labelViscosity = document.getElementById('label-viscosity');
-
-    const sliderAdhesion = document.getElementById('slider-adhesion');
-    const labelAdhesion = document.getElementById('label-adhesion');
-
-    const sliderStick = document.getElementById('slider-stick');
-    const labelStick = document.getElementById('label-stick');
-
-    const sliderGravity = document.getElementById('slider-gravity');
-    const labelGravity = document.getElementById('label-gravity');
-
-    const toggleObstacles = document.getElementById('toggle-obstacles');
-    const toggleSticking = document.getElementById('toggle-sticking');
-
-    const btnPour = document.getElementById('btn-pour');
-    const btnReset = document.getElementById('btn-reset');
-
-    // Preset Buttons
-    const presetButtons = document.querySelectorAll('.preset-btn');
-    presetButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        presetButtons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const key = btn.dataset.preset;
-        engine.setPreset(key);
-
-        // Update UI sliders to match preset
-        sliderViscosity.value = engine.params.viscosity;
-        labelViscosity.textContent = engine.params.viscosity.toFixed(3);
-
-        sliderAdhesion.value = engine.params.adhesion;
-        labelAdhesion.textContent = engine.params.adhesion.toFixed(2);
-
-        sliderStick.value = engine.params.sticking;
-        labelStick.textContent = engine.params.sticking.toFixed(2);
-
-        sliderGravity.value = engine.params.gravity;
-        labelGravity.textContent = engine.params.gravity.toFixed(1);
-      });
-    });
-
-    // DRS Toggles
-    toggleDrs.addEventListener('change', (e) => {
-      engine.drsAuto = e.target.checked;
-      sliderScale.disabled = e.target.checked;
-    });
-
-    sliderScale.addEventListener('input', (e) => {
-      if (!engine.drsAuto) {
-        engine.renderScale = parseFloat(e.target.value);
-        labelScale.textContent = `${engine.renderScale.toFixed(2)}x`;
-        engine.recreateDepthTexture();
+    if (!navigator.gpu) {
+      throw new Error("WebGPU API not available in navigator");
+    }
+    const gpuEngine = new FluidEngine(canvas);
+    await gpuEngine.init();
+    engine = gpuEngine;
+    backendName = 'WebGPU';
+    if (backendBadge) backendBadge.textContent = 'WebGPU';
+    if (engineStatus) engineStatus.textContent = 'WebGPU Hardware Accelerated Simulation';
+  } catch (gpuError) {
+    console.warn("WebGPU initialization failed, switching to WebGL2 engine fallback:", gpuError);
+    try {
+      const glEngine = new WebGLFluidEngine(canvas);
+      engine = glEngine;
+      backendName = 'WebGL2';
+      if (backendBadge) {
+        backendBadge.textContent = 'WebGL2';
+        backendBadge.style.color = '#a855f7';
+        backendBadge.style.borderColor = '#a855f7';
+        backendBadge.style.background = 'rgba(168, 85, 247, 0.2)';
       }
-    });
-
-    // Sliders
-    sliderViscosity.addEventListener('input', (e) => {
-      const v = parseFloat(e.target.value);
-      engine.params.viscosity = v;
-      labelViscosity.textContent = v.toFixed(3);
-    });
-
-    sliderAdhesion.addEventListener('input', (e) => {
-      const v = parseFloat(e.target.value);
-      engine.params.adhesion = v;
-      labelAdhesion.textContent = v.toFixed(2);
-    });
-
-    sliderStick.addEventListener('input', (e) => {
-      const v = parseFloat(e.target.value);
-      engine.params.sticking = v;
-      labelStick.textContent = v.toFixed(2);
-    });
-
-    sliderGravity.addEventListener('input', (e) => {
-      const v = parseFloat(e.target.value);
-      engine.params.gravity = v;
-      labelGravity.textContent = v.toFixed(1);
-    });
-
-    toggleObstacles.addEventListener('change', (e) => {
-      engine.obstaclesEnabled = e.target.checked;
-    });
-
-    toggleSticking.addEventListener('change', (e) => {
-      engine.enableSticking = e.target.checked;
-    });
-
-    btnPour.addEventListener('click', () => {
-      engine.pourEnabled = !engine.pourEnabled;
-      btnPour.style.background = engine.pourEnabled ? '#2563eb' : '#475569';
-    });
-
-    btnReset.addEventListener('click', () => {
-      engine.splashBurst();
-    });
-
-    statParticles.textContent = engine.numParticles.toLocaleString();
-
-    // Main Animation Loop
-    let lastUiUpdate = 0;
-    function frame(time) {
-      engine.render(time);
-
-      if (time - lastUiUpdate > 250) {
-        lastUiUpdate = time;
-        statFps.textContent = `${engine.currentFps} FPS`;
-        statRes.textContent = `${Math.round(engine.renderScale * 100)}%`;
-        statSimTime.textContent = `${engine.physicsStepMs} ms`;
-        if (engine.drsAuto) {
-          sliderScale.value = engine.renderScale;
-          labelScale.textContent = `${engine.renderScale.toFixed(2)}x (Auto)`;
-        }
+      if (engineStatus) engineStatus.textContent = 'WebGL2 High Performance Fallback Simulation';
+    } catch (glError) {
+      console.error("Fatal: Both WebGPU and WebGL failed:", glError);
+      const errorBanner = document.getElementById('error-banner');
+      if (errorBanner) {
+        errorBanner.style.display = 'block';
+        errorBanner.innerHTML = `<strong>GPU Context Failed:</strong><br>${glError.message}`;
       }
+      return;
+    }
+  }
 
-      requestAnimationFrame(frame);
+  // Hook UI elements
+  const statFps = document.getElementById('stat-fps');
+  const statParticles = document.getElementById('stat-particles');
+  const statRes = document.getElementById('stat-res');
+  const statSimTime = document.getElementById('stat-simtime');
+
+  const toggleDrs = document.getElementById('toggle-drs');
+  const sliderScale = document.getElementById('slider-scale');
+  const labelScale = document.getElementById('label-scale');
+
+  const sliderViscosity = document.getElementById('slider-viscosity');
+  const labelViscosity = document.getElementById('label-viscosity');
+
+  const sliderAdhesion = document.getElementById('slider-adhesion');
+  const labelAdhesion = document.getElementById('label-adhesion');
+
+  const sliderStick = document.getElementById('slider-stick');
+  const labelStick = document.getElementById('label-stick');
+
+  const sliderGravity = document.getElementById('slider-gravity');
+  const labelGravity = document.getElementById('label-gravity');
+
+  const toggleObstacles = document.getElementById('toggle-obstacles');
+  const toggleSticking = document.getElementById('toggle-sticking');
+
+  const btnPour = document.getElementById('btn-pour');
+  const btnReset = document.getElementById('btn-reset');
+
+  // Preset Buttons
+  const presetButtons = document.querySelectorAll('.preset-btn');
+  presetButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      presetButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const key = btn.dataset.preset;
+      engine.setPreset(key);
+
+      sliderViscosity.value = engine.params.viscosity;
+      labelViscosity.textContent = engine.params.viscosity.toFixed(3);
+
+      sliderAdhesion.value = engine.params.adhesion;
+      labelAdhesion.textContent = engine.params.adhesion.toFixed(2);
+
+      sliderStick.value = engine.params.sticking;
+      labelStick.textContent = engine.params.sticking.toFixed(2);
+
+      sliderGravity.value = engine.params.gravity;
+      labelGravity.textContent = engine.params.gravity.toFixed(1);
+    });
+  });
+
+  // DRS Toggles
+  toggleDrs.addEventListener('change', (e) => {
+    engine.drsAuto = e.target.checked;
+    sliderScale.disabled = e.target.checked;
+  });
+
+  sliderScale.addEventListener('input', (e) => {
+    if (!engine.drsAuto) {
+      engine.renderScale = parseFloat(e.target.value);
+      labelScale.textContent = `${engine.renderScale.toFixed(2)}x`;
+      if (engine.recreateDepthTexture) engine.recreateDepthTexture();
+    }
+  });
+
+  // Sliders
+  sliderViscosity.addEventListener('input', (e) => {
+    const v = parseFloat(e.target.value);
+    engine.params.viscosity = v;
+    labelViscosity.textContent = v.toFixed(3);
+  });
+
+  sliderAdhesion.addEventListener('input', (e) => {
+    const v = parseFloat(e.target.value);
+    engine.params.adhesion = v;
+    labelAdhesion.textContent = v.toFixed(2);
+  });
+
+  sliderStick.addEventListener('input', (e) => {
+    const v = parseFloat(e.target.value);
+    engine.params.sticking = v;
+    labelStick.textContent = v.toFixed(2);
+  });
+
+  sliderGravity.addEventListener('input', (e) => {
+    const v = parseFloat(e.target.value);
+    engine.params.gravity = v;
+    labelGravity.textContent = v.toFixed(1);
+  });
+
+  toggleObstacles.addEventListener('change', (e) => {
+    engine.obstaclesEnabled = e.target.checked;
+  });
+
+  toggleSticking.addEventListener('change', (e) => {
+    engine.enableSticking = e.target.checked;
+  });
+
+  btnPour.addEventListener('click', () => {
+    engine.pourEnabled = !engine.pourEnabled;
+    btnPour.style.background = engine.pourEnabled ? '#2563eb' : '#475569';
+  });
+
+  btnReset.addEventListener('click', () => {
+    engine.splashBurst();
+  });
+
+  statParticles.textContent = engine.numParticles.toLocaleString();
+
+  // Main Animation Loop
+  let lastUiUpdate = 0;
+  function frame(time) {
+    engine.render(time);
+
+    if (time - lastUiUpdate > 250) {
+      lastUiUpdate = time;
+      statFps.textContent = `${engine.currentFps} FPS`;
+      statRes.textContent = `${Math.round(engine.renderScale * 100)}%`;
+      statSimTime.textContent = `${engine.physicsStepMs} ms`;
+      if (engine.drsAuto) {
+        sliderScale.value = engine.renderScale;
+        labelScale.textContent = `${engine.renderScale.toFixed(2)}x (Auto)`;
+      }
     }
 
     requestAnimationFrame(frame);
-
-  } catch (err) {
-    console.error("WebGPU Initialization Error:", err);
-    errorBanner.style.display = 'block';
-    errorBanner.innerHTML = `<strong>WebGPU Initialization Failed:</strong><br>${err.message}<br><br><span style="font-size:12px;opacity:0.9;">Ensure your browser supports WebGPU and WebGPU is enabled in browser flags.</span>`;
   }
+
+  requestAnimationFrame(frame);
 }
 
 window.addEventListener('DOMContentLoaded', bootstrap);
