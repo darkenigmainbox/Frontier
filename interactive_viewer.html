@@ -430,22 +430,31 @@ async function fetchDefaultConfig() {
 
 async function generateCliff(upToStage=6, forceViewStage=null) {
   const btn = document.getElementById('btnGenerate');
+  const allGenButtons = document.querySelectorAll('[data-stage],[data-gen]');
   btn.disabled = true;
+  allGenButtons.forEach(b=>b.disabled=true);
   const originalText = btn.textContent;
   btn.textContent = `⏳ Generating up to stage ${upToStage}...`;
   const cfg = getConfigFromUI();
   cfg.up_to_stage = upToStage;
-  // Remember current view stage to stay there if requested
   const previousStage = document.getElementById('stageSelect').value;
-  log(`Generating up to stage ${upToStage} with seed ${cfg.seed}, fast=${cfg.fast_preview}...`);
+  log(`Generating up to stage ${upToStage} with seed ${cfg.seed}, fast=${cfg.fast_preview}, W=${cfg.W} H=${cfg.H}...`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout
   try {
     const res = await fetch('/api/generate', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(cfg)
+      body: JSON.stringify(cfg),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`HTTP ${res.status}: ${text.slice(0,200)}`);
+    }
     const data = await res.json();
-    if (!data.success) throw new Error(data.error);
+    if (!data.success) throw new Error(data.error || 'Unknown error');
     stageFiles = data.stage_files;
     // Determine which stage to view
     let stageToView = null;
@@ -469,11 +478,19 @@ async function generateCliff(upToStage=6, forceViewStage=null) {
     document.getElementById('stats').innerHTML = `<b>${data.stats.num_blocks}</b> blocks, <b>${data.stats.total_cracks}</b> cracks, <b>${data.stats.final_verts.toLocaleString()}</b> verts in <b>${data.elapsed.toFixed(1)}s</b> (up to stage ${upToStage})`;
     log(`Generated up to stage ${upToStage}: ${data.stats.num_blocks} blocks, ${data.stats.final_verts} verts in ${data.elapsed.toFixed(1)}s, viewing ${stageToView}`);
   } catch (e) {
-    document.getElementById('stats').textContent = 'Error: '+e.message;
-    log('Error: '+e.message);
+    clearTimeout(timeoutId);
+    const msg = e.name === 'AbortError' ? 'Timeout after 90s - try smaller W/H or fewer joints' : e.message;
+    document.getElementById('stats').textContent = 'Error: '+msg;
+    log('Error: '+msg);
     console.error(e);
+    // Fallback: try to load pre-generated stage obj
+    const fallbackMap = {1:'stage1_macro.obj',2:'stage2_bedding.obj',3:'stage3_fractured.obj',4:'stage4_chipped.obj',5:'stage5_eroded.obj',6:'cliff.obj'};
+    const fbFile = fallbackMap[upToStage] || 'cliff.obj';
+    log(`Fallback: loading pre-generated ${fbFile}`);
+    loadOBJ('/obj/'+fbFile);
   } finally {
     btn.disabled = false;
+    allGenButtons.forEach(b=>b.disabled=false);
     btn.textContent = originalText;
   }
 }
