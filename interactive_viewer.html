@@ -94,19 +94,39 @@
     </div>
   </div>
 
-  <!-- Stage 1 -->
+  <!-- Stage 1 - Improved with base/middle/top -->
   <div class="stage">
-    <h3>1 — Macro Shape <button class="small secondary" data-gen="1">Gen 1</button></h3>
+    <h3>1 — Macro Shape (Base/Mid/Top) <button class="small secondary" data-gen="1">Gen 1</button></h3>
+    <p style="font-size:10px; color:#777; margin:0 0 8px 0;">Base/middle/top sections with height, depth, slope, bulge. No longer stuck as prism.</p>
     <div class="row">
-      <div class="control"><label>Macro Cuts <span class="value" id="val_macro_cuts">6</span></label><input type="range" id="macro_cuts" min="3" max="12" value="6"></div>
+      <div class="control"><label>Num Profiles (X) <span class="value" id="val_num_profiles">6</span></label><input type="range" id="num_profiles" min="3" max="12" value="6"></div>
+      <div class="control"><label>X Variation m <span class="value" id="val_profile_variation">0.9</span></label><input type="range" id="profile_variation" min="0" max="2.5" step="0.1" value="0.9"></div>
+    </div>
+    <div class="row">
+      <div class="control"><label>Base H% <span class="value" id="val_base_height_ratio">0.25</span></label><input type="range" id="base_height_ratio" min="0.1" max="0.5" step="0.05" value="0.25"></div>
+      <div class="control"><label>Mid H% <span class="value" id="val_middle_height_ratio">0.50</span></label><input type="range" id="middle_height_ratio" min="0.2" max="0.7" step="0.05" value="0.5"></div>
+      <div class="control"><label>Top H% <span class="value" id="val_top_height_ratio">0.25</span></label><input type="range" id="top_height_ratio" min="0.1" max="0.5" step="0.05" value="0.25"></div>
+    </div>
+    <div class="row">
+      <div class="control"><label>Base Depth <span class="value" id="val_base_depth">0.0</span></label><input type="range" id="base_depth" min="-1.5" max="1.0" step="0.1" value="0"></div>
+      <div class="control"><label>Mid Depth <span class="value" id="val_middle_depth">-0.8</span></label><input type="range" id="middle_depth" min="-3.0" max="0.5" step="0.1" value="-0.8"></div>
+      <div class="control"><label>Top Depth <span class="value" id="val_top_depth">-1.2</span></label><input type="range" id="top_depth" min="-4.0" max="0.5" step="0.1" value="-1.2"></div>
+    </div>
+    <div class="row">
+      <div class="control"><label>Base Slope ° <span class="value" id="val_base_slope">-12</span></label><input type="range" id="base_slope" min="-35" max="20" step="1" value="-12"></div>
+      <div class="control"><label>Mid Slope ° <span class="value" id="val_middle_slope">2</span></label><input type="range" id="middle_slope" min="-20" max="20" step="1" value="2"></div>
+      <div class="control"><label>Top Slope ° <span class="value" id="val_top_slope">-18</span></label><input type="range" id="top_slope" min="-40" max="10" step="1" value="-18"></div>
+    </div>
+    <div class="row">
+      <div class="control"><label>Base Bulge <span class="value" id="val_base_bulge">0.2</span></label><input type="range" id="base_bulge" min="-1.0" max="1.5" step="0.1" value="0.2"></div>
+      <div class="control"><label>Mid Bulge <span class="value" id="val_middle_bulge">0.3</span></label><input type="range" id="middle_bulge" min="-1.0" max="1.5" step="0.1" value="0.3"></div>
+      <div class="control"><label>Top Bulge <span class="value" id="val_top_bulge">0.1</span></label><input type="range" id="top_bulge" min="-1.0" max="1.0" step="0.1" value="0.1"></div>
+    </div>
+    <div class="row">
+      <div class="control"><label>Macro Cuts <span class="value" id="val_macro_cuts">4</span></label><input type="range" id="macro_cuts" min="0" max="10" value="4"></div>
       <div class="control"><label>Bay Count <span class="value" id="val_bay_count">1</span></label><input type="range" id="bay_count" min="0" max="4" value="1"></div>
+      <div class="control"><label>Bay Depth <span class="value" id="val_bay_depth">0.9</span></label><input type="range" id="bay_depth" min="0.2" max="2.5" step="0.1" value="0.9"></div>
     </div>
-    <div class="row">
-      <div class="control"><label>Top Var <span class="value" id="val_top_variation">1.0</span></label><input type="range" id="top_variation" min="0.3" max="3.0" step="0.1" value="1.0"></div>
-      <div class="control"><label>Base Slope ° <span class="value" id="val_base_slope_angle">45</span></label><input type="range" id="base_slope_angle" min="15" max="60" value="45"></div>
-    </div>
-    <div class="control"><label>Bay Depth <span class="value" id="val_bay_depth">0.9</span></label><input type="range" id="bay_depth" min="0.3" max="3.0" step="0.1" value="0.9"></div>
-    <div class="control"><label>Mid Step Depth <span class="value" id="val_mid_step_depth">1.0</span></label><input type="range" id="mid_step_depth" min="0.3" max="3.0" step="0.1" value="1.0"></div>
   </div>
 
   <!-- Stage 2 -->
@@ -207,7 +227,16 @@ container.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(16, 8, -3);
 controls.enableDamping = true;
-controls.dampingFactor = 0.08;
+controls.dampingFactor = 0.05;
+controls.enableZoom = true;
+controls.zoomSpeed = 1.2;
+controls.minDistance = 0.5;
+controls.maxDistance = 200;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.minPolarAngle = 0.05;
+controls.screenSpacePanning = false;
+controls.panSpeed = 1.0;
+controls.rotateSpeed = 0.8;
 
 const ambient = new THREE.AmbientLight(0xffffff, 0.4);
 scene.add(ambient);
@@ -283,9 +312,24 @@ function getConfigFromUI() {
       macro_cuts: parseInt(document.getElementById('macro_cuts').value),
       bay_count: parseInt(document.getElementById('bay_count').value),
       top_variation: parseFloat(document.getElementById('top_variation').value),
-      base_slope_angle: parseFloat(document.getElementById('base_slope_angle').value),
       bay_depth: parseFloat(document.getElementById('bay_depth').value),
-      mid_step_depth: parseFloat(document.getElementById('mid_step_depth').value),
+      mid_step_depth: parseFloat(document.getElementById('mid_step_depth')?.value || 1.0),
+      base_slope_angle: parseFloat(document.getElementById('base_slope_angle')?.value || 45),
+      // New base/mid/top sections
+      num_profiles: parseInt(document.getElementById('num_profiles').value),
+      profile_variation: parseFloat(document.getElementById('profile_variation').value),
+      base_height_ratio: parseFloat(document.getElementById('base_height_ratio').value),
+      middle_height_ratio: parseFloat(document.getElementById('middle_height_ratio').value),
+      top_height_ratio: parseFloat(document.getElementById('top_height_ratio').value),
+      base_depth: parseFloat(document.getElementById('base_depth').value),
+      middle_depth: parseFloat(document.getElementById('middle_depth').value),
+      top_depth: parseFloat(document.getElementById('top_depth').value),
+      base_slope: parseFloat(document.getElementById('base_slope').value),
+      middle_slope: parseFloat(document.getElementById('middle_slope').value),
+      top_slope: parseFloat(document.getElementById('top_slope').value),
+      base_bulge: parseFloat(document.getElementById('base_bulge').value),
+      middle_bulge: parseFloat(document.getElementById('middle_bulge').value),
+      top_bulge: parseFloat(document.getElementById('top_bulge').value),
     },
     stage2: {
       num_layers: parseInt(document.getElementById('num_layers').value),
@@ -332,8 +376,25 @@ function applyConfigToUI(cfg) {
   set('seed', cfg.seed);
   set('W', cfg.W); set('H', cfg.H); set('D', cfg.D); set('voxel_size', cfg.voxel_size);
   set('macro_cuts', cfg.stage1.macro_cuts); set('bay_count', cfg.stage1.bay_count);
-  set('top_variation', cfg.stage1.top_variation); set('base_slope_angle', cfg.stage1.base_slope_angle);
-  set('bay_depth', cfg.stage1.bay_depth); set('mid_step_depth', cfg.stage1.mid_step_depth||1.0);
+  set('top_variation', cfg.stage1.top_variation);
+  if (document.getElementById('base_slope_angle')) set('base_slope_angle', cfg.stage1.base_slope_angle);
+  set('bay_depth', cfg.stage1.bay_depth);
+  if (document.getElementById('mid_step_depth')) set('mid_step_depth', cfg.stage1.mid_step_depth||1.0);
+  // New base/mid/top
+  set('num_profiles', cfg.stage1.num_profiles||6);
+  set('profile_variation', cfg.stage1.profile_variation||0.9);
+  set('base_height_ratio', cfg.stage1.base_height_ratio||0.25);
+  set('middle_height_ratio', cfg.stage1.middle_height_ratio||0.5);
+  set('top_height_ratio', cfg.stage1.top_height_ratio||0.25);
+  set('base_depth', cfg.stage1.base_depth||0);
+  set('middle_depth', cfg.stage1.middle_depth||-0.8);
+  set('top_depth', cfg.stage1.top_depth||-1.2);
+  set('base_slope', cfg.stage1.base_slope||-12);
+  set('middle_slope', cfg.stage1.middle_slope||2);
+  set('top_slope', cfg.stage1.top_slope||-18);
+  set('base_bulge', cfg.stage1.base_bulge||0.2);
+  set('middle_bulge', cfg.stage1.middle_bulge||0.3);
+  set('top_bulge', cfg.stage1.top_bulge||0.1);
   set('num_layers', cfg.stage2.num_layers); set('thickness_min', cfg.stage2.thickness_min);
   set('thickness_max', cfg.stage2.thickness_max);
   set('dip_x_range', Math.abs(cfg.stage2.dip_x_range[1])); set('dip_z_range', Math.abs(cfg.stage2.dip_z_range[1]));
@@ -367,13 +428,15 @@ async function fetchDefaultConfig() {
   document.getElementById('stats').textContent = 'Default config loaded. Click Generate.';
 }
 
-async function generateCliff(upToStage=6) {
+async function generateCliff(upToStage=6, forceViewStage=null) {
   const btn = document.getElementById('btnGenerate');
   btn.disabled = true;
   const originalText = btn.textContent;
   btn.textContent = `⏳ Generating up to stage ${upToStage}...`;
   const cfg = getConfigFromUI();
   cfg.up_to_stage = upToStage;
+  // Remember current view stage to stay there if requested
+  const previousStage = document.getElementById('stageSelect').value;
   log(`Generating up to stage ${upToStage} with seed ${cfg.seed}, fast=${cfg.fast_preview}...`);
   try {
     const res = await fetch('/api/generate', {
@@ -384,17 +447,27 @@ async function generateCliff(upToStage=6) {
     const data = await res.json();
     if (!data.success) throw new Error(data.error);
     stageFiles = data.stage_files;
-    // Auto-view the stage we just generated, or final if exists
-    const stageMap = {1:'stage1_macro',2:'stage2_bedding',3:'stage3_fractured',4:'stage4_chipped',5:'stage5_eroded',6:'final'};
-    const stageName = stageMap[upToStage];
-    const file = stageFiles[stageName] || stageFiles['final'];
+    // Determine which stage to view
+    let stageToView = null;
+    if (forceViewStage) {
+      stageToView = forceViewStage;
+    } else {
+      // Stay where user left it if possible
+      if (stageFiles[previousStage]) {
+        stageToView = previousStage;
+      } else {
+        const stageMap = {1:'stage1_macro',2:'stage2_bedding',3:'stage3_fractured',4:'stage4_chipped',5:'stage5_eroded',6:'final'};
+        stageToView = stageMap[upToStage] || 'final';
+      }
+    }
+    const file = stageFiles[stageToView] || stageFiles['final'];
     if (file) {
-      document.getElementById('stageSelect').value = stageName;
-      document.getElementById('currentStageLabel').textContent = stageName;
-      loadOBJ('/generated/'+file, stageName==='final'?0xc9bba3:0x9aa0a6);
+      document.getElementById('stageSelect').value = stageToView;
+      document.getElementById('currentStageLabel').textContent = stageToView;
+      loadOBJ('/generated/'+file, stageToView==='final'?0xc9bba3:0x9aa0a6);
     }
     document.getElementById('stats').innerHTML = `<b>${data.stats.num_blocks}</b> blocks, <b>${data.stats.total_cracks}</b> cracks, <b>${data.stats.final_verts.toLocaleString()}</b> verts in <b>${data.elapsed.toFixed(1)}s</b> (up to stage ${upToStage})`;
-    log(`Generated up to stage ${upToStage}: ${data.stats.num_blocks} blocks, ${data.stats.final_verts} verts in ${data.elapsed.toFixed(1)}s`);
+    log(`Generated up to stage ${upToStage}: ${data.stats.num_blocks} blocks, ${data.stats.final_verts} verts in ${data.elapsed.toFixed(1)}s, viewing ${stageToView}`);
   } catch (e) {
     document.getElementById('stats').textContent = 'Error: '+e.message;
     log('Error: '+e.message);
@@ -405,24 +478,26 @@ async function generateCliff(upToStage=6) {
   }
 }
 
-document.getElementById('btnGenerate').addEventListener('click', () => generateCliff(6));
+document.getElementById('btnGenerate').addEventListener('click', () => generateCliff(6, null)); // stay at current stage
 document.querySelectorAll('[data-stage]').forEach(btn => {
   btn.addEventListener('click', () => {
     const stage = parseInt(btn.dataset.stage);
-    generateCliff(stage);
+    const stageMap = {1:'stage1_macro',2:'stage2_bedding',3:'stage3_fractured',4:'stage4_chipped',5:'stage5_eroded',6:'final'};
+    generateCliff(stage, stageMap[stage]); // force view that stage
   });
 });
 document.querySelectorAll('[data-gen]').forEach(btn => {
   btn.addEventListener('click', () => {
     const stage = parseInt(btn.dataset.gen);
-    generateCliff(stage);
+    const stageMap = {1:'stage1_macro',2:'stage2_bedding',3:'stage3_fractured',4:'stage4_chipped',5:'stage5_eroded',6:'final'};
+    generateCliff(stage, stageMap[stage]);
   });
 });
 document.getElementById('btnRandomSeed').addEventListener('click', () => {
   const s = Math.floor(Math.random()*9999)+1;
   document.getElementById('seed').value=s;
   document.getElementById('val_seed').textContent=s;
-  generateCliff(6);
+  generateCliff(6, null); // stay at current view
 });
 document.getElementById('btnReset').addEventListener('click', async () => {
   await fetchDefaultConfig();
