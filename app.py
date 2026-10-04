@@ -148,6 +148,23 @@ def serve_obj(filename):
         return send_from_directory('.', filename)
     return f"File not found: {filename}", 404
 
+@app.route('/<path:filename>')
+def serve_static_root(filename):
+    # Serve any static file from root or generated (for .obj, .html, etc)
+    # Avoid overriding API routes
+    if filename.startswith('api/'):
+        return "Not found", 404
+    # Check root
+    if os.path.exists(filename) and os.path.isfile(filename):
+        return send_from_directory('.', filename)
+    # Check generated
+    gen_path = os.path.join(GENERATED_DIR, filename)
+    if os.path.exists(gen_path) and os.path.isfile(gen_path):
+        return send_from_directory(GENERATED_DIR, filename)
+    # Also check if filename is like stage1_macro.obj without prefix, try in root
+    # If not found, return 404 with helpful message
+    return f"File not found: {filename}", 404
+
 @app.route('/api/list_generated')
 def list_generated():
     files = os.listdir(GENERATED_DIR)

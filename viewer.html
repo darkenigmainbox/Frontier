@@ -5,10 +5,13 @@
 <title>Cliff Formation Viewer</title>
 <style>
   body { margin:0; overflow:hidden; background:#1a1a1a; font-family: sans-serif; }
-  #info { position:absolute; top:10px; left:10px; color:#ddd; background:rgba(0,0,0,0.6); padding:12px 16px; border-radius:8px; max-width:420px; }
+  #info { position:absolute; top:10px; left:10px; color:#ddd; background:rgba(0,0,0,0.6); padding:12px 16px; border-radius:8px; max-width:420px; z-index:10; }
   #info h2 { margin:0 0 8px 0; font-size:18px; color:#fff; }
   #info p { margin:4px 0; font-size:13px; line-height:1.4; }
   #info code { background:rgba(255,255,255,0.1); padding:2px 4px; border-radius:3px; }
+  #controls { position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.6); padding:10px; border-radius:8px; z-index:10; }
+  #controls button { margin:2px; padding:6px 10px; background:#333; color:#ddd; border:1px solid #555; border-radius:4px; cursor:pointer; }
+  #controls button.active { background:#5a8dee; color:white; }
   canvas { display:block; }
 </style>
 <script type="importmap">
@@ -23,10 +26,15 @@
 <body>
 <div id="info">
   <h2>Cliff Formation Generator</h2>
-  <p><b>Pipeline:</b> Macro shape → Bedding & Joint fractures (offset) → Edge chipping → SDF erosion → Surface cracks (polygon placement + SDF carving)</p>
-  <p><b>Constraints met:</b> No noise, only triangles, geological fracture sets, hybrid Polygon/SDF</p>
-  <p>Drag to orbit, scroll to zoom, right-drag to pan. Untextured geometry shows silhouette.</p>
+  <p><b>Pipeline:</b> Macro → Bedding & Joints (offset) → Chipping → Erosion → Cracks</p>
+  <p><b>Constraints:</b> No noise, only triangles, geological fracture sets, hybrid Polygon/SDF</p>
+  <p>Drag to orbit, scroll to zoom. Untextured shows silhouette.</p>
   <p id="stats">Loading...</p>
+  <p style="font-size:10px; color:#888;">If 404, click RawGithack or Local below</p>
+</div>
+<div id="controls">
+  <button id="btnLocal" class="active">Local /obj/</button>
+  <button id="btnRaw">RawGithack CDN</button>
 </div>
 <script type="module">
 import * as THREE from 'three';
@@ -54,28 +62,19 @@ controls.dampingFactor = 0.08;
 controls.minDistance = 2;
 controls.maxDistance = 80;
 
-// Lights - untextured, need good shading to show geometry
 const ambient = new THREE.AmbientLight(0xffffff, 0.35);
 scene.add(ambient);
-
 const dirLight = new THREE.DirectionalLight(0xfff4e0, 1.2);
 dirLight.position.set(15, 25, 12);
 dirLight.castShadow = true;
-dirLight.shadow.mapSize.width = 2048;
-dirLight.shadow.mapSize.height = 2048;
-dirLight.shadow.camera.near = 0.5;
-dirLight.shadow.camera.far = 80;
-dirLight.shadow.camera.left = -25;
-dirLight.shadow.camera.right = 25;
-dirLight.shadow.camera.top = 25;
-dirLight.shadow.camera.bottom = -15;
+dirLight.shadow.mapSize.set(2048,2048);
+dirLight.shadow.camera.left = -25; dirLight.shadow.camera.right = 25;
+dirLight.shadow.camera.top = 25; dirLight.shadow.camera.bottom = -15;
 scene.add(dirLight);
-
 const fillLight = new THREE.DirectionalLight(0x8ab4ff, 0.4);
 fillLight.position.set(-10, 12, -8);
 scene.add(fillLight);
 
-// Ground plane for reference
 const groundGeo = new THREE.PlaneGeometry(100,100);
 const groundMat = new THREE.MeshStandardMaterial({ color:0x2a2f36, roughness:0.9, metalness:0.05 });
 const ground = new THREE.Mesh(groundGeo, groundMat);
@@ -83,61 +82,84 @@ ground.rotation.x = -Math.PI/2;
 ground.position.y = -0.02;
 ground.receiveShadow = true;
 scene.add(ground);
-
-// Grid helper
 const grid = new THREE.GridHelper(100, 50, 0x444444, 0x333333);
 grid.position.y = 0.01;
 scene.add(grid);
 
-// Load OBJ
 const loader = new OBJLoader();
 const statsEl = document.getElementById('stats');
+let currentObj = null;
+let useRaw = false;
 
-loader.load('cliff.obj', (obj) => {
-  let totalVerts = 0;
-  let totalTris = 0;
-  obj.traverse((child) => {
-    if (child.isMesh) {
-      const geom = child.geometry;
-      geom.computeVertexNormals();
-      totalVerts += geom.attributes.position.count;
-      if (geom.index) totalTris += geom.index.count / 3;
-      else totalTris += geom.attributes.position.count / 3;
+function getUrls(file) {
+  const rawBase = "https://raw.githack.com/darkenigmainbox/Frontier/arena/01a1089a-frontier/";
+  const urls = [];
+  if (useRaw) urls.push(rawBase + file);
+  urls.push('/obj/' + file);
+  urls.push('/' + file);
+  urls.push('./' + file);
+  urls.push(file);
+  urls.push('/generated/' + file);
+  if (!useRaw) urls.push(rawBase + file);
+  return urls;
+}
 
-      // Untextured material that shows geometry - no normal maps
-      child.material = new THREE.MeshStandardMaterial({
-        color: 0xc9bba3,
-        roughness: 0.85,
-        metalness: 0.02,
-        flatShading: false,
-        side: THREE.DoubleSide
-      });
-      child.castShadow = true;
-      child.receiveShadow = true;
-    }
-  });
-  // Center and scale? Our cliff is at 0,0,-D to 0
-  // Compute bounding box
-  const box = new THREE.Box3().setFromObject(obj);
-  const center = box.getCenter(new THREE.Vector3());
-  // Keep at origin but adjust controls target
-  controls.target.copy(center);
-  controls.target.y = box.min.y + (box.max.y - box.min.y)*0.5;
-
-  scene.add(obj);
-  statsEl.textContent = `Loaded: ${totalVerts.toLocaleString()} vertices, ${Math.round(totalTris).toLocaleString()} triangles, ${obj.children.length} blocks. No noise, pure geological fracture.`;
-
-  // Add wireframe toggle helper
-  console.log(`Cliff loaded: ${totalVerts} verts, ${totalTris} tris`);
-}, (xhr) => {
-  if (xhr.lengthComputable) {
-    const pct = (xhr.loaded / xhr.total * 100).toFixed(1);
-    statsEl.textContent = `Loading... ${pct}%`;
+function loadWithFallback(file, urls, idx=0) {
+  if (idx >= urls.length) {
+    statsEl.textContent = `Failed ${file}: all URLs failed`;
+    return;
   }
-}, (err) => {
-  statsEl.textContent = `Failed to load cliff.obj: ${err}`;
-  console.error(err);
+  const url = urls[idx];
+  statsEl.textContent = `Loading ${file} via ${url}...`;
+  loader.load(url, (obj) => {
+    let verts=0, tris=0;
+    obj.traverse(c => {
+      if (c.isMesh) {
+        const g=c.geometry;
+        g.computeVertexNormals();
+        verts+=g.attributes.position.count;
+        tris+=g.index ? g.index.count/3 : g.attributes.position.count/3;
+        c.material = new THREE.MeshStandardMaterial({ color:0xc9bba3, roughness:0.85, metalness:0.02, side:THREE.DoubleSide });
+        c.castShadow=true; c.receiveShadow=true;
+      }
+    });
+    if (currentObj) scene.remove(currentObj);
+    const box = new THREE.Box3().setFromObject(obj);
+    const center = box.getCenter(new THREE.Vector3());
+    controls.target.copy(center);
+    controls.target.y = box.min.y + (box.max.y-box.min.y)*0.5;
+    scene.add(obj);
+    currentObj=obj;
+    statsEl.textContent = `Loaded ${file} via ${url}: ${verts.toLocaleString()} verts, ${Math.round(tris).toLocaleString()} tris`;
+  }, (xhr) => {
+    if (xhr.lengthComputable) {
+      const pct = (xhr.loaded/xhr.total*100).toFixed(1);
+      statsEl.textContent = `Loading ${file} ${pct}% via ${url}`;
+    }
+  }, (err) => {
+    console.warn(`Failed ${url}, trying next`);
+    loadWithFallback(file, urls, idx+1);
+  });
+}
+
+function loadCliff(file) {
+  loadWithFallback(file, getUrls(file), 0);
+}
+
+document.getElementById('btnLocal').addEventListener('click', () => {
+  useRaw=false;
+  document.getElementById('btnLocal').classList.add('active');
+  document.getElementById('btnRaw').classList.remove('active');
+  loadCliff('cliff.obj');
 });
+document.getElementById('btnRaw').addEventListener('click', () => {
+  useRaw=true;
+  document.getElementById('btnRaw').classList.add('active');
+  document.getElementById('btnLocal').classList.remove('active');
+  loadCliff('cliff.obj');
+});
+
+loadCliff('cliff.obj');
 
 function animate() {
   requestAnimationFrame(animate);

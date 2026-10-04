@@ -2,14 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Cliff Stages Viewer</title>
+<title>Cliff Stages Viewer - Procedural Pipeline</title>
 <style>
   body { margin:0; overflow:hidden; background:#1a1a1a; font-family: sans-serif; }
-  #info { position:absolute; top:10px; left:10px; color:#ddd; background:rgba(0,0,0,0.6); padding:12px 16px; border-radius:8px; max-width:440px; }
+  #info { position:absolute; top:10px; left:10px; color:#ddd; background:rgba(0,0,0,0.7); padding:12px 16px; border-radius:8px; max-width:460px; z-index:10; }
   #info h2 { margin:0 0 8px 0; font-size:18px; color:#fff; }
-  #controls { position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.6); padding:12px; border-radius:8px; color:#ddd; }
+  #info p { margin:4px 0; font-size:12px; line-height:1.4; }
+  #controls { position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.7); padding:12px; border-radius:8px; color:#ddd; z-index:10; }
   #controls select, #controls button { margin:4px; padding:6px 10px; background:#333; color:#ddd; border:1px solid #555; border-radius:4px; }
+  #controls button { cursor:pointer; background:#5a8dee; color:white; border:none; }
   canvas { display:block; }
+  a { color:#8ab4ff; }
 </style>
 <script type="importmap">
 {
@@ -23,13 +26,18 @@
 <body>
 <div id="info">
   <h2>Cliff Pipeline Stages</h2>
-  <p>1: Macro shape (authored planes, no noise)<br>
-     2: Bedding (strata)<br>
-     3: Fractured (bedding + joints with offset)<br>
-     4: Edge chipped<br>
-     5: Eroded (SDF shrink)<br>
-     6: Final HQ (chipped + eroded + surface cracks via SDF)</p>
+  <p><b>1:</b> Macro shape (authored planes, no noise)<br>
+     <b>2:</b> Bedding (strata)<br>
+     <b>3:</b> Fractured (bedding + joints with offset)<br>
+     <b>4:</b> Edge chipped<br>
+     <b>5:</b> Eroded (SDF shrink)<br>
+     <b>6:</b> Final HQ (chipped + eroded + surface cracks via SDF)</p>
   <p id="stats">Loading...</p>
+  <p style="font-size:10px; color:#888;">Works via: <br>
+    - Local Flask: <code>/obj/*.obj</code><br>
+    - Arena preview: same origin<br>
+    - RawGithack: <code>https://raw.githack.com/darkenigmainbox/Frontier/arena/01a1089a-frontier/</code><br>
+    - Direct: <code>./*.obj</code></p>
 </div>
 <div id="controls">
   <label>Stage: </label>
@@ -42,6 +50,9 @@
     <option value="cliff.obj" selected>6 - Final (voxel 0.09)</option>
     <option value="cliff_hq.obj">6 - Final HQ (voxel 0.07)</option>
   </select>
+  <br>
+  <button id="btnRawGithack">Try RawGithack CDN</button>
+  <button id="btnLocal">Try Local /obj/</button>
 </div>
 <script type="module">
 import * as THREE from 'three';
@@ -91,11 +102,38 @@ scene.add(grid);
 const loader = new OBJLoader();
 const statsEl = document.getElementById('stats');
 let currentObj = null;
+let useRawGithack = false;
 
-function loadStage(path) {
-  if (currentObj) scene.remove(currentObj);
-  statsEl.textContent = `Loading ${path}...`;
-  loader.load(path, (obj) => {
+function getUrlsForFile(filename) {
+  // Try multiple URLs in order
+  const rawGithackBase = "https://raw.githack.com/darkenigmainbox/Frontier/arena/01a1089a-frontier/";
+  const urls = [];
+  if (useRawGithack) {
+    urls.push(rawGithackBase + filename);
+  }
+  // Local Flask routes
+  urls.push('/obj/' + filename);
+  urls.push('/' + filename);
+  urls.push('./' + filename);
+  urls.push(filename);
+  // Generated folder
+  urls.push('/generated/' + filename);
+  // Also try without obj/ prefix for arena preview
+  if (!useRawGithack) {
+    urls.push(rawGithackBase + filename);
+  }
+  return urls;
+}
+
+function loadWithFallback(filename, urls, idx=0) {
+  if (idx >= urls.length) {
+    statsEl.textContent = `Failed ${filename}: all URLs tried. Tried: ${urls.join(', ')}`;
+    console.error(`All URLs failed for ${filename}`);
+    return;
+  }
+  const url = urls[idx];
+  statsEl.textContent = `Loading ${filename} via ${url}... (try ${idx+1}/${urls.length})`;
+  loader.load(url, (obj) => {
     let totalVerts = 0, totalTris = 0;
     obj.traverse((child) => {
       if (child.isMesh) {
@@ -104,7 +142,7 @@ function loadStage(path) {
         totalVerts += geom.attributes.position.count;
         totalTris += geom.index ? geom.index.count/3 : geom.attributes.position.count/3;
         child.material = new THREE.MeshStandardMaterial({
-          color: path.includes('cliff') ? 0xc9bba3 : 0x9aa0a6,
+          color: filename.includes('cliff') ? 0xc9bba3 : 0x9aa0a6,
           roughness: 0.85,
           metalness: 0.02,
           side: THREE.DoubleSide
@@ -113,22 +151,42 @@ function loadStage(path) {
         child.receiveShadow = true;
       }
     });
+    if (currentObj) scene.remove(currentObj);
     const box = new THREE.Box3().setFromObject(obj);
     const center = box.getCenter(new THREE.Vector3());
     controls.target.copy(center);
     controls.target.y = box.min.y + (box.max.y - box.min.y)*0.5;
     scene.add(obj);
     currentObj = obj;
-    statsEl.textContent = `${path}: ${totalVerts.toLocaleString()} verts, ${Math.round(totalTris).toLocaleString()} tris`;
+    statsEl.textContent = `${filename} via ${url}: ${totalVerts.toLocaleString()} verts, ${Math.round(totalTris).toLocaleString()} tris`;
   }, undefined, (err) => {
-    statsEl.textContent = `Failed ${path}: ${err}`;
+    console.warn(`Failed ${url}: ${err}, trying next...`);
+    loadWithFallback(filename, urls, idx+1);
   });
+}
+
+function loadStage(filename) {
+  const urls = getUrlsForFile(filename);
+  loadWithFallback(filename, urls, 0);
 }
 
 document.getElementById('stageSelect').addEventListener('change', (e) => {
   loadStage(e.target.value);
 });
 
+document.getElementById('btnRawGithack').addEventListener('click', () => {
+  useRawGithack = true;
+  const sel = document.getElementById('stageSelect').value;
+  loadStage(sel);
+});
+
+document.getElementById('btnLocal').addEventListener('click', () => {
+  useRawGithack = false;
+  const sel = document.getElementById('stageSelect').value;
+  loadStage(sel);
+});
+
+// Initial load - try cliff.obj
 loadStage('cliff.obj');
 
 function animate() {
