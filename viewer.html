@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cliff Formation Viewer</title>
+<style>
+  body { margin:0; overflow:hidden; background:#1a1a1a; font-family: sans-serif; }
+  #info { position:absolute; top:10px; left:10px; color:#ddd; background:rgba(0,0,0,0.6); padding:12px 16px; border-radius:8px; max-width:420px; }
+  #info h2 { margin:0 0 8px 0; font-size:18px; color:#fff; }
+  #info p { margin:4px 0; font-size:13px; line-height:1.4; }
+  #info code { background:rgba(255,255,255,0.1); padding:2px 4px; border-radius:3px; }
+  canvas { display:block; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="info">
+  <h2>Cliff Formation Generator</h2>
+  <p><b>Pipeline:</b> Macro shape → Bedding & Joint fractures (offset) → Edge chipping → SDF erosion → Surface cracks (polygon placement + SDF carving)</p>
+  <p><b>Constraints met:</b> No noise, only triangles, geological fracture sets, hybrid Polygon/SDF</p>
+  <p>Drag to orbit, scroll to zoom, right-drag to pan. Untextured geometry shows silhouette.</p>
+  <p id="stats">Loading...</p>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1e2329);
+scene.fog = new THREE.Fog(0x1e2329, 40, 120);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 500);
+camera.position.set(18, 12, 22);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(16, 8, -3);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 2;
+controls.maxDistance = 80;
+
+// Lights - untextured, need good shading to show geometry
+const ambient = new THREE.AmbientLight(0xffffff, 0.35);
+scene.add(ambient);
+
+const dirLight = new THREE.DirectionalLight(0xfff4e0, 1.2);
+dirLight.position.set(15, 25, 12);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 2048;
+dirLight.shadow.mapSize.height = 2048;
+dirLight.shadow.camera.near = 0.5;
+dirLight.shadow.camera.far = 80;
+dirLight.shadow.camera.left = -25;
+dirLight.shadow.camera.right = 25;
+dirLight.shadow.camera.top = 25;
+dirLight.shadow.camera.bottom = -15;
+scene.add(dirLight);
+
+const fillLight = new THREE.DirectionalLight(0x8ab4ff, 0.4);
+fillLight.position.set(-10, 12, -8);
+scene.add(fillLight);
+
+// Ground plane for reference
+const groundGeo = new THREE.PlaneGeometry(100,100);
+const groundMat = new THREE.MeshStandardMaterial({ color:0x2a2f36, roughness:0.9, metalness:0.05 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI/2;
+ground.position.y = -0.02;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Grid helper
+const grid = new THREE.GridHelper(100, 50, 0x444444, 0x333333);
+grid.position.y = 0.01;
+scene.add(grid);
+
+// Load OBJ
+const loader = new OBJLoader();
+const statsEl = document.getElementById('stats');
+
+loader.load('cliff.obj', (obj) => {
+  let totalVerts = 0;
+  let totalTris = 0;
+  obj.traverse((child) => {
+    if (child.isMesh) {
+      const geom = child.geometry;
+      geom.computeVertexNormals();
+      totalVerts += geom.attributes.position.count;
+      if (geom.index) totalTris += geom.index.count / 3;
+      else totalTris += geom.attributes.position.count / 3;
+
+      // Untextured material that shows geometry - no normal maps
+      child.material = new THREE.MeshStandardMaterial({
+        color: 0xc9bba3,
+        roughness: 0.85,
+        metalness: 0.02,
+        flatShading: false,
+        side: THREE.DoubleSide
+      });
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+  // Center and scale? Our cliff is at 0,0,-D to 0
+  // Compute bounding box
+  const box = new THREE.Box3().setFromObject(obj);
+  const center = box.getCenter(new THREE.Vector3());
+  // Keep at origin but adjust controls target
+  controls.target.copy(center);
+  controls.target.y = box.min.y + (box.max.y - box.min.y)*0.5;
+
+  scene.add(obj);
+  statsEl.textContent = `Loaded: ${totalVerts.toLocaleString()} vertices, ${Math.round(totalTris).toLocaleString()} triangles, ${obj.children.length} blocks. No noise, pure geological fracture.`;
+
+  // Add wireframe toggle helper
+  console.log(`Cliff loaded: ${totalVerts} verts, ${totalTris} tris`);
+}, (xhr) => {
+  if (xhr.lengthComputable) {
+    const pct = (xhr.loaded / xhr.total * 100).toFixed(1);
+    statsEl.textContent = `Loading... ${pct}%`;
+  }
+}, (err) => {
+  statsEl.textContent = `Failed to load cliff.obj: ${err}`;
+  console.error(err);
+});
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
