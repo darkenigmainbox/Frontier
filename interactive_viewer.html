@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Procedural Cliff Generator - Interactive</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; overflow:hidden; background:#1a1a1a; font-family: -apple-system, BlinkMacSystemFont, sans-serif; color:#ddd; }
+  #canvas-container { position:absolute; top:0; left:0; right:400px; bottom:0; }
+  #sidebar { position:absolute; top:0; right:0; width:400px; bottom:0; background:#22252a; overflow-y:auto; border-left:1px solid #333; padding:0; }
+  #sidebar h2 { margin:0; padding:14px 16px; background:#1e2126; font-size:16px; color:#fff; border-bottom:1px solid #333; position:sticky; top:0; z-index:10; display:flex; justify-content:space-between; align-items:center; }
+  .stage { border-bottom:1px solid #2a2e35; padding:12px 16px; }
+  .stage h3 { margin:0 0 10px 0; font-size:13px; color:#8ab4ff; text-transform:uppercase; letter-spacing:0.8px; display:flex; justify-content:space-between; }
+  .stage h3 button { width:auto; padding:4px 8px; font-size:10px; margin:0; }
+  .control { margin:8px 0; display:flex; flex-direction:column; }
+  .control label { font-size:11px; color:#aaa; margin-bottom:4px; display:flex; justify-content:space-between; }
+  .control label span.value { color:#fff; font-weight:600; }
+  .control input[type=range] { width:100%; accent-color:#5a8dee; }
+  .control select { background:#2a2e35; color:#ddd; border:1px solid #444; padding:6px; border-radius:4px; font-size:12px; }
+  .control input[type=number] { background:#2a2e35; color:#ddd; border:1px solid #444; padding:5px 8px; border-radius:4px; width:100%; }
+  .row { display:flex; gap:8px; }
+  .row .control { flex:1; }
+  button { background:#5a8dee; color:white; border:none; padding:10px 14px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; width:100%; margin:4px 0; }
+  button:hover { background:#4a7edd; }
+  button.secondary { background:#2a2e35; border:1px solid #444; }
+  button.secondary:hover { background:#333840; }
+  button.small { padding:6px 10px; font-size:11px; width:auto; }
+  button:disabled { opacity:0.5; cursor:not-allowed; }
+  #stats { background:#1e2126; padding:12px 16px; font-size:11px; line-height:1.5; color:#aaa; border-bottom:1px solid #333; }
+  #stats b { color:#fff; }
+  #stage-selector { padding:12px 16px; background:#1e2126; border-bottom:1px solid #333; }
+  #stage-selector select { width:100%; }
+  #log { padding:10px 16px; font-size:10px; color:#666; max-height:140px; overflow-y:auto; background:#1a1d21; }
+  canvas { display:block; width:100%; height:100%; }
+  .checkbox { display:flex; align-items:center; gap:8px; font-size:12px; margin:8px 0; }
+  .checkbox input { accent-color:#5a8dee; }
+  .pipeline { display:flex; gap:4px; margin:8px 0; }
+  .pipeline button { flex:1; padding:6px 4px; font-size:10px; }
+  .pipeline button.active { background:#2ecc71; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="canvas-container"></div>
+<div id="sidebar">
+  <h2>🏔️ Procedural Cliff <span style="font-size:10px; background:#5a8dee; padding:2px 6px; border-radius:10px;">BETA</span></h2>
+  <div id="stats">Loading default config...</div>
+  <div id="stage-selector">
+    <div class="control">
+      <label>View Stage <span class="value" id="currentStageLabel">final</span></label>
+      <select id="stageSelect">
+        <option value="stage1_macro">1 - Macro Shape (0.06s)</option>
+        <option value="stage2_bedding">2 - Bedding (0.11s)</option>
+        <option value="stage3_fractured">3 - Fractured (3s)</option>
+        <option value="stage4_chipped">4 - Chipped (16s)</option>
+        <option value="stage5_eroded">5 - Eroded (18s)</option>
+        <option value="final" selected>6 - Final + Cracks (20s)</option>
+      </select>
+    </div>
+    <div class="checkbox"><input type="checkbox" id="fastPreview" checked><label for="fastPreview">Fast Preview (polygon only, no SDF) - instant final</label></div>
+    <div class="pipeline">
+      <button class="small secondary" data-stage="1">Gen 1</button>
+      <button class="small secondary" data-stage="2">Gen 2</button>
+      <button class="small secondary" data-stage="3">Gen 3</button>
+      <button class="small secondary" data-stage="4">Gen 4</button>
+      <button class="small secondary" data-stage="5">Gen 5</button>
+      <button class="small" data-stage="6">Gen 6</button>
+    </div>
+    <button id="btnGenerate">⚡ Generate Full Cliff (All Stages)</button>
+    <div class="row">
+      <button class="secondary" id="btnRandomSeed">🎲 Random Seed</button>
+      <button class="secondary" id="btnReset">↺ Reset</button>
+    </div>
+  </div>
+
+  <!-- Global -->
+  <div class="stage">
+    <h3>🌍 Global <button class="small secondary" data-gen="1">Gen Stage 1</button></h3>
+    <div class="row">
+      <div class="control"><label>Seed <span class="value" id="val_seed">42</span></label><input type="range" id="seed" min="1" max="9999" value="42"></div>
+      <div class="control"><label>Voxel <span class="value" id="val_voxel_size">0.12</span></label><input type="range" id="voxel_size" min="0.05" max="0.18" step="0.01" value="0.12"></div>
+    </div>
+    <div class="row">
+      <div class="control"><label>Width W <span class="value" id="val_W">32</span></label><input type="range" id="W" min="10" max="60" value="32"></div>
+      <div class="control"><label>Height H <span class="value" id="val_H">18</span></label><input type="range" id="H" min="8" max="35" value="18"></div>
+      <div class="control"><label>Depth D <span class="value" id="val_D">10</span></label><input type="range" id="D" min="4" max="20" value="10"></div>
+    </div>
+  </div>
+
+  <!-- Stage 1 -->
+  <div class="stage">
+    <h3>1 — Macro Shape <button class="small secondary" data-gen="1">Gen 1</button></h3>
+    <div class="row">
+      <div class="control"><label>Macro Cuts <span class="value" id="val_macro_cuts">6</span></label><input type="range" id="macro_cuts" min="3" max="12" value="6"></div>
+      <div class="control"><label>Bay Count <span class="value" id="val_bay_count">1</span></label><input type="range" id="bay_count" min="0" max="4" value="1"></div>
+    </div>
+    <div class="row">
+      <div class="control"><label>Top Var <span class="value" id="val_top_variation">1.0</span></label><input type="range" id="top_variation" min="0.3" max="3.0" step="0.1" value="1.0"></div>
+      <div class="control"><label>Base Slope ° <span class="value" id="val_base_slope_angle">45</span></label><input type="range" id="base_slope_angle" min="15" max="60" value="45"></div>
+    </div>
+    <div class="control"><label>Bay Depth <span class="value" id="val_bay_depth">0.9</span></label><input type="range" id="bay_depth" min="0.3" max="3.0" step="0.1" value="0.9"></div>
+    <div class="control"><label>Mid Step Depth <span class="value" id="val_mid_step_depth">1.0</span></label><input type="range" id="mid_step_depth" min="0.3" max="3.0" step="0.1" value="1.0"></div>
+  </div>
+
+  <!-- Stage 2 -->
+  <div class="stage">
+    <h3>2 — Bedding <button class="small secondary" data-gen="2">Gen 2</button></h3>
+    <div class="row">
+      <div class="control"><label>Layers <span class="value" id="val_num_layers">12</span></label><input type="range" id="num_layers" min="4" max="20" value="12"></div>
+      <div class="control"><label>Hardness <span class="value" id="val_hardness">alternating</span></label>
+        <select id="hardness_pattern">
+          <option value="alternating" selected>Alternating</option>
+          <option value="hard_soft_hard">Hard-Soft-Hard</option>
+          <option value="random">Random</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="control"><label>Thick Min <span class="value" id="val_thickness_min">0.7</span></label><input type="range" id="thickness_min" min="0.3" max="1.5" step="0.1" value="0.7"></div>
+      <div class="control"><label>Thick Max <span class="value" id="val_thickness_max">2.5</span></label><input type="range" id="thickness_max" min="1.0" max="4.0" step="0.1" value="2.5"></div>
+    </div>
+    <div class="row">
+      <div class="control"><label>Dip X ±° <span class="value" id="val_dip_x_range">3.0</span></label><input type="range" id="dip_x_range" min="0" max="8" step="0.5" value="3"></div>
+      <div class="control"><label>Dip Z ±° <span class="value" id="val_dip_z_range">1.0</span></label><input type="range" id="dip_z_range" min="0" max="3" step="0.2" value="1"></div>
+    </div>
+  </div>
+
+  <!-- Stage 3 -->
+  <div class="stage">
+    <h3>3 — Joints (Offset) <button class="small secondary" data-gen="3">Gen 3</button></h3>
+    <div class="row">
+      <div class="control"><label>Face-Parallel # <span class="value" id="val_face_parallel_count">4</span></label><input type="range" id="face_parallel_count" min="2" max="10" value="4"></div>
+      <div class="control"><label>Perp # <span class="value" id="val_perp_count">6</span></label><input type="range" id="perp_count" min="3" max="15" value="6"></div>
+      <div class="control"><label>Diagonal # <span class="value" id="val_diagonal_count">2</span></label><input type="range" id="diagonal_count" min="0" max="8" value="2"></div>
+    </div>
+    <div class="row">
+      <div class="control"><label>Azimuth Var ° <span class="value" id="val_azimuth_var">12</span></label><input type="range" id="azimuth_var" min="2" max="25" value="12"></div>
+      <div class="control"><label>Dip Var ° <span class="value" id="val_dip_var">7</span></label><input type="range" id="dip_var" min="1" max="15" value="7"></div>
+    </div>
+    <div class="control"><label>Front Only Ratio <span class="value" id="val_front_only_ratio">0.80</span></label><input type="range" id="front_only_ratio" min="0.3" max="1.0" step="0.05" value="0.80"></div>
+  </div>
+
+  <!-- Stage 4 -->
+  <div class="stage">
+    <h3>4 — Edge Chipping + Erosion <button class="small secondary" data-gen="4">Gen 4</button></h3>
+    <div class="row">
+      <div class="control"><label>Chip Prob Ext <span class="value" id="val_chip_prob_exterior">0.50</span></label><input type="range" id="chip_prob_exterior" min="0" max="1" step="0.05" value="0.5"></div>
+      <div class="control"><label>Chip Prob Int <span class="value" id="val_chip_prob_interior">0.15</span></label><input type="range" id="chip_prob_interior" min="0" max="0.5" step="0.05" value="0.15"></div>
+    </div>
+    <div class="row">
+      <div class="control"><label>Chip Min <span class="value" id="val_chip_size_min">0.05</span></label><input type="range" id="chip_size_min" min="0.02" max="0.15" step="0.01" value="0.05"></div>
+      <div class="control"><label>Chip Max <span class="value" id="val_chip_size_max">0.22</span></label><input type="range" id="chip_size_max" min="0.1" max="0.4" step="0.01" value="0.22"></div>
+    </div>
+    <div class="row">
+      <div class="control"><label>Erosion Base <span class="value" id="val_erosion_base">0.035</span></label><input type="range" id="erosion_base" min="0.01" max="0.1" step="0.005" value="0.035"></div>
+      <div class="control"><label>Erosion Extra <span class="value" id="val_erosion_extra">0.055</span></label><input type="range" id="erosion_extra" min="0" max="0.15" step="0.005" value="0.055"></div>
+    </div>
+  </div>
+
+  <!-- Stage 5 -->
+  <div class="stage">
+    <h3>5 — Surface Cracks <button class="small secondary" data-gen="5">Gen 5</button></h3>
+    <div class="row">
+      <div class="control"><label>Max Cracks/Block <span class="value" id="val_max_cracks_per_block">3</span></label><input type="range" id="max_cracks_per_block" min="0" max="6" value="3"></div>
+      <div class="control"><label>Density <span class="value" id="val_crack_density">1.0</span></label><input type="range" id="crack_density" min="0.2" max="2.0" step="0.1" value="1.0"></div>
+    </div>
+    <div class="row">
+      <div class="control"><label>Width Min <span class="value" id="val_crack_width_min">0.012</span></label><input type="range" id="crack_width_min" min="0.005" max="0.03" step="0.001" value="0.012"></div>
+      <div class="control"><label>Width Max <span class="value" id="val_crack_width_max">0.030</span></label><input type="range" id="crack_width_max" min="0.01" max="0.06" step="0.001" value="0.03"></div>
+    </div>
+    <div class="row">
+      <div class="control"><label>Depth Min <span class="value" id="val_crack_depth_min">0.03</span></label><input type="range" id="crack_depth_min" min="0.01" max="0.08" step="0.01" value="0.03"></div>
+      <div class="control"><label>Depth Max <span class="value" id="val_crack_depth_max">0.10</span></label><input type="range" id="crack_depth_max" min="0.05" max="0.2" step="0.01" value="0.10"></div>
+    </div>
+  </div>
+
+  <div id="log"></div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1e2329);
+scene.fog = new THREE.Fog(0x1e2329, 50, 140);
+
+const camera = new THREE.PerspectiveCamera(45, container.clientWidth/container.clientHeight, 0.1, 500);
+camera.position.set(20, 14, 24);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(container.clientWidth, container.clientHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+container.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(16, 8, -3);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+scene.add(ambient);
+const dirLight = new THREE.DirectionalLight(0xfff4e0, 1.2);
+dirLight.position.set(15, 25, 12);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(2048,2048);
+dirLight.shadow.camera.left = -30; dirLight.shadow.camera.right = 30;
+dirLight.shadow.camera.top = 30; dirLight.shadow.camera.bottom = -20;
+scene.add(dirLight);
+const fillLight = new THREE.DirectionalLight(0x8ab4ff, 0.35);
+fillLight.position.set(-12, 14, -10);
+scene.add(fillLight);
+
+const groundGeo = new THREE.PlaneGeometry(200,200);
+const groundMat = new THREE.MeshStandardMaterial({ color:0x2a2f36, roughness:0.9 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI/2;
+ground.position.y = -0.05;
+ground.receiveShadow = true;
+scene.add(ground);
+const grid = new THREE.GridHelper(200, 50, 0x444444, 0x333333);
+grid.position.y = 0.01;
+scene.add(grid);
+
+let currentMesh = null;
+let stageFiles = {};
+const loader = new OBJLoader();
+
+function log(msg) {
+  const el = document.getElementById('log');
+  const time = new Date().toLocaleTimeString();
+  el.innerHTML = `[${time}] ${msg}<br>` + el.innerHTML;
+}
+
+function loadOBJ(url, color=0xc9bba3) {
+  if (currentMesh) scene.remove(currentMesh);
+  document.getElementById('stats').innerHTML = `Loading <b>${url}</b>...`;
+  loader.load(url, (obj) => {
+    let verts=0, tris=0;
+    obj.traverse(c => {
+      if (c.isMesh) {
+        const g=c.geometry;
+        g.computeVertexNormals();
+        verts+=g.attributes.position.count;
+        tris+=g.index ? g.index.count/3 : g.attributes.position.count/3;
+        c.material = new THREE.MeshStandardMaterial({ color:color, roughness:0.85, metalness:0.02, side:THREE.DoubleSide });
+        c.castShadow=true; c.receiveShadow=true;
+      }
+    });
+    const box = new THREE.Box3().setFromObject(obj);
+    const center = box.getCenter(new THREE.Vector3());
+    controls.target.copy(center);
+    controls.target.y = box.min.y + (box.max.y-box.min.y)*0.5;
+    scene.add(obj);
+    currentMesh=obj;
+    document.getElementById('stats').innerHTML = `<b>${verts.toLocaleString()}</b> verts, <b>${Math.round(tris).toLocaleString()}</b> tris | ${url.split('/').pop()}`;
+  }, undefined, err => {
+    document.getElementById('stats').innerHTML = `Failed ${url}: ${err}`;
+    log(`Failed ${url}: ${err}`);
+  });
+}
+
+function getConfigFromUI() {
+  return {
+    seed: parseInt(document.getElementById('seed').value),
+    W: parseFloat(document.getElementById('W').value),
+    H: parseFloat(document.getElementById('H').value),
+    D: parseFloat(document.getElementById('D').value),
+    voxel_size: parseFloat(document.getElementById('voxel_size').value),
+    fast_preview: document.getElementById('fastPreview').checked,
+    stage1: {
+      macro_cuts: parseInt(document.getElementById('macro_cuts').value),
+      bay_count: parseInt(document.getElementById('bay_count').value),
+      top_variation: parseFloat(document.getElementById('top_variation').value),
+      base_slope_angle: parseFloat(document.getElementById('base_slope_angle').value),
+      bay_depth: parseFloat(document.getElementById('bay_depth').value),
+      mid_step_depth: parseFloat(document.getElementById('mid_step_depth').value),
+    },
+    stage2: {
+      num_layers: parseInt(document.getElementById('num_layers').value),
+      thickness_min: parseFloat(document.getElementById('thickness_min').value),
+      thickness_max: parseFloat(document.getElementById('thickness_max').value),
+      dip_x_range: [-parseFloat(document.getElementById('dip_x_range').value), parseFloat(document.getElementById('dip_x_range').value)],
+      dip_z_range: [-parseFloat(document.getElementById('dip_z_range').value), parseFloat(document.getElementById('dip_z_range').value)],
+      hardness_pattern: document.getElementById('hardness_pattern').value,
+    },
+    stage3: {
+      face_parallel_count: parseInt(document.getElementById('face_parallel_count').value),
+      perp_count: parseInt(document.getElementById('perp_count').value),
+      diagonal_count: parseInt(document.getElementById('diagonal_count').value),
+      azimuth_var: parseFloat(document.getElementById('azimuth_var').value),
+      dip_var: parseFloat(document.getElementById('dip_var').value),
+      front_only_ratio: parseFloat(document.getElementById('front_only_ratio').value),
+    },
+    stage4: {
+      chip_prob_exterior: parseFloat(document.getElementById('chip_prob_exterior').value),
+      chip_prob_interior: parseFloat(document.getElementById('chip_prob_interior').value),
+      chip_size_min: parseFloat(document.getElementById('chip_size_min').value),
+      chip_size_max: parseFloat(document.getElementById('chip_size_max').value),
+      erosion_base: parseFloat(document.getElementById('erosion_base').value),
+      erosion_extra: parseFloat(document.getElementById('erosion_extra').value),
+    },
+    stage5: {
+      max_cracks_per_block: parseInt(document.getElementById('max_cracks_per_block').value),
+      crack_density: parseFloat(document.getElementById('crack_density').value),
+      crack_width_min: parseFloat(document.getElementById('crack_width_min').value),
+      crack_width_max: parseFloat(document.getElementById('crack_width_max').value),
+      crack_depth_min: parseFloat(document.getElementById('crack_depth_min').value),
+      crack_depth_max: parseFloat(document.getElementById('crack_depth_max').value),
+    }
+  };
+}
+
+function applyConfigToUI(cfg) {
+  const set = (id,val) => {
+    const el=document.getElementById(id);
+    if (el) el.value=val;
+    const valEl=document.getElementById('val_'+id);
+    if (valEl) valEl.textContent = typeof val==='number' ? (Number.isInteger(val)?val:val.toFixed(3)) : val;
+  };
+  set('seed', cfg.seed);
+  set('W', cfg.W); set('H', cfg.H); set('D', cfg.D); set('voxel_size', cfg.voxel_size);
+  set('macro_cuts', cfg.stage1.macro_cuts); set('bay_count', cfg.stage1.bay_count);
+  set('top_variation', cfg.stage1.top_variation); set('base_slope_angle', cfg.stage1.base_slope_angle);
+  set('bay_depth', cfg.stage1.bay_depth); set('mid_step_depth', cfg.stage1.mid_step_depth||1.0);
+  set('num_layers', cfg.stage2.num_layers); set('thickness_min', cfg.stage2.thickness_min);
+  set('thickness_max', cfg.stage2.thickness_max);
+  set('dip_x_range', Math.abs(cfg.stage2.dip_x_range[1])); set('dip_z_range', Math.abs(cfg.stage2.dip_z_range[1]));
+  document.getElementById('hardness_pattern').value = cfg.stage2.hardness_pattern;
+  document.getElementById('val_hardness').textContent = cfg.stage2.hardness_pattern;
+  set('face_parallel_count', cfg.stage3.face_parallel_count); set('perp_count', cfg.stage3.perp_count);
+  set('diagonal_count', cfg.stage3.diagonal_count); set('azimuth_var', cfg.stage3.azimuth_var);
+  set('dip_var', cfg.stage3.dip_var); set('front_only_ratio', cfg.stage3.front_only_ratio);
+  set('chip_prob_exterior', cfg.stage4.chip_prob_exterior); set('chip_prob_interior', cfg.stage4.chip_prob_interior);
+  set('chip_size_min', cfg.stage4.chip_size_min); set('chip_size_max', cfg.stage4.chip_size_max);
+  set('erosion_base', cfg.stage4.erosion_base); set('erosion_extra', cfg.stage4.erosion_extra);
+  set('max_cracks_per_block', cfg.stage5.max_cracks_per_block); set('crack_density', cfg.stage5.crack_density);
+  set('crack_width_min', cfg.stage5.crack_width_min); set('crack_width_max', cfg.stage5.crack_width_max);
+  set('crack_depth_min', cfg.stage5.crack_depth_min); set('crack_depth_max', cfg.stage5.crack_depth_max);
+}
+
+document.querySelectorAll('input[type=range], input[type=number], select').forEach(el => {
+  el.addEventListener('input', () => {
+    const valEl = document.getElementById('val_'+el.id);
+    if (valEl) {
+      const v = el.type==='range' ? parseFloat(el.value) : el.value;
+      valEl.textContent = el.tagName==='SELECT' ? el.value : (Number.isInteger(v)?v: (isNaN(v)?el.value: v.toFixed(3)));
+    }
+  });
+});
+
+async function fetchDefaultConfig() {
+  const res = await fetch('/api/default_config');
+  const cfg = await res.json();
+  applyConfigToUI(cfg);
+  document.getElementById('stats').textContent = 'Default config loaded. Click Generate.';
+}
+
+async function generateCliff(upToStage=6) {
+  const btn = document.getElementById('btnGenerate');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = `⏳ Generating up to stage ${upToStage}...`;
+  const cfg = getConfigFromUI();
+  cfg.up_to_stage = upToStage;
+  log(`Generating up to stage ${upToStage} with seed ${cfg.seed}, fast=${cfg.fast_preview}...`);
+  try {
+    const res = await fetch('/api/generate', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(cfg)
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    stageFiles = data.stage_files;
+    // Auto-view the stage we just generated, or final if exists
+    const stageMap = {1:'stage1_macro',2:'stage2_bedding',3:'stage3_fractured',4:'stage4_chipped',5:'stage5_eroded',6:'final'};
+    const stageName = stageMap[upToStage];
+    const file = stageFiles[stageName] || stageFiles['final'];
+    if (file) {
+      document.getElementById('stageSelect').value = stageName;
+      document.getElementById('currentStageLabel').textContent = stageName;
+      loadOBJ('/generated/'+file, stageName==='final'?0xc9bba3:0x9aa0a6);
+    }
+    document.getElementById('stats').innerHTML = `<b>${data.stats.num_blocks}</b> blocks, <b>${data.stats.total_cracks}</b> cracks, <b>${data.stats.final_verts.toLocaleString()}</b> verts in <b>${data.elapsed.toFixed(1)}s</b> (up to stage ${upToStage})`;
+    log(`Generated up to stage ${upToStage}: ${data.stats.num_blocks} blocks, ${data.stats.final_verts} verts in ${data.elapsed.toFixed(1)}s`);
+  } catch (e) {
+    document.getElementById('stats').textContent = 'Error: '+e.message;
+    log('Error: '+e.message);
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+document.getElementById('btnGenerate').addEventListener('click', () => generateCliff(6));
+document.querySelectorAll('[data-stage]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const stage = parseInt(btn.dataset.stage);
+    generateCliff(stage);
+  });
+});
+document.querySelectorAll('[data-gen]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const stage = parseInt(btn.dataset.gen);
+    generateCliff(stage);
+  });
+});
+document.getElementById('btnRandomSeed').addEventListener('click', () => {
+  const s = Math.floor(Math.random()*9999)+1;
+  document.getElementById('seed').value=s;
+  document.getElementById('val_seed').textContent=s;
+  generateCliff(6);
+});
+document.getElementById('btnReset').addEventListener('click', async () => {
+  await fetchDefaultConfig();
+});
+
+document.getElementById('stageSelect').addEventListener('change', (e) => {
+  const stage = e.target.value;
+  document.getElementById('currentStageLabel').textContent = stage;
+  const file = stageFiles[stage];
+  if (file) {
+    loadOBJ('/generated/'+file, stage==='final'?0xc9bba3:0x9aa0a6);
+  } else {
+    log(`Stage ${stage} not yet generated - click Generate`);
+  }
+});
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = container.clientWidth/container.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(container.clientWidth, container.clientHeight);
+});
+
+fetchDefaultConfig().then(() => {
+  loadOBJ('/obj/cliff.obj');
+});
+</script>
+</body>
+</html>

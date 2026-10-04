@@ -1,2 +1,4 @@
 numpy>=1.24
 scikit-image>=0.20
+flask>=2.0
+flask-cors>=4.0
