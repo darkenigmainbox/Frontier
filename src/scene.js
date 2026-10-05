@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {buildAtrium} from './atrium.js';
 export const settings = {
  running:true, gi:true, emission:2.8, bounce:1, speed:1, resolution:.75, view:0,
  probes:true, probeLevel:1, probeMode:0, wireframe:false, scene:'chamber', time:0,
@@ -16,6 +17,7 @@ export const sceneInfo={
  large:['Grand hall · 10K','A 24 × 22 × 10 m room with 10,008 triangles at 500 crates, 15 pillars and a connected deforming sheet.'],
  stress:['Geometry stress test','A seeded field of animated triangle meshes. Change object count and compare BVH vs brute force.'],
  swarm:['Triangle swarm','64 orbiting, deforming triangles around an emissive orb.'],
+ atrium:['Aurum atrium','A modern two-storey colonnade: skylight lattice, upper galleries, timber fins, bronze details and connected cloth banners. All triangle meshes.'],
  cornell:['Stack study','Tall blocks, reflective surfaces, and contrasting emissive materials.'],
 };
 const material=(color,emission=0,metal=0)=>({color,emission,baseEmission:emission,metal});
@@ -37,6 +39,10 @@ function panel(kind,width,height,pos,color,emission,angle=0){
 export function makeScene(){
  const disposed=new Set();for(const o of objects)if(!disposed.has(o.geometry)){disposed.add(o.geometry);o.geometry.dispose();}
  objects.length=0;lights.length=0;sceneVersion++;
+ if(settings.scene==='atrium'){
+  buildAtrium({add,material,lights});
+  const orb=sphere('emissive-orb',.28,[0,1.2,1],material([1,.27,.07],8),'orb');orb.directEmitter=true;lights.push({object:orb});updateScene(settings.time);return objects;
+ }
  const large=settings.scene==='large',width=large?24:12,depth=large?22:11,height=large?10:7;
  const floor=plane('floor',[width,depth],[0,0,0],material([.32,.34,.32]));floor.rotation.x=-Math.PI/2;
  plane('left',[depth,height],[-width/2,height/2,0],material([.27,.28,.26]),Math.PI/2);
@@ -123,14 +129,15 @@ export function updateScene(time){
    const vertices=o.geometry.attributes.position,rest=o.restPositions;
    for(let i=0;i<vertices.count;i++){
     const x=rest[i*3],y=rest[i*3+1],free=(rest[1]-y)/4.2;
-    const z=settings.waveAmplitude*free*(.62*Math.sin(x*1.7-time*2.1)+.24*Math.sin(y*2.3+time*1.4));
+    const phase=time+(o.wavePhase||0);const z=settings.waveAmplitude*free*(.62*Math.sin(x*1.7-phase*2.1)+.24*Math.sin(y*2.3+phase*1.4));
     vertices.setXYZ(i,x,y,z);
    }
    vertices.needsUpdate=true;o.geometry.computeVertexNormals();
   }
   if(o.motion==='cube'){o.rotation.set(.13+Math.sin(time*.55)*.12,time*.27,.08);p.y+=Math.sin(time*.8)*.15;}
   if(o.motion==='sphere'){p.x+=Math.sin(time*.6)*.5;p.z+=Math.cos(time*.6)*.35;}
-  if(o.motion==='orb'){const large=settings.scene==='large';p.set(Math.sin(time*.65)*(large?7:2.8),(large?3:1.15)+Math.sin(time*.9)*.35,(large?4:1.6)+Math.cos(time*.65)*(large?2:.8));}
+  if(o.motion==='orb'&&settings.scene==='atrium'){p.set(Math.sin(time*.4)*2.4,1.8+Math.sin(time*.6)*.35,3+Math.cos(time*.4)*2);}
+  else if(o.motion==='orb'){const large=settings.scene==='large';p.set(Math.sin(time*.65)*(large?7:2.8),(large?3:1.15)+Math.sin(time*.9)*.35,(large?4:1.6)+Math.cos(time*.65)*(large?2:.8));}
   if(o.motion?.startsWith('stress')){const i=Number(o.motion.slice(6));o.rotation.set(time*.16+i,time*.21+i*.17,0);p.y+=Math.sin(time*.6+i)*.1;}
   if(o.motion?.startsWith('shard')){const i=Number(o.motion.slice(5)),a=time*.35+i*1.256;
    const radius=settings.scene==='swarm'?1.3+(i%5)*.6:1.9;
@@ -197,7 +204,7 @@ function packEmitterMeshes(){
 export function lightData(){return packEmitterMeshes().lights;}
 export function emitterTriangleData(){return packEmitterMeshes().triangles;}
 export function cameraState(aspect){
- const target=new THREE.Vector3(0,settings.scene==='large'?3:1.65,settings.scene==='large'?-1.6:-.8),yaw=settings.cameraYaw,pitch=.27+settings.cameraPitch;
+ const target=new THREE.Vector3(0,settings.scene==='atrium'?4.4:settings.scene==='large'?3:1.65,settings.scene==='atrium'?-2:settings.scene==='large'?-1.6:-.8),yaw=settings.cameraYaw,pitch=.27+settings.cameraPitch;
  const eye=new THREE.Vector3(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch)).multiplyScalar(settings.distance).add(target);
  const forward=target.clone().sub(eye).normalize(),right=forward.clone().cross(new THREE.Vector3(0,1,0)).normalize(),up=right.clone().cross(forward).normalize();return {eye,forward,right,up,target,aspect};
 }

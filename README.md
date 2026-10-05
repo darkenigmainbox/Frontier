@@ -1,4 +1,4 @@
-# Cascade / lab · v0.7
+# Cascade / lab · v0.8
 
 A WebGPU **visibility-raster + triangle-traced lighting** experiment. The camera view is rasterized; GI, shadow, reflection and probe-visibility queries intersect real mesh triangles. Built with JavaScript, WGSL, Vite and Three.js (geometry/math and the explicitly labeled WebGL fallback).
 
@@ -22,10 +22,18 @@ WebGPU requires HTTPS or localhost and a compatible GPU/browser/driver. Dev bind
 `site/` is the intentionally tracked static deployment. Relative asset URLs work under:
 
 ```text
-https://raw.githack.com/darkenigmainbox/Frontier/<commit-sha>/site/index.html?scene=large
+https://raw.githack.com/darkenigmainbox/Frontier/<commit-sha>/site/index.html?scene=atrium
 ```
 
 Rebuild and commit `site/` before publishing a new immutable link. raw.githack may show an external-content notice before opening the app.
+
+## New: Aurum atrium
+
+An original procedural, modern Sponza-style architectural test scene: **24 × 22 × 10 m**, with two-storey cylindrical colonnades, upper galleries and balustrades, solid stairs with actual stairwell openings, recessed wall panels, timber soffit fins, a skylight lattice, planted seating bays and a connected bronze ribbon sculpture. Terracotta and teal banners deform at their vertices while their top edges remain pinned.
+
+**9,476 rendered triangles · 1,444 unique local triangles · 428 instances · 9 shared/unique meshes.** Curved columns, foliage, sculpture, walls and emitters are all triangle geometry—not analytic intersection shapes, SDFs or image backdrops. Architecture is static and cached; only the two 240-triangle banners deform, plus the moving mesh emitter. Three registered mesh lights keep light sampling bounded: the skylight, warm rear recess and orb. The roof aperture/transoms physically occlude the daylight emitter.
+
+Choose **Aurum atrium** or open `?scene=atrium`. Its entrance camera and probe bounds are configured for the architecture. Toggle **Triangle edges / wireframe** to inspect the actual tessellation. The existing crate hall remains a separate stress test. Neither architectural hall permits brute-force A/B in the UI. This is a lighting test environment, not a collision-enabled walking simulator or an official Sponza asset; the renderer's existing GI/reconstruction limitations still apply.
 
 ## A. Shared meshes and two-level acceleration
 
@@ -102,9 +110,10 @@ Probe overlay is intentionally X-ray. Radiance colours come from the current cac
 | Grand hall · 10K | 24×22×10 m; 10,008 triangles at 500 crates, 15 pillars and the connected sheet |
 | Geometry stress test | Up to 1,536 animated cubes; 19,188 total triangles |
 | Triangle swarm | 64 vertex-deforming shards |
+| Aurum atrium | Modern colonnade, galleries, skylight, sculpture and deforming banners; 9,476 triangles |
 | Stack study | Occlusion and reflection inspection |
 
-The hall crate slider spans **4,008–16,008 triangles**. BVH-off A/B is blocked for the hall and >256-cube stress variants to reduce GPU watchdog risk, not silently replaced by a different workload.
+The hall crate slider spans **4,008–16,008 triangles**. BVH-off A/B is blocked for both architectural halls and >256-cube stress variants to reduce GPU watchdog risk, not silently replaced by a different workload.
 
 - Drag/scroll: orbit/zoom. Space: animation. R: camera reset. G: GI. P: probes. F: fullscreen.
 - Lit / Direct / Indirect / Normals / Probe atlas; actual triangle edges; PNG capture; reset controls.

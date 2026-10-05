@@ -6,7 +6,7 @@ export const densityPresets=[
  {name:'Ultra',dims:[[24,12,24],[12,6,12],[6,3,6]]},
 ];
 export function getProbeConfig(){
- const preset=densityPresets[settings.probeDensity];const large=settings.scene==='large';
+ const preset=densityPresets[settings.probeDensity];const large=['large','atrium'].includes(settings.scene);
  const min=large?[-12,0,-11]:[-6,0,-5.5],size=large?[24,10,22]:[12,7,11];
  const sides=[4,8,16].map(n=>n*(settings.probeAngular?2:1));
  const counts=preset.dims.map(d=>d[0]*d[1]*d[2]),rayWork=counts.map((n,i)=>n*sides[i]**2);
