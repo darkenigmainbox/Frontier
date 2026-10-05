@@ -4,7 +4,7 @@ struct Params {
  screen:vec4f, light:vec4f, flags:vec4f, counts:vec4f, debug:vec4f,
 };
 struct Triangle {a:vec4f,b:vec4f,c:vec4f,color:vec4f,info:vec4f};
-struct Hit {t:f32, normal:vec3f, color:vec3f, emission:f32, metal:f32, floor:f32};
+struct Hit {t:f32, normal:vec3f, color:vec3f, emission:f32, metal:f32, floor:f32, edge:f32};
 @group(0) @binding(0) var<uniform> u:Params;
 @group(0) @binding(1) var<storage,read> tris:array<Triangle>;
 @group(0) @binding(2) var<storage,read_write> nearField:array<vec4f>;
@@ -29,14 +29,14 @@ fn triangleHit(index:u32,ro:vec3f,rd:vec3f,tmin:f32,previous:Hit)->Hit {
  let q=cross(offset,e1);let w=dot(rd,q)*inv;if(w<0. || v+w>1.){return previous;}
  let dist=dot(e2,q)*inv;if(dist<=tmin || dist>=previous.t){return previous;}
  var n=normalize(cross(e1,e2));if(dot(n,rd)>0.){n=-n;}
- return Hit(dist,n,t.color.xyz,t.color.w,t.info.x,t.info.y);
+ return Hit(dist,n,t.color.xyz,t.color.w,t.info.x,t.info.y,min(v,min(w,1.-v-w)));
 }
 fn sphereRoots(oc:vec3f,rd:vec3f,r:f32)->vec2f {
  let b=dot(oc,rd);let disc=b*b-dot(oc,oc)+r*r;if(disc<0.){return vec2f(-1);}
  let root=sqrt(disc);return vec2f(-b-root,-b+root);
 }
 fn trace(ro:vec3f,rd:vec3f,tmin:f32,tmax:f32)->Hit {
- var hit=Hit(tmax,vec3f(0),vec3f(0),0.,0.,0.);let inv=invDir(rd);
+ var hit=Hit(tmax,vec3f(0),vec3f(0),0.,0.,0.,1.);let inv=invDir(rd);
  if(u.light.w>.5){
   var index=0u;
   loop {
@@ -62,7 +62,7 @@ fn trace(ro:vec3f,rd:vec3f,tmin:f32,tmax:f32)->Hit {
     for(var j=0u;j<2u;j++){let t=roots[j];let pos=local+rd*t;if(t>tmin&&t<distance&&pos.y*signY>=halfLength){distance=t;normal=normalize(pos-center);}}
    }
   }
-  if(distance<hit.t){if(dot(normal,rd)>0.){normal=-normal;}hit=Hit(distance,normal,shape.color.xyz,shape.color.w,shape.info.x,0.);}
+  if(distance<hit.t){if(dot(normal,rd)>0.){normal=-normal;}hit=Hit(distance,normal,shape.color.xyz,shape.color.w,shape.info.x,0.,1.);}
  }
  return hit;
 }
@@ -154,7 +154,7 @@ fn shade(ro:vec3f,rd:vec3f)->vec3f{
  if(u.flags.y==1.){lit=color*direct*.65+color*hit.emission*u.light.x;}
  if(u.flags.y==2.){lit=indirect;}
  if(u.flags.y==3.){lit=hit.normal*.5+.5;}
- if(u.flags.w>0.){let edge=abs(fract(p*1.5)-.5);if(min(edge.x,min(edge.y,edge.z))<.016){lit=mix(lit,vec3f(.5,.85,.5),.45);}}
+ if(u.flags.w>0.){let edge=1.-smoothstep(.015,.065,hit.edge);lit=mix(lit,vec3f(.45,.95,.4),edge*.85);}
  return lit;
 }
 @compute @workgroup_size(8,8)

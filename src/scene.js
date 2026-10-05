@@ -3,13 +3,14 @@ export const settings = {
  running:true, gi:true, emission:2.8, bounce:1, speed:1, resolution:.75, view:0,
  probes:true, probeLevel:1, probeMode:0, wireframe:false, scene:'chamber', time:0,
  cameraYaw:0, cameraPitch:0, distance:14.8, stressCount:256,
- shadowSamples:4, emitterSize:1, bvh:true, reflections:true,
+ shadowSamples:4, emitterSize:1, bvh:true, reflections:true, waveAmplitude:1,
 };
 export const objects=[];
 export const lights=[];
 export let sceneVersion=0;
 export const sceneInfo={
  chamber:['The light chamber','Warm and cool panels, a moving emissive orb, and deforming triangles.'],
+ deform:['Deforming mesh','A connected 3,072-triangle sheet: vertices bend every frame while its object transform stays fixed. No SDF.'],
  windows:['Window / penumbra lab','Real window openings and mullions. An exterior area emitter casts soft shadows through the room.'],
  primitives:['Analytic playground','Exact sphere, axis-aligned box, and capsule intersections. No triangle tessellation on WebGPU.'],
  stress:['Geometry stress test','A seeded field of animated triangle meshes. Change object count and compare BVH vs brute force.'],
@@ -65,6 +66,14 @@ export function makeScene(){
    const size=.18+rand()*.38;
    add('stress-cube',geo,material([.25+rand()*.55,.3+rand()*.45,.25+rand()*.55],0,i%7===0?.6:0),[-5+rand()*10,.4+rand()*5.4,-4.5+rand()*8.5],[size,size,size],`stress${i}`);
   }
+ }else if(settings.scene==='deform'){
+  const mesh=add('wavy-sheet',new THREE.PlaneGeometry(6,4.2,48,32),material([.48,.65,.57],0,.08),[0,2.8,-1],[1,1,1],'wave');
+  // Store rest-space coordinates. Only vertices deform; topology and transform stay fixed.
+  mesh.restPositions=mesh.geometry.attributes.position.array.slice();
+  box('cloth-rail',[6.5,.12,.15],[0,4.94,-1],graphite);
+  box('cloth-post',[.13,5,.13],[-3.25,2.5,-1],graphite);
+  box('cloth-post',[.13,5,.13],[3.25,2.5,-1],graphite);
+  sphere('sphere',.64,[3.7,.66,1.3],material([.63,.71,.68],0,.85));
  }else if(settings.scene==='primitives'){
   sphere('sphere',.85,[-2.4,.9,.2],material([.7,.74,.72],0,.95),'sphere');
   sphere('matte-sphere',.7,[0,.7,-2.2],material([.68,.28,.12]));
@@ -91,6 +100,15 @@ export function makeScene(){
 export function updateScene(time){
  for(const o of objects){
   p.fromArray(o.pos);s.fromArray(o.scale);
+  if(o.motion==='wave'){
+   const vertices=o.geometry.attributes.position,rest=o.restPositions;
+   for(let i=0;i<vertices.count;i++){
+    const x=rest[i*3],y=rest[i*3+1],free=(rest[1]-y)/4.2;
+    const z=settings.waveAmplitude*free*(.62*Math.sin(x*1.7-time*2.1)+.24*Math.sin(y*2.3+time*1.4));
+    vertices.setXYZ(i,x,y,z);
+   }
+   vertices.needsUpdate=true;o.geometry.computeVertexNormals();
+  }
   if(o.motion==='cube'){o.rotation.set(.13+Math.sin(time*.55)*.12,time*.27,.08);p.y+=Math.sin(time*.8)*.15;}
   if(o.motion==='sphere'){p.x+=Math.sin(time*.6)*.5;p.z+=Math.cos(time*.6)*.35;}
   if(o.motion==='orb')p.set(Math.sin(time*.65)*2.8,1.15+Math.sin(time*.9)*.35,1.6+Math.cos(time*.65)*.8);

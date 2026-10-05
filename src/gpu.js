@@ -54,9 +54,18 @@ export class GPURenderer {
  }
  render(){
   const cpuStart=performance.now();this.resize();const d=this.device;const cam=cameraState(this.canvas.width/this.canvas.height);const raw=triangleData();
-  if(this.sceneVersion!==sceneVersion){this.bvh.build(raw);this.sceneVersion=sceneVersion;}else this.bvh.refit(raw);
-  const tris=this.bvh.triangles,shapes=analyticData(),lights=lightData();this.triangleCount=tris.length/20;this.analyticCount=shapes.length/16;this.nodeCount=this.bvh.nodes.length;
-  const payloads={triangles:tris,nodes:this.bvh.data,shapes,emitters:lights};let changed=false;
+  let tris=raw;this.bvhMs=0;this.nodeCount=0;
+  if(settings.bvh){
+   const start=performance.now();
+   if(this.sceneVersion!==sceneVersion){this.bvh.build(raw);this.sceneVersion=sceneVersion;}else this.bvh.refit(raw);
+   tris=this.bvh.triangles;this.nodeCount=this.bvh.nodes.length;this.bvhMs=performance.now()-start;
+  }
+  const shapes=analyticData(),lights=lightData();this.triangleCount=tris.length/20;this.analyticCount=shapes.length/16;
+  const payloads={triangles:tris,shapes,emitters:lights};
+  // BVH OFF is a real baseline: no build, refit, reordering, or node upload.
+  // Retain its allocation so re-enabling doesn't cause allocation churn.
+  if(settings.bvh)payloads.nodes=this.bvh.data;
+  let changed=false;
   for(const [key,data] of Object.entries(payloads)){changed=this.ensureSceneBuffer(key,data.byteLength)||changed;d.queue.writeBuffer(this.sceneBuffers[key],0,data);}
   if(changed)this.rebindScene();
   const data=new Float32Array([...cam.eye,0,...cam.forward,0,...cam.right,0,...cam.up,0,

@@ -23,6 +23,9 @@ try {
  await page.locator('#bounce').fill('1.5');await page.locator('#bounce').dispatchEvent('input');assert.equal(await page.locator('#bounce-value').textContent(),'1.50×');
  await page.locator('[data-view="3"]').click();assert.equal(await page.locator('[data-view="3"]').getAttribute('aria-selected'),'true');
  await page.locator('#show-probes').click();assert.equal(await page.locator('#show-probes').getAttribute('aria-checked'),'false');
+ assert.ok(await page.locator('#bvh-quick').isVisible());assert.equal(await page.locator('#bvh-quick').isDisabled(),true);
+ await page.locator('#scene-select').selectOption('deform');assert.ok(await page.locator('#deform-controls').isVisible());
+ await page.locator('#wave-amplitude').fill('0.5');await page.locator('#wave-amplitude').dispatchEvent('input');assert.equal(await page.locator('#wave-amplitude-value').textContent(),'0.50×');
  await page.locator('#scene-select').selectOption('swarm');assert.equal(await page.locator('#scene-title').textContent(),'TRIANGLE SWARM');
  await page.locator('#scene-select').selectOption('windows');assert.equal(await page.locator('#shadow-samples').inputValue(),'16');
  await page.locator('#scene-select').selectOption('primitives');assert.equal(await page.locator('#scene-title').textContent(),'ANALYTIC PLAYGROUND');
@@ -43,15 +46,16 @@ try {
  await gpuPage.goto(url);
  const results=await gpuPage.evaluate(async()=>{
   if(!navigator.gpu||!await navigator.gpu.requestAdapter())return {skip:true};
-  const {GPURenderer}=await import('/src/gpu.js');const {settings,updateScene,makeScene,analyticData}=await import('/src/scene.js');settings.resolution=1;settings.running=false;settings.probes=false;updateScene(0);
+  const {GPURenderer}=await import('/src/gpu.js');const {settings,updateScene,makeScene,analyticData,objects,lightData}=await import('/src/scene.js');settings.resolution=1;settings.running=false;settings.probes=false;updateScene(0);
   let target,device;const errors=[];
   const canvas={clientWidth:64,clientHeight:48,width:64,height:48,getContext:()=>({configure:({device:d,format})=>{device=d;target=d.createTexture({size:[64,48],format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});},getCurrentTexture:()=>target})};
   const renderer=await new GPURenderer().init(canvas);renderer.onError=e=>errors.push(e.message);
   async function readFrame(){
    await renderer.render();const output=device.createBuffer({size:256*48,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});const encoder=device.createCommandEncoder();encoder.copyTextureToBuffer({texture:target},{buffer:output,bytesPerRow:256},[64,48]);device.queue.submit([encoder.finish()]);await output.mapAsync(GPUMapMode.READ);const pixels=new Uint8Array(output.getMappedRange()).slice();output.unmap();output.destroy();return pixels;
   }
-  const lit=await readFrame();const baseMemory=renderer.memory.total;settings.bvh=false;const brute=await readFrame();settings.bvh=true;settings.gi=false;const direct=await readFrame();settings.gi=true;updateScene(2);const moving=await readFrame();settings.view=3;const normals=await readFrame();settings.probes=true;const probes=await readFrame();
+  const lit=await readFrame();const baseMemory=renderer.memory.total;settings.bvh=false;const brute=await readFrame();const bruteRefitMs=renderer.bvhMs;settings.bvh=true;settings.gi=false;const direct=await readFrame();settings.gi=true;updateScene(2);const moving=await readFrame();settings.view=3;const normals=await readFrame();settings.probes=true;const probes=await readFrame();
   const difference=(a,b)=>a.reduce((sum,x,i)=>sum+(x!==b[i]?1:0),0);
+  const maxDifference=(a,b)=>a.reduce((max,x,i)=>Math.max(max,Math.abs(x-b[i])),0);
   const capture=await renderer.capture();const colors=new Set();for(let i=0;i<lit.length;i+=4)colors.add(lit.slice(i,i+3).join(','));
   const initialTriangles=renderer.triangleCount;
   settings.probes=false;settings.view=4;const atlas=await readFrame();settings.probeLevel=2;const farAtlas=await readFrame();
@@ -59,13 +63,33 @@ try {
   settings.scene='primitives';settings.emitterSize=1;settings.shadowSamples=1;makeScene();const analytical=await readFrame();const analyticalCount=renderer.analyticCount;settings.bvh=false;const analyticalBrute=await readFrame();settings.bvh=true;
   const orbBefore=Array.from(analyticData());updateScene(4);const orbAfter=Array.from(analyticData());
   settings.scene='stress';settings.stressCount=1536;settings.reflections=false;settings.gi=true;makeScene();const stress=await readFrame();const stressTriangles=renderer.triangleCount,stressMemory=renderer.memory.total;
-  const result={errors,colors:colors.size,giChanges:difference(lit,direct),motionChanges:difference(lit,moving),normalChanges:difference(moving,normals),probeChanges:difference(normals,probes),captureBytes:capture.size,triangles:initialTriangles,
-   bvhDifference:difference(lit,brute),analyticBVHDifference:difference(analytical,analyticalBrute),atlasChanges:difference(atlas,farAtlas),penumbraChanges:difference(hard,soft),emitterSizeChanges:difference(soft,smallEmitter),analyticalCount,orbChanges:difference(orbBefore,orbAfter),stressTriangles,baseMemory,stressMemory};renderer.destroy();return result;
+  settings.scene='deform';settings.time=0;settings.gi=true;settings.reflections=true;settings.shadowSamples=1;makeScene();
+  // Freeze every other animation: subsequent changes must come from the mesh alone.
+  for(const o of objects)if(o.motion!=='wave')o.motion=null;
+  updateScene(0);const sheet=objects.find(o=>o.kind==='wavy-sheet');const waveVertices=sheet.geometry.attributes.position.count;
+  const indicesBefore=Array.from(sheet.geometry.index.array),positionsBefore=Array.from(sheet.geometry.attributes.position.array),transformBefore=sheet.matrix.toArray(),lightsBefore=Array.from(lightData());
+  const wave0=await readFrame();const waveTriangles=sheet.geometry.index.count/3;const treeBefore=renderer.bvh.nodes;settings.view=4;const waveAtlas0=await readFrame();
+  updateScene(1.7);const positionsAfter=Array.from(sheet.geometry.attributes.position.array);settings.view=0;const wave1=await readFrame();const reusedWaveTree=renderer.bvh.nodes===treeBefore;
+  settings.wireframe=true;const waveEdges=await readFrame();settings.wireframe=false;
+  settings.bvh=false;const waveBrute=await readFrame();const waveBruteRefit=renderer.bvhMs;settings.bvh=true;
+  settings.view=4;const waveAtlas1=await readFrame();
+  const connectedTopologyUnchanged=difference(indicesBefore,Array.from(sheet.geometry.index.array))===0;
+  const objectTransformUnchanged=difference(transformBefore,sheet.matrix.toArray())===0;
+  const lightsUnchanged=difference(lightsBefore,Array.from(lightData()))===0;
+  settings.waveAmplitude=0;updateScene(1.7);const flattened=sheet.geometry.attributes.position.array.every((v,i)=>i%3!==2||v===0);
+  const result={errors,colors:colors.size,giChanges:difference(lit,direct),motionChanges:difference(lit,moving),normalChanges:difference(moving,normals),probeChanges:difference(normals,probes),captureBytes:capture.size,triangles:initialTriangles,bruteRefitMs,
+   waveVertices,waveTriangles,reusedWaveTree,connectedTopologyUnchanged,objectTransformUnchanged,lightsUnchanged,flattened,
+   waveVertexChanges:difference(positionsBefore,positionsAfter),waveImageChanges:difference(wave0,wave1),waveAtlasChanges:difference(waveAtlas0,waveAtlas1),waveBVHDifference:difference(wave1,waveBrute),waveEdgeChanges:difference(wave1,waveEdges),waveBruteRefit,
+   bvhDifference:difference(lit,brute),bvhMaxDifference:maxDifference(lit,brute),analyticBVHDifference:difference(analytical,analyticalBrute),atlasChanges:difference(atlas,farAtlas),penumbraChanges:difference(hard,soft),emitterSizeChanges:difference(soft,smallEmitter),analyticalCount,orbChanges:difference(orbBefore,orbAfter),stressTriangles,baseMemory,stressMemory};renderer.destroy();return result;
  });
  if(results.skip){console.log('SKIP WebGPU: no adapter in this browser');}else{
   assert.deepEqual(results.errors,[]);assert.ok(results.colors>20);assert.ok(results.giChanges>100);assert.ok(results.motionChanges>100);assert.ok(results.normalChanges>100);assert.ok(results.probeChanges>100);assert.ok(results.captureBytes>100);assert.ok(results.triangles>50);
-  assert.equal(results.bvhDifference,0);assert.equal(results.analyticBVHDifference,0);assert.ok(results.analyticalCount>=6);assert.ok(results.orbChanges>0);
+  // Different traversal orders can resolve shared edges with a one-LSB difference.
+  assert.ok(results.bvhDifference<=12);assert.ok(results.bvhMaxDifference<=1);assert.equal(results.analyticBVHDifference,0);assert.ok(results.analyticalCount>=6);assert.ok(results.orbChanges>0);
   assert.ok(results.atlasChanges>100);assert.ok(results.penumbraChanges>50);assert.ok(results.emitterSizeChanges>100);assert.ok(results.stressTriangles>18000);assert.ok(results.stressMemory>results.baseMemory);
+  assert.equal(results.bruteRefitMs,0);assert.equal(results.waveBruteRefit,0);assert.equal(results.waveVertices,1617);assert.equal(results.waveTriangles,3072);
+  assert.ok(results.reusedWaveTree);assert.ok(results.connectedTopologyUnchanged);assert.ok(results.objectTransformUnchanged);assert.ok(results.lightsUnchanged);assert.ok(results.flattened);
+  assert.ok(results.waveVertexChanges>1000);assert.ok(results.waveImageChanges>100);assert.ok(results.waveAtlasChanges>100);assert.ok(results.waveEdgeChanges>100);assert.equal(results.waveBVHDifference,0);
   console.log('✓ GPU: WGSL compilation, cascade dispatch + merge, GI toggle, dynamic geometry, normals, readback',results);
  }
 }finally{await browser.close();await server.close();}

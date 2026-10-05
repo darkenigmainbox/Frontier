@@ -1,4 +1,4 @@
-# Cascade / lab · v0.2
+# Cascade / lab · v0.3
 
 An interactive **WebGPU 3D radiance-cascade prototype** with animated/deforming triangles, a moving emissive sphere, analytic primitives, traced reflections, area-light shadows, and a triangle BVH. Built with Vite, JavaScript, WGSL, and Three.js (scene math and the explicitly labeled WebGL fallback).
 
@@ -27,12 +27,13 @@ This produces **`site/`**, the intentionally tracked static deployment artifact.
 https://raw.githack.com/darkenigmainbox/Frontier/<commit-sha>/site/index.html
 ```
 
-Add `?scene=windows`, `?scene=primitives`, or `?scene=stress` to open a specific scene. Use an immutable commit URL to avoid stale branch caches. This session publishes only from `arena/01a10bdc-frontier`.
+Add `?scene=deform`, `?scene=windows`, `?scene=primitives`, or `?scene=stress` to open a specific scene. Use an immutable commit URL to avoid stale branch caches. This session publishes only from `arena/01a10bdc-frontier`.
 
-## Six scenes
+## Seven scenes
 
 | Scene | What to inspect |
 | --- | --- |
+| Deforming mesh | One connected indexed sheet: 1,617 vertices, 3,072 triangles, pinned top edge, fixed object transform, changing vertex positions |
 | The light chamber | Two colored panels, an orbiting emissive ball, mirror-like sphere, deforming shards, capsule, and analytic box |
 | Window / penumbra lab | Actual wall openings and mullions, exterior rectangular emitter, emissive sky backdrop, and shadow-receiving objects/floor |
 | Analytic playground | Exact spheres, axis-aligned boxes, and vertical capsules; seven analytic primitives including the moving emitter |
@@ -49,8 +50,9 @@ The ball's emissive material is visible to primary, reflected, and cascade rays.
 - **Drag / scroll:** orbit / zoom, constrained to the open side of the chamber.
 - **Space:** pause/resume. **R:** reset camera. **G:** GI. **P:** probes. **F:** fullscreen.
 - Adjust emission, indirect intensity, speed, render scale, emitter size, and 1/4/16/64 shadow samples.
-- Toggle BVH traversal and reflected rays independently. Brute-force comparison is limited to ≤256 stress cubes to avoid obvious GPU watchdog hazards.
+- Toggle BVH acceleration directly above the viewport, and reflected rays in the sidebar. BVH OFF skips CPU building/refitting, triangle reordering and node uploads as well as GPU traversal; existing buffer capacities remain allocated. Brute-force comparison is limited to ≤256 stress cubes to avoid obvious GPU watchdog hazards.
 - Inspect **Lit**, **Direct only**, **Indirect** (gathered radiance), **Normals**, and **Probe atlas**.
+- **Triangle edges / wireframe** draws actual barycentric triangle edges on WebGPU (wireframe mesh rendering on WebGL), including the connected deforming sheet. Analytic shapes have no triangle edges in WebGPU.
 - Export a PNG including probe overlays, restart time, or restore all settings.
 
 ### Actual probe data
@@ -65,11 +67,46 @@ The default overlay shows **C1's 108 probes**. Select C0 (864), C1 (108), or C2 
 
 Probes/atlas require current cascade data, so their visualization continues to dispatch cascades even when GI shading is toggled off. Disable overlays and use Lit/Direct to measure GI-off performance without that debug work.
 
+## Dynamic meshes: the distinction this demo now shows
+
+Moving a rigid object is not the same as deforming a mesh. In **Deforming mesh**, `updateScene()` changes the local-space positions in a single indexed `PlaneGeometry(6, 4.2, 48, 32)`. The top row stays pinned; the other 1,568 vertices bend. The object matrix and triangle indices do not change. Set **Vertex displacement** to zero for a flat sheet; enable **Triangle edges / wireframe** to inspect the actual triangles. This is a procedural wave, **not** cloth simulation or an imported skinned character.
+
+Every frame follows this chain:
+
+```text
+animate / skin / displace vertices
+        ↓
+update triangle positions (+ refit BVH if enabled)
+        ↓
+trace cascade rays against the CURRENT triangles
+        ↓
+merge distant radiance into nearer cascades
+        ↓
+gather and sample lighting for surfaces
+```
+
+A character can supply skinned vertices to the same ray-query stage. Merely animating the raster draw is insufficient: tracing against the old bind-pose mesh would give incorrect shadows and GI. GPU-only vertex displacement also needs a matching tracing representation. A normal-map-only ripple does not move the surface or silhouette and does not require changing bounds, though lighting/material evaluation must use the updated normals.
+
+**No SDF is generated here.** Radiance cascades organize lighting samples; they do not prescribe an SDF as the geometry representation. An SDF can describe animated analytic geometry, but keeping a baked mesh-distance volume accurate under arbitrary skinning is a different, potentially costly problem. This renderer avoids it by intersecting triangles directly.
+
+### Does BVH overhead outweigh the benefit?
+
+Sometimes, particularly with tiny scenes or very few rays. The comparison is:
+
+```text
+BVH ON  = geometry update + BVH update + rays × accelerated query cost
+BVH OFF = geometry update              + rays × full triangle-list cost
+```
+
+For illustration, 25,344 cascade rays against 10,000 triangles imply about 253 million triangle checks without acceleration, before shadow/reflection work. A BVH rejects groups by their bounding boxes, but its benefit depends on overlap, mesh motion, ray distribution and update implementation. This demo uses CPU refitting, not GPU refitting or hardware ray-tracing support. Large deformation can degrade the hierarchy and eventually justify a rebuild. Compare **CPU pack + BVH, the explicit CPU BVH time, GPU time and FPS**; GPU time alone omits CPU update overhead. Pause motion for a stable comparison, and keep resolution/samples/overlays unchanged.
+
+Cascades are distance scales, **not bounce counts**. Three levels do not mean three light bounces. This prototype evaluates emission/direct-lit hits and approximates their gathered contribution; it is not a full multi-bounce transport solver.
+
 ## Acceleration and reflections
 
 ### Triangle BVH
 
-`src/bvh.js` builds a **CPU median-split binary BVH** with up to four triangles per leaf. Nodes are flattened depth-first with escape indices for stackless WGSL traversal. Triangle vertices are uploaded in leaf order. The topology is rebuilt on scene changes and **bounds are refitted each frame**, including deformed vertices. This same triangle BVH is used for primary, shadow, cascade, and reflected rays.
+`src/bvh.js` builds a **CPU median-split binary BVH** with up to four triangles per leaf. Nodes are flattened depth-first with escape indices for stackless WGSL traversal. Triangle vertices are uploaded in leaf order. When BVH is enabled, its topology is rebuilt on scene changes and **bounds are refitted each frame**, including deformed vertices. When disabled, raw triangles are uploaded directly with no BVH work. Re-enabling refits current geometry or rebuilds if the scene changed. This same triangle BVH is used for primary, shadow, cascade, and reflected rays.
 
 This is software ray tracing in WebGPU compute, **not hardware RT/DXR**. Analytic primitives use exact intersections in a separate small linear list; they are not in the triangle BVH. Sphere, AABB, and vertical-capsule intersections include inside/outside and end-cap handling. Analytic primitives are shown separately in telemetry and do not count as WebGPU triangles.
 
@@ -128,9 +165,10 @@ npm test
 Tests start an isolated Vite server on port 5180 and check fallback labeling, controls, scene switching, memory explanation, pause/reset, dialogs, PNG download, and mobile overflow. The GPU tests execute WGSL into an offscreen texture (avoiding headless swap-chain limitations) and verify:
 
 - Nontrivial output, GI and geometry-motion changes, normals, overlays, atlas levels, PNG readback.
-- **Pixel-identical BVH vs brute force** for the chamber and analytic scene.
+- BVH vs brute force agreement: exact pixels for the analytic and deforming-sheet tests; the chamber permits a few one-LSB differences from shared-edge/tie ordering.
 - Window shadow-sample and emitter-size image changes.
 - Analytic geometry and moving emitter updates.
 - An **18,468-triangle** dispatch and corresponding allocation growth.
+- Isolated connected-mesh deformation: fixed topology, fixed transform, fixed lights, changing vertices and cascade atlas; BVH refit reuses the same tree, and BVH OFF records zero refit time.
 
 GPU tests explicitly skip if no adapter exists. Set `CHROMIUM_PATH=/path/to/chromium` to use an existing browser. Linux may need `npx playwright install-deps chromium` or equivalent native libraries.
