@@ -53,6 +53,11 @@
             <input class="switch-input" type="checkbox" id="motion-toggle" checked />
             <span class="switch" aria-hidden="true"></span>
           </label>
+          <label class="toggle-row" for="gi-toggle">
+            <span class="toggle-copy"><strong>Indirect lighting</strong><small>Blend cached cascade radiance</small></span>
+            <input class="switch-input" type="checkbox" id="gi-toggle" checked />
+            <span class="switch" aria-hidden="true"></span>
+          </label>
           <label class="toggle-row" for="field-toggle">
             <span class="toggle-copy"><strong>Refresh radiance field</strong><small>Re-trace probes on the GPU</small></span>
             <input class="switch-input" type="checkbox" id="field-toggle" checked />
@@ -96,15 +101,15 @@
             <span class="field-refresh"><i class="refresh-dot"></i><span id="field-status">FIELD UPDATING</span></span>
           </div>
 
-          <div class="tech-note"><span class="tech-note-mark">i</span><p><strong>How it works</strong> Each cascade traces a distance band at a different probe density. Coarse radiance seeds the next finer pass; the final mesh shader blends all three fields for soft, multi-bounce color bleed.</p><span class="tech-note-tag">GPU COMPUTE / WGSL</span></div>
+          <div class="tech-note"><span class="tech-note-mark">i</span><p><strong>How it works</strong> Directional probes store four first-order SH coefficients per cascade; coarse radiance seeds each finer pass. A live key-light shadow map anchors direct light. Choose <em>Indirect GI only</em> or <em>Shadow visibility</em> to inspect each contribution.</p><span class="tech-note-tag">GPU COMPUTE / WGSL</span></div>
         </section>
 
         <aside class="panel inspector-panel" aria-label="Radiance cascade controls">
           <div class="inspector-header"><div><div class="panel-eyebrow"><span class="eyebrow-index">02</span> LIGHTING</div><h2>Field controls</h2></div><span class="inspector-glyph">✳</span></div>
 
           <div class="control-block">
-            <div class="control-label-row"><label for="gi-slider">Indirect gain</label><output id="gi-value">0.82</output></div>
-            <input class="range-input range-cyan" type="range" id="gi-slider" min="0" max="1.8" step="0.01" value="0.82" />
+            <div class="control-label-row"><label for="gi-slider">Indirect gain</label><output id="gi-value">1.35</output></div>
+            <input class="range-input range-cyan" type="range" id="gi-slider" min="0" max="1.8" step="0.01" value="1.35" />
             <div class="range-ends"><span>SUBTLE</span><span>BOUNCE ENERGY</span><span>STRONG</span></div>
           </div>
           <div class="control-block control-block-compact">
@@ -122,6 +127,8 @@
               <option value="3">Far cascade · 5.2–10 m</option>
               <option value="4">Surface normals</option>
               <option value="5">Albedo / emission</option>
+              <option value="6">Indirect GI only</option>
+              <option value="7">Shadow visibility</option>
             </select><span class="select-chevron">⌄</span></div>
           </div>
 

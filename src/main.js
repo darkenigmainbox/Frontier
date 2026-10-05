@@ -7,6 +7,7 @@ const runToggle = document.querySelector('#run-toggle');
 const runLabel = document.querySelector('#run-label');
 const runIcon = document.querySelector('#run-icon');
 const motionToggle = document.querySelector('#motion-toggle');
+const giToggle = document.querySelector('#gi-toggle');
 const fieldToggle = document.querySelector('#field-toggle');
 const giSlider = document.querySelector('#gi-slider');
 const bounceSlider = document.querySelector('#bounce-slider');
@@ -23,6 +24,7 @@ const PROBE_DIMS = [[14, 8, 14], [7, 4, 7], [4, 3, 4]];
 const PROBE_BASES = [0, 1568, 1764];
 const PROBE_COUNTS = [1568, 196, 48];
 const TOTAL_PROBES = 1812;
+const SHADOW_SIZE = 1024;
 const MAX_TRIANGLES = 512;
 const TRIANGLE_FLOATS = 20;
 const VERTEX_FLOATS = 12;
@@ -77,7 +79,7 @@ fn probeIndex(level: u32, cell: vec3<u32>) -> u32 {
   return cascadeBase(level) + cell.x + dims.x * (cell.y + dims.y * cell.z);
 }
 
-fn sampleCascade(level: u32, worldPosition: vec3<f32>) -> vec3<f32> {
+fn sampleCascade(level: u32, worldPosition: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
   let dims = cascadeDims(level);
   let normalized = clamp((worldPosition - u.worldMin.xyz) / u.worldSize.xyz, vec3<f32>(0.0), vec3<f32>(1.0));
   let grid = clamp(normalized * vec3<f32>(dims) - vec3<f32>(0.5), vec3<f32>(0.0), vec3<f32>(dims) - vec3<f32>(1.0));
@@ -85,7 +87,10 @@ fn sampleCascade(level: u32, worldPosition: vec3<f32>) -> vec3<f32> {
   let lo = vec3<u32>(floored);
   let hi = min(lo + vec3<u32>(1u), dims - vec3<u32>(1u));
   let f = grid - floored;
-  var result = vec3<f32>(0.0);
+  var l0 = vec3<f32>(0.0);
+  var lx = vec3<f32>(0.0);
+  var ly = vec3<f32>(0.0);
+  var lz = vec3<f32>(0.0);
   for (var z = 0u; z < 2u; z = z + 1u) {
     for (var y = 0u; y < 2u; y = y + 1u) {
       for (var x = 0u; x < 2u; x = x + 1u) {
@@ -93,11 +98,16 @@ fn sampleCascade(level: u32, worldPosition: vec3<f32>) -> vec3<f32> {
         let wx = select(1.0 - f.x, f.x, x == 1u);
         let wy = select(1.0 - f.y, f.y, y == 1u);
         let wz = select(1.0 - f.z, f.z, z == 1u);
-        result = result + probeRadiance[probeIndex(level, cell)].rgb * (wx * wy * wz);
+        let weight = wx * wy * wz;
+        let base = probeIndex(level, cell) * 4u;
+        l0 = l0 + probeRadiance[base].rgb * weight;
+        lx = lx + probeRadiance[base + 1u].rgb * weight;
+        ly = ly + probeRadiance[base + 2u].rgb * weight;
+        lz = lz + probeRadiance[base + 3u].rgb * weight;
       }
     }
   }
-  return result;
+  return max(l0 + (lx * normal.x + ly * normal.y + lz * normal.z) * 0.6666667, vec3<f32>(0.0));
 }
 
 fn triangleDistance(ro: vec3<f32>, rd: vec3<f32>, tri: Triangle, minT: f32, maxT: f32) -> f32 {
@@ -186,25 +196,37 @@ fn updateCascade(@builtin(global_invocation_id) id: vec3<u32>) {
   if (level == 1u) { minDistance = 2.2; maxDistance = 5.2; }
   if (level == 2u) { minDistance = 5.2; maxDistance = 10.0; }
   let rayCount = max(1u, u32(u.settings.w));
-  var total = vec3<f32>(0.0);
+  var coefficient0 = vec3<f32>(0.0);
+  var coefficientX = vec3<f32>(0.0);
+  var coefficientY = vec3<f32>(0.0);
+  var coefficientZ = vec3<f32>(0.0);
   for (var rayIndex = 0u; rayIndex < ${CASCADE_RAYS}u; rayIndex = rayIndex + 1u) {
     if (rayIndex >= rayCount) { break; }
     let direction = sampleDirection(rayIndex, rayCount, localIndex, level);
     let hit = traceScene(origin, direction, minDistance, maxDistance);
+    var radiance = vec3<f32>(0.0);
     if (hit.found == 1u) {
       let direct = directFromPoint(hit.position, hit.normal, hit.albedo, u.lightPosition0, u.lightColor0)
                   + directFromPoint(hit.position, hit.normal, hit.albedo, u.lightPosition1, u.lightColor1);
       let ambient = hit.albedo * vec3<f32>(0.022, 0.035, 0.052) * (0.65 + 0.35 * max(hit.normal.y, 0.0));
       var bounced = vec3<f32>(0.0);
-      if (level < 2u) { bounced = sampleCascade(level + 1u, hit.position) * u.settings.z * 0.58; }
-      total = total + hit.emission + direct + ambient + hit.albedo * bounced;
+      if (level < 2u) { bounced = sampleCascade(level + 1u, hit.position, hit.normal) * u.settings.z * 0.58; }
+      radiance = hit.emission + direct + ambient + hit.albedo * bounced;
     } else if (level == 2u) {
       let sky = mix(vec3<f32>(0.018, 0.032, 0.055), vec3<f32>(0.105, 0.17, 0.25), max(direction.y, 0.0));
-      total = total + sky * 0.25;
+      radiance = sky * 0.25;
     }
+    coefficient0 = coefficient0 + radiance;
+    coefficientX = coefficientX + radiance * direction.x;
+    coefficientY = coefficientY + radiance * direction.y;
+    coefficientZ = coefficientZ + radiance * direction.z;
   }
-  let outputIndex = cascadeBase(level) + localIndex;
-  probeRadiance[outputIndex] = vec4<f32>(total / f32(rayCount), 1.0);
+  let inverseRayCount = 1.0 / f32(rayCount);
+  let outputIndex = (cascadeBase(level) + localIndex) * 4u;
+  probeRadiance[outputIndex] = vec4<f32>(coefficient0 * inverseRayCount, 1.0);
+  probeRadiance[outputIndex + 1u] = vec4<f32>(coefficientX * (3.0 * inverseRayCount), 0.0);
+  probeRadiance[outputIndex + 2u] = vec4<f32>(coefficientY * (3.0 * inverseRayCount), 0.0);
+  probeRadiance[outputIndex + 3u] = vec4<f32>(coefficientZ * (3.0 * inverseRayCount), 0.0);
 }
 `;
 
@@ -219,6 +241,7 @@ struct Triangle {
 
 struct FrameUniforms {
   viewProjection: mat4x4<f32>,
+  shadowViewProjection: mat4x4<f32>,
   cameraPosition: vec4<f32>,
   lightPosition0: vec4<f32>,
   lightColor0: vec4<f32>,
@@ -231,6 +254,8 @@ struct FrameUniforms {
 
 @group(0) @binding(0) var<uniform> frame: FrameUniforms;
 @group(0) @binding(2) var<storage, read> probeRadiance: array<vec4<f32>>;
+@group(0) @binding(3) var shadowDepth: texture_depth_2d;
+@group(0) @binding(4) var shadowSampler: sampler_comparison;
 
 struct VertexInput {
   @location(0) position: vec3<f32>,
@@ -275,7 +300,7 @@ fn probeIndex(level: u32, cell: vec3<u32>) -> u32 {
   return cascadeBase(level) + cell.x + dims.x * (cell.y + dims.y * cell.z);
 }
 
-fn sampleCascade(level: u32, worldPosition: vec3<f32>) -> vec3<f32> {
+fn sampleCascade(level: u32, worldPosition: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
   let dims = cascadeDims(level);
   let normalized = clamp((worldPosition - frame.worldMin.xyz) / frame.worldSize.xyz, vec3<f32>(0.0), vec3<f32>(1.0));
   let grid = clamp(normalized * vec3<f32>(dims) - vec3<f32>(0.5), vec3<f32>(0.0), vec3<f32>(dims) - vec3<f32>(1.0));
@@ -283,7 +308,10 @@ fn sampleCascade(level: u32, worldPosition: vec3<f32>) -> vec3<f32> {
   let lo = vec3<u32>(floored);
   let hi = min(lo + vec3<u32>(1u), dims - vec3<u32>(1u));
   let f = grid - floored;
-  var result = vec3<f32>(0.0);
+  var l0 = vec3<f32>(0.0);
+  var lx = vec3<f32>(0.0);
+  var ly = vec3<f32>(0.0);
+  var lz = vec3<f32>(0.0);
   for (var z = 0u; z < 2u; z = z + 1u) {
     for (var y = 0u; y < 2u; y = y + 1u) {
       for (var x = 0u; x < 2u; x = x + 1u) {
@@ -291,11 +319,28 @@ fn sampleCascade(level: u32, worldPosition: vec3<f32>) -> vec3<f32> {
         let wx = select(1.0 - f.x, f.x, x == 1u);
         let wy = select(1.0 - f.y, f.y, y == 1u);
         let wz = select(1.0 - f.z, f.z, z == 1u);
-        result = result + probeRadiance[probeIndex(level, cell)].rgb * (wx * wy * wz);
+        let weight = wx * wy * wz;
+        let base = probeIndex(level, cell) * 4u;
+        l0 = l0 + probeRadiance[base].rgb * weight;
+        lx = lx + probeRadiance[base + 1u].rgb * weight;
+        ly = ly + probeRadiance[base + 2u].rgb * weight;
+        lz = lz + probeRadiance[base + 3u].rgb * weight;
       }
     }
   }
-  return result;
+  return max(l0 + (lx * normal.x + ly * normal.y + lz * normal.z) * 0.6666667, vec3<f32>(0.0));
+}
+
+fn shadowVisibility(position: vec3<f32>, normal: vec3<f32>) -> f32 {
+  let biasedPosition = position + normal * 0.018;
+  let shadowClip = frame.shadowViewProjection * vec4<f32>(biasedPosition, 1.0);
+  if (shadowClip.w <= 0.0) { return 1.0; }
+  let ndc = shadowClip.xyz / shadowClip.w;
+  let uv = vec2<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
+  if (uv.x < 0.002 || uv.x > 0.998 || uv.y < 0.002 || uv.y > 0.998 || ndc.z <= 0.0 || ndc.z >= 1.0) { return 1.0; }
+  let lightDirection = normalize(frame.lightPosition0.xyz - position);
+  let bias = 0.0012 + (1.0 - max(dot(normal, lightDirection), 0.0)) * 0.0008;
+  return textureSampleCompare(shadowDepth, shadowSampler, uv, ndc.z - bias);
 }
 
 fn pointLight(position: vec3<f32>, normal: vec3<f32>, lightPosition: vec4<f32>, lightColor: vec4<f32>) -> vec3<f32> {
@@ -315,13 +360,14 @@ fn toneMap(color: vec3<f32>) -> vec3<f32> {
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   let normal = normalize(input.normal);
-  let nearField = sampleCascade(0u, input.worldPosition);
-  let midField = sampleCascade(1u, input.worldPosition);
-  let farField = sampleCascade(2u, input.worldPosition);
+  let nearField = sampleCascade(0u, input.worldPosition, normal);
+  let midField = sampleCascade(1u, input.worldPosition, normal);
+  let farField = sampleCascade(2u, input.worldPosition, normal);
   let cache = nearField * 0.52 + midField * 0.31 + farField * 0.17;
   let albedo = input.albedo;
   let ambient = albedo * vec3<f32>(0.035, 0.047, 0.064);
-  let direct = albedo * (pointLight(input.worldPosition, normal, frame.lightPosition0, frame.lightColor0)
+  let shadow = shadowVisibility(input.worldPosition, normal);
+  let direct = albedo * (pointLight(input.worldPosition, normal, frame.lightPosition0, frame.lightColor0) * shadow
                        + pointLight(input.worldPosition, normal, frame.lightPosition1, frame.lightColor1));
   let indirect = albedo * cache * frame.params.x;
   let viewDirection = normalize(frame.cameraPosition.xyz - input.worldPosition);
@@ -333,7 +379,26 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   if (mode == 3u) { color = farField * 1.8 + vec3<f32>(0.095, 0.05, 0.012); }
   if (mode == 4u) { color = normal * 0.5 + vec3<f32>(0.5); }
   if (mode == 5u) { color = albedo * 0.8 + input.emission * 0.35; }
+  if (mode == 6u) { color = albedo * cache * frame.params.x * 2.4; }
+  if (mode == 7u) { color = vec3<f32>(shadow * 4.0); }
   return vec4<f32>(toneMap(color), 1.0);
+}
+`;
+
+const SHADOW_WGSL = /* wgsl */`
+struct ShadowUniforms {
+  lightViewProjection: mat4x4<f32>,
+};
+
+@group(0) @binding(0) var<uniform> shadow: ShadowUniforms;
+
+struct ShadowVertexInput {
+  @location(0) position: vec3<f32>,
+};
+
+@vertex
+fn shadowVertex(input: ShadowVertexInput) -> @builtin(position) vec4<f32> {
+  return shadow.lightViewProjection * vec4<f32>(input.position, 1.0);
 }
 `;
 
@@ -342,6 +407,11 @@ const state = {
   context: null,
   format: null,
   depthTexture: null,
+  shadowTexture: null,
+  shadowSampler: null,
+  shadowPipeline: null,
+  shadowBindGroup: null,
+  shadowUniformBuffer: null,
   renderPipeline: null,
   computePipeline: null,
   renderBindGroup: null,
@@ -350,12 +420,15 @@ const state = {
   computeUniformBuffers: [],
   triangleBuffer: null,
   vertexBuffer: null,
+  shadowVertexBuffer: null,
+  shadowTriangleCount: 0,
   radianceBuffer: null,
   width: 0,
   height: 0,
   playing: true,
   moving: true,
   refreshField: true,
+  giEnabled: true,
   time: 0,
   frozenTime: 0,
   gain: Number(giSlider.value),
@@ -386,14 +459,14 @@ const staticTriangles = [];
 const dynamicObjects = [];
 let currentTriangles = [];
 
-function addTriangle(output, a, b, c, albedo, emission = [0, 0, 0], expectedNormal = null) {
+function addTriangle(output, a, b, c, albedo, emission = [0, 0, 0], expectedNormal = null, castsShadow = true) {
   let p0 = [...a], p1 = [...b], p2 = [...c];
   let n = normalize3(cross3(sub3(p1, p0), sub3(p2, p0)));
   if (expectedNormal && dot3(n, expectedNormal) < 0) {
     [p1, p2] = [p2, p1];
     n = normalize3(cross3(sub3(p1, p0), sub3(p2, p0)));
   }
-  output.push({ a: p0, b: p1, c: p2, normal: n, albedo: [...albedo], emission: [...emission] });
+  output.push({ a: p0, b: p1, c: p2, normal: n, albedo: [...albedo], emission: [...emission], castsShadow });
 }
 
 function addQuad(output, points, albedo, normal, emission = [0, 0, 0]) {
@@ -448,9 +521,9 @@ function buildStaticScene() {
 
   // A pair of faceted, fixed luminous markers make the point-light positions legible.
   const lampA = makePolyhedron(0.17, 'ico', [0.7,0.43,0.23], [2.8,1.1,0.38]);
-  appendTransformed(staticTriangles, lampA, [-2.55,3.78,1.25], [0.25,0.45,0.0], 1.0);
+  appendTransformed(staticTriangles, lampA, [-2.55,3.78,1.25], [0.25,0.45,0.0], 1.0, 1.0, false);
   const lampB = makePolyhedron(0.15, 'ico', [0.18,0.52,0.7], [0.1,1.2,2.1]);
-  appendTransformed(staticTriangles, lampB, [2.65,3.14,-1.45], [0.3,0.15,0.4], 1.0);
+  appendTransformed(staticTriangles, lampB, [2.65,3.14,-1.45], [0.3,0.15,0.4], 1.0, 1.0, false);
 }
 
 function makePolyhedron(radius, type, albedo, emission) {
@@ -488,14 +561,14 @@ function makePolyhedron(radius, type, albedo, emission) {
   });
 }
 
-function appendTransformed(output, template, position, rotation, scale = 1, emissionScale = 1) {
+function appendTransformed(output, template, position, rotation, scale = 1, emissionScale = 1, castsShadow = true) {
   for (const tri of template) {
     const a = add3(rotate3(scale3(tri.a, scale), rotation), position);
     const b = add3(rotate3(scale3(tri.b, scale), rotation), position);
     const c = add3(rotate3(scale3(tri.c, scale), rotation), position);
     const normal = normalize3(cross3(sub3(b,a), sub3(c,a)));
     const emission = tri.emission.map((v) => v * emissionScale);
-    addTriangle(output, a, b, c, tri.albedo, emission, normal);
+    addTriangle(output, a, b, c, tri.albedo, emission, normal, castsShadow);
   }
 }
 
@@ -550,19 +623,29 @@ function uploadGeometry() {
   if (state.triangleCount > MAX_TRIANGLES) throw new Error(`Scene has ${state.triangleCount} triangles, exceeding the ${MAX_TRIANGLES}-triangle streaming buffer.`);
   const triangleData = new Float32Array(state.triangleCount * TRIANGLE_FLOATS);
   const vertexData = new Float32Array(state.triangleCount * 3 * VERTEX_FLOATS);
+  const shadowTriangleCount = currentTriangles.reduce((count, tri) => count + (tri.castsShadow === false ? 0 : 1), 0);
+  const shadowVertexData = new Float32Array(shadowTriangleCount * 3 * VERTEX_FLOATS);
   let vertexOffset = 0;
+  let shadowVertexOffset = 0;
   for (let index = 0; index < state.triangleCount; index++) {
     const tri = currentTriangles[index];
     const normal = normalize3(cross3(sub3(tri.b, tri.a), sub3(tri.c, tri.a)));
     const triOffset = index * TRIANGLE_FLOATS;
     triangleData.set([tri.a[0],tri.a[1],tri.a[2],0, tri.b[0],tri.b[1],tri.b[2],0, tri.c[0],tri.c[1],tri.c[2],0, tri.albedo[0],tri.albedo[1],tri.albedo[2],0, tri.emission[0],tri.emission[1],tri.emission[2],0], triOffset);
     for (const p of [tri.a, tri.b, tri.c]) {
-      vertexData.set([p[0],p[1],p[2], normal[0],normal[1],normal[2], tri.albedo[0],tri.albedo[1],tri.albedo[2], tri.emission[0],tri.emission[1],tri.emission[2]], vertexOffset);
+      const vertex = [p[0],p[1],p[2], normal[0],normal[1],normal[2], tri.albedo[0],tri.albedo[1],tri.albedo[2], tri.emission[0],tri.emission[1],tri.emission[2]];
+      vertexData.set(vertex, vertexOffset);
       vertexOffset += VERTEX_FLOATS;
+      if (tri.castsShadow !== false) {
+        shadowVertexData.set(vertex, shadowVertexOffset);
+        shadowVertexOffset += VERTEX_FLOATS;
+      }
     }
   }
+  state.shadowTriangleCount = shadowTriangleCount;
   state.device.queue.writeBuffer(state.triangleBuffer, 0, triangleData);
   state.device.queue.writeBuffer(state.vertexBuffer, 0, vertexData);
+  state.device.queue.writeBuffer(state.shadowVertexBuffer, 0, shadowVertexData);
 }
 
 function vec3(x,y,z) { return [x,y,z]; }
@@ -651,7 +734,12 @@ async function initializeGpu() {
 
   const computeModule = state.device.createShaderModule({ label: 'Radiance cascade compute shader', code: COMPUTE_WGSL });
   const renderModule = state.device.createShaderModule({ label: 'GI mesh render shader', code: RENDER_WGSL });
-  await Promise.all([compileShader(computeModule, 'Compute shader'), compileShader(renderModule, 'Render shader')]);
+  const shadowModule = state.device.createShaderModule({ label: 'Point-light shadow-map shader', code: SHADOW_WGSL });
+  await Promise.all([
+    compileShader(computeModule, 'Compute shader'),
+    compileShader(renderModule, 'Render shader'),
+    compileShader(shadowModule, 'Shadow shader'),
+  ]);
 
   state.computePipeline = await state.device.createComputePipelineAsync({
     label: 'Probe cascade update',
@@ -678,13 +766,38 @@ async function initializeGpu() {
     primitive: { topology: 'triangle-list', cullMode: 'none' },
     depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' },
   });
+  state.shadowPipeline = await state.device.createRenderPipelineAsync({
+    label: 'Dynamic point-light shadow map',
+    layout: 'auto',
+    vertex: {
+      module: shadowModule,
+      entryPoint: 'shadowVertex',
+      buffers: [{ arrayStride: VERTEX_FLOATS * 4, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }] }],
+    },
+    primitive: { topology: 'triangle-list', cullMode: 'none' },
+    depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less', depthBias: 2, depthBiasSlopeScale: 1.5 },
+  });
 
   state.triangleBuffer = state.device.createBuffer({ label: 'Animated triangle scene', size: MAX_TRIANGLES * TRIANGLE_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
   state.vertexBuffer = state.device.createBuffer({ label: 'Scene render vertices', size: MAX_TRIANGLES * 3 * VERTEX_FLOATS * 4, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
-  state.radianceBuffer = state.device.createBuffer({ label: 'Three-level probe radiance', size: TOTAL_PROBES * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-  state.frameBuffer = state.device.createBuffer({ label: 'View and lighting uniforms', size: 192, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  state.shadowVertexBuffer = state.device.createBuffer({ label: 'Shadow-casting vertices', size: MAX_TRIANGLES * 3 * VERTEX_FLOATS * 4, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
+  state.radianceBuffer = state.device.createBuffer({ label: 'Three-level probe radiance', size: TOTAL_PROBES * 4 * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+  state.frameBuffer = state.device.createBuffer({ label: 'View, shadow, and lighting uniforms', size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  state.shadowUniformBuffer = state.device.createBuffer({ label: 'Point-light view projection', size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  state.shadowTexture = state.device.createTexture({
+    label: 'Dynamic point-light depth map',
+    size: [SHADOW_SIZE, SHADOW_SIZE],
+    format: 'depth32float',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+  });
+  state.shadowSampler = state.device.createSampler({ compare: 'less-equal', minFilter: 'linear', magFilter: 'linear' });
   state.computeUniformBuffers = PROBE_COUNTS.map((_, level) => state.device.createBuffer({ label: `Cascade ${level} uniforms`, size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
 
+  state.shadowBindGroup = state.device.createBindGroup({
+    label: 'Shadow map bindings',
+    layout: state.shadowPipeline.getBindGroupLayout(0),
+    entries: [{ binding: 0, resource: { buffer: state.shadowUniformBuffer } }],
+  });
   const computeLayout = state.computePipeline.getBindGroupLayout(0);
   state.computeBindGroups = state.computeUniformBuffers.map((uniformBuffer, level) => state.device.createBindGroup({
     label: `Cascade ${level} bindings`,
@@ -701,6 +814,8 @@ async function initializeGpu() {
     entries: [
       { binding: 0, resource: { buffer: state.frameBuffer } },
       { binding: 2, resource: { buffer: state.radianceBuffer } },
+      { binding: 3, resource: state.shadowTexture.createView() },
+      { binding: 4, resource: state.shadowSampler },
     ],
   });
   resizeCanvas();
@@ -743,16 +858,20 @@ function writeUniforms() {
     state.target[2] + Math.cos(state.yaw) * cp * state.distance,
   ];
   const viewProjection = multiply4(projection, lookAt(eye, state.target));
-  const frameData = new Float32Array(48);
+  const shadowProjection = perspective(108 * Math.PI / 180, 1, 0.08, 18);
+  const shadowViewProjection = multiply4(shadowProjection, lookAt(lights[0].position, [0, 1.35, -0.35]));
+  state.device.queue.writeBuffer(state.shadowUniformBuffer, 0, shadowViewProjection);
+  const frameData = new Float32Array(64);
   frameData.set(viewProjection, 0);
-  frameData.set([eye[0],eye[1],eye[2],1], 16);
-  frameData.set([...lights[0].position, lights[0].power], 20);
-  frameData.set([...lights[0].color, 0], 24);
-  frameData.set([...lights[1].position, lights[1].power], 28);
-  frameData.set([...lights[1].color, 0], 32);
-  frameData.set([...WORLD_MIN, 0], 36);
-  frameData.set([...WORLD_SIZE, 0], 40);
-  frameData.set([state.gain, state.bounce, state.viewMode, 0], 44);
+  frameData.set(shadowViewProjection, 16);
+  frameData.set([eye[0],eye[1],eye[2],1], 32);
+  frameData.set([...lights[0].position, lights[0].power], 36);
+  frameData.set([...lights[0].color, 0], 40);
+  frameData.set([...lights[1].position, lights[1].power], 44);
+  frameData.set([...lights[1].color, 0], 48);
+  frameData.set([...WORLD_MIN, 0], 52);
+  frameData.set([...WORLD_SIZE, 0], 56);
+  frameData.set([state.giEnabled ? state.gain : 0, state.bounce, state.viewMode, 0], 60);
   state.device.queue.writeBuffer(state.frameBuffer, 0, frameData);
 
   for (let level = 0; level < 3; level++) {
@@ -780,6 +899,21 @@ function frame(now) {
   writeUniforms();
 
   const encoder = state.device.createCommandEncoder({ label: 'Radiance Lab frame' });
+  const shadowPass = encoder.beginRenderPass({
+    label: 'Render point-light depth map',
+    colorAttachments: [],
+    depthStencilAttachment: {
+      view: state.shadowTexture.createView(),
+      depthClearValue: 1,
+      depthLoadOp: 'clear',
+      depthStoreOp: 'store',
+    },
+  });
+  shadowPass.setPipeline(state.shadowPipeline);
+  shadowPass.setBindGroup(0, state.shadowBindGroup);
+  shadowPass.setVertexBuffer(0, state.shadowVertexBuffer);
+  shadowPass.draw(state.shadowTriangleCount * 3, 1, 0, 0);
+  shadowPass.end();
   if (state.refreshField) {
     // Separate passes establish a storage-buffer dependency between far, mid, and near fields.
     for (const level of [2, 1, 0]) {
@@ -876,6 +1010,9 @@ motionToggle.addEventListener('change', () => {
   state.frozenTime = state.time;
   assembleScene(state.time, true);
 });
+giToggle.addEventListener('change', () => {
+  state.giEnabled = giToggle.checked;
+});
 fieldToggle.addEventListener('change', () => {
   state.refreshField = fieldToggle.checked;
   updateFieldStatus();
@@ -890,7 +1027,7 @@ bounceSlider.addEventListener('input', () => {
 });
 viewSelect.addEventListener('change', () => {
   state.viewMode = Number(viewSelect.value);
-  const labels = ['COMPOSITE / LIT', 'DEBUG / NEAR CASCADE', 'DEBUG / MID CASCADE', 'DEBUG / FAR CASCADE', 'DEBUG / NORMALS', 'DEBUG / MATERIAL'];
+  const labels = ['COMPOSITE / LIT', 'DEBUG / NEAR CASCADE', 'DEBUG / MID CASCADE', 'DEBUG / FAR CASCADE', 'DEBUG / NORMALS', 'DEBUG / MATERIAL', 'DEBUG / INDIRECT GI', 'DEBUG / SHADOW MASK'];
   document.querySelector('#view-readout').textContent = labels[state.viewMode] || labels[0];
 });
 document.querySelectorAll('[data-quality]').forEach((button) => {

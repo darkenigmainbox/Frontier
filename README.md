@@ -17,19 +17,19 @@ Open `http://localhost:4173` in a current WebGPU-capable desktop browser with ha
 - **Drag** the viewport to orbit; **scroll** to dolly.
 - Pause, advance a single animation step, reset, or freeze moving geometry.
 - Stop field refresh to inspect the last computed lighting solution.
-- Tune indirect gain and the coarse-to-fine diffuse-bounce estimate.
-- Switch between the composite, each cascade, normals, and material debug views.
+- Toggle indirect lighting for an A/B comparison; tune indirect gain and the coarse-to-fine diffuse-bounce estimate.
+- Switch between the composite, each cascade, GI-only, shadow visibility, normals, and material debug views.
 - Select 6, 12, or 20 rays per probe to compare update cost and noise.
 
 ## What is implemented
 
 - A rasterized triangle scene rendered by WebGPU, with a storage-buffer scene representation shared with the compute solver.
 - Three nested world-space probe grids (1,568 / 196 / 48 probes) whose rays cover near, middle, and far distance bands.
-- A Fibonacci-sphere direction set and triangle intersection in WGSL. Each ray gathers emission, two point lights with triangle-tested visibility, a small environment term, and a coarse-field bounce estimate.
-- Coarse-to-fine compute dispatches (far → mid → near), followed by trilinear probe sampling and a weighted three-level blend in the mesh fragment shader.
-- Per-frame CPU transforms and GPU uploads for the animated crystal meshes; changing their positions, materials, or emission automatically changes the refreshed field.
+- A Fibonacci-sphere direction set and triangle intersection in WGSL. Each ray gathers emission, two point lights with triangle-tested visibility, a small environment term, and a coarse-field bounce estimate; the directional result is stored as first-order spherical-harmonic coefficients per probe.
+- Coarse-to-fine compute dispatches (far → mid → near), followed by trilinear directional-probe sampling and a weighted three-level blend in the mesh fragment shader. The composite includes a dynamic key-light shadow map, and the debug menu exposes both the indirect contribution and shadow mask.
+- Per-frame CPU transforms and GPU uploads for the animated crystal meshes; changing their positions, materials, or emission automatically changes the refreshed field and shadow map.
 
-This is an **interactive research/demo approximation inspired by radiance cascades**, not a production-grade or fully energy-conserving global-illumination solver. It uses fixed probe bounds, a small number of directional samples, brute-force triangle traversal, and a single coarse-cache bounce estimate. The UI exposes the important trade-offs instead of hiding those limitations.
+This is an **interactive research/demo approximation inspired by radiance cascades**, not a production-grade or fully energy-conserving global-illumination solver. It uses fixed probe bounds, a small number of directional samples, brute-force triangle traversal, a first-order directional fit, and a single coarse-cache bounce estimate. Rasterized direct lighting has one perspective shadow map for the warm key light; the cool fill is unshadowed. The UI exposes the important trade-offs instead of hiding those limitations.
 
 ## Taking it toward a game renderer
 
