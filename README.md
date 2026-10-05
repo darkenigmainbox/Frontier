@@ -1,4 +1,4 @@
-# Cascade / lab · v0.5
+# Cascade / lab · v0.6
 
 An interactive **WebGPU 3D radiance-cascade prototype** with animated/deforming triangles, a moving emissive sphere, tessellated mesh primitives, traced reflections, area-light shadows, and a triangle BVH. Built with Vite, JavaScript, WGSL, and Three.js (scene math and the explicitly labeled WebGL fallback).
 
@@ -8,7 +8,7 @@ An interactive **WebGPU 3D radiance-cascade prototype** with animated/deforming 
 
 All visible and occluding objects are real triangle meshes. Procedural sphere/capsule generators only create vertex/index buffers; there are **no sphere/capsule/box surface-intersection equations and no SDF** in the tracing shaders. Primary, shadow, reflection, cascade, and optional probe-visibility rays all use the same triangle geometry. Direct-light samples are drawn from the emitter meshes themselves.
 
-Current WebGPU triangle totals: chamber **1,945**; triangle playground **3,052**; deforming scene **4,584** (of which **3,072** form the connected sheet); maximum stress scene **19,188**. A sphere, including the emissive ball, uses 720 triangles; a capsule uses 416. There is no separate analytical shortcut when BVH is enabled or disabled. The former 36-triangle "Analytic playground" and its measurements are historical, not the current scene.
+Current WebGPU triangle totals: chamber **1,945**; triangle playground **3,052**; deforming scene **4,584** (of which **3,072** form the connected sheet); grand hall **10,008** at its default density; maximum stress scene **19,188**. A sphere, including the emissive ball, uses 720 triangles; a capsule uses 416. There is no separate analytical shortcut when BVH is enabled or disabled. The former 36-triangle "Analytic playground" and its measurements are historical, not the current scene.
 
 ## Run / build
 
@@ -35,41 +35,42 @@ https://raw.githack.com/darkenigmainbox/Frontier/<commit-sha>/site/index.html
 
 Add `?scene=deform`, `?scene=windows`, `?scene=primitives`, or `?scene=stress` to open a specific scene. Use an immutable commit URL to avoid stale branch caches. This session publishes only from `arena/01a10bdc-frontier`.
 
-## Seven scenes
+## Eight scenes
 
 | Scene | What to inspect |
 | --- | --- |
 | Deforming mesh | One connected indexed sheet: 1,617 vertices, 3,072 triangles, pinned top edge, fixed object transform, changing vertex positions |
 | The light chamber | Two colored panels, an orbiting emissive ball, mirror-like sphere, deforming shards, capsule, and box mesh |
 | Window / penumbra lab | Actual wall openings and mullions, exterior rectangular emitter, emissive sky backdrop, and shadow-receiving objects/floor |
-| Analytic playground | Exact spheres, axis-aligned boxes, and vertical capsules; seven tessellated mesh primitives including the moving emitter |
+| Triangle playground | Tessellated sphere, box and capsule meshes; **3,052 triangles**, including the moving emitter |
+| Grand hall · 10K | **24 × 22 × 10 m**, 500 animated crates, 15 pillars and the connected 3,072-triangle sheet; **10,008 triangles** by default. Crate-density slider: 0–1,000 crates, **4,008–16,008 triangles** total |
 | Geometry stress test | Seeded, animated triangle cubes: 64 / 256 / 768 / 1,536 instances; **19,188 total triangles** at maximum |
 | Triangle swarm | 64 orbiting/deforming triangle shards |
 | Stack study | Taller blocks for occlusion and reflection inspection |
 
 For a clear **penumbra comparison**, open the window room, pause motion, use **Direct only**, disable probes, and compare 1 shadow sample against 16 or 64. Change **Area emitter size** to see shadow softness change. Size changes emitting area at constant radiance, so total power also changes. This is surface lighting, **not volumetric fog or god rays**. The window scene selects 16 samples; stress selects 1 to keep workloads manageable.
 
-The ball's emissive material is visible to primary and reflected rays. Cascade rays intersect it as an occluder but exclude its directly sampled emission from the indirect field, avoiding a second direct-light contribution. Its direct light is sampled on its **actual 720 triangles** using an area-weighted cumulative distribution and barycentric point sampling. Panels use their own triangle surfaces too. Shadow segments terminate just before the sampled triangle; other emitter faces can occlude it. No disk, sphere or rectangle proxy is used for WebGPU direct-light sampling. Low sample counts can produce quadrature artifacts.
+The ball's emissive material is visible to primary and reflected rays. Cascade rays intersect it as an occluder but exclude its directly sampled emission from the indirect field, avoiding a second direct-light contribution. Its direct light is sampled on its **actual 720 triangles** using a smooth mixture of six normal-weighted triangle-area distributions and barycentric point sampling. Mesh normals are spatially ordered to spread samples across the surface. The actual sampling PDF compensates for the directional bias, and a 0.02 uniform floor keeps every face sampleable. Panels use their own triangle surfaces too. Shadow segments terminate just before the sampled triangle; other emitter faces can occlude it. No disk, sphere or rectangle proxy is used for WebGPU direct-light sampling. Each mesh face emits outward; together they cover the ball, rather than reusing a few fixed latitude patches. This remains finite quadrature, not perfect spherical symmetry at low sample counts. **Orb light samples** offers 8/16/32/64 (default 16); **Orb emission** changes its power, and **Isolate emissive ball** disables other emissive materials while retaining their geometry and the small ambient fill. More samples cost GPU work. Cascade hit lighting caps the orb at four samples.
 
 ## Controls and visualization
 
 - **Drag / scroll:** orbit / zoom, constrained to the open side of the chamber.
 - **Space:** pause/resume. **R:** reset camera. **G:** GI. **P:** probes. **F:** fullscreen.
 - Adjust emission, indirect intensity, speed, render scale, emitter size, and 1/4/16/64 shadow samples.
-- Toggle BVH acceleration directly above the viewport, and reflected rays in the sidebar. BVH OFF skips CPU building/refitting, triangle reordering and node uploads as well as GPU traversal; existing buffer capacities remain allocated. Brute-force comparison is limited to ≤256 stress cubes to avoid obvious GPU watchdog hazards.
+- Toggle BVH acceleration directly above the viewport, and reflected rays in the sidebar. BVH OFF skips CPU building/refitting, triangle reordering and node uploads as well as GPU traversal; existing buffer capacities remain allocated. Brute-force comparison is limited to ≤256 stress cubes; the grand hall remains BVH-only to avoid obvious GPU watchdog hazards. Both the UI and shared benchmark enforce the guard.
 - Inspect **Lit**, **Direct only**, **Indirect** (gathered radiance), **Normals**, and **Probe atlas**.
 - **Triangle edges / wireframe** draws actual barycentric triangle edges on WebGPU (wireframe mesh rendering on WebGL), including the connected deforming sheet. Curved primitives and the emissive ball now show their actual triangle edges too. WebGPU uses geometric face normals, so tessellated curved meshes may look faceted.
 - Export a PNG including probe overlays, restart time, or restore all settings.
 
 ### Actual probe data
 
-The default overlay shows **C1's 108 probes**. Select C0 (864), C1 (108), or C2 (18). Markers are drawn through geometry intentionally:
+The default overlay shows **C1's 108 probes** at Standard density. Overlay counts, atlases and the allocation estimate update with the sliders. Select C0 (864), C1 (108), or C2 (18). Markers are drawn through geometry intentionally:
 
 - **Radiance:** average merged indirect-field radiance from that probe's actual GPU buffer, tonemapped.
 - **Cascade ID:** a fixed color identifying the selected level.
 - **Visibility:** fraction of directions with no intersection in that probe's own distance interval; not full-scene visibility.
 
-**Probe atlas** tiles show directional bins, not averages. Columns are 36 / 12 / 6 for C0 / C1 / C2, with probes in the same X-fastest order as the 3D grid. Visibility mode displays the interval miss flag per direction. Cascade-ID mode affects marker colors only; the atlas still displays radiance.
+**Probe atlas** tiles show directional bins, not averages. Column count adapts to probe count and viewport aspect ratio, with probes in the same X-fastest order as the 3D grid. Visibility mode displays the interval miss flag per direction. Cascade-ID mode affects marker colors only; the atlas still displays radiance.
 
 Probes/atlas require current cascade data, so their visualization continues to dispatch cascades even when GI shading is toggled off. Disable overlays and use Lit/Direct to measure GI-off performance without that debug work.
 
@@ -122,16 +123,31 @@ Reflections trace **one perfect reflected ray** at reflective surfaces and blend
 
 | Level | Probe grid | Probes | Directions/probe | Interval |
 | --- | --- | ---: | ---: | --- |
-| C0 | 12 × 6 × 12 | 864 | 16 | 0–0.9 m |
-| C1 | 6 × 3 × 6 | 108 | 64 | 0.9–3 m |
-| C2 | 3 × 2 × 3 | 18 | 256 | 3–24 m |
+| C0 | 12 × 6 × 12 | 864 | 16 | 0–1.05 m |
+| C1 | 6 × 3 × 6 | 108 | 64 | 1.05–3.5 m |
+| C2 | 3 × 2 × 3 | 18 | 256 | 3.5–24 m |
 
-**990 probes, 25,344 interval rays per update.** Directions use a uniform-solid-angle spherical parameterization. Spatial sampling becomes coarser as directional sampling becomes finer.
+**Standard density, base angular detail, ordinary room:** 990 probes, 25,344 interval rays per update. Directions use a uniform-solid-angle spherical parameterization. Spatial sampling becomes coarser as directional sampling becomes finer.
+
+### Probe quality sliders
+
+| Spatial density | C0 / C1 / C2 grids | Total probes | Base interval rays/update |
+| --- | --- | ---: | ---: |
+| Low | 8×4×8 / 4×2×4 / 2×1×2 | 292 | 7,168 |
+| Standard | 12×6×12 / 6×3×6 / 3×2×3 | 990 | 25,344 |
+| High | 16×8×16 / 8×4×8 / 4×2×4 | 2,336 | 57,344 |
+| Ultra | 24×12×24 / 12×6×12 / 6×3×6 | 7,884 | 193,536 |
+
+**Angular detail** doubles each direction-grid side: 16/64/256 → 64/256/1,024 directions per probe, **four times as many interval rays**. Ultra plus high angular detail is 774,144 interval rays/update, before hit-lighting shadow rays or pixel shading. More probes/rays are a quality/workload trade-off, not a speed optimization or complete leakage fix.
+
+`src/probes.js` configures all GPU passes and the illustrative fallback overlay. Bounds cover 12×7×11 m normally and **24×10×22 m** in the hall. Grids span the whole room; the same preset has wider spacing in the larger room. Distance intervals adapt to near-probe spacing and room size (Standard hall: 0–1.8 / 1.8–6 / 6–48 m). Probe buffers are replaced when configuration changes; scene buffer capacities remain retained.
+
+### Passes
 
 1. `src/scene.js` transforms/deforms geometry and produces triangle and emitter-mesh sampling data. `src/bvh.js` builds/refits triangle bounds.
-2. `src/shaders.js` traces **C2 → C1 → C0**. Unoccluded interval rays merge coarse radiance with trilinear spatial interpolation and nearest directional-bin lookup. Non-emissive hits evaluate a scaled direct-light term. Registered direct emitters block the ray but do not inject emission into this indirect cache; unregistered emissive backdrops can still contribute. Cascade hit lighting uses one representative sample per emitter for cost control.
+2. `src/shaders.js` traces **C2 → C1 → C0**. Unoccluded interval rays merge coarse radiance with trilinear spatial interpolation and nearest directional-bin lookup. Non-emissive hits evaluate a scaled direct-light term. Registered direct emitters block the ray but do not inject emission into this indirect cache; unregistered emissive backdrops can still contribute. Cascade hit lighting uses one sample per panel and up to four for the orb for cost control.
 3. A gather pass integrates C0 into six cosine-weighted irradiance lobes per probe.
-4. Primary rays trace the scene, interpolate gathered irradiance, sample area-light visibility, and optionally trace one reflection. Direct/reflection lighting uses the selected shadow-sample count.
+4. Primary rays trace the scene, interpolate gathered irradiance, sample area-light visibility, and optionally trace one reflection. Direct/reflection lighting uses separate selected panel-shadow and orb sample counts. Shadow and optional probe-connection queries now terminate at the first blocker; primary/reflection/cascade queries still find the nearest triangle. No speedup is claimed without a matching measurement.
 5. A full-screen pass presents the compute texture; an instanced pass draws probe markers.
 
 `src/gpu.js` owns buffers, bind groups, dispatch order, output texture, timing, and readback. Allocations grow when scene capacity increases. The renderer waits for completed submitted work before scheduling another frame, avoiding an unbounded command backlog.
@@ -140,18 +156,26 @@ Reflections trace **one perfect reflected ray** at reflective surfaces and blend
 
 Click **Measure A/B** above the viewport for a controlled comparison on your own GPU. It freezes the scene/camera/settings, alternates modes with warm-ups, reports medians and p95/raw samples in a downloadable JSON, and restores the original settings. See [the measured software-GPU results and limitations](docs/MEASUREMENTS.md). Historical v0.3/v0.4 measurements used a mixed triangle/analytic scene and **do not apply to the new triangle-only workload**. That sandbox software renderer did **not** reproduce the reported BVH-off slowdown; it must be measured on the affected hardware rather than assumed normal.
 
-Blocky indirect light is a real limitation: C0 uses only 16 directions per probe, directional merging is coarse, interpolation normally ignores walls, and probe origins differ. Soft direct shadows come from separate visibility rays and do not validate the cascade solve. v0.4 removed duplicate registered-emitter energy from the probe cache, and offers **GI visibility guard** to test surface-to-probe visibility at additional cost. The guard is OFF by default and is not a complete leakage fix. No antialiasing is implemented, so 75% render scale can also produce visibly jagged outlines.
+Blocky indirect light is a real limitation: C0 uses 16 or 64 directions per probe, directional merging is coarse, interpolation normally ignores walls, and probe origins differ. Soft direct shadows come from separate visibility rays and do not validate the cascade solve. v0.4 removed duplicate registered-emitter energy from the probe cache, and offers **GI visibility guard** to test surface-to-probe visibility at additional cost. The guard is OFF by default and is not a complete leakage fix. No antialiasing is implemented, so 75% render scale can also produce visibly jagged outlines.
 
 Use **Direct only** versus **Indirect** with overlays disabled to distinguish the two lighting paths. Direct-only and normals views now skip unneeded cascade and shading work; turning off GI while inspecting probes still runs the solve for that debug data.
+
+## Why can 3,000 triangles be slow? CPU or GPU?
+
+**The ray tracing and lighting run on the GPU.** The CPU animates/deforms meshes, packs world-space triangles/emitter tables, builds/refits the BVH, and submits work. The GPU traces the primary view, probe rays, sampled shadows and reflections, then gathers/presents the result.
+
+A rasterized game does not repeatedly intersect the whole world for every lighting sample. This renderer can ask many ray-visibility questions per pixel, plus thousands of probe rays; resolution and sample counts matter as much as triangle count. It uses custom WebGPU compute shaders, **not hardware RT acceleration**. Reported ~10 FPS on the user's GPU cannot be diagnosed from triangle count alone.
+
+Check **CPU pack + BVH** and the separate **GPU pass timings**. If shading dominates, reduce render scale, orb/panel samples or reflections; if cascades dominate, reduce probe density/angular detail and turn off the overlay when disabling GI. CPU/GPU stages can overlap, so do not simply add their displayed times. No target-device FPS improvement has been measured for v0.6; the higher default orb sample count can cost more. The grand hall is a workload test, not a claim that 10K triangles are cheap.
 
 ## Performance / VRAM telemetry
 
 - **FPS:** completed browser/render-loop throughput, not a synthetic engine benchmark.
 - **GPU time:** hardware timestamp queries when available; compute total excludes presentation. The pass strip separately reports cascades/gather, primary/shadow/reflection shading, and presentation/overlay. Otherwise shown as unavailable.
-- **CPU pack + BVH:** triangle packing, BVH build/refit, buffer writes/rebinding, and resize preparation. Excludes the preceding object-transform update and UI work.
+- **CPU pack + BVH:** triangle packing, BVH build/refit, buffer writes/rebinding, and resize preparation. Includes emitter distribution packing. Excludes the preceding object-transform/vertex-deformation update and UI work; completed-render benchmark wall time includes the scene update.
 - **VRAM allocation · est.:** sum of known renderer-owned GPU buffer capacities, RGBA8 output texture, and temporary capture allocations while active. Click the metric for a breakdown.
 
-**WebGPU cannot expose total physical VRAM, other apps' GPU memory, or exact resident memory.** This is an application allocation estimate, not a device-usage meter. It excludes browser swap-chain buffers, pipeline/driver overhead, query-set implementation memory, and delayed resource destruction. Buffer capacities are retained when a scene gets smaller. WebGL fallback allocation is not estimated.
+**WebGPU cannot expose total physical VRAM, other apps' GPU memory, or exact resident memory.** This is an application allocation estimate, not a device-usage meter. It excludes browser swap-chain buffers, pipeline/driver overhead, query-set implementation memory, and delayed resource destruction. Scene buffer capacities are retained when a scene gets smaller; changing probe quality replaces probe fields. WebGL fallback allocation is not estimated.
 
 At 64×48 output, the software-GPU tests recorded approximately 0.85 MiB owned for the chamber and 3.54 MiB for 1,536 stress cubes; real viewport output textures add more. These are allocation checks, **not hardware performance claims**.
 

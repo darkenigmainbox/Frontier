@@ -3,7 +3,7 @@ export const settings = {
  running:true, gi:true, emission:2.8, bounce:1, speed:1, resolution:.75, view:0,
  probes:true, probeLevel:1, probeMode:0, wireframe:false, scene:'chamber', time:0,
  cameraYaw:0, cameraPitch:0, distance:14.8, stressCount:256,
- shadowSamples:4, emitterSize:1, bvh:true, reflections:true, waveAmplitude:1, probeVisibility:false,
+ shadowSamples:4, emitterSize:1, bvh:true, reflections:true, waveAmplitude:1, probeVisibility:false, probeDensity:1, probeAngular:0, largeCount:500, orbPower:1, orbSamples:16, orbOnly:false,
 };
 export const objects=[];
 export const lights=[];
@@ -13,11 +13,12 @@ export const sceneInfo={
  deform:['Deforming mesh','A connected 3,072-triangle sheet: vertices bend every frame while its object transform stays fixed. No SDF.'],
  windows:['Window / penumbra lab','Real window openings and mullions. An exterior area emitter casts soft shadows through the room.'],
  primitives:['Triangle playground','Spheres, capsules, boxes and the emissive ball are tessellated meshes. Every ray intersects their triangles.'],
+ large:['Grand hall · 10K','A 24 × 22 × 10 m room with 10,008 triangles at 500 crates, 15 pillars and a connected deforming sheet.'],
  stress:['Geometry stress test','A seeded field of animated triangle meshes. Change object count and compare BVH vs brute force.'],
  swarm:['Triangle swarm','64 orbiting, deforming triangles around an emissive orb.'],
  cornell:['Stack study','Tall blocks, reflective surfaces, and contrasting emissive materials.'],
 };
-const material=(color,emission=0,metal=0)=>({color,emission,metal});
+const material=(color,emission=0,metal=0)=>({color,emission,baseEmission:emission,metal});
 const concrete=material([.46,.48,.46]);
 const graphite=material([.16,.19,.19],0,.1);
 const p=new THREE.Vector3(),q=new THREE.Quaternion(),s=new THREE.Vector3();
@@ -36,9 +37,10 @@ function panel(kind,width,height,pos,color,emission,angle=0){
 export function makeScene(){
  const disposed=new Set();for(const o of objects)if(!disposed.has(o.geometry)){disposed.add(o.geometry);o.geometry.dispose();}
  objects.length=0;lights.length=0;sceneVersion++;
- const floor=plane('floor',[12,11],[0,0,0],material([.32,.34,.32]));floor.rotation.x=-Math.PI/2;
- plane('left',[11,7],[-6,3.5,0],material([.27,.28,.26]),Math.PI/2);
- plane('right',[11,7],[6,3.5,0],material([.24,.29,.29]),-Math.PI/2);
+ const large=settings.scene==='large',width=large?24:12,depth=large?22:11,height=large?10:7;
+ const floor=plane('floor',[width,depth],[0,0,0],material([.32,.34,.32]));floor.rotation.x=-Math.PI/2;
+ plane('left',[depth,height],[-width/2,height/2,0],material([.27,.28,.26]),Math.PI/2);
+ plane('right',[depth,height],[width/2,height/2,0],material([.24,.29,.29]),-Math.PI/2);
  if(settings.scene==='windows'){
   // The back wall is genuinely open, not a bright decal on an opaque plane.
   box('sill',[12,1.8,.25],[0,.9,-5.5]);box('lintel',[12,1.8,.25],[0,6.1,-5.5]);
@@ -53,13 +55,23 @@ export function makeScene(){
   sphere('sphere',.85,[2,1,-1.7],material([.65,.71,.72],0,.8),'sphere');
   capsule(.32,.7,[-.3,1.02,-3.3],material([.68,.4,.23],0,.1));
  }else{
-  plane('back',[12,7],[0,3.5,-5.5],concrete);
-  box('warm-frame',[.14,3.9,2.4],[-5.88,2.7,-1.2],graphite);
-  panel('warm-light',1.9,3.4,[-5.79,2.7,-1.2],[1,.29,.045],4,Math.PI/2);
-  box('cool-frame',[2.5,3.7,.15],[3.1,2.7,-5.39],graphite);
-  panel('cool-light',2.1,3.3,[3.1,2.7,-5.29],[.06,.68,.78],3);
+  plane('back',[width,height],[0,height/2,-depth/2],concrete);
+  box('warm-frame',[.14,3.9,2.4],[-width/2+.12,large?4:2.7,-1.2],graphite);
+  panel('warm-light',1.9,3.4,[-width/2+.21,large?4:2.7,-1.2],[1,.29,.045],4,Math.PI/2);
+  box('cool-frame',[2.5,3.7,.15],[large?7:3.1,large?4:2.7,-depth/2+.11],graphite);
+  panel('cool-light',2.1,3.3,[large?7:3.1,large?4:2.7,-depth/2+.21],[.06,.68,.78],3);
  }
- if(settings.scene==='stress'){
+ if(large){
+  const cubeGeometry=new THREE.BoxGeometry(1,1,1);let seed=723;
+  const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+  const rows=Math.max(1,Math.ceil(settings.largeCount/20));
+  for(let i=0;i<settings.largeCount;i++){
+   const h=.35+rand()*1.5;
+   add('hall-crate',cubeGeometry,material([.3+rand()*.35,.34+rand()*.3,.29+rand()*.3]),[-10+(i%20+.5),h/2+.1,-9+(Math.floor(i/20)+.5)*17/rows],[.45+rand()*.3,h,.45+rand()*.3],`stress${i}`);
+  }
+  for(let i=0;i<15;i++)box('hall-column',[.32,5.5,.32],[-10+(i%5)*5,2.75,-8+Math.floor(i/5)*6],graphite);
+  const sheet=add('wavy-sheet',new THREE.PlaneGeometry(9,4.2,48,32),material([.44,.62,.59]),[0,5.1,-2],[1,1,1],'wave');sheet.restPositions=sheet.geometry.attributes.position.array.slice();
+ }else if(settings.scene==='stress'){
   const geo=new THREE.BoxGeometry(1,1,1);let seed=237;
   const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
   for(let i=0;i<settings.stressCount;i++){
@@ -102,6 +114,7 @@ export function updateScene(time){
  lightCache=null;
  for(const o of objects){
   p.fromArray(o.pos);s.fromArray(o.scale);
+  if(o.mat.baseEmission>0)o.mat.emission=o.kind==='emissive-orb'?o.mat.baseEmission*settings.orbPower:settings.orbOnly?0:o.mat.baseEmission;
   if(o.motion==='wave'){
    const vertices=o.geometry.attributes.position,rest=o.restPositions;
    for(let i=0;i<vertices.count;i++){
@@ -113,7 +126,7 @@ export function updateScene(time){
   }
   if(o.motion==='cube'){o.rotation.set(.13+Math.sin(time*.55)*.12,time*.27,.08);p.y+=Math.sin(time*.8)*.15;}
   if(o.motion==='sphere'){p.x+=Math.sin(time*.6)*.5;p.z+=Math.cos(time*.6)*.35;}
-  if(o.motion==='orb')p.set(Math.sin(time*.65)*2.8,1.15+Math.sin(time*.9)*.35,1.6+Math.cos(time*.65)*.8);
+  if(o.motion==='orb'){const large=settings.scene==='large';p.set(Math.sin(time*.65)*(large?7:2.8),(large?3:1.15)+Math.sin(time*.9)*.35,(large?4:1.6)+Math.cos(time*.65)*(large?2:.8));}
   if(o.motion?.startsWith('stress')){const i=Number(o.motion.slice(6));o.rotation.set(time*.16+i,time*.21+i*.17,0);p.y+=Math.sin(time*.6+i)*.1;}
   if(o.motion?.startsWith('shard')){const i=Number(o.motion.slice(5)),a=time*.35+i*1.256;
    const radius=settings.scene==='swarm'?1.3+(i%5)*.6:1.9;
@@ -139,31 +152,47 @@ export function triangleData(){
 // rectangle proxy. The same world-space vertices also enter the scene BVH.
 let lightCache=null;
 const ab=new THREE.Vector3(),ac=new THREE.Vector3();
+// Six direction-biased area distributions, with a nonzero uniform floor.
+// The PDF is corrected at shading time; all samples remain actual mesh points.
+// This is directional importance sampling, not an analytic sphere light.
+// Morton ordering of the unfolded mesh normals keeps nearby faces together.
+// Stratified CDF samples then cover distinct regions instead of correlated
+// latitude strips or randomly scattered patches. This only orders triangles.
+function normalMorton(n){
+ const scale=1/(Math.abs(n.x)+Math.abs(n.y)+Math.abs(n.z));let x=n.x*scale,y=n.y*scale;
+ if(n.z<0){const ox=x;x=(1-Math.abs(y))*(ox<0?-1:1);y=(1-Math.abs(ox))*(y<0?-1:1);}
+ const ix=Math.min(1023,Math.floor((x*.5+.5)*1024)),iy=Math.min(1023,Math.floor((y*.5+.5)*1024));let key=0;
+ for(let b=0;b<10;b++)key|=((ix>>b)&1)<<(b*2)|((iy>>b)&1)<<(b*2+1);return key;
+}
 function packEmitterMeshes(){
  if(lightCache)return lightCache;
  const data=[],samples=[];
  for(const light of lights){
   const o=light.object,positions=o.geometry.attributes.position,index=o.geometry.index;
-  const start=samples.length/12;let totalArea=0;
+  const list=[],boundsMin=[Infinity,Infinity,Infinity],boundsMax=[-Infinity,-Infinity,-Infinity];
   const n=index?index.count:positions.count;
   for(let i=0;i<n;i+=3){
    a.fromBufferAttribute(positions,index?index.getX(i):i).applyMatrix4(o.matrix);
    b.fromBufferAttribute(positions,index?index.getX(i+1):i+1).applyMatrix4(o.matrix);
    c.fromBufferAttribute(positions,index?index.getX(i+2):i+2).applyMatrix4(o.matrix);
-   const area=ab.subVectors(b,a).cross(ac.subVectors(c,a)).length()*.5;
-   if(area<1e-10)continue;totalArea+=area;
-   samples.push(a.x,a.y,a.z,totalArea,b.x,b.y,b.z,0,c.x,c.y,c.z,0);
+   const normal=ab.subVectors(b,a).cross(ac.subVectors(c,a)),area=normal.length()*.5;if(area<1e-10)continue;normal.normalize();
+   for(const v of [a,b,c])for(let k=0;k<3;k++){boundsMin[k]=Math.min(boundsMin[k],v.getComponent(k));boundsMax[k]=Math.max(boundsMax[k],v.getComponent(k));}
+   list.push({vertices:[...a,...b,...c],normal:[...normal],area,hash:normalMorton(normal)});
   }
-  const count=samples.length/12-start;
-  for(let i=start;i<start+count;i++)samples[i*12+3]/=totalArea;
-  data.push(start,count,totalArea,o.areaEmitter?1:0,...o.mat.color,o.mat.emission);
+  // Preserve 2D normal-space locality, rather than procedural index strips.
+  list.sort((a,b)=>a.hash-b.hash);
+  const start=samples.length/20,totals=Array(6).fill(0);let totalArea=0;
+  for(const t of list){totalArea+=t.area;const w=Array.from({length:6},(_,axis)=>{const cosine=t.normal[axis>>1]*(axis%2?-1:1);return t.area*(.02+(o.areaEmitter?Math.abs(cosine):Math.max(0,cosine)));});w.forEach((v,i)=>totals[i]+=v);t.cumulative=totals.slice();t.uniform=totalArea;}
+  for(const t of list){const v=t.vertices;const cdf=t.cumulative.map((x,i)=>x/totals[i]);samples.push(...v.slice(0,3),t.uniform/totalArea,...v.slice(3,6),t.area,...v.slice(6,9),0,...cdf,0,0);}
+  const center=boundsMin.map((x,i)=>(x+boundsMax[i])*.5);
+  data.push(start,list.length,totalArea,o.areaEmitter?1:0,...o.mat.color,o.mat.emission,...center,.02,...totals,0,0);
  }
  lightCache={lights:new Float32Array(data),triangles:new Float32Array(samples)};return lightCache;
 }
 export function lightData(){return packEmitterMeshes().lights;}
 export function emitterTriangleData(){return packEmitterMeshes().triangles;}
 export function cameraState(aspect){
- const target=new THREE.Vector3(0,1.65,-.8),yaw=settings.cameraYaw,pitch=.27+settings.cameraPitch;
+ const target=new THREE.Vector3(0,settings.scene==='large'?3:1.65,settings.scene==='large'?-1.6:-.8),yaw=settings.cameraYaw,pitch=.27+settings.cameraPitch;
  const eye=new THREE.Vector3(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch)).multiplyScalar(settings.distance).add(target);
  const forward=target.clone().sub(eye).normalize(),right=forward.clone().cross(new THREE.Vector3(0,1,0)).normalize(),up=right.clone().cross(forward).normalize();return {eye,forward,right,up,target,aspect};
 }

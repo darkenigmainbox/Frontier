@@ -1,3 +1,4 @@
+import {getProbeConfig} from './probes.js';
 import * as THREE from 'three';
 import {settings,objects,lights,lightData,cameraState,sceneVersion} from './scene.js';
 export class FallbackRenderer {
@@ -6,10 +7,16 @@ export class FallbackRenderer {
   this.scene=new THREE.Scene();this.scene.background=new THREE.Color('#161e21');this.camera=new THREE.PerspectiveCamera(41.6,1,.1,100);
   this.fill=new THREE.HemisphereLight('#c9e2e1','#29271d',.4);this.scene.add(this.fill);
   const grid=new THREE.GridHelper(12,12,'#242a28','#252c2c');grid.position.y=.008;this.scene.add(grid);this.grid=grid;
-  const pgeo=new THREE.SphereGeometry(.045,6,4);this.probes=[[12,6,12],[6,3,6],[3,2,3]].map((dims,level)=>{
-   const [dx,dy,dz]=dims;const mesh=new THREE.InstancedMesh(pgeo,new THREE.MeshBasicMaterial({color:['#c6f578','#50dbe0','#e28ff2'][level],transparent:true,opacity:.8,depthTest:false}),dx*dy*dz);let i=0;const mat=new THREE.Matrix4();for(let z=0;z<dz;z++)for(let y=0;y<dy;y++)for(let x=0;x<dx;x++){mat.makeTranslation(-6+(x+.5)*12/dx,(y+.5)*6/dy,-5.5+(z+.5)*11/dz);mesh.setMatrixAt(i++,mat);}this.scene.add(mesh);return mesh;
-  });
+  this.probes=[];this.syncProbes();
   this.name='WebGL2 preview';this.gpuMs=null;this.syncScene();return this;
+ }
+ syncProbes(){
+  const config=getProbeConfig();if(this.probeKey===config.key)return;this.probeKey=config.key;
+  for(const p of this.probes){this.scene.remove(p);p.geometry.dispose();p.material.dispose();p.dispose();}
+  this.probes=config.dims.map((dims,level)=>{
+   const [dx,dy,dz]=dims;const mesh=new THREE.InstancedMesh(new THREE.SphereGeometry(.045,6,4),new THREE.MeshBasicMaterial({color:['#c6f578','#50dbe0','#e28ff2'][level],transparent:true,opacity:.8,depthTest:false}),dx*dy*dz);let i=0;const matrix=new THREE.Matrix4();
+   for(let z=0;z<dz;z++)for(let y=0;y<dy;y++)for(let x=0;x<dx;x++){matrix.makeTranslation(config.min[0]+(x+.5)*config.size[0]/dx,config.min[1]+(y+.5)*config.size[1]/dy,config.min[2]+(z+.5)*config.size[2]/dz);mesh.setMatrixAt(i++,matrix);}this.scene.add(mesh);return mesh;
+  });
  }
  syncScene(){
   for(const mesh of this.meshes||[]){this.scene.remove(mesh);mesh.material.dispose();}
@@ -19,13 +26,13 @@ export class FallbackRenderer {
   this.sceneVersion=sceneVersion;this.triangleCount=objects.reduce((n,o)=>n+(o.geometry.index?.count??o.geometry.attributes.position.count)/3,0);this.meshCount=objects.length;
  }
  render(){
-  if(this.sceneVersion!==sceneVersion)this.syncScene();
+  if(this.sceneVersion!==sceneVersion)this.syncScene();this.syncProbes();
   const w=this.canvas.clientWidth,h=this.canvas.clientHeight;
   if(this.width!==w||this.height!==h||this.scale!==settings.resolution){this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.5)*settings.resolution);this.renderer.setSize(w,h,false);this.width=w;this.height=h;this.scale=settings.resolution;}
   const cam=cameraState(w/h);this.camera.aspect=w/h;this.camera.position.copy(cam.eye);this.camera.lookAt(cam.target);this.camera.updateProjectionMatrix();
   this.meshes.forEach((m,i)=>{m.matrix.copy(objects[i].matrix);m.material.wireframe=settings.wireframe;m.material.emissiveIntensity=objects[i].mat.emission*settings.emission*.65;m.material.metalness=settings.reflections?objects[i].mat.metal:0;});
   const emitterMetadata=lightData();
-  this.sceneLights.forEach((light,i)=>{const l=lights[i],m=l.object.matrix.elements;light.position.set(m[12],m[13],m[14]);const area=emitterMetadata[i*8+2];light.intensity=settings.view===2?0:settings.emission*l.object.mat.emission*area*(l.object.areaEmitter?.5:.25);});
+  this.sceneLights.forEach((light,i)=>{const l=lights[i],m=l.object.matrix.elements;light.position.set(m[12],m[13],m[14]);const area=emitterMetadata[i*20+2];light.intensity=settings.view===2?0:settings.emission*l.object.mat.emission*area*(l.object.areaEmitter?.5:.25);});
   this.fill.intensity=settings.gi?.18+settings.bounce*.18:.05;if(settings.view===1)this.fill.intensity=.05;if(settings.view===2)this.fill.intensity=.7*settings.bounce;
   this.probes.forEach((p,i)=>{p.visible=settings.probes&&settings.probeLevel===i;});
   this.scene.overrideMaterial=settings.view===3?(this.normalMat??=new THREE.MeshNormalMaterial({side:THREE.DoubleSide})):null;

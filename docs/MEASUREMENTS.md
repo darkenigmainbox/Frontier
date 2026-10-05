@@ -68,3 +68,24 @@ The optional **GI visibility guard** casts surface-to-probe rays and rejects blo
 This tests only final interpolation. It **does not prove** that coarse cascade merging, parallax, probes inside geometry, or angular aliasing are solved. The guard defaults OFF because it adds up to eight ray queries per irradiance lookup (including reflected hits). Blocky/leaking indirect lighting can remain.
 
 Direct-only and normals views now skip unneeded GI work when overlays are off. Soft direct shadows remain a separate sampled ray-visibility calculation: their visual quality is not evidence that the indirect field is correct. The output still has no antialiasing/temporal reconstruction; low render scale can also cause jagged outlines, independently of GI leakage.
+
+
+## v0.6: sphere sampling, quality controls and grand hall
+
+The historical performance tables above still do **not** describe the current triangle-only renderer. No hardware FPS improvement is claimed. New any-hit shadow traversal may save work, while the default orb count rises to 16 samples; these changes need a same-device, same-settings measurement.
+
+The sphere regression fixture traces the actual **720-triangle orb**, without other scene occluders. Seventy inward-facing receivers sit 3 m from its center: 16 equatorial positions, six cardinal directions, and 48 directions distributed over the sphere. The small ambient term is subtracted. This checks coverage in every direction, including above/below—not just a single floor image. Single-channel direct radiance, emission multiplier 1:
+
+| Orb samples | Minimum | Maximum | Max/min |
+| --- | ---: | ---: | ---: |
+| 8 | 0.08870 | 0.26520 | 2.990 |
+| 16 (default) | 0.14066 | 0.22442 | 1.595 |
+| 32 | 0.16064 | 0.21148 | 1.316 |
+| 64 | 0.17584 | 0.21026 | 1.196 |
+| 256 (test-only convergence reference) | 0.18596 | 0.19321 | 1.039 |
+
+These are **SwiftShader correctness measurements, not performance measurements**. They demonstrate outward coverage and convergence, not perfect uniformity at interactive sample counts. Low settings can still show directional quadrature artifacts; the tessellated geometry itself is not an exact sphere. Sampling uses a smoothly blended, mesh-normal-weighted triangle CDF, normal-space ordering, barycentric surface points, and matching PDF compensation—no analytic light or intersection proxy. Real scene blockers should produce unequal brightness.
+
+GPU smoke tests additionally exercise probe-field reallocation/dispatch (Low, High with increased angular detail, Ultra with increased angular detail), dynamic atlas indexing, standard-density hall bounds, the **10,008-triangle** hall, and the large-scene brute-force guard. Default/high-density geometry, BVH/brute equivalence, connected vertex deformation, actual emitter triangle membership, and the existing visibility fixture remain tested. The hall's crate slider spans **4,008–16,008 triangles**.
+
+Probe configuration and all light-quality settings are included in benchmark JSON. CPU pack/BVH excludes the preceding scene animation/deformation update; completed-render wall time includes it. The grand hall and >256-cube stress variants are blocked from brute-force A/B in the shared benchmark as well as the UI to reduce watchdog risk. Other scenes retain a genuine BVH-off baseline.
