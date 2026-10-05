@@ -1,3 +1,5 @@
+import {RouteProfiles} from './FormationRoute.js';
+import {MountRouteEditor} from './FormationRouteEditor.js';
 import '@fontsource/dm-sans/300.css';
 import '@fontsource/dm-sans/400.css';
 //============================================================================================================================================
@@ -10,7 +12,7 @@ import {SolidLabels,SolidPresets,SolidCountRanges} from './SolidFormation.js';
 import {CreateGrainPanel} from './ParticlePanel.js';
 import {CaptureGrainSource} from './GrainSequence.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {CliffDefaults, CliffProfiles, ReadSpecification, EarliestStage, NoiseModes, FractureStyles, FormationPresets, ReadRecipe, ShapeModes} from './CliffSpecification.js';
+import {CliffDefaults, ReadSpecification, EarliestStage, NoiseModes, FractureStyles, ReadRecipe} from './CliffSpecification.js';
 
 const Element=Id=>document.getElementById(Id);
 const StageDescriptions=[
@@ -300,7 +302,7 @@ function Generate()
     }
     const Revision=++State.Revision;
     const Initial=!State.Result;
-    const Reframe=Initial || ['Profile','Width','Height','Depth'].some(Name=>State.Result.Specification[Name]!==State.Specification[Name]);
+    const Reframe=Initial || ['Profile','Width','Height','Depth','RoutePoints','RouteWidth','CanyonGap'].some(Name=>JSON.stringify(State.Result.Specification[Name])!==JSON.stringify(State.Specification[Name]));
     State.Error=null;
     State.Busy=true;
     State.Dirty=true;
@@ -313,7 +315,7 @@ function Generate()
     SetStatus(`Building through stage ${State.Stage} only`);
     try
     {
-        State.Specification=ReadSpecification(State.Specification);
+        Object.assign(State.Specification,ReadSpecification(State.Specification));
         for (const [Name,Value] of Object.entries(State.Specification))
         {
             const Input=Element(Name);
@@ -406,7 +408,8 @@ function ObjText()
 }
 
 const Groups=[
-    ['Cliff mass',true,[['ShapeMode','Base shape generator'],['Profile','Landform preset · applies size'],['Seed','Formation seed'],
+    ['Cliff mass',true,[['Profile','Landform preset · applies size'],['Seed','Formation seed'],
+        ['RouteSegments','Route segments',4,12,1,''],['RouteWidth','Rock thickness',3,10,.5,'m'],['RouteSmooth','Curve smoothing',0,1,.05,''],['ArchThickness','Arch band thickness',3,9,.5,'m'],['CanyonGap','Corridor width',5,16,.5,'m'],
         ['PeakCount','Major peaks · 0 = seeded',0,7,1,''],['PeakSpread','Peak / valley contrast',0,1,.05,''],['PeakSharpness','Peak sharpness',0,1,.05,''],['Lean','Formation lean',-1,1,.05,''],['Taper','Crown taper',0,.75,.05,''],['Terraces','Large shelves',0,1,.05,''],['BayDepth','Buttress / recess depth',0,1.5,.05,''],
         ['NoiseMode','Small surface relief'],['Variation','Small relief strength',0,1,.05,'×'],['NoiseScale','Small relief frequency',1,5,.1,'×'],
         ['Width','Width',10,80,.5,'m'],['Height','Height',10,56,.5,'m'],['Depth','Depth',8,24,.5,'m'],
@@ -423,11 +426,11 @@ const Groups=[
 function BuildControls()
 {
     const Solid=State.Specification.ShapeMode==='Solid',Profile=State.Specification.Profile;
-    const Supports={PeakCount:['Headland','Escarpment','Needles','WideWall','Amphitheatre'],PeakSpread:['Headland','Needles','WideWall','Amphitheatre'],Taper:['Headland','Escarpment','Spire'],Terraces:['Headland','Escarpment','Spire','Needles'],BayDepth:['Headland','Needles','WideWall','Amphitheatre']};
+    const Supports={RouteSegments:RouteProfiles,RouteWidth:RouteProfiles,RouteSmooth:RouteProfiles,ArchThickness:['RockArch'],CanyonGap:['Canyon'],PeakCount:['Headland','Escarpment','Needles','WideWall','Amphitheatre'],PeakSpread:['Headland','Needles','WideWall','Amphitheatre','RouteCliff','Canyon'],Taper:['Headland','Escarpment','Spire'],Terraces:['Headland','Escarpment','Spire','Needles'],BayDepth:['Headland','Needles','WideWall','Amphitheatre']};
     const Labels={PeakCount:Profile==='Escarpment'?'Terrace count':Profile==='Needles'?'Tower count':'Mass count',PeakSpread:'Mass height variation',PeakSharpness:'Crown bevel',Taper:'Upper mass narrowing',Terraces:Profile==='Needles'||Profile==='Spire'?'Pedestal height':'Shelf strength',BayDepth:Profile==='Amphitheatre'?'Cove opening':Profile==='WideWall'?'Ridge bend':'Mass spread'};
     const ControlGroups=Groups.map(([title,open,fields])=>[title,open,fields.filter(([name])=>!Solid||(!['NoiseMode','Variation','NoiseScale','Relief','Retreat'].includes(name)&&(!Supports[name]||Supports[name].includes(Profile)))).map(field=>Solid&&Labels[field[0]]?[field[0],Labels[field[0]],...field.slice(2)]:field)]);
 
-    const Choices={ShapeMode:ShapeModes,Profile:Solid?SolidLabels:Object.fromEntries(Object.entries(CliffProfiles).map(([Key,Profile])=>[Key,Profile.Label])),NoiseMode:NoiseModes,FractureStyle:FractureStyles};
+    const Choices={Profile:SolidLabels,NoiseMode:NoiseModes,FractureStyle:FractureStyles};
     if(Solid&&Profile!=='Spire'){const [a,b]=SolidCountRanges[Profile];Choices.PeakCount=Object.fromEntries([[0,'Seeded'],...Array.from({length:b-a+1},(_,i)=>[a+i,String(a+i)])]);}
     Element('ParameterControls').innerHTML=ControlGroups.map(([Title,Open,Fields])=>`<details ${Open?'open':''}><summary>${Title}</summary><div class="ControlGroup">${Fields.map(([Name,Label,Minimum,Maximum,Step,Unit])=>
     {
@@ -444,15 +447,21 @@ function BuildControls()
         Input.addEventListener('input',()=>
         {
             State.Specification[Name]=Choices[Name]?Input.value:Number(Input.value);
-            if(Name==='ShapeMode'){if(Input.value==='Solid')Object.assign(State.Specification,SolidPresets[State.Specification.Profile]);BuildControls();}
             if (Name==='Profile')
             {
-                Object.assign(State.Specification,(State.Specification.ShapeMode==='Solid'?SolidPresets:FormationPresets)[Input.value]);
+                State.Specification.ShapeMode='Solid';
+                Object.assign(State.Specification,structuredClone(SolidPresets[Input.value]));
                 BuildControls();
             }
             UpdateRange(Input);
             MarkDirty();
         });
+    }
+    if(Solid&&RouteProfiles.includes(Profile)){
+        const Host=document.createElement('div');
+        Element('Profile').closest('.Property').after(Host);
+        const Draw=MountRouteEditor(Host,State.Specification,()=>MarkDirty());
+        Element('RouteSmooth').addEventListener('input',Draw);
     }
     for (const Name of ['Seed','FractureSeed']) Element(`New${Name}`).onclick=()=>
     {
@@ -527,7 +536,7 @@ Element('LightAngle').oninput=Event=>
     Element('LightValue').textContent=`${Event.target.value}°`;
 };
 Element('ExportObj').onclick=()=>Download(`Cliff_${State.Specification.Profile}_${State.Specification.Seed}_Stage${State.Stage}.obj`,ObjText(),'text/plain');
-Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:5,Specification:State.Specification},null,2),'application/json');
+Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:6,Specification:State.Specification},null,2),'application/json');
 Element('ImportRecipe').onclick=()=>Element('RecipeFile').click();
 Element('RecipeFile').onchange=async Event=>
 {

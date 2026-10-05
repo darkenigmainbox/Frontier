@@ -15,7 +15,9 @@
     "test:formations": "node tests/formations.mjs",
     "test:formations:browser": "npm run build:githack && node tests/formations-browser.mjs",
     "test:solid-formations": "node tests/solid-formations.mjs",
-    "test:solid-formations:browser": "npm run build:githack && node tests/solid-formations-browser.mjs"
+    "test:solid-formations:browser": "npm run build:githack && node tests/solid-formations-browser.mjs",
+    "test:routes": "node tests/formation-routes.mjs",
+    "test:routes:browser": "npm run build:githack && node tests/formation-routes-browser.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",

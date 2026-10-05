@@ -12,14 +12,15 @@ try{
   await page.waitForFunction(r=>CliffApp.State.ReadyRevision>r&&!CliffApp.State.Busy&&!CliffApp.State.Dirty,old,{timeout:120000});
   assert.equal(await page.evaluate(()=>CliffApp.State.Error),null);
  };
+ const mode=async value=>{await page.evaluate(value=>CliffApp.SetSpecification({ShapeMode:value}),value);await ready();};
  const frame=()=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
- await change('ShapeMode','Procedural');await change('NoiseMode','None');await change('Variation',0);await page.click('#Front');
+ await mode('Procedural');await change('NoiseMode','None');await change('Variation',0);await page.click('#Front');
  fs.mkdirSync('.arena',{recursive:true});const images=[];
- for(const seed of [42,1,73]){await change('Seed',seed);await frame();images.push(await page.evaluate(()=>CliffApp.Renderer.domElement.toDataURL()));await page.screenshot({path:`.arena/formation-${seed}.png`});}
+ for(const seed of [42,1,73]){await change('Seed',seed);await frame();images.push(await page.evaluate(()=>CliffApp.Renderer.domElement.toDataURL()));fs.writeFileSync(`.arena/formation-${seed}.png`,Buffer.from(images.at(-1).split(',')[1],'base64'));}
  assert.equal(new Set(images).size,3,'seed changes visible formation even without noise');
  await change('Lean',-1);const left=await page.evaluate(()=>CliffApp.ObjText());await change('Lean',1);assert.notEqual(await page.evaluate(()=>CliffApp.ObjText()),left);
- const downloadPromise=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await (await downloadPromise).path(),'utf8'));assert.equal(recipe.Version,5);
- await change('ShapeMode','Authored');assert(await page.locator('#Lean').isDisabled());await change('ShapeMode','Procedural');assert(!(await page.locator('#Lean').isDisabled()));
+ const downloadPromise=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await (await downloadPromise).path(),'utf8'));assert.equal(recipe.Version,6);
+ await mode('Authored');assert(await page.locator('#Lean').isDisabled());await mode('Procedural');assert(!(await page.locator('#Lean').isDisabled()));
  await page.locator('[data-stage="2"]').click();await page.click('#Regenerate');await ready();assert.equal(await page.evaluate(()=>CliffApp.State.DisplayStage),2);
  // A stage-1 edit invalidates downstream output; later stages still require the explicit rebuild.
  await page.locator('#Seed').evaluate(el=>{el.value=19;el.dispatchEvent(new Event('input',{bubbles:true}));});assert(await page.locator('#ExportObj').isDisabled());

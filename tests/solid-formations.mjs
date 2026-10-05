@@ -17,7 +17,7 @@ function valid(stage){
 }
 const make=(Profile,changes={})=>ReadSpecification({...SolidPresets[Profile],ShapeMode:'Solid',Profile,...changes});
 const report={passed:false,corpus:[],parameters:[],pipelines:[]};const defaults={};
-for(const Profile of Object.keys(SolidPresets))for(const Seed of [1,17,42,73,913]){
+for(const Profile of ['Headland','Escarpment','Spire','Needles','WideWall','Amphitheatre'])for(const Seed of [1,17,42,73,913]){
  const stage=GenerateCliff(make(Profile,{Seed}),()=>{},1).Stages[0];valid(stage);assert.equal(components(stage.Meshes[0]),1,`${Profile}/${Seed}: unjoined mass or retained internal cap`);
  if(Seed===42)defaults[Profile]=stage.Meshes[0];
  report.corpus.push({Profile,Seed,triangles:stage.Metrics.Triangles,thinTriangles:stage.Metrics.ThinTriangles,volume:stage.Metrics.Volume,components:1});
@@ -41,7 +41,7 @@ for(const [Profile,names]of Object.entries(supports))for(const name of names){
  for(const spec of [a,b]){const stage=GenerateCliff(spec,()=>{},1).Stages[0];valid(stage);assert.equal(components(stage.Meshes[0]),1,`${Profile}/${name}: disconnected endpoint`);}
  report.parameters.push({Profile,name,low,high});
 }
-for(const Profile of Object.keys(SolidPresets)){
+for(const Profile of ['Headland','Escarpment','Spire','Needles','WideWall','Amphitheatre']){
  const result=GenerateCliff(make(Profile));result.Stages.forEach(valid);
  report.pipelines.push({Profile,triangles:result.Stages.map(s=>s.Metrics.Triangles),thinTriangles:result.Stages.map(s=>s.Metrics.ThinTriangles)});
 }

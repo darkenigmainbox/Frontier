@@ -1,10 +1,14 @@
+import {SampleRoute,RoutePresets,RouteProfiles} from './FormationRoute.js';
 // Polygon-only 3D mass assembly. Convex rocks are unioned into disjoint cells;
 // no paired front/back profile, height-map extrusion, voxel field or SDF.
 import {Face,ClipCell,Dot,Scale,Subtract,Centre,Cross} from './PolyhedronSolver.js';
 
-export const SolidLabels={Headland:'Compact outcrop',Escarpment:'Terraced mesa',Spire:'Thick monolith',Needles:'Tower cluster',WideWall:'Curved ridge',Amphitheatre:'Horseshoe cliff'};
-export const SolidCountRanges={Headland:[2,7],Escarpment:[2,5],Spire:[1,1],Needles:[2,7],WideWall:[3,7],Amphitheatre:[5,7]};
+export const SolidLabels={Headland:'Compact outcrop',Escarpment:'Terraced mesa',Spire:'Thick monolith',Needles:'Tower cluster',WideWall:'Curved ridge',Amphitheatre:'Horseshoe cliff',RouteCliff:'Route-following cliff',Canyon:'Winding canyon',RockArch:'Rock arch'};
+export const SolidCountRanges={Headland:[2,7],Escarpment:[2,5],Spire:[1,1],Needles:[2,7],WideWall:[3,7],Amphitheatre:[5,7],RouteCliff:[1,1],Canyon:[1,1],RockArch:[1,1]};
 export const SolidPresets={
+ RouteCliff:{Width:48,Height:18,Depth:24,RoutePoints:RoutePresets.Sweep,RouteSegments:8,RouteWidth:6,RouteSmooth:1,PeakSpread:.5,PeakSharpness:.3,Lean:0},
+ Canyon:{Width:48,Height:22,Depth:24,RoutePoints:RoutePresets.Bend,RouteSegments:8,RouteWidth:5,RouteSmooth:1,CanyonGap:10,PeakSpread:.5,PeakSharpness:.25,Lean:0},
+ RockArch:{Width:38,Height:24,Depth:16,RoutePoints:RoutePresets.Straight,RouteSegments:10,RouteWidth:7,RouteSmooth:1,ArchThickness:5,PeakSharpness:.25,Lean:0},
  Headland:{Width:26,Height:18,Depth:22,PeakCount:0,PeakSpread:.65,PeakSharpness:.35,Lean:.1,Taper:.3,Terraces:.45,BayDepth:.8},
  Escarpment:{Width:36,Height:20,Depth:24,PeakCount:3,PeakSpread:.3,PeakSharpness:.15,Lean:0,Taper:.25,Terraces:.85,BayDepth:.3},
  Spire:{Width:12,Height:36,Depth:12,PeakCount:1,PeakSpread:.65,PeakSharpness:.45,Lean:.15,Taper:.4,Terraces:.4,BayDepth:.4},
@@ -114,6 +118,35 @@ export function ConstructSolidCells(s){
   }
   break;
  }
+ case 'RouteCliff':case 'Canyon':case 'RockArch':{
+  const path=SampleRoute(s.RoutePoints,s.RouteSegments,W,D,s.RouteSmooth);
+  if(s.Profile==='RockArch'){
+   const points=path.map((p,i)=>[p[0],Math.sin(Math.PI*i/s.RouteSegments)*(H-s.ArchThickness*.5),p[1]]);
+   for(let i=0;i<points.length-1;i++){
+    const a=points[i],b=points[i+1],v=Subtract(b,a),length=Math.hypot(...v),horizontal=Math.hypot(v[0],v[2]);
+    if(horizontal<1e-5)throw Error('Route folds back on itself at an arch segment. Move a control point or increase route segments.');
+    const e=v.map(x=>x/length),up=[-e[0]*e[1]/(horizontal/length),horizontal/length,-e[2]*e[1]/(horizontal/length)],side=[-v[2]/horizontal,0,v[0]/horizontal];
+    const centre=a.map((x,k)=>(x+b[k])*.5);
+    const cell=rock(length*1.65,s.ArchThickness,s.RouteWidth,0,0,0,0,s.PeakSharpness,random);
+    const transform=p=>centre.map((x,k)=>x+p[0]*e[k]+(p[1]-s.ArchThickness*.5)*up[k]+p[2]*side[k]);
+    const middle=transform(Centre(cell.flatMap(f=>f.Loop)));
+    primitives.push(cell.map(f=>{const loop=f.Loop.map(transform);return Face(loop,'Cliff',Subtract(Centre(loop),middle));}));
+   }
+  }else{
+   for(const sign of s.Profile==='Canyon'?[-1,1]:[0]){
+    const offset=path.map((p,i)=>{
+     const a=path[Math.max(0,i-1)],b=path[Math.min(path.length-1,i+1)],dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz)||1;
+     const distance=sign*(s.CanyonGap+s.RouteWidth)*.5;
+     return [p[0]-dz/l*distance,p[1]+dx/l*distance];
+    });
+    for(let i=0;i<offset.length-1;i++){
+     const a=offset[i],b=offset[i+1],length=Math.hypot(b[0]-a[0],b[1]-a[1]);
+     add(length*1.8,H*(1-s.PeakSpread*.38*random()),s.RouteWidth,(a[0]+b[0])*.5,0,(a[1]+b[1])*.5,Math.atan2(b[1]-a[1],b[0]-a[0]));
+    }
+   }
+  }
+  break;
+ }
  default:throw Error('Unknown solid formation');
  }
  // Seeded structural cuts, global lean and proportions operate on complete 3D masses.
@@ -121,6 +154,7 @@ export function ConstructSolidCells(s){
  const all=primitives.flatMap(c=>c.flatMap(f=>f.Loop)),lo=[0,1,2].map(k=>Math.min(...all.map(p=>p[k]))),hi=[0,1,2].map(k=>Math.max(...all.map(p=>p[k])));
  const transform=p=>{
   const t=(p[1]-lo[1])/(hi[1]-lo[1]);
+  if(RouteProfiles.includes(s.Profile))return [p[0]+s.Lean*W*.18*t,t*H,p[2]-D*.5];
   return [(p[0]-(hi[0]+lo[0])*.5)*W/(hi[0]-lo[0])+s.Lean*W*.18*t,t*H,(p[2]-lo[2])*D/(hi[2]-lo[2])-D];
  };
  const transformed=primitives.map(cell=>{

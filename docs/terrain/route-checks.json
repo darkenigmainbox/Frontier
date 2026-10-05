@@ -1,0 +1,364 @@
+{
+  "passed": true,
+  "corpus": [
+    {
+      "Profile": "RouteCliff",
+      "pattern": "Straight",
+      "Seed": 1,
+      "components": 1,
+      "triangles": 3442,
+      "thin": 7
+    },
+    {
+      "Profile": "RouteCliff",
+      "pattern": "Straight",
+      "Seed": 42,
+      "components": 1,
+      "triangles": 3726,
+      "thin": 3
+    },
+    {
+      "Profile": "RouteCliff",
+      "pattern": "Straight",
+      "Seed": 73,
+      "components": 1,
+      "triangles": 3844,
+      "thin": 3
+    },
+    {
+      "Profile": "RouteCliff",
+      "pattern": "Sweep",
+      "Seed": 1,
+      "components": 1,
+      "triangles": 3816,
+      "thin": 8
+    },
+    {
+      "Profile": "RouteCliff",
+      "pattern": "Sweep",
+      "Seed": 42,
+      "components": 1,
+      "triangles": 3928,
+      "thin": 8
+    },
+    {
+      "Profile": "RouteCliff",
+      "pattern": "Sweep",
+      "Seed": 73,
+      "components": 1,
+      "triangles": 3330,
+      "thin": 1
+    },
+    {
+      "Profile": "RouteCliff",
+      "pattern": "Bend",
+      "Seed": 1,
+      "components": 1,
+      "triangles": 3670,
+      "thin": 2
+    },
+    {
+      "Profile": "RouteCliff",
+      "pattern": "Bend",
+      "Seed": 42,
+      "components": 1,
+      "triangles": 3784,
+      "thin": 2
+    },
+    {
+      "Profile": "RouteCliff",
+      "pattern": "Bend",
+      "Seed": 73,
+      "components": 1,
+      "triangles": 3378,
+      "thin": 2
+    },
+    {
+      "Profile": "Canyon",
+      "pattern": "Straight",
+      "Seed": 1,
+      "components": 2,
+      "triangles": 7606,
+      "thin": 17
+    },
+    {
+      "Profile": "Canyon",
+      "pattern": "Straight",
+      "Seed": 42,
+      "components": 2,
+      "triangles": 7596,
+      "thin": 12
+    },
+    {
+      "Profile": "Canyon",
+      "pattern": "Straight",
+      "Seed": 73,
+      "components": 2,
+      "triangles": 7808,
+      "thin": 9
+    },
+    {
+      "Profile": "Canyon",
+      "pattern": "Sweep",
+      "Seed": 1,
+      "components": 2,
+      "triangles": 8280,
+      "thin": 26
+    },
+    {
+      "Profile": "Canyon",
+      "pattern": "Sweep",
+      "Seed": 42,
+      "components": 2,
+      "triangles": 8252,
+      "thin": 29
+    },
+    {
+      "Profile": "Canyon",
+      "pattern": "Sweep",
+      "Seed": 73,
+      "components": 2,
+      "triangles": 8158,
+      "thin": 19
+    },
+    {
+      "Profile": "Canyon",
+      "pattern": "Bend",
+      "Seed": 1,
+      "components": 2,
+      "triangles": 7712,
+      "thin": 12
+    },
+    {
+      "Profile": "Canyon",
+      "pattern": "Bend",
+      "Seed": 42,
+      "components": 2,
+      "triangles": 7710,
+      "thin": 8
+    },
+    {
+      "Profile": "Canyon",
+      "pattern": "Bend",
+      "Seed": 73,
+      "components": 2,
+      "triangles": 7742,
+      "thin": 11
+    },
+    {
+      "Profile": "RockArch",
+      "pattern": "Straight",
+      "Seed": 1,
+      "components": 1,
+      "triangles": 4914,
+      "thin": 1
+    },
+    {
+      "Profile": "RockArch",
+      "pattern": "Straight",
+      "Seed": 42,
+      "components": 1,
+      "triangles": 5152,
+      "thin": 3
+    },
+    {
+      "Profile": "RockArch",
+      "pattern": "Straight",
+      "Seed": 73,
+      "components": 1,
+      "triangles": 5088,
+      "thin": 1
+    },
+    {
+      "Profile": "RockArch",
+      "pattern": "Sweep",
+      "Seed": 1,
+      "components": 1,
+      "triangles": 4982,
+      "thin": 2
+    },
+    {
+      "Profile": "RockArch",
+      "pattern": "Sweep",
+      "Seed": 42,
+      "components": 1,
+      "triangles": 4980,
+      "thin": 1
+    },
+    {
+      "Profile": "RockArch",
+      "pattern": "Sweep",
+      "Seed": 73,
+      "components": 1,
+      "triangles": 4966,
+      "thin": 1
+    },
+    {
+      "Profile": "RockArch",
+      "pattern": "Bend",
+      "Seed": 1,
+      "components": 1,
+      "triangles": 4866,
+      "thin": 2
+    },
+    {
+      "Profile": "RockArch",
+      "pattern": "Bend",
+      "Seed": 42,
+      "components": 1,
+      "triangles": 4974,
+      "thin": 0
+    },
+    {
+      "Profile": "RockArch",
+      "pattern": "Bend",
+      "Seed": 73,
+      "components": 1,
+      "triangles": 4870,
+      "thin": 1
+    }
+  ],
+  "parameters": [
+    {
+      "Profile": "RouteCliff",
+      "name": "RouteSegments",
+      "values": [
+        4,
+        12
+      ]
+    },
+    {
+      "Profile": "RouteCliff",
+      "name": "RouteWidth",
+      "values": [
+        3,
+        10
+      ]
+    },
+    {
+      "Profile": "RouteCliff",
+      "name": "RouteSmooth",
+      "values": [
+        0,
+        1
+      ]
+    },
+    {
+      "Profile": "Canyon",
+      "name": "RouteSegments",
+      "values": [
+        4,
+        12
+      ]
+    },
+    {
+      "Profile": "Canyon",
+      "name": "RouteWidth",
+      "values": [
+        3,
+        10
+      ]
+    },
+    {
+      "Profile": "Canyon",
+      "name": "RouteSmooth",
+      "values": [
+        0,
+        1
+      ]
+    },
+    {
+      "Profile": "Canyon",
+      "name": "CanyonGap",
+      "values": [
+        5,
+        16
+      ]
+    },
+    {
+      "Profile": "RockArch",
+      "name": "RouteSegments",
+      "values": [
+        4,
+        12
+      ]
+    },
+    {
+      "Profile": "RockArch",
+      "name": "RouteWidth",
+      "values": [
+        3,
+        10
+      ]
+    },
+    {
+      "Profile": "RockArch",
+      "name": "RouteSmooth",
+      "values": [
+        0,
+        1
+      ]
+    },
+    {
+      "Profile": "RockArch",
+      "name": "ArchThickness",
+      "values": [
+        3,
+        9
+      ]
+    }
+  ],
+  "pipelines": [
+    {
+      "Profile": "RouteCliff",
+      "triangles": [
+        3928,
+        11648,
+        21378,
+        28646,
+        32448
+      ],
+      "thin": [
+        8,
+        2,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "Profile": "Canyon",
+      "triangles": [
+        7710,
+        19120,
+        31876,
+        44834,
+        50378
+      ],
+      "thin": [
+        8,
+        1,
+        3,
+        3,
+        3
+      ]
+    },
+    {
+      "Profile": "RockArch",
+      "triangles": [
+        5152,
+        9204,
+        17098,
+        26990,
+        29018
+      ],
+      "thin": [
+        3,
+        1,
+        1,
+        1,
+        1
+      ]
+    }
+  ]
+}
