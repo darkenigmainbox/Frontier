@@ -3,7 +3,7 @@ export const settings = {
  running:true, gi:true, emission:2.8, bounce:1, speed:1, resolution:.75, view:0,
  probes:true, probeLevel:1, probeMode:0, wireframe:false, scene:'chamber', time:0,
  cameraYaw:0, cameraPitch:0, distance:14.8, stressCount:256,
- shadowSamples:4, emitterSize:1, bvh:true, reflections:true, waveAmplitude:1, probeVisibility:false, probeDensity:1, probeAngular:0, largeCount:500, orbPower:1, orbSamples:16, orbOnly:false,
+ shadowSamples:4, emitterSize:1, bvh:true, reflections:true, waveAmplitude:1, probeVisibility:false, probeDensity:1, probeAngular:0, largeCount:500, orbPower:1, orbSamples:16, orbOnly:false, temporal:true, spatialFilter:true, probeBudget:4,
 };
 export const objects=[];
 export const lights=[];
@@ -110,9 +110,13 @@ export function makeScene(){
  lights.push({object:orb});
  updateScene(settings.time);return objects;
 }
+export let updateMs=0;let updateKey;
+export function invalidateSceneUpdate(){updateKey=undefined;}
 export function updateScene(time){
+ const begin=performance.now(),key=`${sceneVersion}:${time}:${settings.waveAmplitude}:${settings.emitterSize}:${settings.orbPower}:${settings.orbOnly}`;if(key===updateKey){updateMs=0;return;}updateKey=key;
  lightCache=null;
  for(const o of objects){
+  if(o.initialized&&!o.motion&&!o.areaEmitter&&!o.mat.baseEmission)continue;
   p.fromArray(o.pos);s.fromArray(o.scale);
   if(o.mat.baseEmission>0)o.mat.emission=o.kind==='emissive-orb'?o.mat.baseEmission*settings.orbPower:settings.orbOnly?0:o.mat.baseEmission;
   if(o.motion==='wave'){
@@ -135,8 +139,9 @@ export function updateScene(time){
   }
   if(settings.scene==='cornell'&&o.kind==='cube'){s.set(1,1.7,1);p.y+=.6;}
   if(o.areaEmitter){s.x*=settings.emitterSize;s.y*=settings.emitterSize;}
-  q.setFromEuler(o.rotation);o.matrix.compose(p,q,s);
+  q.setFromEuler(o.rotation);o.matrix.compose(p,q,s);o.initialized=true;
  }
+ updateMs=performance.now()-begin;
 }
 const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();
 export function triangleData(){

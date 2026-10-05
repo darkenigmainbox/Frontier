@@ -1,106 +1,63 @@
-import { cascade, gather, render, blit, probeOverlay } from './shaders.js';
-import { triangleData, emitterTriangleData, lightData, objects, cameraState, settings, sceneVersion } from './scene.js';
-import { TriangleBVH } from './bvh.js';
+import * as shaders from './modern-shaders.js';
+import {emitterTriangleData,lightData,objects,cameraState,settings,updateMs} from './scene.js';
+import {InstancedScene} from './acceleration.js';
+import {ProbeScheduler} from './scheduler.js';
 import {getProbeConfig} from './probes.js';
 export class GPURenderer {
  async init(canvas){
-  if(!navigator.gpu)throw new Error('WebGPU is not available in this browser.');
-  const adapter=await navigator.gpu.requestAdapter({powerPreference:'high-performance'});if(!adapter)throw new Error('No WebGPU adapter found.');
-  this.timestamp=adapter.features.has('timestamp-query');
-  this.device=await adapter.requestDevice({requiredFeatures:this.timestamp?['timestamp-query']:[]});const d=this.device;
-  this.canvas=canvas;this.context=canvas.getContext('webgpu');this.format=navigator.gpu.getPreferredCanvasFormat();this.context.configure({device:d,format:this.format,alphaMode:'opaque'});
-  this.adapterInfo=Object.fromEntries(['vendor','architecture','device','description'].map(k=>[k,adapter.info?.[k]||'']));
-  this.name=adapter.info?.description||adapter.info?.architecture||adapter.info?.device||'WebGPU device';
-  this.allocations=[];
-  const buffer=(size,usage)=>{const b=d.createBuffer({size,usage});this.allocations.push(b);return b;};
-  this.buffer=buffer;this.bvh=new TriangleBVH();
-  this.uniform=buffer(240,GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST);
-  this.sceneBuffers={};
-  this.ensureSceneBuffer('triangles',80);this.ensureSceneBuffer('nodes',48);this.ensureSceneBuffer('emitterTriangles',80);this.ensureSceneBuffer('emitters',80);
-  this.configureProbes();
-  this.levels=[0,1,2].map(i=>{const b=buffer(16,GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST);d.queue.writeBuffer(b,0,new Uint32Array([i,0,0,0]));return b;});
-  const compute=async(code,label)=>{const m=d.createShaderModule({code,label});const info=await m.getCompilationInfo();const errors=info.messages.filter(m=>m.type==='error');if(errors.length)throw new Error(errors.map(m=>`${label}:${m.lineNum}: ${m.message}`).join('\n'));return d.createComputePipelineAsync({label,layout:'auto',compute:{module:m,entryPoint:'main'}});};
-  this.cp=await compute(cascade,'Radiance cascade');this.gp=await compute(gather,'Irradiance gather');this.rp=await compute(render,'Scene shading');
-  const mod=d.createShaderModule({code:blit});this.bp=d.createRenderPipeline({layout:'auto',vertex:{module:mod,entryPoint:'vs'},fragment:{module:mod,entryPoint:'fs',targets:[{format:this.format}]},primitive:{topology:'triangle-list'}});
-  const pm=d.createShaderModule({code:probeOverlay,label:'Probe overlay'});
-  this.pp=d.createRenderPipeline({layout:'auto',vertex:{module:pm,entryPoint:'vs'},fragment:{module:pm,entryPoint:'fs',targets:[{format:this.format,blend:{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}}]},primitive:{topology:'triangle-list'}});
-
-  this.sampler=d.createSampler({magFilter:'linear',minFilter:'linear'});
-  if(this.timestamp){this.queries=d.createQuerySet({type:'timestamp',count:6});this.queryBuffer=buffer(48,GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC);this.readBuffer=buffer(48,GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ);}
-  this.gpuMs=null;this.pending=false;
-  d.lost.then(info=>this.onError?.(new Error(`GPU device lost: ${info.message}`)));
-  d.addEventListener('uncapturederror',e=>{console.error(e.error);this.onError?.(e.error);});
-  this.rebindFields();this.resize();return this;
+  if(!navigator.gpu)throw new Error('WebGPU unavailable');const adapter=await navigator.gpu.requestAdapter({powerPreference:'high-performance'});if(!adapter)throw new Error('No WebGPU adapter');this.timestamp=adapter.features.has('timestamp-query');this.device=await adapter.requestDevice({requiredFeatures:this.timestamp?['timestamp-query']:[]});const d=this.device;
+  this.adapterInfo=Object.fromEntries(['vendor','architecture','device','description'].map(k=>[k,adapter.info?.[k]||'']));this.name=adapter.info?.description||'WebGPU';this.canvas=canvas;this.context=canvas.getContext('webgpu');this.format=navigator.gpu.getPreferredCanvasFormat();this.context.configure({device:d,format:this.format,alphaMode:'opaque'});
+  this.allocations=[];this.sceneBuffers={};this.acceleration=new InstancedScene();this.scheduler=new ProbeScheduler();this.uniform=this.buffer(352,GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST);this.uniformData=new Float32Array(88);this.levels=[0,1,2].map(()=>this.buffer(16,GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST));
+  this.ensureSceneBuffer('triangles',80);this.ensureSceneBuffer('nodes',256);this.ensureSceneBuffer('emitterTriangles',80);this.ensureSceneBuffer('emitters',80);this.configureProbes();
+  const module=async(code,label)=>{const m=d.createShaderModule({code,label});const info=await m.getCompilationInfo();const errors=info.messages.filter(x=>x.type==='error');if(errors.length)throw new Error(errors.map(x=>`${label}:${x.lineNum}: ${x.message}`).join('\n'));return m;};
+  for(const [key,source] of Object.entries({cp:'cascade',vp:'classify',ap:'age',gp:'gatherShader',rp:'render',tp:'temporal',fp:'filter'})){this[key]=await d.createComputePipelineAsync({layout:'auto',compute:{module:await module(shaders[source],source),entryPoint:'main'}});}
+  this.visPipeline=await d.createRenderPipelineAsync({layout:'auto',vertex:{module:await module(shaders.visibilityRaster,'Visibility raster'),entryPoint:'vs'},fragment:{module:await module(shaders.visibilityRaster,'Visibility fragment'),entryPoint:'fs',targets:[{format:'rg32uint'}]},primitive:{topology:'triangle-list',cullMode:'none'},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'less'}});
+  const mod=await module(shaders.blit,'Present');this.bp=d.createRenderPipeline({layout:'auto',vertex:{module:mod,entryPoint:'vs'},fragment:{module:mod,entryPoint:'fs',targets:[{format:this.format}]},primitive:{topology:'triangle-list'}});
+  const pm=await module(shaders.probeOverlay,'Probe overlay');this.pp=d.createRenderPipeline({layout:'auto',vertex:{module:pm,entryPoint:'vs'},fragment:{module:pm,entryPoint:'fs',targets:[{format:this.format,blend:{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}}]},primitive:{topology:'triangle-list'}});this.sampler=d.createSampler({magFilter:'linear',minFilter:'linear'});
+  if(this.timestamp){this.queries=d.createQuerySet({type:'timestamp',count:10});this.queryBuffer=this.buffer(80,GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC);this.readBuffer=this.buffer(80,GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ);}
+  d.lost.then(info=>this.onError?.(new Error(`GPU device lost: ${info.message}`)));d.addEventListener('uncapturederror',e=>this.onError?.(e.error));this.frameId=0;this.resize();return this;
  }
- configureProbes(){
-  const config=getProbeConfig();if(this.probeConfig?.key===config.key)return;
-  for(const field of this.fields||[]){field.destroy();this.allocations.splice(this.allocations.indexOf(field),1);}
-  this.probeConfig=config;this.fields=[...config.rayWork,config.counts[0]*6].map(n=>this.buffer(n*16,GPUBufferUsage.STORAGE));
-  if(this.cp)this.rebindFields();
+ buffer(size,usage){const b=this.device.createBuffer({size,usage});this.allocations.push(b);return b;}
+ ensureSceneBuffer(name,size){const previous=this.sceneBuffers[name];if(previous&&previous.size>=size)return false;if(previous){previous.destroy();this.allocations.splice(this.allocations.indexOf(previous),1);}this.sceneBuffers[name]=this.buffer(Math.max(256,2**Math.ceil(Math.log2(Math.max(1,size)))),GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST);return true;}
+ configureProbes(){const config=getProbeConfig();if(this.probeConfig?.key===config.key)return false;for(const b of this.fields||[]){b.destroy();this.allocations.splice(this.allocations.indexOf(b),1);}this.probeConfig=config;this.fields=[...config.rayWork,config.counts[0]*6+config.totalProbes].map(n=>this.buffer(n*16,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST));this.scheduler.configure(config);this.resetHistory=true;this.bindDirty=true;return true;}
+ resize(){const w=Math.max(1,Math.floor(this.canvas.clientWidth*Math.min(devicePixelRatio,1.5)*settings.resolution)),h=Math.max(1,Math.floor(this.canvas.clientHeight*Math.min(devicePixelRatio,1.5)*settings.resolution));if(w===this.canvas.width&&h===this.canvas.height&&this.texture)return;this.canvas.width=w;this.canvas.height=h;for(const t of this.textures||[])t.destroy();this.textures=[];this.textureBytes=0;
+  const tex=(format,bytes,usage)=>{const t=this.device.createTexture({size:[w,h],format,usage});this.textures.push(t);this.textureBytes+=w*h*bytes;return t;};const rw=GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.STORAGE_BINDING;
+  this.texture=tex('rgba8unorm',4,rw|GPUTextureUsage.COPY_SRC);this.visibility=tex('rg32uint',8,GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_SRC);this.depth=tex('depth32float',4,GPUTextureUsage.RENDER_ATTACHMENT);this.raw=tex('rgba16float',8,rw);this.histories=[0,1].map(()=>({color:tex('rgba16float',8,rw|GPUTextureUsage.COPY_SRC),position:tex('rgba16float',8,rw),normal:tex('rgba16float',8,rw)}));this.resetHistory=true;this.bindDirty=true;
  }
- rebindFields(){
-  this.gbg=this.device.createBindGroup({layout:this.gp.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform}},{binding:2,resource:{buffer:this.fields[0]}},{binding:5,resource:{buffer:this.fields[3]}}]});
-  this.pbg=this.device.createBindGroup({layout:this.pp.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform}},...this.fields.slice(0,3).map((buffer,i)=>({binding:i+1,resource:{buffer}}))]});
-  this.rebindScene();
+ bind(pipeline,entries){return this.device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:Object.entries(entries).map(([binding,resource])=>({binding:Number(binding),resource:resource instanceof GPUBuffer?{buffer:resource}:resource}))});}
+ rebind(){const s=this.sceneBuffers,b={0:this.uniform,1:s.triangles,2:this.fields[0],3:this.fields[1],4:this.fields[2],5:this.fields[3],7:s.nodes,8:s.emitterTriangles,9:s.emitters};
+  this.cbg=this.levels.map(level=>this.bind(this.cp,{...b,6:level}));this.vbg=this.levels.map(level=>this.bind(this.vp,{0:this.uniform,1:s.triangles,5:this.fields[3],6:level,7:s.nodes}));this.abg=this.levels.map(level=>this.bind(this.ap,{0:this.uniform,5:this.fields[3],6:level,7:s.nodes}));this.gbg=this.bind(this.gp,{0:this.uniform,2:this.fields[0],5:this.fields[3]});
+  this.visBG=this.bind(this.visPipeline,{0:this.uniform,1:s.triangles,7:s.nodes});this.rbg=this.bind(this.rp,{...b,6:this.raw.createView(),10:this.visibility.createView()});
+  this.tbg=this.histories.map((h,i)=>{const old=this.histories[1-i];return this.bind(this.tp,{0:this.uniform,1:s.triangles,7:s.nodes,10:this.visibility.createView(),11:this.raw.createView(),12:old.color.createView(),13:old.position.createView(),14:old.normal.createView(),15:h.color.createView(),16:h.position.createView(),17:h.normal.createView()});});
+  this.fbg=this.histories.map(h=>this.bind(this.fp,{0:this.uniform,6:this.texture.createView(),11:h.color.createView(),13:h.position.createView(),14:h.normal.createView()}));this.bbg=this.bind(this.bp,{0:this.texture.createView(),1:this.sampler});this.pbg=this.bind(this.pp,{0:this.uniform,1:this.fields[0],2:this.fields[1],3:this.fields[2]});this.bindDirty=false;
  }
- ensureSceneBuffer(name,size){
-  const previous=this.sceneBuffers[name];if(previous&&previous.size>=size)return false;
-  const capacity=Math.max(256,2**Math.ceil(Math.log2(Math.max(size,1))));
-  if(previous){previous.destroy();this.allocations.splice(this.allocations.indexOf(previous),1);}
-  this.sceneBuffers[name]=this.buffer(capacity,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST);return true;
- }
- sceneEntries(){return [{binding:0,resource:{buffer:this.uniform}},{binding:1,resource:{buffer:this.sceneBuffers.triangles}},...this.fields.map((buffer,i)=>({binding:i+2,resource:{buffer}})),...['nodes','emitterTriangles','emitters'].map((key,i)=>({binding:i+7,resource:{buffer:this.sceneBuffers[key]}}))];}
- rebindScene(){
-  const entries=this.sceneEntries();this.cbg=this.levels.map(buffer=>this.device.createBindGroup({layout:this.cp.getBindGroupLayout(0),entries:[...entries.filter(e=>e.binding!==5),{binding:6,resource:{buffer}}]}));
-  if(this.texture)this.bindOutput();
- }
- bindOutput(){this.rbg=this.device.createBindGroup({layout:this.rp.getBindGroupLayout(0),entries:[...this.sceneEntries(),{binding:6,resource:this.texture.createView()}]});}
- get memory(){const buffers=this.allocations.reduce((sum,b)=>sum+b.size,0);const textures=this.canvas.width*this.canvas.height*4;return {buffers,textures,total:buffers+textures+(this.captureBytes||0)};}
- resize(){
-  const w=Math.max(1,Math.floor(this.canvas.clientWidth* Math.min(devicePixelRatio,1.5)*settings.resolution)),h=Math.max(1,Math.floor(this.canvas.clientHeight*Math.min(devicePixelRatio,1.5)*settings.resolution));
-  if(w===this.canvas.width&&h===this.canvas.height&&this.texture)return;
-  this.canvas.width=w;this.canvas.height=h;this.texture?.destroy();this.texture=this.device.createTexture({size:[w,h],format:'rgba8unorm',usage:GPUTextureUsage.STORAGE_BINDING|GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_SRC});
-  this.bindOutput();
-  this.bbg=this.device.createBindGroup({layout:this.bp.getBindGroupLayout(0),entries:[{binding:0,resource:this.texture.createView()},{binding:1,resource:this.sampler}]});
- }
+ get memory(){const buffers=this.allocations.reduce((n,b)=>n+b.size,0);return {buffers,textures:this.textureBytes,total:buffers+this.textureBytes+(this.captureBytes||0)};}
  render(){
-  const cpuStart=performance.now();this.configureProbes();this.resize();const d=this.device;const cam=cameraState(this.canvas.width/this.canvas.height);const raw=triangleData();
-  let tris=raw;this.bvhMs=0;this.nodeCount=0;
-  if(settings.bvh){
-   const start=performance.now();
-   if(this.sceneVersion!==sceneVersion){this.bvh.build(raw);this.sceneVersion=sceneVersion;}else this.bvh.refit(raw);
-   tris=this.bvh.triangles;this.nodeCount=this.bvh.nodes.length;this.bvhMs=performance.now()-start;
-  }
-  const lights=lightData(),emitterTriangles=emitterTriangleData();this.triangleCount=tris.length/20;this.meshCount=objects.length;
-  const payloads={triangles:tris,emitterTriangles,emitters:lights};
-  // BVH OFF is a real baseline: no build, refit, reordering, or node upload.
-  // Retain its allocation so re-enabling doesn't cause allocation churn.
-  if(settings.bvh)payloads.nodes=this.bvh.data;
-  let changed=false;
-  for(const [key,data] of Object.entries(payloads)){changed=this.ensureSceneBuffer(key,data.byteLength)||changed;d.queue.writeBuffer(this.sceneBuffers[key],0,data);}
-  if(changed)this.rebindScene();
-  const data=new Float32Array([...cam.eye,0,...cam.forward,0,...cam.right,0,...cam.up,0,
-   this.canvas.width,this.canvas.height,this.triangleCount,settings.time,
-   settings.emission,settings.bounce,lights.length/20,settings.bvh?1:0,
-   settings.gi?1:0,settings.view,settings.probes?1:0,settings.wireframe?1:0,
-   this.meshCount,this.nodeCount,settings.shadowSamples,settings.probeVisibility?1:0,
-   settings.probeLevel,settings.probeMode,settings.reflections?1:0,settings.orbSamples,
-   ...this.probeConfig.min,0,...this.probeConfig.size,0,
-   ...this.probeConfig.dims.flatMap((d,i)=>[...d,this.probeConfig.sides[i]]),...this.probeConfig.intervals,0]);
-  d.queue.writeBuffer(this.uniform,0,data);this.cpuMs=performance.now()-cpuStart;
-  const e=d.createCommandEncoder();const measure=this.timestamp&&!this.pending;const frameId=this.frameId=(this.frameId||0)+1;
-  const p=e.beginComputePass(measure?{timestampWrites:{querySet:this.queries,beginningOfPassWriteIndex:0,endOfPassWriteIndex:1}}:{});
-  p.setPipeline(this.cp);
-  if((settings.gi&&settings.view===0)||settings.view===2||settings.view===4||settings.probes){for(const l of [2,1,0]){p.setBindGroup(0,this.cbg[l]);p.dispatchWorkgroups(Math.ceil(this.probeConfig.rayWork[l]/64));}p.setPipeline(this.gp);p.setBindGroup(0,this.gbg);p.dispatchWorkgroups(Math.ceil(this.probeConfig.counts[0]*6/64));}
-  p.end();
-  const shading=e.beginComputePass(measure?{timestampWrites:{querySet:this.queries,beginningOfPassWriteIndex:2,endOfPassWriteIndex:3}}:{});
-  shading.setPipeline(this.rp);shading.setBindGroup(0,this.rbg);shading.dispatchWorkgroups(Math.ceil(this.canvas.width/8),Math.ceil(this.canvas.height/8));shading.end();
-  const pass=e.beginRenderPass({...(measure?{timestampWrites:{querySet:this.queries,beginningOfPassWriteIndex:4,endOfPassWriteIndex:5}}:{}),colorAttachments:[{view:this.context.getCurrentTexture().createView(),loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:1}}]});pass.setPipeline(this.bp);pass.setBindGroup(0,this.bbg);pass.draw(3);if(settings.probes&&settings.view!==4){pass.setPipeline(this.pp);pass.setBindGroup(0,this.pbg);pass.draw(6,this.probeConfig.counts[settings.probeLevel]);}pass.end();
-  if(measure){e.resolveQuerySet(this.queries,0,6,this.queryBuffer,0);e.copyBufferToBuffer(this.queryBuffer,0,this.readBuffer,0,48);}
-  d.queue.submit([e.finish()]);
-  if(measure){this.pending=true;this.timingReady=this.readBuffer.mapAsync(GPUMapMode.READ).then(()=>{const times=new BigUint64Array(this.readBuffer.getMappedRange());this.passMs={cascades:Number(times[1]-times[0])/1e6,shading:Number(times[3]-times[2])/1e6,present:Number(times[5]-times[4])/1e6};this.gpuMs=this.passMs.cascades+this.passMs.shading;this.timingFrameId=frameId;this.readBuffer.unmap();this.pending=false;}).catch(()=>{this.pending=false;});}
-  return d.queue.onSubmittedWorkDone();
+  const begin=performance.now();this.configureProbes();this.resize();const d=this.device,scene=this.acceleration;const accelStart=performance.now();scene.update();this.accelMs=performance.now()-accelStart;this.bvhMs=scene.refitMs;this.triangleCount=scene.triangleCount;this.meshCount=objects.length;this.nodeCount=scene.instanceBase/3;this.localTriangleCount=scene.localTriangleCount;
+  const key=JSON.stringify([scene.version,this.probeConfig.key,settings.emission,settings.orbPower,settings.orbOnly,settings.emitterSize,settings.waveAmplitude,settings.gi,settings.bounce,settings.view,settings.probes,settings.temporal,settings.spatialFilter,settings.probeBudget,settings.shadowSamples,settings.orbSamples,settings.reflections,settings.bvh]);let reset=this.resetHistory||key!==this.historyKey;this.historyKey=key;
+  const lights=lightData(),emitterTriangles=emitterTriangleData();
+  if(this.lightCenters?.length===lights.length)for(let i=0;i<lights.length;i+=20){if(lights[i+7]>0&&Math.hypot(lights[i+8]-this.lightCenters[i+8],lights[i+9]-this.lightCenters[i+9],lights[i+10]-this.lightCenters[i+10])>.5)reset=true;}
+  if(this.lightCenters?.length!==lights.length)this.lightCenters=new Float32Array(lights.length);this.lightCenters.set(lights);let growth=false;for(const [name,data] of Object.entries({triangles:scene.triangles,nodes:scene.nodes,emitters:lights,emitterTriangles})){if(this.ensureSceneBuffer(name,data.byteLength)){growth=true;this.bindDirty=true;}}
+  let uploaded=0;const write=(name,data,offset=0,length=data.length)=>{d.queue.writeBuffer(this.sceneBuffers[name],offset*4,data.buffer,data.byteOffset+offset*4,length*4);uploaded+=length*4;};
+  if(scene.rebuilt||growth){write('triangles',scene.triangles);write('nodes',scene.nodes);}else{for(const [offset,length] of scene.dirtyTriangles)write('triangles',scene.triangles,offset,length);for(const [offset,length] of scene.dirtyNodes)write('nodes',scene.nodes,offset,length);if(scene.changed)write('nodes',scene.nodes,0,scene.tree.length*12);if(scene.changed||reset||this.wasMoving)write('nodes',scene.nodes,scene.instanceBase*4,scene.instances.length*44);}
+  this.wasMoving=scene.changed;if(this.lastLights!==lights||growth){write('emitters',lights);write('emitterTriangles',emitterTriangles);this.lastLights=lights;}
+  const counts=[],config=this.probeConfig;this.scheduler.frame++;let offset=scene.scheduleBase;let rays=0;const budget=settings.temporal?settings.probeBudget:1;
+  for(let level=0;level<3;level++){const count=this.scheduler.select(level,budget,reset,scene.dirtyBounds);counts.push(count);const ids=this.scheduler.ids[level];d.queue.writeBuffer(this.sceneBuffers.nodes,offset*16,ids.buffer,0,Math.ceil(count/4)*16);d.queue.writeBuffer(this.levels[level],0,new Uint32Array([level,count,offset,0]));offset+=Math.ceil(config.counts[level]/4);rays+=count*config.sides[level]**2;}
+  const cam=cameraState(this.canvas.width/this.canvas.height),previous=this.previousCamera||cam;const cameraMoved=this.previousCamera&&[...cam.eye,...cam.forward].some((v,i)=>Math.abs(v-[...previous.eye,...previous.forward][i])>1e-5);
+  this.stableFrames=scene.changed||reset?0:(this.stableFrames||0)+1;
+  this.uniformData.set([...cam.eye,0,...cam.forward,0,...cam.right,0,...cam.up,0,this.canvas.width,this.canvas.height,this.triangleCount,settings.time,settings.emission,settings.bounce,lights.length/20,settings.bvh?1:0,settings.gi?1:0,settings.view,settings.probes?1:0,settings.wireframe?1:0,this.meshCount,scene.tree.length,settings.shadowSamples,1,settings.probeLevel,settings.probeMode,settings.reflections?1:0,settings.orbSamples,...config.min,0,...config.size,0,...config.dims.flatMap((v,i)=>[...v,config.sides[i]]),...config.intervals,0,...previous.eye,this.canvas.width/this.canvas.height,...previous.forward,0,...previous.right,0,...previous.up,0,(this.sampleFrame??this.frameId),reset?1:0,0,budget,scene.instanceBase,0,scene.changed?1:0,0,settings.temporal?1:0,settings.spatialFilter?1:0,0,cameraMoved?1:0]);d.queue.writeBuffer(this.uniform,0,this.uniformData);
+  if(this.bindDirty)this.rebind();this.cpuMs=performance.now()-begin;this.uploadBytes=uploaded;this.sceneMs=updateMs;this.scheduledRays=rays;
+  const e=d.createCommandEncoder(),measure=this.timestamp&&!this.pending;const stamps=i=>measure?{timestampWrites:{querySet:this.queries,beginningOfPassWriteIndex:i*2,endOfPassWriteIndex:i*2+1}}:{};
+  const v=e.beginRenderPass({...stamps(0),colorAttachments:[{view:this.visibility.createView(),loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:0}}],depthStencilAttachment:{view:this.depth.createView(),depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'store'}});v.setPipeline(this.visPipeline);v.setBindGroup(0,this.visBG);for(const mesh of scene.meshes)v.draw(mesh.count*3,mesh.objects.length,mesh.triStart*3,mesh.instanceFirst);v.end();
+  const gi=(settings.gi&&settings.view===0)||settings.view===2||settings.view===4||settings.probes;const solveGI=gi&&(this.stableFrames<budget*16);this.scheduledRays=solveGI?rays:0;const p=e.beginComputePass(stamps(1));if(solveGI){for(const l of [2,1,0]){p.setPipeline(this.vp);p.setBindGroup(0,this.vbg[l]);p.dispatchWorkgroups(Math.ceil(counts[l]/64));p.setPipeline(this.cp);p.setBindGroup(0,this.cbg[l]);p.dispatchWorkgroups(Math.ceil(counts[l]*config.sides[l]**2/64));p.setPipeline(this.ap);p.setBindGroup(0,this.abg[l]);p.dispatchWorkgroups(Math.ceil(counts[l]/64));}p.setPipeline(this.gp);p.setBindGroup(0,this.gbg);p.dispatchWorkgroups(Math.ceil(config.counts[0]*6/64));}p.end();
+  const dispatch=(pipeline,bg,stamp)=>{const pass=e.beginComputePass(stamp);pass.setPipeline(pipeline);pass.setBindGroup(0,bg);pass.dispatchWorkgroups(Math.ceil(this.canvas.width/8),Math.ceil(this.canvas.height/8));pass.end();};dispatch(this.rp,this.rbg,stamps(2));
+  const history=this.frameId%2;const post=e.beginComputePass(stamps(3));for(const [pipeline,bg] of [[this.tp,this.tbg[history]],[this.fp,this.fbg[history]]]){post.setPipeline(pipeline);post.setBindGroup(0,bg);post.dispatchWorkgroups(Math.ceil(this.canvas.width/8),Math.ceil(this.canvas.height/8));}post.end();
+  const pass=e.beginRenderPass({...stamps(4),colorAttachments:[{view:this.context.getCurrentTexture().createView(),loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:1}}]});pass.setPipeline(this.bp);pass.setBindGroup(0,this.bbg);pass.draw(3);if(settings.probes&&settings.view!==4){pass.setPipeline(this.pp);pass.setBindGroup(0,this.pbg);pass.draw(6,config.counts[settings.probeLevel]);}pass.end();
+  if(measure){e.resolveQuerySet(this.queries,0,10,this.queryBuffer,0);e.copyBufferToBuffer(this.queryBuffer,0,this.readBuffer,0,80);}const submitted=performance.now();this.encodeMs=submitted-begin-this.cpuMs;d.queue.submit([e.finish()]);const frameId=++this.frameId;if(this.sampleFrame!=null)this.sampleFrame++;
+  if(measure){this.pending=true;this.timingReady=this.readBuffer.mapAsync(GPUMapMode.READ).then(()=>{const times=new BigUint64Array(this.readBuffer.getMappedRange());this.passMs=Object.fromEntries(['visibility','cascades','shading','reconstruction','present'].map((k,i)=>[k,Number(times[i*2+1]-times[i*2])/1e6]));this.gpuMs=this.passMs.visibility+this.passMs.cascades+this.passMs.shading+this.passMs.reconstruction;this.timingFrameId=frameId;this.readBuffer.unmap();this.pending=false;}).catch(()=>{this.pending=false;});}
+  this.previousCamera=cam;this.resetHistory=false;return d.queue.onSubmittedWorkDone().then(()=>{this.queueMs=performance.now()-submitted;this.wallMs=performance.now()-begin+this.sceneMs;});
  }
+ resetBenchmarkBlock(){this.resetHistory=true;this.sampleFrame=0;this.scheduler.frame=0;this.scheduler.cursor.fill(0);for(const a of this.scheduler.age)a.fill(0);}
  async capture(){
   const d=this.device,w=this.canvas.width,h=this.canvas.height;
   const stride=Math.ceil(w*4/256)*256;

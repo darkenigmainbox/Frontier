@@ -51,7 +51,7 @@ try {
  await gpuPage.goto(url);
  const results=await gpuPage.evaluate(async()=>{
   if(!navigator.gpu||!await navigator.gpu.requestAdapter())return {skip:true};
-  const {GPURenderer}=await import('/src/gpu.js');const {settings,updateScene,makeScene,triangleData,emitterTriangleData,objects,lightData}=await import('/src/scene.js');settings.resolution=1;settings.running=false;settings.probes=false;updateScene(0);
+  const {GPURenderer}=await import('/src/reference-gpu.js');const {settings,updateScene,invalidateSceneUpdate,makeScene,triangleData,emitterTriangleData,objects,lightData}=await import('/src/scene.js');settings.resolution=1;settings.running=false;settings.probes=false;updateScene(0);
   let target,device;const errors=[];
   const canvas={clientWidth:64,clientHeight:48,width:64,height:48,getContext:()=>({configure:({device:d,format})=>{device=d;target=d.createTexture({size:[64,48],format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});},getCurrentTexture:()=>target})};
   const renderer=await new GPURenderer().init(canvas);renderer.onError=e=>errors.push(e.message);
@@ -77,7 +77,7 @@ try {
   settings.scene='stress';settings.stressCount=1536;settings.reflections=false;settings.gi=true;makeScene();const stress=await readFrame();const stressTriangles=renderer.triangleCount,stressMemory=renderer.memory.total;
   settings.scene='deform';settings.time=0;settings.gi=true;settings.reflections=true;settings.shadowSamples=1;makeScene();
   // Freeze every other animation: subsequent changes must come from the mesh alone.
-  for(const o of objects)if(o.motion!=='wave')o.motion=null;
+  for(const o of objects)if(o.motion!=='wave')o.motion=null;invalidateSceneUpdate();
   updateScene(0);const sheet=objects.find(o=>o.kind==='wavy-sheet');const waveVertices=sheet.geometry.attributes.position.count;
   const indicesBefore=Array.from(sheet.geometry.index.array),positionsBefore=Array.from(sheet.geometry.attributes.position.array),transformBefore=sheet.matrix.toArray(),lightsBefore=Array.from(lightData());
   const wave0=await readFrame();const waveTriangles=sheet.geometry.index.count/3;const treeBefore=renderer.bvh.nodes;settings.view=4;const waveAtlas0=await readFrame();
@@ -150,7 +150,7 @@ try {
   assert.ok(Math.abs(results.visibility.naiveBlocked-1)<.0001);assert.equal(results.visibility.guardedBlocked,0);assert.ok(Math.abs(results.visibility.guardedClear-1)<.0001);
   assert.equal(results.low.count,292);assert.equal(results.high.count,2336);assert.equal(results.high.rays,229376);assert.ok(results.high.bytes>results.low.bytes);assert.equal(results.ultraCount,7884);assert.equal(results.hall.triangles,10008);assert.equal(results.maximumHallTriangles,16008);assert.ok(results.largeBenchmarkBlocked);assert.deepEqual(results.hall.bounds,[24,10,22]);
   assert.ok(results.omni.every(v=>v.minimum>0),'Orb illuminates every tested direction');assert.ok(results.omni.find(v=>v.samples===16).ratio<1.7);assert.ok(results.omni.find(v=>v.samples===64).ratio<1.25);assert.ok(results.omni.find(v=>v.samples===256).ratio<1.06);
-  console.log('✓ GPU: WGSL compilation, cascade dispatch + merge, GI toggle, dynamic geometry, normals, readback',results);
+  console.log('✓ Retained v0.6 reference GPU: WGSL compilation, cascade dispatch + merge, GI toggle, dynamic geometry, normals, readback',results);
  }
  // Real WebGPU UI lifecycle, with only presentation redirected to an offscreen
  // texture because this headless browser cannot composite a WebGPU swap chain.

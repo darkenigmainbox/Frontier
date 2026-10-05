@@ -1,0 +1,216 @@
+{
+  "date": "2026-10-05T14:45:41.925Z",
+  "resolution": [
+    64,
+    48
+  ],
+  "triangles": 10008,
+  "probes": 7884,
+  "angular": "base",
+  "warmup": 2,
+  "samples": 3,
+  "settings": {
+    "view": "Lit",
+    "reflections": true,
+    "panelSampleTarget": 64,
+    "orbSampleTarget": 64,
+    "emission": 4.9,
+    "orbPower": 3.3,
+    "emitterSize": 1.9,
+    "cameraDistance": 29.6,
+    "poseTimesMeasured": [
+      4.1,
+      4.15,
+      4.2
+    ]
+  },
+  "notes": "SwiftShader software GPU. Moving pose, high sample targets. Fixed order. v0.6 reference uses current scene-update cache and refit-copy micro-optimization, so is not an untouched old build. Reconstructed profile uses <=8 fresh emitter samples and a quarter-probe budget; not equal quality or equivalent per-frame work. No target hardware FPS claim.",
+  "results": [
+    {
+      "name": "v06 reference",
+      "adapter": {
+        "vendor": "google",
+        "architecture": "swiftshader",
+        "device": "",
+        "description": ""
+      },
+      "errors": [],
+      "rows": [
+        {
+          "wallMs": 7586.10000000149,
+          "cpuMs": 14,
+          "refitMs": 1.6000000014901161,
+          "gpuMs": 7565.438261,
+          "cascades": 4019.955589,
+          "shading": 3545.482672,
+          "present": 0.103961,
+          "uploadBytes": null,
+          "rays": 193536
+        },
+        {
+          "wallMs": 7758.9000000003725,
+          "cpuMs": 7.800000000745058,
+          "refitMs": 1.5,
+          "gpuMs": 7748.037638,
+          "cascades": 3995.910042,
+          "shading": 3752.127596,
+          "present": 0.099025,
+          "uploadBytes": null,
+          "rays": 193536
+        },
+        {
+          "wallMs": 7867.5,
+          "cpuMs": 19.59999999962747,
+          "refitMs": 2.5,
+          "gpuMs": 7841.473400000001,
+          "cascades": 4159.772845,
+          "shading": 3681.700555,
+          "present": 0.132373,
+          "uploadBytes": null,
+          "rays": 193536
+        }
+      ],
+      "median": {
+        "wallMs": 7758.9000000003725,
+        "cpuMs": 14,
+        "refitMs": 1.6000000014901161,
+        "gpuMs": 7748.037638,
+        "visibility": null,
+        "cascades": 4019.955589,
+        "shading": 3681.700555,
+        "reconstruction": null,
+        "present": 0.103961,
+        "uploadBytes": null,
+        "rays": 193536
+      }
+    },
+    {
+      "name": "v07 full refresh",
+      "adapter": {
+        "vendor": "google",
+        "architecture": "swiftshader",
+        "device": "",
+        "description": ""
+      },
+      "errors": [],
+      "rows": [
+        {
+          "wallMs": 13018.200000001118,
+          "cpuMs": 6.100000001490116,
+          "refitMs": 0.19999999925494194,
+          "gpuMs": 13009.372774,
+          "visibility": 11.649029,
+          "cascades": 6262.932957,
+          "shading": 6733.555512,
+          "reconstruction": 1.235276,
+          "present": 0.107468,
+          "uploadBytes": 544928,
+          "rays": 193536
+        },
+        {
+          "wallMs": 12957,
+          "cpuMs": 4.799999998882413,
+          "refitMs": 0.40000000037252903,
+          "gpuMs": 12949.053831000001,
+          "visibility": 11.849307,
+          "cascades": 6147.580242,
+          "shading": 6788.484,
+          "reconstruction": 1.140282,
+          "present": 0.111594,
+          "uploadBytes": 544928,
+          "rays": 193536
+        },
+        {
+          "wallMs": 13519.39999999851,
+          "cpuMs": 5.299999998882413,
+          "refitMs": 0.4000000022351742,
+          "gpuMs": 13511.298163000001,
+          "visibility": 11.661852,
+          "cascades": 6659.49952,
+          "shading": 6838.983311,
+          "reconstruction": 1.15348,
+          "present": 0.083296,
+          "uploadBytes": 544928,
+          "rays": 193536
+        }
+      ],
+      "median": {
+        "wallMs": 13018.200000001118,
+        "cpuMs": 5.299999998882413,
+        "refitMs": 0.40000000037252903,
+        "gpuMs": 13009.372774,
+        "visibility": 11.661852,
+        "cascades": 6262.932957,
+        "shading": 6788.484,
+        "reconstruction": 1.15348,
+        "present": 0.107468,
+        "uploadBytes": 544928,
+        "rays": 193536
+      }
+    },
+    {
+      "name": "v07 reconstructed",
+      "adapter": {
+        "vendor": "google",
+        "architecture": "swiftshader",
+        "device": "",
+        "description": ""
+      },
+      "errors": [],
+      "rows": [
+        {
+          "wallMs": 2569.0999999996275,
+          "cpuMs": 3.5,
+          "refitMs": 0.2999999988824129,
+          "gpuMs": 2562.373678,
+          "visibility": 11.805884,
+          "cascades": 1625.102922,
+          "shading": 923.388985,
+          "reconstruction": 2.075887,
+          "present": 0.080213,
+          "uploadBytes": 544928,
+          "rays": 48384
+        },
+        {
+          "wallMs": 2457.199999999255,
+          "cpuMs": 3.900000000372529,
+          "refitMs": 0.2999999988824129,
+          "gpuMs": 2450.799152,
+          "visibility": 18.77545,
+          "cascades": 1520.741457,
+          "shading": 909.196566,
+          "reconstruction": 2.085679,
+          "present": 0.103105,
+          "uploadBytes": 544928,
+          "rays": 48384
+        },
+        {
+          "wallMs": 2632.7000000011176,
+          "cpuMs": 4.199999999254942,
+          "refitMs": 0.30000000074505806,
+          "gpuMs": 2626.7468790000003,
+          "visibility": 11.209698,
+          "cascades": 1688.146304,
+          "shading": 925.352873,
+          "reconstruction": 2.038004,
+          "present": 0.117687,
+          "uploadBytes": 544928,
+          "rays": 48384
+        }
+      ],
+      "median": {
+        "wallMs": 2569.0999999996275,
+        "cpuMs": 3.900000000372529,
+        "refitMs": 0.2999999988824129,
+        "gpuMs": 2562.373678,
+        "visibility": 11.805884,
+        "cascades": 1625.102922,
+        "shading": 923.388985,
+        "reconstruction": 2.075887,
+        "present": 0.103105,
+        "uploadBytes": 544928,
+        "rays": 48384
+      }
+    }
+  ]
+}
