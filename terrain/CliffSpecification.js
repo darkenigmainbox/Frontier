@@ -3,10 +3,12 @@
 //============================================================================================================================================
 // 📦 Authored geological feature catalogues and bounded polygon cliff parameters.
 
+export const DetailRocks={Sandstone:'Sandstone · worn bedding',Granite:'Granite · pitted facets',Slate:'Slate · directional cleavage'};
+
 export const CliffDefaults = Object.freeze({Profile:'Headland', Seed:42, Width:32, Height:18, Depth:12, Relief:1,
     NoiseMode:'Ridged', Variation:.8, NoiseScale:2.6, FractureStyle:'Conjugate', FractureSeed:42,
     Retreat:0.48, Beds:7, Dip:4, Aperture:0.07, FractureBend:1, JointSpacing:4.6, Penetration:0.78, FaceRecess:0.65, SpallSize:0.8,
-    SpallDensity:0.8, CrackLength:1.4, CrackWidth:0.12, CrackDepth:0.18, CrackDensity:0.55, TriangleSpan:1.4});
+    SpallDensity:0.8, CrackLength:1.4, CrackWidth:0.12, CrackDepth:0.18, CrackDensity:0.55, TriangleSpan:1.4,DetailRock:'Sandstone',DetailSeed:123,DetailDepth:.16,DetailScale:1.2,DetailSpan:.32,DetailBudget:240000});
 
 // 📝 These are authored geological cross-sections, not samples of a displacement function.
 // 📝 Each station is [horizontal extent, crown elevation, promontory projection].
@@ -107,9 +109,11 @@ export function SelectCatalogue(Seed)
 export function ReadSpecification(Input = {})
 {
     const Result = {...CliffDefaults, ...Input};
-    const Limits = {Seed:[0,999999],FractureSeed:[0,999999],Variation:[0,1],NoiseScale:[1,5],Width:[10,80],Height:[10,56],Depth:[8,24],Relief:[.35,1.3],Retreat:[.25,.65],
+    const Limits = {DetailSeed:[0,999999],DetailDepth:[0,.3],DetailScale:[.4,3],DetailSpan:[.15,.8],DetailBudget:[40000,600000],Seed:[0,999999],FractureSeed:[0,999999],Variation:[0,1],NoiseScale:[1,5],Width:[10,80],Height:[10,56],Depth:[8,24],Relief:[.35,1.3],Retreat:[.25,.65],
         Beds:[4,10],Dip:[-8,8],Aperture:[.035,.18],FractureBend:[0,1.5],JointSpacing:[3,7],Penetration:[.55,.9],FaceRecess:[0,1.5],SpallSize:[.25,1.3],
         SpallDensity:[0,1],CrackLength:[.5,2.2],CrackWidth:[.07,.22],CrackDepth:[.06,.3],CrackDensity:[0,1],TriangleSpan:[.8,2.2]};
+    if (!Object.hasOwn(DetailRocks,Result.DetailRock)) throw new Error('Unknown detail rock');
+    Result.DetailSeed=Math.round(Number(Result.DetailSeed));
     if (!Object.hasOwn(CliffProfiles,Result.Profile)) throw new Error('Unknown cliff profile');
     if (!Object.hasOwn(NoiseModes,Result.NoiseMode)) throw new Error('Unknown noise mode');
     if (!Object.hasOwn(FractureStyles,Result.FractureStyle)) throw new Error('Unknown fracture style');
@@ -129,18 +133,19 @@ export const StageProperties=[
     ['FractureSeed','FractureStyle','Beds','Dip','Aperture','FractureBend'],
     ['JointSpacing','Penetration','FaceRecess'],
     ['SpallSize','SpallDensity'],
-    ['CrackLength','CrackWidth','CrackDepth','CrackDensity']];
+    ['CrackLength','CrackWidth','CrackDepth','CrackDensity'],
+    ['DetailRock','DetailSeed','DetailDepth','DetailScale','DetailSpan','DetailBudget']];
 
 export function EarliestStage(Before,After)
 {
     if (!Before) return 1;
     const Index=StageProperties.findIndex(Names=>Names.some(Name=>Before[Name]!==After[Name]));
-    return Index<0?6:Index+1;
+    return Index<0?7:Index+1;
 }
 
 export function ReadRecipe(Recipe)
 {
-    if (Recipe.Format!=='Frontier.PolygonCliff' || ![1,2].includes(Recipe.Version)) throw new Error('Unsupported cliff recipe');
+    if (Recipe.Format!=='Frontier.PolygonCliff' || ![1,2,3].includes(Recipe.Version)) throw new Error('Unsupported cliff recipe');
     const Specification={...Recipe.Specification};
     if (Recipe.Version===1)
     {

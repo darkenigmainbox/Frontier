@@ -1,4 +1,6 @@
-# Slate terrain generator: baseline and proposed next steps
+# Slate terrain generator: baseline audit (historical)
+
+**Update:** Stage 6 is now implemented in `terrain/SurfaceDetail.js`. See [the implementation notes](STAGE6.md). This file preserves the earlier audit and proposal, not the current implementation status. The user clarified that the grain work must eventually simulate actual particles; the legacy polygon-grain study is not the intended solution and its correction remains deferred.
 
 ## Source inspected
 

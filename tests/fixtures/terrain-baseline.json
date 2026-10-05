@@ -1,0 +1,30 @@
+{
+  "commit": "d93aa16",
+  "checks": [
+    {
+      "stage": 1,
+      "triangles": 716,
+      "digest": "790bd9701f9c6cc2715604e7d5824639d8c12fce8fffa1e3b9b41df53e3651a4"
+    },
+    {
+      "stage": 2,
+      "triangles": 9544,
+      "digest": "04db6f6290efdb01d7b38087e74a3df696c9fbfa62c31ec612f897e3cde738bd"
+    },
+    {
+      "stage": 3,
+      "triangles": 20472,
+      "digest": "5f08db0fa123e8103ec2fc8b0b9afeed266963db704a31b94baaba3e7fe0ab03"
+    },
+    {
+      "stage": 4,
+      "triangles": 32414,
+      "digest": "f5c21f22223056d5ec274d2e03342feea815902a3f3375211683c5e03e3fb979"
+    },
+    {
+      "stage": 5,
+      "triangles": 36710,
+      "digest": "1d4420ef424470e7343067fb5b6ea0ce0210f74da215b0a7061a400891239dde"
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "date": "2026-10-05",
+  "baselineCommit": "d93aa16",
+  "cpu": {
+    "passed": true,
+    "defaultStage6": {
+      "Stage": 6,
+      "Bodies": 54,
+      "Vertices": 102650,
+      "Triangles": 205064,
+      "OpenEdges": 0,
+      "NonmanifoldEdges": 0,
+      "WindingErrors": 0,
+      "ZeroArea": 0,
+      "NonmanifoldVertices": 0,
+      "DuplicateTriangles": 0,
+      "ThinTriangles": 16,
+      "MinimumAngle": 2.5361831799632615,
+      "RejectedSpalls": 3,
+      "RejectedCracks": 0,
+      "Volume": 2636.278481950064,
+      "Spalls": 219,
+      "Cracks": 20,
+      "MovedVertices": 61005,
+      "MaxDisplacement": 0.1336102035156651,
+      "BudgetLimited": false,
+      "InputOverBudget": false
+    },
+    "seconds": 32.850038479999995
+  },
+  "browser": {
+    "passed": true,
+    "stage5Triangles": 36710,
+    "stage6": {
+      "Stage": 6,
+      "Bodies": 54,
+      "Vertices": 102652,
+      "Triangles": 205068,
+      "OpenEdges": 0,
+      "NonmanifoldEdges": 0,
+      "WindingErrors": 0,
+      "ZeroArea": 0,
+      "NonmanifoldVertices": 0,
+      "DuplicateTriangles": 0,
+      "ThinTriangles": 16,
+      "MinimumAngle": 2.536183179962974,
+      "RejectedSpalls": 3,
+      "RejectedCracks": 0,
+      "Volume": 2636.276835840353,
+      "Spalls": 219,
+      "Cracks": 20,
+      "MovedVertices": 61007,
+      "MaxDisplacement": 0.1336102035156651,
+      "BudgetLimited": false,
+      "InputOverBudget": false
+    },
+    "closeupTarget": [
+      15.316204296066495,
+      7.6240236391576675,
+      -2.5417161248216944
+    ],
+    "errors": [],
+    "failedRequests": []
+  },
+  "existingRegressionSuite": "npm test passed (smoke + modern)",
+  "limitations": [
+    "Not a complete self-intersection test",
+    "Narrow triangles reported, not hidden",
+    "Particle grain simulation deferred",
+    "No SDF stage"
+  ]
+}

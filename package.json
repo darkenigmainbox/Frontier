@@ -9,7 +9,9 @@
     "test": "node tests/smoke.mjs && node tests/modern.mjs",
     "build:githack": "vite build --outDir site",
     "measure": "node tests/measure.mjs",
-    "compare": "node tests/compare.mjs"
+    "compare": "node tests/compare.mjs",
+    "test:terrain": "node tests/terrain.mjs",
+    "test:terrain:browser": "npm run build:githack && node tests/terrain-browser.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",

@@ -3,6 +3,7 @@
 //============================================================================================================================================
 // 📦 Profiled cliff mass, bedding, finite joints, local spalls and shallow polygon fissures.
 
+import {GenerateSurfaceDetail} from './SurfaceDetail.js';
 import {ConstructRelief} from './ReliefProjection.js';
 import {FractureMass} from './RuptureSolver.js';
 import {CollapseSlivers, FlipCaps, SnapCaps} from './TriangleSolver.js';
@@ -427,10 +428,10 @@ export class CliffSequence
         this.Construction=[];
     }
 
-    Generate(Input, Progress=()=>{}, Through=5)
+    Generate(Input, Progress=()=>{}, Through=6)
     {
         const Specification=ReadSpecification(Input);
-        Through=Math.max(1,Math.min(5,Math.round(Through)));
+        Through=Math.max(1,Math.min(6,Math.round(Through)));
         const Changed=EarliestStage(this.Specification,Specification);
         this.Stages.length=Math.min(this.Stages.length,Changed-1);
         this.Construction.length=this.Stages.length;
@@ -441,6 +442,14 @@ export class CliffSequence
         {
             const Started=performance.now();
             Progress(Number);
+            if (Number===6)
+            {
+                this.Stages.push(GenerateSurfaceDetail(this.Stages[4],Specification));
+                this.Construction.push(null);
+                ExecutedStages.push(6);
+                Timings[6]=performance.now()-Started;
+                continue;
+            }
             const Select=SelectCatalogue(Specification.FractureSeed+Number*104729);
             const Previous=this.Construction[Number-2];
             let Content,Bodies;
@@ -474,7 +483,7 @@ export class CliffSequence
     }
 }
 
-export function GenerateCliff(Input, Progress=()=>{}, Through=5)
+export function GenerateCliff(Input, Progress=()=>{}, Through=6)
 {
     return new CliffSequence().Generate(Input,Progress,Through);
 }
