@@ -21,7 +21,9 @@
     "test:placement": "node tests/formation-placement.mjs",
     "test:viewport:browser": "npm run build:githack && node tests/viewport-editor-browser.mjs",
     "test:mould-detail": "node tests/mould-detail.mjs",
-    "test:mould-detail:browser": "npm run build:githack && node tests/mould-detail-browser.mjs"
+    "test:mould-detail:browser": "npm run build:githack && node tests/mould-detail-browser.mjs",
+    "test:detail-mask": "node tests/detail-mask.mjs",
+    "test:detail-paint:browser": "npm run build:githack && node tests/detail-paint-browser.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",

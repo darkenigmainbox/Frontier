@@ -1,3 +1,5 @@
+import {CreateDetailPainter} from './DetailPainter.js';
+import {DetailPatterns} from './DetailMask.js';
 import {RouteProfiles} from './FormationRoute.js';
 import {CreateViewportEditor} from './ViewportEditor.js';
 import '@fontsource/dm-sans/300.css';
@@ -77,6 +79,7 @@ const WireMaterial=new THREE.LineBasicMaterial({color:'#111820',transparent:true
 const SelectionMaterial=new THREE.LineBasicMaterial({color:'#efb063',transparent:true,opacity:.9,depthTest:true});
 const CutColours={Cliff:'#929aa5',Crown:'#929aa5',Base:'#929aa5',End:'#929aa5',Back:'#929aa5',Bedding:'#8ca49d',
     Fracture:'#8ca49d',Joint:'#8ca49d',Termination:'#8ca49d',Spall:'#e0a570',Crack:'#d07969'};
+let DetailPainter=null;
 let MouldSection=null;
 let ViewportEditor=null;
 let SelectionOutline=null;
@@ -141,6 +144,7 @@ function ViewStage(StageNumber)
 {
     RenderRequested=true;
     Renderer.shadowMap.needsUpdate=true;
+    if(StageNumber!==6)DetailPainter?.stop();
     State.Stage=Math.max(1,Math.min(6,StageNumber));
     const [Title,,Description]=StageDescriptions[State.Stage-1];
     Element('StageTitle').textContent=State.Stage===1&&State.Specification.ShapeMode==='Solid'?SolidLabels[State.Specification.Profile]:Title;
@@ -160,7 +164,8 @@ function ViewStage(StageNumber)
     document.querySelectorAll('#ParameterControls details').forEach((Section,Index)=>{Section.open=Index===State.Stage-1;});
     const ValidThrough=Math.min(State.Stage,EarliestStage(State.Result?.Specification,State.Specification)-1);
     const Stage=State.Result?.Stages.slice(0,ValidThrough).at(-1);
-    Element('MouldStudy').hidden=Stage?.Number!==6||State.Dirty;
+    Element('PaintPanel').hidden=State.Stage!==6;
+    Element('MouldStudy').hidden=Stage?.Number!==6||State.Dirty||State.Painting;
     MouldSection=null;ClayMaterial.clippingPlanes=[];CutMaterial.clippingPlanes=[];ClayMaterial.side=THREE.FrontSide;CutMaterial.side=THREE.FrontSide;
     State.DisplayStage=Stage?.Number||0;
     if (State.Dirty)
@@ -176,10 +181,11 @@ function ViewStage(StageNumber)
         Element('Metrics').textContent='No current mesh at this stage. Rebuild to continue.';
         Element('BodyCount').textContent='No current mesh';
         Element('TriangleCount').textContent='— triangles';
+        DetailPainter?.refresh();
         return;
     }
     const Study=Stage.Number===6&&State.DetailView!=='Final';
-    const Meshes=Study?Stage.Study[State.DetailView]:Stage.Meshes;
+    const Meshes=State.Painting?State.Result.Stages[0].Meshes:Study?Stage.Study[State.DetailView]:Stage.Meshes;
     Meshes.forEach((Mesh,Index)=>BodyGroup.add(BuildRenderBody(Mesh,Index)));
     if(Study&&['Hollow','Noisy'].includes(State.DetailView)){
         BodyGroup.updateWorldMatrix(true,false);
@@ -190,7 +196,7 @@ function ViewStage(StageNumber)
     }
     Element('ExportObj').textContent=State.Stage===6?'Export final OBJ':'Export OBJ';
     Element('Explode').disabled=State.Stage===6;
-    if(Stage.Detail){const D=Stage.Detail;Element('MouldNumbers').textContent=`${D.refinedTriangles.toLocaleString()} mould triangles · signed offsets ${D.minimumOffset.toFixed(2)} to +${D.maximumOffset.toFixed(2)} m · ${D.removedVolume.toFixed(1)} m³ removed · ${(D.milliseconds/1000).toFixed(2)} s detail pass. ${Study?'Inspection only — export and diagnostics still describe the final rock.':'One combined output mesh; source face tags consolidated.'}`;}
+    if(Stage.Detail){const D=Stage.Detail;Element('MouldNumbers').textContent=`${D.refinedTriangles.toLocaleString()} mould triangles · ${D.affectedVertices??D.mouldVerticesMoved}/${D.mouldVerticesMoved} inner vertices influenced · signed offsets ${D.minimumOffset.toFixed(2)} to +${D.maximumOffset.toFixed(2)} m · ${D.removedVolume.toFixed(1)} m³ removed · ${(D.milliseconds/1000).toFixed(2)} s detail pass. ${Study?'Inspection only — export and diagnostics still describe the final rock.':D.affectedVertices===0?'All protected: original stage-5 meshes retained exactly.':'One combined output mesh; source face tags consolidated.'}`;}
     if (Name)
     {
         const Match=BodyGroup.children.find(Body=>Body.name===Name);
@@ -199,6 +205,8 @@ function ViewStage(StageNumber)
     }
     ApplyVisibility();
     UpdateMetrics();
+    DetailPainter?.refresh();
+    if(State.Painting){Element('BodyCount').textContent='Paint preview · original stage 1';Element('TriangleCount').textContent=State.Result.Stages[0].Metrics.Triangles.toLocaleString()+' preview triangles';Element('QualityNote').textContent='Influence preview on source vertices, not output geometry. The refined mould can resolve finer falloff. Rebuild for final measurements.';Element('StageDescription').textContent='Paint on the ORIGINAL stage-1 mass. Blue is protected; orange permits cutting. This is the influence preview, not the final rock. Stop painting and rebuild stage 6 to apply.';Element('ExportObj').disabled=true;}
 }
 
 function UpdateMetrics()
@@ -220,7 +228,7 @@ function UpdateMetrics()
     Element('QualityNote').textContent=State.Dirty ? `Showing stage ${State.DisplayStage} input, not the selected stage output. Export is disabled.` : Metrics.ThinTriangles ?
         'Narrow triangles remain at some clipped intersections; counted above, not hidden. Topology checks do not prove absence of all surface intersections.' :
         'Indexed export topology checked per body. No n-gons. Display wireframe includes every triangulation edge.';
-    if(Stage.Detail)Element('QualityNote').textContent+=' ¹Source-stage counts, not a recount after carving. Face tags and per-block selection are consolidated in this prototype.';
+    if(Stage.Detail&&Stage.Detail.affectedVertices!==0)Element('QualityNote').textContent+=' ¹Source-stage counts, not a recount after carving. Face tags and per-block selection are consolidated in this prototype.';
     Element('BodyCount').textContent=`${Metrics.Bodies} closed mesh objects`;
     Element('TriangleCount').textContent=`${Format(Metrics.Triangles)} triangles`;
     if (!State.Dirty) SetStatus(`Stage ${State.Stage} · ${Metrics.ThinTriangles ? `${Metrics.ThinTriangles} narrow-triangle warnings` : 'Topology checked'} · seed ${State.Result.Specification.Seed}`,!!Metrics.ThinTriangles);
@@ -315,6 +323,7 @@ function MarkDirty()
 
 function Generate()
 {
+    DetailPainter?.stop();
     clearTimeout(ShapePreviewTimer);
     if (State.Busy)
     {
@@ -444,7 +453,7 @@ const Groups=[
     ['Edge spalls',true,[['SpallSize','Spall scale',.25,1.3,.05,'m'],['SpallDensity','Edge occupancy',0,1,.05,'×']]],
     ['Surface fissures',false,[['CrackLength','Maximum length',.5,2.2,.1,'m'],['CrackWidth','Mouth width',.07,.22,.01,'m'],
         ['CrackDepth','Maximum depth',.06,.3,.01,'m'],['CrackDensity','Face occupancy',0,1,.05,'×']]],
-    ['Mould detail · stage 6',false,[['DetailSeed','Noise seed',0,999999,1,''],['DetailSpacing','Mould triangle spacing',.4,1.8,.05,'m'],['DetailAmplitude','Noise displacement',0,.8,.05,'m'],['DetailBias','Mean inward cut',-.15,.3,.01,'m'],['DetailScale','Noise wavelength',1,6,.1,'m'],['DetailAnisotropy','Vertical frequency',1,3,.1,'×']]],
+    ['Mould detail · stage 6',false,[['DetailPattern','Noise shape'],['DetailCoverage','Mask coverage · trim weak edges',0,1,.05,''],['DetailSeed','Noise seed',0,999999,1,''],['DetailSpacing','Mould triangle spacing',.4,1.8,.05,'m'],['DetailAmplitude','Noise displacement',0,.8,.05,'m'],['DetailBias','Cut depth / penetration',-.15,1.5,.01,'m'],['DetailScale','Noise wavelength',1,6,.1,'m'],['DetailAnisotropy','Vertical frequency',1,3,.1,'×']]],
     ['Triangulation',false,[['TriangleSpan','Target edge span',.8,2.2,.1,'m']]]
 ];
 function BuildControls()
@@ -454,7 +463,7 @@ function BuildControls()
     const Labels={PeakCount:Profile==='Escarpment'?'Terrace count':Profile==='Needles'?'Tower count':'Mass count',PeakSpread:'Mass height variation',PeakSharpness:'Crown bevel',Taper:'Upper mass narrowing',Terraces:Profile==='Needles'||Profile==='Spire'?'Pedestal height':'Shelf strength',BayDepth:Profile==='Amphitheatre'?'Cove opening':Profile==='WideWall'?'Ridge bend':'Mass spread'};
     const ControlGroups=Groups.map(([title,open,fields])=>[title,open,fields.filter(([name])=>!Solid||(!['NoiseMode','Variation','NoiseScale','Relief','Retreat'].includes(name)&&(!Supports[name]||Supports[name].includes(Profile)))).map(field=>Solid&&Labels[field[0]]?[field[0],Labels[field[0]],...field.slice(2)]:field)]);
 
-    const Choices={Profile:SolidLabels,NoiseMode:NoiseModes,FractureStyle:FractureStyles};
+    const Choices={DetailPattern:DetailPatterns,Profile:SolidLabels,NoiseMode:NoiseModes,FractureStyle:FractureStyles};
     if(Solid&&Profile!=='Spire'){const [a,b]=SolidCountRanges[Profile];Choices.PeakCount=Object.fromEntries([[0,'Seeded'],...Array.from({length:b-a+1},(_,i)=>[a+i,String(a+i)])]);}
     Element('ParameterControls').innerHTML=ControlGroups.map(([Title,Open,Fields])=>`<details ${Open?'open':''}><summary>${Title}</summary><div class="ControlGroup">${Fields.map(([Name,Label,Minimum,Maximum,Step,Unit])=>
     {
@@ -557,7 +566,7 @@ Element('LightAngle').oninput=Event=>
     Element('LightValue').textContent=`${Event.target.value}°`;
 };
 Element('ExportObj').onclick=()=>Download(`Cliff_${State.Specification.Profile}_${State.Specification.Seed}_Stage${State.Stage}.obj`,ObjText(),'text/plain');
-Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:9,Specification:State.Specification},null,2),'application/json');
+Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:10,Specification:State.Specification},null,2),'application/json');
 Element('ImportRecipe').onclick=()=>Element('RecipeFile').click();
 Element('RecipeFile').onchange=async Event=>
 {
@@ -565,6 +574,7 @@ Element('RecipeFile').onchange=async Event=>
     {
         const Recipe=JSON.parse(await Event.target.files[0].text());
         State.Specification=ReadRecipe(Recipe);
+        DetailPainter?.resetHistory();
         BuildControls();
         Generate();
     }
@@ -576,7 +586,7 @@ Element('RecipeFile').onchange=async Event=>
 };
 Renderer.domElement.addEventListener('dblclick',Event=>
 {
-    if (ViewportEditor.mode!=='View' || !State.Result || State.Dirty) return;
+    if (State.Painting || ViewportEditor.mode!=='View' || !State.Result || State.Dirty) return;
     const Rect=Renderer.domElement.getBoundingClientRect();
     const Ray=new THREE.Raycaster();
     Ray.setFromCamera(new THREE.Vector2((Event.clientX-Rect.left)/Rect.width*2-1,1-(Event.clientY-Rect.top)/Rect.height*2),Camera);
@@ -653,6 +663,7 @@ const GrainStudy=CreateGrainPanel(Element('GrainWorkspace'),AcquireGrainSource,(
 const DocumentNames={Geometry:'Cliff formation',Material:'Grain weathering'};
 function ViewDocument(Material)
 {
+    if(Material&&State.Painting){DetailPainter.stop();ViewStage(State.Stage);}
     Element('GeometryWorkspace').hidden=Material;
     Controls.enabled=!Material;
     GrainStudy.SetActive(Material);
@@ -681,7 +692,8 @@ Element('SaveActive').onclick=()=>Element(GrainStudy.Parameters.Active?'GrainSav
 Element('OpenActive').onclick=()=>Element(GrainStudy.Parameters.Active?'GrainLoad':'ImportRecipe').click();
 Element('CliffSearch').oninput=Event=>document.querySelectorAll('.StageButton').forEach(Button=>{Button.hidden=!Button.textContent.toLowerCase().includes(Event.target.value.toLowerCase());});
 window.GrainApp=GrainStudy;
-window.CliffApp={State,Scene,Camera,Controls,Renderer,BodyGroup,ViewportEditor,Generate,ViewStage,FrameView,SelectBody,ObjText,
+DetailPainter=CreateDetailPainter({state:State,canvas:Renderer.domElement,camera:Camera,scene:Scene,bodies:BodyGroup,orbit:Controls,editor:()=>ViewportEditor,view:ViewStage,dirty:MarkDirty,render:()=>{RenderRequested=true;},status:SetStatus});
+window.CliffApp={DetailPainter,State,Scene,Camera,Controls,Renderer,BodyGroup,ViewportEditor,Generate,ViewStage,FrameView,SelectBody,ObjText,
     SetSpecification:Specification=>{State.Specification=ReadSpecification({...State.Specification,...Specification});BuildControls();Generate();},
     FocusSpall:()=>
     {

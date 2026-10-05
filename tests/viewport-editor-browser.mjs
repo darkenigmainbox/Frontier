@@ -78,14 +78,15 @@ try{
  const pp=await project(2);await page.mouse.move(pp.x,pp.y);await page.mouse.down();await page.mouse.move(pp.x+14,pp.y+8,{steps:4});await page.mouse.up();await ready();
  assert.notEqual(await page.evaluate(()=>JSON.stringify(CliffApp.State.Specification.RoutePoints)),posed);
  const saved=await page.evaluate(()=>structuredClone(CliffApp.State.Specification));
- const download=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await (await download).path(),'utf8'));assert.equal(recipe.Version,9);
+ const download=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await (await download).path(),'utf8'));assert.equal(recipe.Version,10);
  await page.click('#ToolReset');assert.deepEqual(await page.evaluate(()=>CliffApp.State.Specification.TransformScale),[1,1,1]);
- await page.setInputFiles('#RecipeFile',{name:'viewport.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(recipe))});await ready();
+ const importRevision=await page.evaluate(()=>CliffApp.State.Revision);
+ await page.setInputFiles('#RecipeFile',{name:'viewport.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(recipe))});await page.waitForFunction(revision=>CliffApp.State.Revision>revision,importRevision);await ready();
  assert.deepEqual(await page.evaluate(()=>CliffApp.State.Specification),saved);
  assert.deepEqual(await page.evaluate(()=>CliffApp.ViewportEditor.root.scale.toArray()),[1.3,.8,1.1]);
  await page.click('#Frame');await page.click('#ToolMove');await frame();
  fs.mkdirSync('.arena',{recursive:true});fs.writeFileSync('.arena/viewport-move.png',Buffer.from((await page.evaluate(()=>CliffApp.Renderer.domElement.toDataURL())).split(',')[1],'base64'));
  await page.click('#Top');await page.click('#ToolSpline');await frame();fs.writeFileSync('.arena/viewport-spline.png',Buffer.from((await page.evaluate(()=>CliffApp.Renderer.domElement.toDataURL())).split(',')[1],'base64'));
  assert.deepEqual(errors,[]);assert.deepEqual(failed,[]);
- console.log(JSON.stringify({passed:true,viewportDragging:true,realGizmoDrags:3,posedSplineDragging:true,pointEditing:true,placementExport:true,recipeVersion:9,errors,failedRequests:failed},null,2));
+ console.log(JSON.stringify({passed:true,viewportDragging:true,realGizmoDrags:3,posedSplineDragging:true,pointEditing:true,placementExport:true,recipeVersion:10,errors,failedRequests:failed},null,2));
 }finally{await browser.close();await server.close();}

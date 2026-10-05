@@ -1,0 +1,23 @@
+{
+  "operation": "Stage5 − noisy(Box − Stage1)",
+  "pattern": "Fractal",
+  "affectedVertices": 444,
+  "spacing": 0.65,
+  "amplitude": 0.5,
+  "bias": 0.5,
+  "refinedTriangles": 38194,
+  "mouldVerticesMoved": 6013,
+  "minimumOffset": 0,
+  "maximumOffset": 0.8003598946269519,
+  "stage5Volume": 4509.297149940037,
+  "finalVolume": 4475.5166852135535,
+  "removedVolume": 33.78046472648384,
+  "outputTriangles": 6130,
+  "cleanupTolerance": 0.002,
+  "cleanupPasses": 2,
+  "exchangeRepairs": 0,
+  "appliedVertices": 6013,
+  "sourceSpalls": 122,
+  "sourceCracks": 15,
+  "milliseconds": 1104.8999999999069
+}

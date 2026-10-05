@@ -1,5 +1,7 @@
 # Stage 6 — noisy hollow-mould prototype
 
+**Update:** [Painted influence masks, new patterns, coverage and independent depth](PAINTED_DETAIL.md) are now available. The measurements below document the original unmasked prototype.
+
 The rejected texture/banding pass was reverted first (`d86d187`, reverting `593f74f`). The accepted spline and transformation tools remain. No RC/atrium, particle simulation, or stages 1–5 geometry-source code was changed.
 
 ## Construction

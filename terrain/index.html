@@ -53,6 +53,17 @@
 </section>
 <aside class="Inspector"><div class="PanelHeader">Inspector <span>Cliff formation</span></div><div class="InspectorScroll">
 <div class="ObjectHeader"><svg><use href="#RockIcon"/></svg><div><b>Cliff formation</b><small>Procedural polygon solid</small></div><span class="Tile">●</span></div>
+<div id="PaintPanel" hidden><details open><summary>Paint stage-6 influence</summary><div class="ControlGroup">
+<button id="PaintToggle">Paint influence in viewport</button>
+<button id="PaintProtectAll">Protect all · clear paint</button><button id="PaintCutAll">Affect all · clear paint</button><button id="PaintUndo">Undo stroke / clear</button>
+<p class="Small">Paint on the original mass, not the cut rock. Blue stays flat; orange allows the noisy mould to cut. Changes apply only after rebuilding stage 6.</p>
+<label>Brush action <select id="PaintAction"><option value="1">Add cut influence</option><option value="0">Protect / erase influence</option></select></label>
+<label>Radius · local metres <input id="PaintRadius" type="number" min=".2" max="12" step=".2" value="3"></label>
+<label>Brush strength <input id="PaintStrength" type="range" min=".05" max="1" step=".05" value=".6"></label>
+<label>Soft edge falloff <input id="PaintSoftness" type="range" min="0" max="1" step=".05" value=".8"></label>
+
+<p class="Small" id="PaintCount"></p><p class="Small">Start with Protect all, then paint patches. Lower coverage trims the soft edges; fully painted centres keep their depth. Strokes use local metres and follow move/rotate/scale. After reshaping the base, check their alignment. For smooth patches, use a brush radius at least twice the mould spacing.</p>
+</div></details></div>
 <div id="MouldStudy" hidden><details open><summary>Stage 6 · inspect construction</summary><div class="ControlGroup"><label for="DetailView">Displayed geometry</label><select id="DetailView"><option value="Final">06 · Final carved rock</option><option value="Before">05 · Before detail</option><option value="Base">01 · Original base</option><option value="Hollow">Box − base · cutaway</option><option value="Noisy">Noisy mould · cutaway</option></select><p class="Small">Mould views use a display-only section plane. Use Front to look into the hollow. Export always saves the complete final rock.</p><p class="Small" id="MouldNumbers"></p></div></details></div>
 <div id="ParameterControls"></div>
 <details open><summary>Display</summary><div class="ControlGroup"><label class="FieldLabel" for="LightAngle">Light azimuth <output id="LightValue">−35°</output></label><input id="LightAngle" type="range" min="-160" max="160" step="1" value="-35"><label class="Check"><input id="Shadows" type="checkbox" checked> Cast shadows</label><label class="Check"><input id="Ground" type="checkbox" checked> Ground plane</label><label class="Check"><input id="Explode" type="checkbox"> Explode blocks <span class="Subtle">inspection only</span></label></div></details>

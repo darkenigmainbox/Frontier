@@ -1,0 +1,174 @@
+{
+  "Format": "Frontier.PolygonCliff",
+  "Version": 10,
+  "Specification": {
+    "DetailPattern": "Fractal",
+    "DetailMaskBase": 0,
+    "DetailCoverage": 1,
+    "DetailPaint": [
+      {
+        "p": [
+          3.1897194347534894,
+          13.571426457815805,
+          -4.485189956168881
+        ],
+        "n": [
+          0.6286656670185351,
+          0.3016020063518139,
+          0.7168093950812174
+        ],
+        "radius": 5,
+        "strength": 1,
+        "softness": 0.8,
+        "target": 1,
+        "stroke": 1
+      },
+      {
+        "p": [
+          3.721943181317828,
+          13.092390367886305,
+          -4.7504104660232835
+        ],
+        "n": [
+          0.6286656741103007,
+          0.30160201449308266,
+          0.7168093854360138
+        ],
+        "radius": 5,
+        "strength": 1,
+        "softness": 0.8,
+        "target": 1,
+        "stroke": 1
+      },
+      {
+        "p": [
+          4.257388267906071,
+          12.61045486180028,
+          -5.017236250818791
+        ],
+        "n": [
+          0.6286656741103007,
+          0.30160201449308266,
+          0.7168093854360138
+        ],
+        "radius": 5,
+        "strength": 1,
+        "softness": 0.8,
+        "target": 1,
+        "stroke": 1
+      },
+      {
+        "p": [
+          4.796084029731579,
+          12.125593536411957,
+          -5.285681928498789
+        ],
+        "n": [
+          0.6286656727294828,
+          0.3016020155159827,
+          0.7168093862166453
+        ],
+        "radius": 5,
+        "strength": 1,
+        "softness": 0.8,
+        "target": 1,
+        "stroke": 1
+      },
+      {
+        "p": [
+          5.338060159220975,
+          11.637779666968108,
+          -5.555762295121299
+        ],
+        "n": [
+          0.6286656727294828,
+          0.3016020155159827,
+          0.7168093862166453
+        ],
+        "radius": 5,
+        "strength": 1,
+        "softness": 0.8,
+        "target": 1,
+        "stroke": 1
+      }
+    ],
+    "DetailSeed": 42,
+    "DetailSpacing": 0.65,
+    "DetailAmplitude": 0.5,
+    "DetailBias": 0.5,
+    "DetailScale": 2.8,
+    "DetailAnisotropy": 1.6,
+    "TransformPosition": [
+      3,
+      1,
+      2
+    ],
+    "TransformRotation": [
+      0,
+      0.25,
+      0
+    ],
+    "TransformScale": [
+      1.1,
+      0.9,
+      1.2
+    ],
+    "ShapeMode": "Solid",
+    "RoutePoints": [
+      [
+        -0.85,
+        0.55
+      ],
+      [
+        -0.3,
+        -0.5
+      ],
+      [
+        0.3,
+        0.5
+      ],
+      [
+        0.85,
+        -0.55
+      ]
+    ],
+    "RouteSegments": 8,
+    "RouteWidth": 6,
+    "RouteSmooth": 1,
+    "ArchThickness": 5,
+    "CanyonGap": 10,
+    "PeakCount": 0,
+    "PeakSpread": 0.65,
+    "PeakSharpness": 0.35,
+    "Lean": 0.1,
+    "Taper": 0.3,
+    "Terraces": 0.45,
+    "BayDepth": 0.8,
+    "Profile": "Headland",
+    "Seed": 42,
+    "Width": 26,
+    "Height": 18,
+    "Depth": 22,
+    "Relief": 1,
+    "NoiseMode": "Ridged",
+    "Variation": 0.8,
+    "NoiseScale": 2.6,
+    "FractureStyle": "Conjugate",
+    "FractureSeed": 42,
+    "Retreat": 0.48,
+    "Beds": 7,
+    "Dip": 4,
+    "Aperture": 0.07,
+    "FractureBend": 1,
+    "JointSpacing": 4.6,
+    "Penetration": 0.78,
+    "FaceRecess": 0.65,
+    "SpallSize": 0.8,
+    "SpallDensity": 0.8,
+    "CrackLength": 1.4,
+    "CrackWidth": 0.12,
+    "CrackDepth": 0.18,
+    "CrackDensity": 0.55,
+    "TriangleSpan": 1.4
+  }
+}

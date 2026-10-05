@@ -1,3 +1,4 @@
+import {DetailMask} from './DetailMask.js';
 // Stage 6: explicit triangle-mesh CSG. No SDF, voxel remeshing, textures or displacement of stage 5.
 import {RepairExchange} from './ExchangeRepair.js';
 import {MeshMetrics} from './PolyhedronSolver.js';
@@ -13,7 +14,19 @@ export function DetailSignal(p,s){
  let value=0,weight=0;for(let octave=0;octave<3;octave++){
   const f=2**octave/s.DetailScale,w=.52**octave;
   value+=noise(p[0]*f+11.3,p[1]*f*s.DetailAnisotropy-7.1,p[2]*f+3.7,s.DetailSeed+octave*197)*w;weight+=w;
- }return value/weight;
+ }
+ value/=weight;
+ if(s.DetailPattern==='Ridges')return Math.max(-1,1-4*Math.abs(value));
+ if(s.DetailPattern==='Pits'){
+  const q=[p[0]/s.DetailScale,p[1]*s.DetailAnisotropy/s.DetailScale,p[2]/s.DetailScale],cell=q.map(Math.floor);let nearest=2;
+  for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++){
+   const c=cell.map((v,k)=>v+[x,y,z][k]);
+   const centre=c.map((v,k)=>v+.5+.35*noise(c[0]+k*13,c[1]-k*7,c[2]+k*19,s.DetailSeed));
+   nearest=Math.min(nearest,Math.hypot(...q.map((v,k)=>v-centre[k])));
+  }
+  return Math.max(-1,Math.min(1,1-nearest*2.5));
+ }
+ return value;
 }
 export function BuildMouldDetail(baseStage,cutStage,s,lib,progress=()=>{}){
  const started=performance.now(),{Manifold,Mesh}=lib,owned=[],keep=m=>(owned.push(m),m);
@@ -50,12 +63,13 @@ export function BuildMouldDetail(baseStage,cutStage,s,lib,progress=()=>{}){
   const raw=refined.getMesh(),n=raw.vertProperties.length/raw.numProp,normals=Array.from({length:n},()=>[0,0,0]),points=Array.from({length:n},(_,i)=>Array.from(raw.vertProperties.slice(i*raw.numProp,i*raw.numProp+3)));
   for(let i=0;i<raw.triVerts.length;i+=3){const t=Array.from(raw.triVerts.slice(i,i+3)),normal=cross(subtract(points[t[1]],points[t[0]]),subtract(points[t[2]],points[t[0]]));for(const j of t)for(let k=0;k<3;k++)normals[j][k]+=normal[k];}
   progress('Pushing and pulling the inner mould wall with 3D noise');
-  const lookup=new Map();let moved=0,minOffset=Infinity,maxOffset=-Infinity;
+  const lookup=new Map();let moved=0,minOffset=Infinity,maxOffset=-Infinity,affected=0;
   for(let i=0;i<n;i++){
    const p=points[i],outer=p.some((v,k)=>Math.abs(v-low[k])<1e-4||Math.abs(v-high[k])<1e-4);
    if(outer)continue;
    const length=Math.hypot(...normals[i])||1,ground=clamp((p[1]-bounds.min[1])/(s.DetailSpacing*1.5));
-   const offset=(s.DetailBias+s.DetailAmplitude*DetailSignal(p,s))*ground*ground*(3-2*ground);
+   const mask=DetailMask(p,normals[i].map(v=>-v/length),s);if(mask>0)affected++;
+   const offset=mask*(s.DetailBias+s.DetailAmplitude*DetailSignal(p,s))*ground*ground*(3-2*ground);
    lookup.set(p.map(v=>v.toPrecision(10)).join(','),normals[i].map(v=>v/length*offset));moved++;minOffset=Math.min(minOffset,offset);maxOffset=Math.max(maxOffset,offset);
   }
   let applied=0;
@@ -64,6 +78,10 @@ export function BuildMouldDetail(baseStage,cutStage,s,lib,progress=()=>{}){
   // Fresh cutter identity. Final exchange cleanup consolidates face tags, not geometry.
   const cutter=keep(noisy.asOriginal());
   progress('Stage 5 minus the noisy mould · triangle boolean');
+  // A fully protected mask is exactly stage 5, not a numerically recut approximation.
+  if(!affected)return {Number:6,Meshes:cutStage.Meshes,Records:cutStage.Records,Metrics:{...cutStage.Metrics,Stage:6},
+   Detail:{operation:'Protected mask — unchanged stage 5',refinedTriangles:refined.numTri(),mouldVerticesMoved:moved,appliedVertices:applied,affectedVertices:0,minimumOffset:0,maximumOffset:0,stage5Volume:cutStage.Metrics.Volume,finalVolume:cutStage.Metrics.Volume,removedVolume:0,outputTriangles:cutStage.Metrics.Triangles,sourceSpalls:cutStage.Metrics.Spalls,sourceCracks:cutStage.Metrics.Cracks,milliseconds:performance.now()-started},
+   Study:{Base:baseStage.Meshes,Before:cutStage.Meshes,Hollow:[output(hollow,'Box minus base','Mould')],Noisy:[output(noisy,'Protected mould','Mould')]}};
   const difference=keep(rock.subtract(cutter));
   if(difference.status()!=='NoError'||difference.isEmpty())throw Error('Detail boolean failed: '+difference.status());
   // Reimport the actual Float32 exchange geometry before simplifying again. The kernel works
@@ -83,7 +101,7 @@ export function BuildMouldDetail(baseStage,cutStage,s,lib,progress=()=>{}){
    candidate=keep(reconstructed.asOriginal());
   }
   const before=rock.volume();if(record.Volume>before+Math.max(.001,before*.00001))throw Error('Subtraction unexpectedly increased rock volume.');
-  const stats={operation:'Stage5 − noisy(Box − Stage1)',spacing:s.DetailSpacing,amplitude:s.DetailAmplitude,bias:s.DetailBias,refinedTriangles:refined.numTri(),mouldVerticesMoved:moved,minimumOffset:minOffset,maximumOffset:maxOffset,stage5Volume:before,finalVolume:record.Volume,removedVolume:before-record.Volume,outputTriangles:mesh.Triangles.length,cleanupTolerance,cleanupPasses,exchangeRepairs,appliedVertices:applied,sourceSpalls:cutStage.Metrics.Spalls,sourceCracks:cutStage.Metrics.Cracks,milliseconds:performance.now()-started};
+  const stats={operation:'Stage5 − noisy(Box − Stage1)',pattern:s.DetailPattern,affectedVertices:affected,spacing:s.DetailSpacing,amplitude:s.DetailAmplitude,bias:s.DetailBias,refinedTriangles:refined.numTri(),mouldVerticesMoved:moved,minimumOffset:minOffset,maximumOffset:maxOffset,stage5Volume:before,finalVolume:record.Volume,removedVolume:before-record.Volume,outputTriangles:mesh.Triangles.length,cleanupTolerance,cleanupPasses,exchangeRepairs,appliedVertices:applied,sourceSpalls:cutStage.Metrics.Spalls,sourceCracks:cutStage.Metrics.Cracks,milliseconds:performance.now()-started};
   return {Number:6,Meshes:[mesh],Records:[record],Metrics:{Stage:6,Bodies:1,...record,Spalls:0,Cracks:0,RejectedSpalls:0,RejectedCracks:0},Detail:stats,Study:{Base:baseStage.Meshes,Before:cutStage.Meshes,Hollow:[output(hollow,'Box minus base','Mould')],Noisy:[output(noisy,'Displaced hollow mould','Mould')]}};
  }finally{for(const m of owned.reverse())m.delete();}
 }

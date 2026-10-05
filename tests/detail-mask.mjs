@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import init from 'manifold-3d';
+import {DetailMask,ReadDetailPaint} from '../terrain/DetailMask.js';
+import {ReadSpecification,ReadRecipe,EarliestStage} from '../terrain/CliffSpecification.js';
+import {SolidPresets} from '../terrain/SolidFormation.js';
+import {MouldSequence} from '../terrain/MouldSequence.js';
+import {DetailSignal} from '../terrain/MouldDetail.js';
+const stamp={p:[0,0,0],n:[0,0,1],radius:4,strength:1,softness:1,target:1,stroke:1};
+const mask={DetailMaskBase:0,DetailCoverage:1,DetailPaint:[stamp]};
+assert.equal(DetailMask([0,0,0],[0,0,1],mask),1);
+assert.equal(DetailMask([0,0,0],[0,0,-1],mask),0,'no opposite-facing paint');
+assert.equal(DetailMask([4,0,0],[0,0,1],mask),0);
+assert.equal(DetailMask([2,0,0],[0,0,1],mask),.5);
+assert.equal(DetailMask([2,0,0],[0,0,1],{...mask,DetailCoverage:.5}),0);
+assert.equal(DetailMask([0,0,0],[0,0,1],{...mask,DetailPaint:[stamp,{...stamp,target:0,stroke:2}]}),0);
+assert.deepEqual(ReadDetailPaint(ReadDetailPaint([{...stamp,n:[.3,.4,.8660254037844386]}])),ReadDetailPaint([{...stamp,n:[.3,.4,.8660254037844386]}]),'mask normalization is idempotent');
+assert.throws(()=>ReadDetailPaint([{...stamp,radius:NaN}]));
+assert.throws(()=>ReadDetailPaint(Array(3001).fill(stamp)));
+const lib=await init();lib.setup();const seq=new MouldSequence(async()=>lib);
+let spec=ReadSpecification({...SolidPresets.Headland,Profile:'Headland',DetailMaskBase:0});
+const protectedResult=await seq.Generate(spec),before=protectedResult.Stages[4];
+assert.deepEqual(protectedResult.Stages[5].Meshes,before.Meshes,'all protected is EXACT stage 5');
+const m=protectedResult.Stages[0].Meshes[0];
+let best=null;
+for(const t of m.Triangles){const p=t.map(i=>m.Vertices[i]),a=p[1].map((v,k)=>v-p[0][k]),b=p[2].map((v,k)=>v-p[0][k]),n=[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],area=Math.hypot(...n),centre=[0,1,2].map(k=>p.reduce((s,v)=>s+v[k],0)/3);if(n[2]/area>.6&&centre[1]>5&&(!best||area>best.area))best={area,p:centre,n:n.map(v=>v/area)};}
+const paint={...stamp,p:best.p,n:best.n,radius:5,softness:.85};
+spec=ReadSpecification({...spec,DetailPaint:[paint],DetailBias:.5});
+assert.equal(EarliestStage(protectedResult.Specification,spec),6);
+assert.deepEqual(ReadRecipe({Format:'Frontier.PolygonCliff',Version:10,Specification:spec}),spec);
+let volumes=[];
+for(const DetailPattern of ['Fractal','Ridges','Pits']){
+ const r=await seq.Generate({...spec,DetailPattern}),stage=r.Stages[5];
+ assert.deepEqual(r.ExecutedStages,[6]);assert.deepEqual(r.Stages[4].Meshes,before.Meshes);
+ for(const key of ['OpenEdges','NonmanifoldEdges','NonmanifoldVertices','ZeroArea','WindingErrors','DuplicateTriangles'])assert.equal(stage.Metrics[key],0);
+ assert(stage.Detail.affectedVertices>0&&stage.Detail.affectedVertices<stage.Detail.mouldVerticesMoved*.5);
+ assert(stage.Detail.removedVolume>0);volumes.push(stage.Detail.finalVolume);console.log(DetailPattern,stage.Detail);
+}
+assert.equal(new Set(volumes).size,3);
+const deeper=await seq.Generate({...spec,DetailBias:1,DetailPattern:'Fractal'});
+assert(deeper.Stages[5].Detail.finalVolume<volumes[0],'more penetration removes more material');
+const coverageZero=await seq.Generate({...spec,DetailCoverage:0});assert.deepEqual(coverageZero.Stages[5].Meshes,before.Meshes);
+console.log('PASS: falloff, protection, coverage, normal gating, input validation, exact zero-mask identity, painted CSG, 3 patterns, independent depth, cache and recipe 10.');
