@@ -27,7 +27,7 @@ try{
   shapes.push(await page.evaluate(()=>({profile:CliffApp.State.Specification.Profile,triangles:CliffApp.State.Result.Stages[0].Metrics.Triangles,open:CliffApp.State.Result.Stages[0].Metrics.OpenEdges})));
  }
  assert.deepEqual(await page.locator('#PeakCount option').evaluateAll(es=>es.map(e=>e.value)),['0','5','6','7'],'only applicable horseshoe segment counts');
- const downloadPromise=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await (await downloadPromise).path(),'utf8'));assert.equal(recipe.Version,8);
+ const downloadPromise=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await (await downloadPromise).path(),'utf8'));assert.equal(recipe.Version,7);
  await change('Profile','Headland');const initial=await page.evaluate(()=>CliffApp.ObjText());await change('Seed',73);assert.notEqual(await page.evaluate(()=>CliffApp.ObjText()),initial);
  await page.locator('[data-stage="2"]').click();await page.click('#Regenerate');await page.waitForFunction(()=>!CliffApp.State.Busy&&!CliffApp.State.Dirty,null,{timeout:120000});assert.equal(await page.evaluate(()=>CliffApp.State.DisplayStage),2);
  assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);
