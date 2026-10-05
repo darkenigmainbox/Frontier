@@ -151,9 +151,3 @@ See [measurements and caveats](docs/MEASUREMENTS.md), especially the v0.7 compar
 Remaining work includes more robust probe classification/placement, less biased merging, object motion vectors, better sampling/denoising, antialiasing, higher-quality acceleration trees/GPU refits and hardware-target profiling. Full-refresh visibility checks can be **slower** than the old leaking approximation. Temporal lag, noisy moving surfaces, dark corners and residual GI errors remain possible.
 
 WebGL fallback is a labelled conventional raster preview with point lights/shadow maps. It does **not** run these cascade/reconstruction compute stages. Character loading/skinning and cloth simulation are not implemented; the sheet is procedural vertex deformation.
-
-## Terrain authoring demo — stage 6
-
-A separate Slate-derived triangle-mesh cliff demo is available at [`terrain/index.html`](terrain/index.html) (deployed: `site/terrain/index.html`). It does not replace the RC/atrium demo. Stage 6 adds conforming mesh refinement and geometric rock relief, with a stage 5/6 comparison, close-up, three rock structures, an independent seed and OBJ export. Actual particle-based grain simulation is deferred; there is no SDF stage. See [implementation, tests and limitations](docs/terrain/STAGE6.md).
-
-Run `npm run test:terrain` for CPU checks. `npm run test:terrain:browser` builds and tests the deployed terrain page (Playwright Chromium required; optionally set `CHROMIUM_PATH`).

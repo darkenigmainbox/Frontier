@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import {CreateGrainPanel} from './GrainPanel.js';
 import {CaptureGrainSource} from './GrainSequence.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {CliffDefaults, CliffProfiles, ReadSpecification, EarliestStage, NoiseModes, FractureStyles, FormationPresets, ReadRecipe, DetailRocks} from './CliffSpecification.js';
+import {CliffDefaults, CliffProfiles, ReadSpecification, EarliestStage, NoiseModes, FractureStyles, FormationPresets, ReadRecipe} from './CliffSpecification.js';
 
 const Element=Id=>document.getElementById(Id);
 const StageDescriptions=[
@@ -17,10 +17,9 @@ const StageDescriptions=[
     ['Primary fractures','Joint sets, not just bedding','Geological orientation families with rough polygon cuts. New fractures terminate at existing boundaries; bedding is an optional preset.'],
     ['Bounded joints','Finite-depth rock blocks','Kinked joints split front, rear and end exposures, terminating against a retained interior core.'],
     ['Edge spalls','Local fracture cavities','Localized, asymmetric bites with four or six fracture facets. The original edge survives on both sides—not a full-edge bevel.'],
-    ['Surface fissures','Shallow polygon incisions','Finite, kinked V-grooves cut into individual rock faces. Closed bottoms, bounded depth; no SDF erosion.'],
-    ['Rock surface detail','Real displaced mesh · not grains','Conforming triangle refinement and seeded rock relief. Crease edges and fissures are protected. Compare with stage 5 or inspect a close-up. Particle grain simulation is deferred.']
+    ['Surface fissures','Shallow polygon incisions','Finite, kinked V-grooves cut into individual rock faces. Closed bottoms, bounded depth; no SDF erosion.']
 ];
-const State={Specification:{...CliffDefaults},Result:null,Stage:6,Busy:false,DisplayStage:0,Revision:0,ReadyRevision:0,Worker:null,Dirty:false,
+const State={Specification:{...CliffDefaults},Result:null,Stage:1,Busy:false,DisplayStage:0,Revision:0,ReadyRevision:0,Worker:null,Dirty:false,
     Mode:'Clay',Wire:false,Selected:null,Isolated:false,Exploded:false,Milliseconds:0,Error:null};
 const Scene=new THREE.Scene();
 Scene.background=new THREE.Color('#282e38');
@@ -64,7 +63,7 @@ Grid.material.opacity=.25;
 Scene.add(Grid);
 const BodyGroup=new THREE.Group();
 Scene.add(BodyGroup);
-const ClayMaterial=new THREE.MeshStandardMaterial({color:'#a9abad',roughness:1,metalness:0,flatShading:false,
+const ClayMaterial=new THREE.MeshStandardMaterial({color:'#a9abad',roughness:1,metalness:0,flatShading:true,
     polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1});
 const CutMaterial=ClayMaterial.clone();
 CutMaterial.color.set('#ffffff');
@@ -117,10 +116,6 @@ function BuildRenderBody(Mesh, Index)
     Geometry.setAttribute('position',new THREE.BufferAttribute(Positions,3));
     Geometry.setAttribute('color',new THREE.BufferAttribute(Colours,3));
     Geometry.computeVertexNormals();
-    if(Mesh.DetailNormals){
-        const NormalAttribute=Geometry.getAttribute('normal');
-        Mesh.Triangles.forEach((t,i)=>t.forEach((v,j)=>{const n=Mesh.DetailNormals[v];if(n)NormalAttribute.setXYZ(i*3+j,...n);}));
-    }
     Geometry.computeBoundingBox();
     Geometry.computeBoundingSphere();
     const Body=new THREE.Mesh(Geometry,State.Mode==='Scars'?CutMaterial:ClayMaterial);
@@ -139,15 +134,13 @@ function ViewStage(StageNumber)
 {
     RenderRequested=true;
     Renderer.shadowMap.needsUpdate=true;
-    State.Stage=Math.max(1,Math.min(6,StageNumber));
-    Element('CompareDetail').disabled=State.Busy||!State.Result?.Stages[5];
-    Element('DetailCloseup').disabled=State.Busy||!State.Result?.Stages[4];
+    State.Stage=Math.max(1,Math.min(5,StageNumber));
     const [Title,,Description]=StageDescriptions[State.Stage-1];
     Element('StageTitle').textContent=Title;
     Element('StageDescription').textContent=Description;
-    Element('StageNumber').textContent=`0${State.Stage} / 06`;
+    Element('StageNumber').textContent=`0${State.Stage} / 05`;
     Element('PreviousStage').disabled=State.Stage===1;
-    Element('NextStage').disabled=State.Stage===6;
+    Element('NextStage').disabled=State.Stage===5;
     document.querySelectorAll('.StageButton').forEach(Button=>
     {
         const Selected=Number(Button.dataset.stage)===State.Stage;
@@ -203,11 +196,9 @@ function UpdateMetrics()
         <span>Triangles below 5°</span><b class="${Metrics.ThinTriangles?'Warn':'Pass'}">${Metrics.ThinTriangles}</b>
         <span>Minimum triangle angle</span><b>${Metrics.MinimumAngle.toFixed(2)}°</b>
         <span>Last requested rebuild</span><b>${(State.Milliseconds/1000).toFixed(2)} s</b>`;
-    if(Stage.Number===6) Element('Metrics').innerHTML+=`<span>Displaced vertices</span><b>${Format(Metrics.MovedVertices)}</b><span>Actual maximum relief</span><b>${(Metrics.MaxDisplacement*100).toFixed(1)} cm</b><span>Triangle ceiling reached</span><b>${Metrics.InputOverBudget?'Input already exceeds ceiling':Metrics.BudgetLimited?'Yes · spacing limited':'No'}</b>`;
     Element('QualityNote').textContent=State.Dirty ? `Showing stage ${State.DisplayStage} input, not the selected stage output. Export is disabled.` : Metrics.ThinTriangles ?
         'Narrow triangles remain at some clipped intersections; counted above, not hidden. Topology checks do not prove absence of all surface intersections.' :
         'Indexed export topology checked per body. No n-gons. Display wireframe includes every triangulation edge.';
-    if(Stage.Number===6&&!State.Dirty) Element('QualityNote').textContent='Real mesh relief; crease boundaries pinned, inward thickness and local inversion guarded. Not a complete self-intersection proof. Particle grains deferred.';
     Element('BodyCount').textContent=`${Metrics.Bodies} closed mesh objects`;
     Element('TriangleCount').textContent=`${Format(Metrics.Triangles)} triangles`;
     if (!State.Dirty) SetStatus(`Stage ${State.Stage} · ${Metrics.ThinTriangles ? `${Metrics.ThinTriangles} narrow-triangle warnings` : 'Topology checked'} · seed ${State.Result.Specification.Seed}`,!!Metrics.ThinTriangles);
@@ -275,35 +266,6 @@ function FrameView(Body=null, Direction=null)
     Controls.update();
 }
 
-function FocusDetail()
-{
-    const Input=State.Result?.Stages[5]||State.Result?.Stages[4];
-    if(!Input)return;
-    let Best=null;
-    for(const Mesh of Input.Meshes) for(let i=0;i<Mesh.Triangles.length;i++)
-    {
-        if(Mesh.Tags[i]!=='Cliff'||Mesh.Name.endsWith('core'))continue;
-        const Depths=Mesh.DetailDepths?Mesh.Triangles[i].map(v=>Mesh.DetailDepths[v]):null;
-        if(Depths&&Math.min(...Depths)<.005)continue;
-        const [A,B,C]=Mesh.Triangles[i].map(v=>new THREE.Vector3(...Mesh.Vertices[v]));
-        const Normal=B.clone().sub(A).cross(C.clone().sub(A));
-        const Area=Normal.length();Normal.normalize();
-        const Centre=A.clone().add(B).add(C).multiplyScalar(1/3);
-        const Lit=Math.max(.05,Normal.dot(Sun.position.clone().sub(Centre).normalize()));
-        const Relief=Depths?(Math.max(...Depths)-Math.min(...Depths))/Math.max(.05,Math.sqrt(Area)):1;
-        const Score=Relief*Math.max(0,Normal.z)*Lit*Math.max(0,1-Math.abs(Centre.y-State.Specification.Height*.5)/State.Specification.Height);
-        if(Best&&Score<=Best.Score)continue;
-        const Ray=new THREE.Raycaster(Centre.clone().add(new THREE.Vector3(0,0,100)),new THREE.Vector3(0,0,-1));
-        const Hit=Ray.intersectObjects(BodyGroup.children,false)[0];
-        if(!Hit||Math.abs(Hit.point.z-Centre.z)>.4)continue;
-        if(!Best||Score>Best.Score)Best={Score,Centre,Normal};
-    }
-    if(!Best)return;
-    Controls.target.copy(Best.Centre);
-    Camera.position.copy(Best.Centre).addScaledVector(Best.Normal,4.8).add(new THREE.Vector3(.7,.5,0));
-    Camera.near=.02;Camera.updateProjectionMatrix();Controls.update();RenderRequested=true;
-}
-
 function MarkDirty()
 {
     if (State.Busy)
@@ -329,7 +291,6 @@ function Generate()
     const Reframe=Initial || ['Profile','Width','Height','Depth'].some(Name=>State.Result.Specification[Name]!==State.Specification[Name]);
     State.Error=null;
     State.Busy=true;
-    Element('CompareDetail').disabled=true;Element('DetailCloseup').disabled=true;
     State.Dirty=true;
     Element('ExportObj').disabled=true;
     Element('Failure').hidden=true;
@@ -395,7 +356,6 @@ function FailGeneration(Message)
     DisposeBodies();
     Renderer.shadowMap.needsUpdate=true;
     Element('ExportObj').disabled=true;
-    if(Stage.Number===6&&!State.Dirty) Element('QualityNote').textContent='Real mesh relief; crease boundaries pinned, inward thickness and local inversion guarded. Not a complete self-intersection proof. Particle grains deferred.';
     Element('BodyCount').textContent='No generated mesh';
     Element('Metrics').textContent='No mesh available. Generation or rendering failed.';
     Element('Loading').hidden=true;
@@ -444,12 +404,11 @@ const Groups=[
     ['Edge spalls',true,[['SpallSize','Spall scale',.25,1.3,.05,'m'],['SpallDensity','Edge occupancy',0,1,.05,'×']]],
     ['Surface fissures',false,[['CrackLength','Maximum length',.5,2.2,.1,'m'],['CrackWidth','Mouth width',.07,.22,.01,'m'],
         ['CrackDepth','Maximum depth',.06,.3,.01,'m'],['CrackDensity','Face occupancy',0,1,.05,'×']]],
-    ['Rock surface detail',false,[['DetailRock','Rock structure'],['DetailSeed','Detail seed'],['DetailDepth','Maximum relief',0,.3,.01,'m'],['DetailScale','Feature wavelength',.4,3,.1,'m'],['DetailSpan','Target triangle spacing',.15,.8,.05,'m'],['DetailBudget','Total triangle ceiling',40000,600000,20000,'']]],
     ['Triangulation',false,[['TriangleSpan','Target edge span',.8,2.2,.1,'m']]]
 ];
 function BuildControls()
 {
-    const Choices={Profile:Object.fromEntries(Object.entries(CliffProfiles).map(([Key,Profile])=>[Key,Profile.Label])),NoiseMode:NoiseModes,FractureStyle:FractureStyles,DetailRock:DetailRocks};
+    const Choices={Profile:Object.fromEntries(Object.entries(CliffProfiles).map(([Key,Profile])=>[Key,Profile.Label])),NoiseMode:NoiseModes,FractureStyle:FractureStyles};
     Element('ParameterControls').innerHTML=Groups.map(([Title,Open,Fields])=>`<details ${Open?'open':''}><summary>${Title}</summary><div class="ControlGroup">${Fields.map(([Name,Label,Minimum,Maximum,Step,Unit])=>
     {
         if (Choices[Name]) return `<div class="Property"><label class="FieldLabel" for="${Name}">${Label}</label><select id="${Name}">${Object.entries(Choices[Name]).map(([Key,Title])=>`<option value="${Key}">${Title}</option>`).join('')}</select></div>`;
@@ -473,7 +432,7 @@ function BuildControls()
             MarkDirty();
         });
     }
-    for (const Name of ['Seed','FractureSeed','DetailSeed']) Element(`New${Name}`).onclick=()=>
+    for (const Name of ['Seed','FractureSeed']) Element(`New${Name}`).onclick=()=>
     {
         const Next=crypto.getRandomValues(new Uint32Array(1))[0]%1000000;
         State.Specification[Name]=Next===State.Specification[Name]?(Next+1)%1000000:Next;
@@ -502,8 +461,6 @@ StageDescriptions.forEach(([Title,Subtitle],Index)=>
 BuildControls();
 ViewStage(State.Stage);
 Element('Regenerate').onclick=Generate;
-Element('CompareDetail').onclick=()=>ViewStage(State.Stage===5?6:5);
-Element('DetailCloseup').onclick=FocusDetail;
 Element('PreviousStage').onclick=()=>ViewStage(State.Stage-1);
 Element('NextStage').onclick=()=>ViewStage(State.Stage+1);
 Element('Frame').onclick=()=>FrameView();
@@ -545,7 +502,7 @@ Element('LightAngle').oninput=Event=>
     Element('LightValue').textContent=`${Event.target.value}°`;
 };
 Element('ExportObj').onclick=()=>Download(`Cliff_${State.Specification.Profile}_${State.Specification.Seed}_Stage${State.Stage}.obj`,ObjText(),'text/plain');
-Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:3,Specification:State.Specification},null,2),'application/json');
+Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:2,Specification:State.Specification},null,2),'application/json');
 Element('ImportRecipe').onclick=()=>Element('RecipeFile').click();
 Element('RecipeFile').onchange=async Event=>
 {
@@ -668,7 +625,7 @@ Element('SaveActive').onclick=()=>Element(GrainStudy.Parameters.Active?'GrainSav
 Element('OpenActive').onclick=()=>Element(GrainStudy.Parameters.Active?'GrainLoad':'ImportRecipe').click();
 Element('CliffSearch').oninput=Event=>document.querySelectorAll('.StageButton').forEach(Button=>{Button.hidden=!Button.textContent.toLowerCase().includes(Event.target.value.toLowerCase());});
 window.GrainApp=GrainStudy;
-window.CliffApp={State,Scene,Camera,Controls,Renderer,BodyGroup,Generate,ViewStage,FrameView,SelectBody,ObjText,FocusDetail,
+window.CliffApp={State,Scene,Camera,Controls,Renderer,BodyGroup,Generate,ViewStage,FrameView,SelectBody,ObjText,
     SetSpecification:Specification=>{State.Specification=ReadSpecification({...State.Specification,...Specification});BuildControls();Generate();},
     FocusSpall:()=>
     {
