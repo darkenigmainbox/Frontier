@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0f15" />
+    <meta name="description" content="A real-time WebGPU radiance-cascade lighting study with animated geometry." />
+    <title>Radiance Lab — WebGPU GI Study</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Radiance Lab home">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="brand-copy"><strong>RADIANCE<span class="brand-light">LAB</span></strong><small>REAL-TIME LIGHTING STUDY / 01</small></span>
+        </a>
+        <div class="topbar-center">
+          <span class="topbar-kicker">RESEARCH PREVIEW</span>
+          <span class="topbar-divider"></span>
+          <span class="topbar-title">Cascaded diffuse GI in a dynamic 3D scene</span>
+        </div>
+        <div class="topbar-right">
+          <span class="gpu-pill" id="gpu-status"><i class="status-dot"></i><span>STARTING GPU</span></span>
+          <span class="topbar-version">WGSL <b>01</b></span>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside class="panel left-panel" aria-label="Scene and playback controls">
+          <div class="panel-eyebrow"><span class="eyebrow-index">01</span> SCENE</div>
+          <div class="scene-card">
+            <div class="scene-card-top"><span class="scene-number">SCENE 01</span><span class="scene-live"><i></i> LIVE</span></div>
+            <div class="scene-title">Kinetic<br />lightwell</div>
+            <p class="scene-description">A small architectural volume built to make indirect light visible.</p>
+            <div class="scene-tags"><span>INTERIOR</span><span>LOW-POLY</span></div>
+            <div class="scene-card-art" aria-hidden="true">
+              <div class="art-grid"></div><div class="art-orbit orbit-a"></div><div class="art-orbit orbit-b"></div>
+              <div class="art-crystal"><b></b><i></i><em></em></div>
+              <span class="art-coordinate">X / Y / Z</span>
+            </div>
+          </div>
+
+          <div class="panel-divider"></div>
+          <div class="section-heading"><span>SIMULATION</span><span class="section-subtle">FRAME CONTROL</span></div>
+          <div class="transport-row">
+            <button class="button button-primary" id="run-toggle" type="button" aria-label="Pause simulation"><span class="play-icon" id="run-icon">Ⅱ</span><span id="run-label">PAUSE</span></button>
+            <button class="button button-square" id="step-button" type="button" title="Advance one animation step" aria-label="Advance one frame"><span class="step-icon">›</span></button>
+            <button class="button button-square" id="reset-button" type="button" title="Reset scene and camera" aria-label="Reset scene"><span class="reset-icon">↺</span></button>
+          </div>
+          <label class="toggle-row" for="motion-toggle">
+            <span class="toggle-copy"><strong>Move geometry</strong><small>Update vertex positions each frame</small></span>
+            <input class="switch-input" type="checkbox" id="motion-toggle" checked />
+            <span class="switch" aria-hidden="true"></span>
+          </label>
+          <label class="toggle-row" for="field-toggle">
+            <span class="toggle-copy"><strong>Refresh radiance field</strong><small>Re-trace probes on the GPU</small></span>
+            <input class="switch-input" type="checkbox" id="field-toggle" checked />
+            <span class="switch" aria-hidden="true"></span>
+          </label>
+
+          <div class="panel-divider slim-divider"></div>
+          <div class="section-heading"><span>CAMERA</span><button class="text-button" id="camera-reset" type="button">RESET VIEW <span>↗</span></button></div>
+          <div class="camera-hint"><span class="mouse-glyph">⌖</span><span>Drag to orbit<br />Scroll to dolly</span></div>
+
+          <div class="left-note"><span class="note-icon">✳</span><p>Moving triangles are streamed into a storage buffer, then included in the same-frame probe trace.</p></div>
+        </aside>
+
+        <section class="stage-column" aria-label="Interactive WebGPU scene">
+          <div class="stage-heading">
+            <div><div class="stage-eyebrow"><span class="live-pulse"></span> LIVE RENDER</div><h1>Radiance <em>cascades</em></h1></div>
+            <div class="stage-heading-right"><span class="stage-location">LIGHTWELL / ATLAS 001</span><span class="stage-coordinates">0.0, 1.7, 0.0</span></div>
+          </div>
+
+          <div class="viewport-frame" id="viewport-frame">
+            <canvas id="scene-canvas" aria-label="A 3D room with moving low-poly geometry lit by a WebGPU radiance-cascade field"></canvas>
+            <div class="viewport-top-overlay"><span class="viewport-label"><i></i> PATH FIELD ACTIVE</span><span class="viewport-mode" id="view-readout">COMPOSITE / LIT</span></div>
+            <div class="viewport-crosshair" aria-hidden="true"><span></span><i></i></div>
+            <div class="viewport-bottom-overlay"><span><b id="canvas-triangles">—</b> DYNAMIC TRIANGLES</span><span class="viewport-divider"></span><span><b id="canvas-rays">—</b> PROBE RAYS / FRAME</span></div>
+            <div class="gpu-fallback" id="gpu-fallback" hidden>
+              <div class="fallback-icon">△</div>
+              <h2>WebGPU is unavailable</h2>
+              <p>This demo needs a WebGPU-capable browser and GPU. Open it in a recent desktop Chrome or Edge build with hardware acceleration enabled.</p>
+              <code id="gpu-error">Waiting for an adapter…</code>
+            </div>
+            <div class="loading-overlay" id="loading-overlay"><span class="loader-ring"></span><span>COMPILING WGSL PIPELINES</span></div>
+          </div>
+
+          <div class="metrics-strip">
+            <div class="metric"><span class="metric-icon metric-cyan">◈</span><div><small>PROBE VOLUME</small><strong id="probe-count">1,812 <i>probes</i></strong></div></div>
+            <span class="metrics-rule"></span>
+            <div class="metric"><span class="metric-icon metric-amber">⌁</span><div><small>SCENE GEOMETRY</small><strong><b id="triangle-count">—</b> <i>triangles</i></strong></div></div>
+            <span class="metrics-rule"></span>
+            <div class="metric"><span class="metric-icon metric-violet">◌</span><div><small>FRAME CADENCE</small><strong><b id="fps-count">—</b> <i>FPS</i></strong></div></div>
+            <div class="metrics-spacer"></div>
+            <span class="field-refresh"><i class="refresh-dot"></i><span id="field-status">FIELD UPDATING</span></span>
+          </div>
+
+          <div class="tech-note"><span class="tech-note-mark">i</span><p><strong>How it works</strong> Each cascade traces a distance band at a different probe density. Coarse radiance seeds the next finer pass; the final mesh shader blends all three fields for soft, multi-bounce color bleed.</p><span class="tech-note-tag">GPU COMPUTE / WGSL</span></div>
+        </section>
+
+        <aside class="panel inspector-panel" aria-label="Radiance cascade controls">
+          <div class="inspector-header"><div><div class="panel-eyebrow"><span class="eyebrow-index">02</span> LIGHTING</div><h2>Field controls</h2></div><span class="inspector-glyph">✳</span></div>
+
+          <div class="control-block">
+            <div class="control-label-row"><label for="gi-slider">Indirect gain</label><output id="gi-value">0.82</output></div>
+            <input class="range-input range-cyan" type="range" id="gi-slider" min="0" max="1.8" step="0.01" value="0.82" />
+            <div class="range-ends"><span>SUBTLE</span><span>BOUNCE ENERGY</span><span>STRONG</span></div>
+          </div>
+          <div class="control-block control-block-compact">
+            <div class="control-label-row"><label for="bounce-slider">Diffuse bounce</label><output id="bounce-value">0.55</output></div>
+            <input class="range-input range-amber" type="range" id="bounce-slider" min="0" max="1.2" step="0.01" value="0.55" />
+            <div class="range-ends"><span>ONE BOUNCE</span><span>RECURSIVE ESTIMATE</span></div>
+          </div>
+
+          <div class="control-block view-block">
+            <div class="control-label-row"><label for="view-select">Debug view</label><span class="control-inline-note">OUTPUT</span></div>
+            <div class="select-wrap"><select id="view-select">
+              <option value="0">Composite lighting</option>
+              <option value="1">Near cascade · 0–2.2 m</option>
+              <option value="2">Mid cascade · 2.2–5.2 m</option>
+              <option value="3">Far cascade · 5.2–10 m</option>
+              <option value="4">Surface normals</option>
+              <option value="5">Albedo / emission</option>
+            </select><span class="select-chevron">⌄</span></div>
+          </div>
+
+          <div class="panel-divider inspector-divider"></div>
+          <div class="section-heading cascade-title"><span>CASCADE STACK</span><span class="section-subtle">3 LEVELS</span></div>
+          <div class="cascade-list">
+            <div class="cascade-item">
+              <span class="cascade-marker marker-near"></span><div class="cascade-main"><div class="cascade-name"><strong>Near field</strong><span>C0</span></div><small>0.0 — 2.2 m <i>·</i> 14 × 8 × 14</small><div class="cascade-bar"><i class="bar-near"></i></div></div><span class="cascade-count">1,568</span>
+            </div>
+            <div class="cascade-item">
+              <span class="cascade-marker marker-mid"></span><div class="cascade-main"><div class="cascade-name"><strong>Mid field</strong><span>C1</span></div><small>2.2 — 5.2 m <i>·</i> 7 × 4 × 7</small><div class="cascade-bar"><i class="bar-mid"></i></div></div><span class="cascade-count">196</span>
+            </div>
+            <div class="cascade-item">
+              <span class="cascade-marker marker-far"></span><div class="cascade-main"><div class="cascade-name"><strong>Far field</strong><span>C2</span></div><small>5.2 — 10.0 m <i>·</i> 4 × 3 × 4</small><div class="cascade-bar"><i class="bar-far"></i></div></div><span class="cascade-count">48</span>
+            </div>
+          </div>
+
+          <div class="quality-section">
+            <div class="section-heading"><span>RAY BUDGET</span><span class="section-subtle" id="ray-count-label">12 / PROBE</span></div>
+            <div class="quality-segment" role="group" aria-label="Ray budget quality">
+              <button type="button" data-quality="draft"><span>01</span>DRAFT</button>
+              <button type="button" class="selected" data-quality="balanced"><span>02</span>BALANCED</button>
+              <button type="button" data-quality="quality"><span>03</span>QUALITY</button>
+            </div>
+          </div>
+
+          <div class="realtime-card"><div class="realtime-card-top"><span class="realtime-icon">↗</span><span>REAL-TIME PROFILE</span></div><strong><span id="realtime-rays">21,744</span> rays / refresh</strong><p>Full field refresh each frame. Reduce the ray budget first when targeting lower-end hardware.</p><div class="realtime-meter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="realtime-meter-labels"><span>LOWER COST</span><span>MORE DETAIL</span></div></div>
+        </aside>
+      </main>
+      <footer class="app-footer"><span>RADIANCE LAB <i>·</i> PROTOTYPE 01</span><span>PROBE-BASED INDIRECT LIGHTING <i>·</i> NOT A PRODUCTION ENGINE SOLVER</span><span class="footer-right">BUILT WITH WEBGPU <b>↗</b></span></footer>
+    </div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
