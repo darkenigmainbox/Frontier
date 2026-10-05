@@ -19,7 +19,7 @@ try{
  for(const seed of [42,1,73]){await change('Seed',seed);await frame();images.push(await page.evaluate(()=>CliffApp.Renderer.domElement.toDataURL()));fs.writeFileSync(`.arena/formation-${seed}.png`,Buffer.from(images.at(-1).split(',')[1],'base64'));}
  assert.equal(new Set(images).size,3,'seed changes visible formation even without noise');
  await change('Lean',-1);const left=await page.evaluate(()=>CliffApp.ObjText());await change('Lean',1);assert.notEqual(await page.evaluate(()=>CliffApp.ObjText()),left);
- const downloadPromise=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await (await downloadPromise).path(),'utf8'));assert.equal(recipe.Version,6);
+ const downloadPromise=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await (await downloadPromise).path(),'utf8'));assert.equal(recipe.Version,7);
  await mode('Authored');assert(await page.locator('#Lean').isDisabled());await mode('Procedural');assert(!(await page.locator('#Lean').isDisabled()));
  await page.locator('[data-stage="2"]').click();await page.click('#Regenerate');await ready();assert.equal(await page.evaluate(()=>CliffApp.State.DisplayStage),2);
  // A stage-1 edit invalidates downstream output; later stages still require the explicit rebuild.

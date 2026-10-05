@@ -1,5 +1,5 @@
 import {RouteProfiles} from './FormationRoute.js';
-import {MountRouteEditor} from './FormationRouteEditor.js';
+import {CreateViewportEditor} from './ViewportEditor.js';
 import '@fontsource/dm-sans/300.css';
 import '@fontsource/dm-sans/400.css';
 //============================================================================================================================================
@@ -75,6 +75,7 @@ const WireMaterial=new THREE.LineBasicMaterial({color:'#111820',transparent:true
 const SelectionMaterial=new THREE.LineBasicMaterial({color:'#efb063',transparent:true,opacity:.9,depthTest:true});
 const CutColours={Cliff:'#929aa5',Crown:'#929aa5',Base:'#929aa5',End:'#929aa5',Back:'#929aa5',Bedding:'#8ca49d',
     Fracture:'#8ca49d',Joint:'#8ca49d',Termination:'#8ca49d',Spall:'#e0a570',Crack:'#d07969'};
+let ViewportEditor=null;
 let SelectionOutline=null;
 let ResizePending=true;
 let RenderRequested=true;
@@ -272,6 +273,8 @@ function FrameView(Body=null, Direction=null)
     Controls.target.copy(Middle);
     Camera.position.copy(Middle).addScaledVector(Offset,Distance);
     Camera.near=Math.max(.02,Distance/2000);
+    Camera.far=Math.max(500,Distance*4);
+    Controls.maxDistance=Math.max(450,Distance*3);
     Camera.updateProjectionMatrix();
     Controls.update();
 }
@@ -302,7 +305,7 @@ function Generate()
     }
     const Revision=++State.Revision;
     const Initial=!State.Result;
-    const Reframe=Initial || ['Profile','Width','Height','Depth','RoutePoints','RouteWidth','CanyonGap'].some(Name=>JSON.stringify(State.Result.Specification[Name])!==JSON.stringify(State.Specification[Name]));
+    const Reframe=Initial || ['Profile','Width','Height','Depth','RoutePoints','RouteWidth','CanyonGap','TransformPosition','TransformRotation','TransformScale'].some(Name=>JSON.stringify(State.Result.Specification[Name])!==JSON.stringify(State.Specification[Name]));
     State.Error=null;
     State.Busy=true;
     State.Dirty=true;
@@ -316,6 +319,7 @@ function Generate()
     try
     {
         Object.assign(State.Specification,ReadSpecification(State.Specification));
+        ViewportEditor.sync();
         for (const [Name,Value] of Object.entries(State.Specification))
         {
             const Input=Element(Name);
@@ -395,12 +399,13 @@ function ObjText()
     if (!State.Result || State.Dirty) throw new Error('Rebuild the current recipe before exporting.');
     const Stage=State.Result.Stages[State.Stage-1];
     const Lines=[`# Frontier polygon cliff | stage ${State.Stage} | seed ${State.Result.Specification.Seed}`,
-        '# metres; triangles only; untransformed source geometry; polygon-only geometry; no textures or SDF','s off'];
+        '# metres; triangles only; formation placement applied; explosion view excluded; no textures or SDF','s off'];
+    BodyGroup.updateWorldMatrix(true,false);
     let Offset=1;
     for (const Mesh of Stage.Meshes)
     {
         Lines.push(`o ${Mesh.Name.replace(/[^a-zA-Z0-9]+/g,'_')}`);
-        Mesh.Vertices.forEach(Point=>Lines.push(`v ${Point.map(Value=>Value.toFixed(8)).join(' ')}`));
+        Mesh.Vertices.forEach(Point=>Lines.push(`v ${new THREE.Vector3(...Point).applyMatrix4(BodyGroup.matrixWorld).toArray().map(Value=>Value.toFixed(8)).join(' ')}`));
         Mesh.Triangles.forEach(Triangle=>Lines.push(`f ${Triangle.map(Index=>Index+Offset).join(' ')}`));
         Offset+=Mesh.Vertices.length;
     }
@@ -457,12 +462,7 @@ function BuildControls()
             MarkDirty();
         });
     }
-    if(Solid&&RouteProfiles.includes(Profile)){
-        const Host=document.createElement('div');
-        Element('Profile').closest('.Property').after(Host);
-        const Draw=MountRouteEditor(Host,State.Specification,()=>MarkDirty());
-        Element('RouteSmooth').addEventListener('input',Draw);
-    }
+    ViewportEditor?.sync();
     for (const Name of ['Seed','FractureSeed']) Element(`New${Name}`).onclick=()=>
     {
         const Next=crypto.getRandomValues(new Uint32Array(1))[0]%1000000;
@@ -490,6 +490,7 @@ StageDescriptions.forEach(([Title,Subtitle],Index)=>
     Button.onclick=()=>ViewStage(Index+1);
     Element('StageList').appendChild(Button);
 });
+ViewportEditor=CreateViewportEditor({scene:Scene,camera:Camera,renderer:Renderer,orbit:Controls,bodies:BodyGroup,getSpec:()=>State.Specification,onRouteChange:()=>MarkDirty(),onRender:()=>{RenderRequested=true;Renderer.shadowMap.needsUpdate=true;},onStatus:SetStatus});
 BuildControls();
 ViewStage(State.Stage);
 Element('Regenerate').onclick=Generate;
@@ -536,7 +537,7 @@ Element('LightAngle').oninput=Event=>
     Element('LightValue').textContent=`${Event.target.value}°`;
 };
 Element('ExportObj').onclick=()=>Download(`Cliff_${State.Specification.Profile}_${State.Specification.Seed}_Stage${State.Stage}.obj`,ObjText(),'text/plain');
-Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:6,Specification:State.Specification},null,2),'application/json');
+Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:7,Specification:State.Specification},null,2),'application/json');
 Element('ImportRecipe').onclick=()=>Element('RecipeFile').click();
 Element('RecipeFile').onchange=async Event=>
 {
@@ -555,7 +556,7 @@ Element('RecipeFile').onchange=async Event=>
 };
 Renderer.domElement.addEventListener('dblclick',Event=>
 {
-    if (!State.Result || State.Dirty) return;
+    if (ViewportEditor.mode!=='View' || !State.Result || State.Dirty) return;
     const Rect=Renderer.domElement.getBoundingClientRect();
     const Ray=new THREE.Raycaster();
     Ray.setFromCamera(new THREE.Vector2((Event.clientX-Rect.left)/Rect.width*2-1,1-(Event.clientY-Rect.top)/Rect.height*2),Camera);
@@ -659,7 +660,7 @@ Element('SaveActive').onclick=()=>Element(GrainStudy.Parameters.Active?'GrainSav
 Element('OpenActive').onclick=()=>Element(GrainStudy.Parameters.Active?'GrainLoad':'ImportRecipe').click();
 Element('CliffSearch').oninput=Event=>document.querySelectorAll('.StageButton').forEach(Button=>{Button.hidden=!Button.textContent.toLowerCase().includes(Event.target.value.toLowerCase());});
 window.GrainApp=GrainStudy;
-window.CliffApp={State,Scene,Camera,Controls,Renderer,BodyGroup,Generate,ViewStage,FrameView,SelectBody,ObjText,
+window.CliffApp={State,Scene,Camera,Controls,Renderer,BodyGroup,ViewportEditor,Generate,ViewStage,FrameView,SelectBody,ObjText,
     SetSpecification:Specification=>{State.Specification=ReadSpecification({...State.Specification,...Specification});BuildControls();Generate();},
     FocusSpall:()=>
     {
@@ -668,7 +669,7 @@ window.CliffApp={State,Scene,Camera,Controls,Renderer,BodyGroup,Generate,ViewSta
         const Selected=Candidates.find(Candidate=>Candidate.Spall.Size>.45)||Candidates[0];
         if (!Selected) return false;
         SelectBody(Selected.Body,false);
-        const Centre=new THREE.Vector3(...Selected.Spall.Centre);
+        const Centre=Selected.Body.localToWorld(new THREE.Vector3(...Selected.Spall.Centre));
         Controls.target.copy(Centre);
         Camera.position.copy(Centre).add(new THREE.Vector3(2,1.3,4.8));
         Controls.update();

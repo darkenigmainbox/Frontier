@@ -1,3 +1,4 @@
+import {ReadPlacement} from './FormationPlacement.js';
 //============================================================================================================================================
 //                                                           CLIFFSPECIFICATION.JS
 //============================================================================================================================================
@@ -8,7 +9,7 @@ import {SolidLabels,SolidCountRanges} from './SolidFormation.js';
 
 export const ShapeModes={Solid:'3D masses · distinct structures',Procedural:'Legacy · folded ridge',Authored:'Legacy · authored profiles'};
 
-export const CliffDefaults = Object.freeze({ShapeMode:'Solid',RoutePoints:RoutePresets.Sweep,RouteSegments:8,RouteWidth:6,RouteSmooth:1,ArchThickness:5,CanyonGap:10,PeakCount:0,PeakSpread:.85,PeakSharpness:.65,Lean:.15,Taper:.4,Terraces:.4,BayDepth:.8,Profile:'Headland', Seed:42, Width:32, Height:18, Depth:12, Relief:1,
+export const CliffDefaults = Object.freeze({...ReadPlacement(),ShapeMode:'Solid',RoutePoints:RoutePresets.Sweep,RouteSegments:8,RouteWidth:6,RouteSmooth:1,ArchThickness:5,CanyonGap:10,PeakCount:0,PeakSpread:.85,PeakSharpness:.65,Lean:.15,Taper:.4,Terraces:.4,BayDepth:.8,Profile:'Headland', Seed:42, Width:32, Height:18, Depth:12, Relief:1,
     NoiseMode:'Ridged', Variation:.8, NoiseScale:2.6, FractureStyle:'Conjugate', FractureSeed:42,
     Retreat:0.48, Beds:7, Dip:4, Aperture:0.07, FractureBend:1, JointSpacing:4.6, Penetration:0.78, FaceRecess:0.65, SpallSize:0.8,
     SpallDensity:0.8, CrackLength:1.4, CrackWidth:0.12, CrackDepth:0.18, CrackDensity:0.55, TriangleSpan:1.4});
@@ -124,6 +125,7 @@ export function ReadSpecification(Input = {})
         if (!Number.isFinite(Number(Result[Name]))) throw new Error(`${Name} must be finite`);
         Result[Name] = Math.max(Minimum, Math.min(Maximum, Number(Result[Name])));
     }
+    Object.assign(Result,ReadPlacement(Result));
     Result.RoutePoints=ReadRoute(Result.RoutePoints);
     Result.RouteSegments=Math.round(Result.RouteSegments);
     Result.PeakCount=Math.round(Result.PeakCount);
@@ -153,7 +155,7 @@ export function EarliestStage(Before,After)
 
 export function ReadRecipe(Recipe)
 {
-    if (Recipe.Format!=='Frontier.PolygonCliff' || ![1,2,3,4,5,6].includes(Recipe.Version)) throw new Error('Unsupported cliff recipe');
+    if (Recipe.Format!=='Frontier.PolygonCliff' || ![1,2,3,4,5,6,7].includes(Recipe.Version)) throw new Error('Unsupported cliff recipe');
     const Specification={...Recipe.Specification};
     if(Recipe.Version<4) Specification.ShapeMode='Authored';
     else if(Recipe.Version===4&&!Specification.ShapeMode)Specification.ShapeMode='Procedural';
