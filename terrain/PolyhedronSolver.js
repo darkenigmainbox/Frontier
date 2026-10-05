@@ -146,7 +146,45 @@ function SplitEdges(Polygons)
 }
 
 // 📝 Remove construction interfaces before triangulation. Co-planar contours are stitched, not concatenated.
-export function JoinCells(Cells, Name)
+// Resolve partially covered coplanar interfaces from solid unions. Edge cancellation
+// alone cannot remove a small internal cap entirely contained in a larger face.
+function ResolveCoplanarCaps(Polygons)
+{
+    const ClipLoop=(Loop,Direction,Offset)=>{
+        const Result=[];
+        for(let i=0;i<Loop.length;i++){
+            const A=Loop[i],B=Loop[(i+1)%Loop.length],DA=Dot(Direction,A)-Offset,DB=Dot(Direction,B)-Offset;
+            if(DA<=ε)Result.push(A);
+            if((DA< -ε&&DB>ε)||(DA>ε&&DB< -ε))Result.push(Lerp(A,B,DA/(DA-DB)));
+        }
+        const Clean=CleanLoop(Result);
+        return Clean.length>=3&&Length(Normal(Clean))>.5?Clean:[];
+    };
+    const Box=Loop=>[0,1,2].map(k=>[Math.min(...Loop.map(p=>p[k])),Math.max(...Loop.map(p=>p[k]))]);
+    const Bounds=Polygons.map(p=>Box(p.Loop));
+    const Result=[];
+    for(let i=0;i<Polygons.length;i++){
+        const P=Polygons[i];let Pieces=[P.Loop];
+        for(let j=0;j<Polygons.length&&Pieces.length;j++){
+            const Q=Polygons[j];
+            if(Dot(P.Normal,Q.Normal)>-.99||Bounds[i].some(([a,b],k)=>b<Bounds[j][k][0]-ε||a>Bounds[j][k][1]+ε))continue;
+            Pieces=Pieces.flatMap(Loop=>{
+                let Inside=Loop;const Outside=[];
+                for(let e=0;e<Q.Loop.length&&Inside.length;e++){
+                    const A=Q.Loop[e],B=Q.Loop[(e+1)%Q.Loop.length];
+                    const N=Normalize(Cross(Subtract(B,A),Q.Normal)),D=Dot(N,A);
+                    const Part=ClipLoop(Inside,Scale(N,-1),-D);if(Part.length)Outside.push(Part);
+                    Inside=ClipLoop(Inside,N,D);
+                }
+                return Outside;
+            });
+        }
+        for(const Loop of Pieces)Result.push(Face(Loop,P.Tag,P.Normal));
+    }
+    return Result;
+}
+
+export function JoinCells(Cells, Name, ResolveOverlaps=false)
 {
     // 📝 Rounded keys alone split a shared corner when roundoff straddles a bucket boundary.
     const Buckets=new Map();
@@ -181,8 +219,9 @@ export function JoinCells(Cells, Name)
         Planes.get(Key).push(Polygon);
     }
     const Result = [];
-    for (const Polygons of Planes.values())
+    for (const Original of Planes.values())
     {
+        const Polygons=ResolveOverlaps?ResolveCoplanarCaps(Original).map(P=>({...P,Loop:P.Loop.map(Weld)})):Original;
         const Aligned = SplitEdges(Polygons);
         const Edges = new Map();
         for (const Polygon of Aligned)

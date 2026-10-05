@@ -6,6 +6,7 @@ import '@fontsource/dm-sans/400.css';
 // 📦 Static polygon cliff authoring workspace, clay viewport, stage inspection and triangle OBJ exchange.
 
 import * as THREE from 'three';
+import {SolidLabels,SolidPresets,SolidCountRanges} from './SolidFormation.js';
 import {CreateGrainPanel} from './ParticlePanel.js';
 import {CaptureGrainSource} from './GrainSequence.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
@@ -13,13 +14,13 @@ import {CliffDefaults, CliffProfiles, ReadSpecification, EarliestStage, NoiseMod
 
 const Element=Id=>document.getElementById(Id);
 const StageDescriptions=[
-    ['Cliff mass','Procedural peaks, shelves & bays','New seed rebuilds the large formation, not just its noise. Major peaks, contrast, sharpness, lean and taper control the silhouette. Small surface relief is separate.'],
+    ['Cliff mass','3D masses · distinct footprints','Closed rock volumes assembled in three dimensions. Choose a formation, then inspect its footprint using Top and Side. No folded front/back sheet.'],
     ['Primary fractures','Joint sets, not just bedding','Geological orientation families with rough polygon cuts. New fractures terminate at existing boundaries; bedding is an optional preset.'],
     ['Bounded joints','Finite-depth rock blocks','Kinked joints split front, rear and end exposures, terminating against a retained interior core.'],
     ['Edge spalls','Local fracture cavities','Localized, asymmetric bites with four or six fracture facets. The original edge survives on both sides—not a full-edge bevel.'],
     ['Surface fissures','Shallow polygon incisions','Finite, kinked V-grooves cut into individual rock faces. Closed bottoms, bounded depth; no SDF erosion.']
 ];
-const State={Specification:{...CliffDefaults},Result:null,Stage:1,Busy:false,DisplayStage:0,Revision:0,ReadyRevision:0,Worker:null,Dirty:false,
+const State={Specification:{...CliffDefaults,...SolidPresets.Headland},Result:null,Stage:1,Busy:false,DisplayStage:0,Revision:0,ReadyRevision:0,Worker:null,Dirty:false,
     Mode:'Clay',Wire:false,Selected:null,Isolated:false,Exploded:false,Milliseconds:0,Error:null};
 const Scene=new THREE.Scene();
 Scene.background=new THREE.Color('#282e38');
@@ -136,8 +137,8 @@ function ViewStage(StageNumber)
     Renderer.shadowMap.needsUpdate=true;
     State.Stage=Math.max(1,Math.min(5,StageNumber));
     const [Title,,Description]=StageDescriptions[State.Stage-1];
-    Element('StageTitle').textContent=Title;
-    Element('StageDescription').textContent=Description;
+    Element('StageTitle').textContent=State.Stage===1&&State.Specification.ShapeMode==='Solid'?SolidLabels[State.Specification.Profile]:Title;
+    Element('StageDescription').textContent=State.Stage===1&&State.Specification.ShapeMode!=='Solid'?'Legacy generator retained for old recipes. Switch to 3D masses for genuinely different footprints.':Description;
     Element('StageNumber').textContent=`0${State.Stage} / 05`;
     Element('PreviousStage').disabled=State.Stage===1;
     Element('NextStage').disabled=State.Stage===5;
@@ -255,10 +256,17 @@ function FrameView(Body=null, Direction=null)
     const Box=new THREE.Box3().setFromObject(Body||BodyGroup);
     const Middle=Box.getCenter(new THREE.Vector3());
     const Size=Box.getSize(new THREE.Vector3());
-    const Radius=Size.length()*.5;
-    const Angle=Math.min(Camera.fov*Math.PI/360,Math.atan(Math.tan(Camera.fov*Math.PI/360)*Camera.aspect));
-    const Distance=Radius/Math.sin(Angle)*(Body?1.10:1.13);
-    const Offset=(Direction||new THREE.Vector3(.47,.25,.88)).clone().normalize();
+    const Offset=(Direction||new THREE.Vector3(.65,.48,.85)).clone().normalize();
+    const Right=new THREE.Vector3().crossVectors(Offset,new THREE.Vector3(0,1,0)).normalize();
+    if(Right.lengthSq()<.001)Right.set(1,0,0);
+    const Up=new THREE.Vector3().crossVectors(Right,Offset).normalize();
+    const Tangent=Math.tan(Camera.fov*Math.PI/360);
+    let Distance=0;
+    for(const x of [-.5,.5])for(const y of [-.5,.5])for(const z of [-.5,.5]){
+        const P=new THREE.Vector3(Size.x*x,Size.y*y,Size.z*z);
+        Distance=Math.max(Distance,P.dot(Offset)+Math.abs(P.dot(Right))/(Tangent*Camera.aspect),P.dot(Offset)+Math.abs(P.dot(Up))/Tangent);
+    }
+    Distance*=Body?1.1:1.13;
     Controls.target.copy(Middle);
     Camera.position.copy(Middle).addScaledVector(Offset,Distance);
     Camera.near=Math.max(.02,Distance/2000);
@@ -414,14 +422,20 @@ const Groups=[
 ];
 function BuildControls()
 {
-    const Choices={ShapeMode:ShapeModes,Profile:Object.fromEntries(Object.entries(CliffProfiles).map(([Key,Profile])=>[Key,Profile.Label])),NoiseMode:NoiseModes,FractureStyle:FractureStyles};
-    Element('ParameterControls').innerHTML=Groups.map(([Title,Open,Fields])=>`<details ${Open?'open':''}><summary>${Title}</summary><div class="ControlGroup">${Fields.map(([Name,Label,Minimum,Maximum,Step,Unit])=>
+    const Solid=State.Specification.ShapeMode==='Solid',Profile=State.Specification.Profile;
+    const Supports={PeakCount:['Headland','Escarpment','Needles','WideWall','Amphitheatre'],PeakSpread:['Headland','Needles','WideWall','Amphitheatre'],Taper:['Headland','Escarpment','Spire'],Terraces:['Headland','Escarpment','Spire','Needles'],BayDepth:['Headland','Needles','WideWall','Amphitheatre']};
+    const Labels={PeakCount:Profile==='Escarpment'?'Terrace count':Profile==='Needles'?'Tower count':'Mass count',PeakSpread:'Mass height variation',PeakSharpness:'Crown bevel',Taper:'Upper mass narrowing',Terraces:Profile==='Needles'||Profile==='Spire'?'Pedestal height':'Shelf strength',BayDepth:Profile==='Amphitheatre'?'Cove opening':Profile==='WideWall'?'Ridge bend':'Mass spread'};
+    const ControlGroups=Groups.map(([title,open,fields])=>[title,open,fields.filter(([name])=>!Solid||(!['NoiseMode','Variation','NoiseScale','Relief','Retreat'].includes(name)&&(!Supports[name]||Supports[name].includes(Profile)))).map(field=>Solid&&Labels[field[0]]?[field[0],Labels[field[0]],...field.slice(2)]:field)]);
+
+    const Choices={ShapeMode:ShapeModes,Profile:Solid?SolidLabels:Object.fromEntries(Object.entries(CliffProfiles).map(([Key,Profile])=>[Key,Profile.Label])),NoiseMode:NoiseModes,FractureStyle:FractureStyles};
+    if(Solid&&Profile!=='Spire'){const [a,b]=SolidCountRanges[Profile];Choices.PeakCount=Object.fromEntries([[0,'Seeded'],...Array.from({length:b-a+1},(_,i)=>[a+i,String(a+i)])]);}
+    Element('ParameterControls').innerHTML=ControlGroups.map(([Title,Open,Fields])=>`<details ${Open?'open':''}><summary>${Title}</summary><div class="ControlGroup">${Fields.map(([Name,Label,Minimum,Maximum,Step,Unit])=>
     {
         if (Choices[Name]) return `<div class="Property"><label class="FieldLabel" for="${Name}">${Label}</label><select id="${Name}">${Object.entries(Choices[Name]).map(([Key,Title])=>`<option value="${Key}">${Title}</option>`).join('')}</select></div>`;
         if (Name.endsWith('Seed')) return `<div class="Property"><label class="FieldLabel" for="${Name}">${Label}<span class="Subtle">repeatable variation</span></label><div class="SeedRow"><input type="number" id="${Name}" min="0" max="999999" step="1"><button id="New${Name}">New seed</button></div></div>`;
         return `<div class="Property"><label class="FieldLabel" for="${Name}">${Label}<output id="${Name}Value"></output></label><input type="range" id="${Name}" min="${Minimum}" max="${Maximum}" step="${Step}" data-unit="${Unit}"></div>`;
     }).join('')}</div></details>`).join('');
-    for (const [, ,Fields] of Groups) for (const [Name] of Fields)
+    for (const [, ,Fields] of ControlGroups) for (const [Name] of Fields)
     {
         const Input=Element(Name);
         Input.value=State.Specification[Name];
@@ -430,10 +444,10 @@ function BuildControls()
         Input.addEventListener('input',()=>
         {
             State.Specification[Name]=Choices[Name]?Input.value:Number(Input.value);
-            if(Name==='ShapeMode')BuildControls();
+            if(Name==='ShapeMode'){if(Input.value==='Solid')Object.assign(State.Specification,SolidPresets[State.Specification.Profile]);BuildControls();}
             if (Name==='Profile')
             {
-                Object.assign(State.Specification,FormationPresets[Input.value]);
+                Object.assign(State.Specification,(State.Specification.ShapeMode==='Solid'?SolidPresets:FormationPresets)[Input.value]);
                 BuildControls();
             }
             UpdateRange(Input);
@@ -474,6 +488,8 @@ Element('PreviousStage').onclick=()=>ViewStage(State.Stage-1);
 Element('NextStage').onclick=()=>ViewStage(State.Stage+1);
 Element('Frame').onclick=()=>FrameView();
 Element('Front').onclick=()=>FrameView(null,new THREE.Vector3(0,.04,1));
+Element('Top').onclick=()=>FrameView(null,new THREE.Vector3(0,1,.001));
+Element('Side').onclick=()=>FrameView(null,new THREE.Vector3(1,.1,0));
 Element('Rear').onclick=()=>FrameView(null,new THREE.Vector3(0,.18,-1));
 Element('SelectCliff').onclick=()=>{ClearSelection();ApplyVisibility();};
 Element('SelectCliff').ondblclick=()=>FrameView();
@@ -511,7 +527,7 @@ Element('LightAngle').oninput=Event=>
     Element('LightValue').textContent=`${Event.target.value}°`;
 };
 Element('ExportObj').onclick=()=>Download(`Cliff_${State.Specification.Profile}_${State.Specification.Seed}_Stage${State.Stage}.obj`,ObjText(),'text/plain');
-Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:4,Specification:State.Specification},null,2),'application/json');
+Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:5,Specification:State.Specification},null,2),'application/json');
 Element('ImportRecipe').onclick=()=>Element('RecipeFile').click();
 Element('RecipeFile').onchange=async Event=>
 {

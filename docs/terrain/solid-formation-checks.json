@@ -1,0 +1,548 @@
+{
+  "passed": true,
+  "corpus": [
+    {
+      "Profile": "Headland",
+      "Seed": 1,
+      "triangles": 1408,
+      "thinTriangles": 0,
+      "volume": 4929.112902163533,
+      "components": 1
+    },
+    {
+      "Profile": "Headland",
+      "Seed": 17,
+      "triangles": 1864,
+      "thinTriangles": 1,
+      "volume": 4292.9660158783345,
+      "components": 1
+    },
+    {
+      "Profile": "Headland",
+      "Seed": 42,
+      "triangles": 1446,
+      "thinTriangles": 1,
+      "volume": 4696.389747911657,
+      "components": 1
+    },
+    {
+      "Profile": "Headland",
+      "Seed": 73,
+      "triangles": 1218,
+      "thinTriangles": 0,
+      "volume": 4814.6483848147645,
+      "components": 1
+    },
+    {
+      "Profile": "Headland",
+      "Seed": 913,
+      "triangles": 1222,
+      "thinTriangles": 2,
+      "volume": 4512.135993977754,
+      "components": 1
+    },
+    {
+      "Profile": "Escarpment",
+      "Seed": 1,
+      "triangles": 1478,
+      "thinTriangles": 2,
+      "volume": 7260.022202365538,
+      "components": 1
+    },
+    {
+      "Profile": "Escarpment",
+      "Seed": 17,
+      "triangles": 1740,
+      "thinTriangles": 0,
+      "volume": 7679.918099749206,
+      "components": 1
+    },
+    {
+      "Profile": "Escarpment",
+      "Seed": 42,
+      "triangles": 1620,
+      "thinTriangles": 2,
+      "volume": 7492.903858959163,
+      "components": 1
+    },
+    {
+      "Profile": "Escarpment",
+      "Seed": 73,
+      "triangles": 1994,
+      "thinTriangles": 1,
+      "volume": 7608.715138784199,
+      "components": 1
+    },
+    {
+      "Profile": "Escarpment",
+      "Seed": 913,
+      "triangles": 1576,
+      "thinTriangles": 0,
+      "volume": 7497.590050511503,
+      "components": 1
+    },
+    {
+      "Profile": "Spire",
+      "Seed": 1,
+      "triangles": 2330,
+      "thinTriangles": 0,
+      "volume": 2122.6838950784577,
+      "components": 1
+    },
+    {
+      "Profile": "Spire",
+      "Seed": 17,
+      "triangles": 3058,
+      "thinTriangles": 0,
+      "volume": 2246.5734211659574,
+      "components": 1
+    },
+    {
+      "Profile": "Spire",
+      "Seed": 42,
+      "triangles": 2644,
+      "thinTriangles": 0,
+      "volume": 2032.2662099880104,
+      "components": 1
+    },
+    {
+      "Profile": "Spire",
+      "Seed": 73,
+      "triangles": 2680,
+      "thinTriangles": 0,
+      "volume": 1905.9449105278738,
+      "components": 1
+    },
+    {
+      "Profile": "Spire",
+      "Seed": 913,
+      "triangles": 2708,
+      "thinTriangles": 0,
+      "volume": 2101.5092315329402,
+      "components": 1
+    },
+    {
+      "Profile": "Needles",
+      "Seed": 1,
+      "triangles": 5962,
+      "thinTriangles": 1,
+      "volume": 6630.7307974516925,
+      "components": 1
+    },
+    {
+      "Profile": "Needles",
+      "Seed": 17,
+      "triangles": 5856,
+      "thinTriangles": 0,
+      "volume": 6668.558878737386,
+      "components": 1
+    },
+    {
+      "Profile": "Needles",
+      "Seed": 42,
+      "triangles": 6170,
+      "thinTriangles": 0,
+      "volume": 7473.806907373275,
+      "components": 1
+    },
+    {
+      "Profile": "Needles",
+      "Seed": 73,
+      "triangles": 5628,
+      "thinTriangles": 0,
+      "volume": 6924.215218465211,
+      "components": 1
+    },
+    {
+      "Profile": "Needles",
+      "Seed": 913,
+      "triangles": 6268,
+      "thinTriangles": 0,
+      "volume": 7337.606342094054,
+      "components": 1
+    },
+    {
+      "Profile": "WideWall",
+      "Seed": 1,
+      "triangles": 2154,
+      "thinTriangles": 0,
+      "volume": 8618.091426274736,
+      "components": 1
+    },
+    {
+      "Profile": "WideWall",
+      "Seed": 17,
+      "triangles": 2304,
+      "thinTriangles": 0,
+      "volume": 8743.289981240476,
+      "components": 1
+    },
+    {
+      "Profile": "WideWall",
+      "Seed": 42,
+      "triangles": 2330,
+      "thinTriangles": 1,
+      "volume": 8682.436491775783,
+      "components": 1
+    },
+    {
+      "Profile": "WideWall",
+      "Seed": 73,
+      "triangles": 2382,
+      "thinTriangles": 3,
+      "volume": 8641.13036358128,
+      "components": 1
+    },
+    {
+      "Profile": "WideWall",
+      "Seed": 913,
+      "triangles": 1962,
+      "thinTriangles": 1,
+      "volume": 8874.28154595673,
+      "components": 1
+    },
+    {
+      "Profile": "Amphitheatre",
+      "Seed": 1,
+      "triangles": 2218,
+      "thinTriangles": 1,
+      "volume": 8185.729055758567,
+      "components": 1
+    },
+    {
+      "Profile": "Amphitheatre",
+      "Seed": 17,
+      "triangles": 2236,
+      "thinTriangles": 2,
+      "volume": 8476.2594822706,
+      "components": 1
+    },
+    {
+      "Profile": "Amphitheatre",
+      "Seed": 42,
+      "triangles": 2576,
+      "thinTriangles": 3,
+      "volume": 8105.106338740817,
+      "components": 1
+    },
+    {
+      "Profile": "Amphitheatre",
+      "Seed": 73,
+      "triangles": 2578,
+      "thinTriangles": 1,
+      "volume": 7957.991479698727,
+      "components": 1
+    },
+    {
+      "Profile": "Amphitheatre",
+      "Seed": 913,
+      "triangles": 2130,
+      "thinTriangles": 4,
+      "volume": 8270.787232642706,
+      "components": 1
+    }
+  ],
+  "parameters": [
+    {
+      "Profile": "Headland",
+      "name": "PeakCount",
+      "low": 2,
+      "high": 7
+    },
+    {
+      "Profile": "Headland",
+      "name": "PeakSpread",
+      "low": 0,
+      "high": 1
+    },
+    {
+      "Profile": "Headland",
+      "name": "PeakSharpness",
+      "low": 0,
+      "high": 1
+    },
+    {
+      "Profile": "Headland",
+      "name": "Lean",
+      "low": -1,
+      "high": 1
+    },
+    {
+      "Profile": "Headland",
+      "name": "Taper",
+      "low": 0,
+      "high": 0.75
+    },
+    {
+      "Profile": "Headland",
+      "name": "Terraces",
+      "low": 0,
+      "high": 1
+    },
+    {
+      "Profile": "Headland",
+      "name": "BayDepth",
+      "low": 0,
+      "high": 1.5
+    },
+    {
+      "Profile": "Escarpment",
+      "name": "PeakCount",
+      "low": 2,
+      "high": 5
+    },
+    {
+      "Profile": "Escarpment",
+      "name": "PeakSharpness",
+      "low": 0,
+      "high": 1
+    },
+    {
+      "Profile": "Escarpment",
+      "name": "Lean",
+      "low": -1,
+      "high": 1
+    },
+    {
+      "Profile": "Escarpment",
+      "name": "Taper",
+      "low": 0,
+      "high": 0.75
+    },
+    {
+      "Profile": "Escarpment",
+      "name": "Terraces",
+      "low": 0,
+      "high": 1
+    },
+    {
+      "Profile": "Spire",
+      "name": "PeakSharpness",
+      "low": 0,
+      "high": 1
+    },
+    {
+      "Profile": "Spire",
+      "name": "Lean",
+      "low": -1,
+      "high": 1
+    },
+    {
+      "Profile": "Spire",
+      "name": "Taper",
+      "low": 0,
+      "high": 0.75
+    },
+    {
+      "Profile": "Spire",
+      "name": "Terraces",
+      "low": 0,
+      "high": 1
+    },
+    {
+      "Profile": "Needles",
+      "name": "PeakCount",
+      "low": 2,
+      "high": 7
+    },
+    {
+      "Profile": "Needles",
+      "name": "PeakSpread",
+      "low": 0,
+      "high": 1
+    },
+    {
+      "Profile": "Needles",
+      "name": "PeakSharpness",
+      "low": 0,
+      "high": 1
+    },
+    {
+      "Profile": "Needles",
+      "name": "Lean",
+      "low": -1,
+      "high": 1
+    },
+    {
+      "Profile": "Needles",
+      "name": "Terraces",
+      "low": 0,
+      "high": 1
+    },
+    {
+      "Profile": "Needles",
+      "name": "BayDepth",
+      "low": 0,
+      "high": 1.5
+    },
+    {
+      "Profile": "WideWall",
+      "name": "PeakCount",
+      "low": 3,
+      "high": 7
+    },
+    {
+      "Profile": "WideWall",
+      "name": "PeakSpread",
+      "low": 0,
+      "high": 1
+    },
+    {
+      "Profile": "WideWall",
+      "name": "PeakSharpness",
+      "low": 0,
+      "high": 1
+    },
+    {
+      "Profile": "WideWall",
+      "name": "Lean",
+      "low": -1,
+      "high": 1
+    },
+    {
+      "Profile": "WideWall",
+      "name": "BayDepth",
+      "low": 0,
+      "high": 1.5
+    },
+    {
+      "Profile": "Amphitheatre",
+      "name": "PeakCount",
+      "low": 5,
+      "high": 7
+    },
+    {
+      "Profile": "Amphitheatre",
+      "name": "PeakSpread",
+      "low": 0,
+      "high": 1
+    },
+    {
+      "Profile": "Amphitheatre",
+      "name": "PeakSharpness",
+      "low": 0,
+      "high": 1
+    },
+    {
+      "Profile": "Amphitheatre",
+      "name": "Lean",
+      "low": -1,
+      "high": 1
+    },
+    {
+      "Profile": "Amphitheatre",
+      "name": "BayDepth",
+      "low": 0,
+      "high": 1.5
+    }
+  ],
+  "pipelines": [
+    {
+      "Profile": "Headland",
+      "triangles": [
+        1446,
+        7874,
+        16300,
+        22342,
+        25888
+      ],
+      "thinTriangles": [
+        1,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "Profile": "Escarpment",
+      "triangles": [
+        1620,
+        10048,
+        22410,
+        31732,
+        35388
+      ],
+      "thinTriangles": [
+        2,
+        0,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "Profile": "Spire",
+      "triangles": [
+        2644,
+        6418,
+        14560,
+        21924,
+        25090
+      ],
+      "thinTriangles": [
+        0,
+        0,
+        3,
+        3,
+        3
+      ]
+    },
+    {
+      "Profile": "Needles",
+      "triangles": [
+        6170,
+        12934,
+        24250,
+        33304,
+        37448
+      ],
+      "thinTriangles": [
+        0,
+        1,
+        5,
+        5,
+        5
+      ]
+    },
+    {
+      "Profile": "WideWall",
+      "triangles": [
+        2330,
+        10758,
+        22222,
+        29856,
+        33826
+      ],
+      "thinTriangles": [
+        1,
+        0,
+        2,
+        2,
+        2
+      ]
+    },
+    {
+      "Profile": "Amphitheatre",
+      "triangles": [
+        2576,
+        11420,
+        22614,
+        30542,
+        35346
+      ],
+      "thinTriangles": [
+        3,
+        0,
+        21,
+        21,
+        21
+      ]
+    }
+  ],
+  "crownSection": {
+    "height": 31.68,
+    "width": 8.860902546762428,
+    "depth": 9.538573208465357
+  }
+}

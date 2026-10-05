@@ -3,9 +3,11 @@
 //============================================================================================================================================
 // 📦 Authored geological feature catalogues and bounded polygon cliff parameters.
 
-export const ShapeModes={Procedural:'Procedural · seeded formations',Authored:'Legacy · authored profiles'};
+import {SolidCountRanges} from './SolidFormation.js';
 
-export const CliffDefaults = Object.freeze({ShapeMode:'Procedural',PeakCount:0,PeakSpread:.85,PeakSharpness:.65,Lean:.15,Taper:.4,Terraces:.4,BayDepth:.8,Profile:'Headland', Seed:42, Width:32, Height:18, Depth:12, Relief:1,
+export const ShapeModes={Solid:'3D masses · distinct structures',Procedural:'Legacy · folded ridge',Authored:'Legacy · authored profiles'};
+
+export const CliffDefaults = Object.freeze({ShapeMode:'Solid',PeakCount:0,PeakSpread:.85,PeakSharpness:.65,Lean:.15,Taper:.4,Terraces:.4,BayDepth:.8,Profile:'Headland', Seed:42, Width:32, Height:18, Depth:12, Relief:1,
     NoiseMode:'Ridged', Variation:.8, NoiseScale:2.6, FractureStyle:'Conjugate', FractureSeed:42,
     Retreat:0.48, Beds:7, Dip:4, Aperture:0.07, FractureBend:1, JointSpacing:4.6, Penetration:0.78, FaceRecess:0.65, SpallSize:0.8,
     SpallDensity:0.8, CrackLength:1.4, CrackWidth:0.12, CrackDepth:0.18, CrackDensity:0.55, TriangleSpan:1.4});
@@ -122,6 +124,10 @@ export function ReadSpecification(Input = {})
         Result[Name] = Math.max(Minimum, Math.min(Maximum, Number(Result[Name])));
     }
     Result.PeakCount=Math.round(Result.PeakCount);
+    if(Result.ShapeMode==='Solid'){
+        const [Minimum,Maximum]=SolidCountRanges[Result.Profile];
+        if(Result.PeakCount||Result.Profile==='Spire')Result.PeakCount=Math.max(Minimum,Math.min(Maximum,Result.PeakCount));
+    }
     Result.Seed = Math.round(Result.Seed);
     Result.Beds = Math.round(Result.Beds);
     Result.FractureSeed = Math.round(Result.FractureSeed);
@@ -144,9 +150,10 @@ export function EarliestStage(Before,After)
 
 export function ReadRecipe(Recipe)
 {
-    if (Recipe.Format!=='Frontier.PolygonCliff' || ![1,2,3,4].includes(Recipe.Version)) throw new Error('Unsupported cliff recipe');
+    if (Recipe.Format!=='Frontier.PolygonCliff' || ![1,2,3,4,5].includes(Recipe.Version)) throw new Error('Unsupported cliff recipe');
     const Specification={...Recipe.Specification};
     if(Recipe.Version<4) Specification.ShapeMode='Authored';
+    else if(Recipe.Version===4&&!Specification.ShapeMode)Specification.ShapeMode='Procedural';
     if (Recipe.Version===1)
     {
         Object.assign(Specification,{NoiseMode:'None',Variation:0,FractureStyle:'Bedding',FractureSeed:Specification.Seed??42});

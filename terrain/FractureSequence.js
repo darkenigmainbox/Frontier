@@ -3,6 +3,7 @@
 //============================================================================================================================================
 // 📦 Profiled cliff mass, bedding, finite joints, local spalls and shallow polygon fissures.
 
+import {ConstructSolidCells} from './SolidFormation.js';
 import {ConstructRelief} from './ReliefProjection.js';
 import {FractureMass} from './RuptureSolver.js';
 import {CollapseSlivers, FlipCaps, SnapCaps} from './TriangleSolver.js';
@@ -12,6 +13,7 @@ import {Add, Subtract, Scale, Dot, Cross, Length, Normalize, Lerp, Centre, Point
 
 function ConstructMass(Specification)
 {
+    if(Specification.ShapeMode==='Solid')return ConstructSolidCells(Specification);
     const {Rows,RearRows,Sections,Stations}=ConstructRelief(Specification);
     const Cells=[];
     for (let Column=0;Column<Rows.length-1;++Column)
@@ -447,16 +449,16 @@ export class CliffSequence
             if (Number===1)
             {
                 Content=ConstructMass(Specification);
-                Bodies=[JoinCells(Content,'Cliff mass')];
+                Bodies=[JoinCells(Content,'Cliff mass',Specification.ShapeMode==='Solid')];
             }
             else if (Number===2)
             {
                 Content=Specification.FractureStyle==='Bedding'?SliceBeds(Previous,Specification,Select):FractureMass(Previous,Specification,Select);
-                Bodies=Content.map(Bed=>JoinCells(Bed.Cells,Bed.Name));
+                Bodies=Content.map(Bed=>JoinCells(Bed.Cells,Bed.Name,Specification.ShapeMode==='Solid'));
             }
             else if (Number===3)
             {
-                Content=SplitJoints(Previous,Specification,Select).map(Part=>({...JoinCells(Part.Cells,Part.Name),Rear:Part.Rear}));
+                Content=SplitJoints(Previous,Specification,Select).map(Part=>({...JoinCells(Part.Cells,Part.Name,Specification.ShapeMode==='Solid'),Rear:Part.Rear}));
                 Bodies=Content;
             }
             else
