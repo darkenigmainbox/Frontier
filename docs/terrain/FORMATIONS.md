@@ -52,7 +52,7 @@ Placement is a separate scene transform, shared by all five stages and the splin
 
 ## Compatibility and scope
 
-New cliff recipes use version **7**. Versions 1–3 default to Authored mode; version 4 without a mode defaults to the earlier Procedural generator. Earlier generators are not selectable in the main UI; old recipes still load through their compatibility path. Selecting a preset returns to solid mode. Historical Authored five-stage hashes still pass.
+New cliff recipes use version **8**. Versions 1–3 default to Authored mode; version 4 without a mode defaults to the earlier Procedural generator. Earlier generators are not selectable in the main UI; old recipes still load through their compatibility path. Selecting a preset returns to solid mode. Historical Authored five-stage hashes still pass.
 
 The workflow still has five polygon stages. Particle simulation, worker, panel and styling files were not changed. Floating/stacking grains remain deferred. RC/atrium source is unchanged. The shared Three.js bundle now includes the transform-control helpers, so generated bundle names changed. No stage 6 was reintroduced.
 
@@ -85,3 +85,7 @@ Narrow-triangle warnings remain and are recorded rather than hidden. These finit
 `npm run test:placement` checks transform validation, identity defaults for recipe versions 1–6, recipe-v7 roundtrip and geometry-cache preservation. `npm run test:viewport:browser` exercises real mouse drags on move/rotate/scale handles, orbit suppression/restoration, viewport spline dragging before and after placement, point insertion/deletion, keyboard edits, transformed OBJ output, Reset pose and recipe reload. The inspector canvas is asserted absent. The route and solid browser suites use the new viewport UI and recipe version. Particle CPU/hash and built-site browser replay regressions also pass.
 
 The broader RC smoke run passed its fallback UI and reference-GPU geometry/shader checks, but its final UI benchmark hit the software renderer's existing slow-frame safety limit rather than completing all four blocks. That run is not reported as a full pass; no benchmark limits or RC implementation were changed for this viewport work.
+
+## Surface material update
+
+The subsequent surface-material pass uses recipe version 8, preserving the viewport placement and spline workflow. See [SURFACE-MAPS.md](SURFACE-MAPS.md) for noise-free geometry maps, surface weathering, UV/PNG export and limitations. The opening material is now Surface; Clay is still selectable.

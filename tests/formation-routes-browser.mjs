@@ -30,7 +30,7 @@ try{
  await page.click('#SplineRemove');await ready();assert.equal(await page.evaluate(()=>CliffApp.ViewportEditor.handles.children.length),4);
  // Real pointer dragging and all three gizmos are covered by viewport-editor-browser.mjs.
  const saved=await page.evaluate(()=>structuredClone(CliffApp.State.Specification));
- const download=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await (await download).path(),'utf8'));assert.equal(recipe.Version,7);assert.deepEqual(recipe.Specification.RoutePoints,saved.RoutePoints);
+ const download=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await (await download).path(),'utf8'));assert.equal(recipe.Version,8);assert.deepEqual(recipe.Specification.RoutePoints,saved.RoutePoints);
  await change('Profile','Headland');
  await page.setInputFiles('#RecipeFile',{name:'route.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(recipe))});await ready();
  assert.deepEqual(await page.evaluate(()=>CliffApp.State.Specification.RoutePoints),saved.RoutePoints);

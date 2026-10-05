@@ -1,3 +1,5 @@
+import {CreateSurfacePanel} from './SurfacePanel.js';
+import {ReadSurfaceSettings} from './SurfaceBake.js';
 import {RouteProfiles} from './FormationRoute.js';
 import {CreateViewportEditor} from './ViewportEditor.js';
 import '@fontsource/dm-sans/300.css';
@@ -23,7 +25,7 @@ const StageDescriptions=[
     ['Surface fissures','Shallow polygon incisions','Finite, kinked V-grooves cut into individual rock faces. Closed bottoms, bounded depth; no SDF erosion.']
 ];
 const State={Specification:{...CliffDefaults,...SolidPresets.Headland},Result:null,Stage:1,Busy:false,DisplayStage:0,Revision:0,ReadyRevision:0,Worker:null,Dirty:false,
-    Mode:'Clay',Wire:false,Selected:null,Isolated:false,Exploded:false,Milliseconds:0,Error:null};
+    Mode:'Surface',Wire:false,Selected:null,Isolated:false,Exploded:false,Milliseconds:0,Error:null};
 const Scene=new THREE.Scene();
 Scene.background=new THREE.Color('#282e38');
 const Camera=new THREE.PerspectiveCamera(38,1,.05,500);
@@ -75,6 +77,7 @@ const WireMaterial=new THREE.LineBasicMaterial({color:'#111820',transparent:true
 const SelectionMaterial=new THREE.LineBasicMaterial({color:'#efb063',transparent:true,opacity:.9,depthTest:true});
 const CutColours={Cliff:'#929aa5',Crown:'#929aa5',Base:'#929aa5',End:'#929aa5',Back:'#929aa5',Bedding:'#8ca49d',
     Fracture:'#8ca49d',Joint:'#8ca49d',Termination:'#8ca49d',Spall:'#e0a570',Crack:'#d07969'};
+let SurfaceStudy=null;
 let ViewportEditor=null;
 let SelectionOutline=null;
 let ResizePending=true;
@@ -118,6 +121,8 @@ function BuildRenderBody(Mesh, Index)
     });
     const Geometry=new THREE.BufferGeometry();
     Geometry.setAttribute('position',new THREE.BufferAttribute(Positions,3));
+    // Keep a stable UV buffer before the first draw; baking updates it in place.
+    Geometry.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(Mesh.Triangles.length*6),2));
     Geometry.setAttribute('color',new THREE.BufferAttribute(Colours,3));
     Geometry.computeVertexNormals();
     Geometry.computeBoundingBox();
@@ -168,6 +173,7 @@ function ViewStage(StageNumber)
     DisposeBodies();
     if (!Stage)
     {
+        SurfaceStudy?.onStage(null,true);
         Element('Metrics').textContent='No current mesh at this stage. Rebuild to continue.';
         Element('BodyCount').textContent='No current mesh';
         Element('TriangleCount').textContent='— triangles';
@@ -182,6 +188,7 @@ function ViewStage(StageNumber)
     }
     ApplyVisibility();
     UpdateMetrics();
+    SurfaceStudy?.onStage(Stage,State.Dirty);
 }
 
 function UpdateMetrics()
@@ -368,6 +375,7 @@ function FailGeneration(Message)
 {
     State.Worker?.terminate();
     State.Worker=null;
+    SurfaceStudy?.onStage(null,true);
     State.Result=null;
     State.Error=Message;
     State.Busy=false;
@@ -490,6 +498,11 @@ StageDescriptions.forEach(([Title,Subtitle],Index)=>
     Button.onclick=()=>ViewStage(Index+1);
     Element('StageList').appendChild(Button);
 });
+const SurfaceHost=document.createElement('div');Element('ParameterControls').before(SurfaceHost);
+function SurfaceRecipe(){return {Format:'Frontier.PolygonCliff',Version:8,Specification:State.Specification,Surface:SurfaceStudy.State.Settings};}
+// UV/texture uploads need one follow-up invalidation in this on-demand renderer.
+SurfaceStudy=CreateSurfacePanel({host:SurfaceHost,bodies:BodyGroup,getState:()=>State,setMode:Mode=>{State.Mode=Mode;SetPressed('Clay',Mode==='Clay');SetPressed('Scars',Mode==='Scars');SetPressed('Surface',Mode==='Surface');},render:()=>{RenderRequested=true;requestAnimationFrame(()=>{RenderRequested=true;});},worldPoint:p=>{BodyGroup.updateWorldMatrix(true,false);return new THREE.Vector3(...p).applyMatrix4(BodyGroup.matrixWorld).toArray();},recipe:SurfaceRecipe});
+SetPressed('Clay',false);SetPressed('Surface',true);
 ViewportEditor=CreateViewportEditor({scene:Scene,camera:Camera,renderer:Renderer,orbit:Controls,bodies:BodyGroup,getSpec:()=>State.Specification,onRouteChange:()=>MarkDirty(),onRender:()=>{RenderRequested=true;Renderer.shadowMap.needsUpdate=true;},onStatus:SetStatus});
 BuildControls();
 ViewStage(State.Stage);
@@ -505,10 +518,12 @@ Element('SelectCliff').onclick=()=>{ClearSelection();ApplyVisibility();};
 Element('SelectCliff').ondblclick=()=>FrameView();
 Element('ShowAll').onclick=()=>{ClearSelection();ApplyVisibility();FrameView();};
 Element('Isolate').onclick=()=>{State.Isolated=!State.Isolated;ApplyVisibility();};
+Element('Surface').onclick=()=>SurfaceStudy.activate();
 Element('Clay').onclick=()=>
 {
     State.Mode='Clay';
     BodyGroup.children.forEach(Body=>{Body.material=ClayMaterial;});
+    SetPressed('Surface',false);
     SetPressed('Clay',true);
     SetPressed('Scars',false);
 };
@@ -517,6 +532,7 @@ Element('Scars').onclick=()=>
     State.Mode='Scars';
     BodyGroup.children.forEach(Body=>{Body.material=CutMaterial;});
     SetPressed('Clay',false);
+    SetPressed('Surface',false);
     SetPressed('Scars',true);
 };
 Element('Wire').onclick=()=>
@@ -537,14 +553,15 @@ Element('LightAngle').oninput=Event=>
     Element('LightValue').textContent=`${Event.target.value}°`;
 };
 Element('ExportObj').onclick=()=>Download(`Cliff_${State.Specification.Profile}_${State.Specification.Seed}_Stage${State.Stage}.obj`,ObjText(),'text/plain');
-Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:7,Specification:State.Specification},null,2),'application/json');
+Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify(SurfaceRecipe(),null,2),'application/json');
 Element('ImportRecipe').onclick=()=>Element('RecipeFile').click();
 Element('RecipeFile').onchange=async Event=>
 {
     try
     {
         const Recipe=JSON.parse(await Event.target.files[0].text());
-        State.Specification=ReadRecipe(Recipe);
+        const Specification=ReadRecipe(Recipe),Surface=ReadSurfaceSettings(Recipe.Surface);
+        State.Specification=Specification;SurfaceStudy.setSettings(Surface);
         BuildControls();
         Generate();
     }
@@ -660,7 +677,7 @@ Element('SaveActive').onclick=()=>Element(GrainStudy.Parameters.Active?'GrainSav
 Element('OpenActive').onclick=()=>Element(GrainStudy.Parameters.Active?'GrainLoad':'ImportRecipe').click();
 Element('CliffSearch').oninput=Event=>document.querySelectorAll('.StageButton').forEach(Button=>{Button.hidden=!Button.textContent.toLowerCase().includes(Event.target.value.toLowerCase());});
 window.GrainApp=GrainStudy;
-window.CliffApp={State,Scene,Camera,Controls,Renderer,BodyGroup,ViewportEditor,Generate,ViewStage,FrameView,SelectBody,ObjText,
+window.CliffApp={State,Scene,Camera,Controls,Renderer,BodyGroup,ViewportEditor,SurfaceStudy,Generate,ViewStage,FrameView,SelectBody,ObjText,
     SetSpecification:Specification=>{State.Specification=ReadSpecification({...State.Specification,...Specification});BuildControls();Generate();},
     FocusSpall:()=>
     {

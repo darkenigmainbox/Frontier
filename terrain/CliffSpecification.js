@@ -155,7 +155,7 @@ export function EarliestStage(Before,After)
 
 export function ReadRecipe(Recipe)
 {
-    if (Recipe.Format!=='Frontier.PolygonCliff' || ![1,2,3,4,5,6,7].includes(Recipe.Version)) throw new Error('Unsupported cliff recipe');
+    if (Recipe.Format!=='Frontier.PolygonCliff' || ![1,2,3,4,5,6,7,8].includes(Recipe.Version)) throw new Error('Unsupported cliff recipe');
     const Specification={...Recipe.Specification};
     if(Recipe.Version<4) Specification.ShapeMode='Authored';
     else if(Recipe.Version===4&&!Specification.ShapeMode)Specification.ShapeMode='Procedural';

@@ -1,0 +1,34 @@
+{
+  "passed": true,
+  "occlusion": {
+    "clear": 1,
+    "covered": 0.4362884409292649
+  },
+  "waterLedger": {
+    "supplied": 4.106666666666686,
+    "evaporated": 2.8966657730925496,
+    "escaped": 0,
+    "remaining": 1.2100008935741218,
+    "residual": 1.4654943925052066e-14
+  },
+  "deterministic": true,
+  "noRainControl": true,
+  "anoxicControl": true,
+  "neutralControl": true,
+  "losslessRGBA": true,
+  "stage5": {
+    "triangles": 26066,
+    "vertices": 13129,
+    "cycles": 80,
+    "milliseconds": 4349.800054999999,
+    "mapBytes": 54525952,
+    "waterLedger": {
+      "supplied": 4782.148506665872,
+      "evaporated": 2875.691287457276,
+      "escaped": 357.3892357934175,
+      "remaining": 1549.0679834143996,
+      "residual": 7.794369594193995e-10
+    }
+  },
+  "geometryUnchanged": true
+}

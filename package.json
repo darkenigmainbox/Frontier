@@ -19,7 +19,9 @@
     "test:routes": "node tests/formation-routes.mjs",
     "test:routes:browser": "npm run build:githack && node tests/formation-routes-browser.mjs",
     "test:placement": "node tests/formation-placement.mjs",
-    "test:viewport:browser": "npm run build:githack && node tests/viewport-editor-browser.mjs"
+    "test:viewport:browser": "npm run build:githack && node tests/viewport-editor-browser.mjs",
+    "test:surface": "node tests/surface-maps.mjs",
+    "test:surface:browser": "npm run build:githack && node tests/surface-browser.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",
