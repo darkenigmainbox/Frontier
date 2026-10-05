@@ -1,5 +1,7 @@
 # Painted control over stage 6
 
+**Update:** [Auto, Paint and Auto + paint modes](AUTO_DETAIL.md) are available. New sessions default to Auto; choose Paint for the manual workflow below.
+
 The accepted hollow-mould boolean is unchanged in principle. This pass adds an object-space, surface-oriented paint mask that controls **where** its inner wall moves. It does not displace stage 5 directly or add textures.
 
 ## Workflow

@@ -9,8 +9,26 @@ export function ReadDetailPaint(stamps=[]){
   return {p:s.p.slice(),n:Math.abs(length-1)>1e-12?s.n.map(x=>x/length):s.n.slice(),radius:s.radius,strength:s.strength,softness:s.softness,target:s.target,stroke:s.stroke};
  });
 }
+export const DetailMaskModes={Auto:'Auto · procedural patches',Paint:'Paint · manual mask',AutoPaint:'Auto + paint · local corrections'};
+// Seeded smooth 3D patches, evaluated in the same object space as painted stamps.
+// Coverage is a threshold control, not a promise of an exact surface-area percentage.
+export function AutoDetailMask(p,s){
+ const coverage=s.DetailAutoCoverage??.45;
+ if(coverage<=0)return 0;if(coverage>=1)return 1;
+ const size=s.DetailAutoSize??6,seed=s.DetailAutoSeed??42;
+ const q=p.map(v=>v/size),cell=q.map(Math.floor),fade=t=>t*t*(3-2*t),f=q.map((v,k)=>fade(v-cell[k]));
+ const hash=(x,y,z)=>{let h=Math.imul(x,374761393)^Math.imul(y,668265263)^Math.imul(z,2147483647)^Math.imul(seed,1274126177);h=Math.imul(h^(h>>>13),1274126177);return ((h^(h>>>16))>>>0)/4294967295;};
+ let signal=0;
+ for(let x=0;x<2;x++)for(let y=0;y<2;y++)for(let z=0;z<2;z++)signal+=hash(cell[0]+x,cell[1]+y,cell[2]+z)*(x?f[0]:1-f[0])*(y?f[1]:1-f[1])*(z?f[2]:1-f[2]);
+ signal+=(s.DetailAutoHeightBias??0)*(clamp(p[1]/Math.max(1,s.Height??18))-.5);
+ const width=s.DetailAutoFalloff??.3,threshold=1-coverage;
+ if(width===0)return signal>=threshold?1:0;
+ return fade(clamp((signal-threshold)/width+.5));
+}
 export function DetailMask(p,normal,s){
- let weight=s.DetailMaskBase??1;
+ const mode=s.DetailMaskMode??'Paint';
+ let weight=mode==='Paint'?(s.DetailMaskBase??1):AutoDetailMask(p,s);
+ if(mode==='Auto')return weight;
  for(const stamp of s.DetailPaint||[]){
   const dx=p[0]-stamp.p[0],dy=p[1]-stamp.p[1],dz=p[2]-stamp.p[2],distance2=dx*dx+dy*dy+dz*dz;
   if(distance2>=stamp.radius*stamp.radius)continue;

@@ -206,7 +206,7 @@ function ViewStage(StageNumber)
     ApplyVisibility();
     UpdateMetrics();
     DetailPainter?.refresh();
-    if(State.Painting){Element('BodyCount').textContent='Paint preview · original stage 1';Element('TriangleCount').textContent=State.Result.Stages[0].Metrics.Triangles.toLocaleString()+' preview triangles';Element('QualityNote').textContent='Influence preview on source vertices, not output geometry. The refined mould can resolve finer falloff. Rebuild for final measurements.';Element('StageDescription').textContent='Paint on the ORIGINAL stage-1 mass. Blue is protected; orange permits cutting. This is the influence preview, not the final rock. Stop painting and rebuild stage 6 to apply.';Element('ExportObj').disabled=true;}
+    if(State.Painting){Element('BodyCount').textContent=(State.Specification.DetailMaskMode==='Auto'?'Auto mask':'Paint')+' preview · original stage 1';Element('TriangleCount').textContent=State.Result.Stages[0].Metrics.Triangles.toLocaleString()+' preview triangles';Element('QualityNote').textContent='Influence preview on source vertices, not output geometry. The refined mould can resolve finer falloff. Rebuild for final measurements.';Element('StageDescription').textContent=State.Specification.DetailMaskMode==='Auto'?'AUTO MASK PREVIEW on the original mass. Blue is protected; orange permits cutting. Orbit to inspect. Return to rock and rebuild stage 6 after changing settings.':'Paint on the ORIGINAL stage-1 mass. Blue is protected; orange permits cutting. This is the influence preview, not the final rock. Stop painting and rebuild stage 6 to apply.';Element('ExportObj').disabled=true;}
 }
 
 function UpdateMetrics()
@@ -453,11 +453,12 @@ const Groups=[
     ['Edge spalls',true,[['SpallSize','Spall scale',.25,1.3,.05,'m'],['SpallDensity','Edge occupancy',0,1,.05,'×']]],
     ['Surface fissures',false,[['CrackLength','Maximum length',.5,2.2,.1,'m'],['CrackWidth','Mouth width',.07,.22,.01,'m'],
         ['CrackDepth','Maximum depth',.06,.3,.01,'m'],['CrackDensity','Face occupancy',0,1,.05,'×']]],
-    ['Mould detail · stage 6',false,[['DetailPattern','Noise shape'],['DetailCoverage','Mask coverage · trim weak edges',0,1,.05,''],['DetailSeed','Noise seed',0,999999,1,''],['DetailSpacing','Mould triangle spacing',.4,1.8,.05,'m'],['DetailAmplitude','Noise displacement',0,.8,.05,'m'],['DetailBias','Cut depth / penetration',-.15,1.5,.01,'m'],['DetailScale','Noise wavelength',1,6,.1,'m'],['DetailAnisotropy','Vertical frequency',1,3,.1,'×']]],
+    ['Mould detail · stage 6',false,[['DetailAutoCoverage','Auto coverage · threshold',0,1,.05,''],['DetailAutoSize','Auto patch size',2,20,.5,'m'],['DetailAutoFalloff','Auto gradient falloff',0,.8,.05,''],['DetailAutoSeed','Auto patch seed'],['DetailAutoHeightBias','Auto height bias · lower / upper',-1,1,.1,''],['DetailPattern','Noise shape'],['DetailCoverage','Paint trim · ignored in Auto',0,1,.05,''],['DetailSeed','Noise seed',0,999999,1,''],['DetailSpacing','Mould triangle spacing',.4,1.8,.05,'m'],['DetailAmplitude','Noise displacement',0,.8,.05,'m'],['DetailBias','Cut depth / penetration',-.15,1.5,.01,'m'],['DetailScale','Noise wavelength',1,6,.1,'m'],['DetailAnisotropy','Vertical frequency',1,3,.1,'×']]],
     ['Triangulation',false,[['TriangleSpan','Target edge span',.8,2.2,.1,'m']]]
 ];
 function BuildControls()
 {
+    Element('AutoMaskControls').replaceChildren();
     const Solid=State.Specification.ShapeMode==='Solid',Profile=State.Specification.Profile;
     const Supports={RouteSegments:RouteProfiles,RouteWidth:RouteProfiles,RouteSmooth:RouteProfiles,ArchThickness:['RockArch'],CanyonGap:['Canyon'],PeakCount:['Headland','Escarpment','Needles','WideWall','Amphitheatre'],PeakSpread:['Headland','Needles','WideWall','Amphitheatre','RouteCliff','Canyon'],Taper:['Headland','Escarpment','Spire'],Terraces:['Headland','Escarpment','Spire','Needles'],BayDepth:['Headland','Needles','WideWall','Amphitheatre']};
     const Labels={PeakCount:Profile==='Escarpment'?'Terrace count':Profile==='Needles'?'Tower count':'Mass count',PeakSpread:'Mass height variation',PeakSharpness:'Crown bevel',Taper:'Upper mass narrowing',Terraces:Profile==='Needles'||Profile==='Spire'?'Pedestal height':'Shelf strength',BayDepth:Profile==='Amphitheatre'?'Cove opening':Profile==='WideWall'?'Ridge bend':'Mass spread'};
@@ -471,6 +472,7 @@ function BuildControls()
         if (Name.endsWith('Seed')) return `<div class="Property"><label class="FieldLabel" for="${Name}">${Label}<span class="Subtle">repeatable variation</span></label><div class="SeedRow"><input type="number" id="${Name}" min="0" max="999999" step="1"><button id="New${Name}">New seed</button></div></div>`;
         return `<div class="Property"><label class="FieldLabel" for="${Name}">${Label}<output id="${Name}Value"></output></label><input type="range" id="${Name}" min="${Minimum}" max="${Maximum}" step="${Step}" data-unit="${Unit}"></div>`;
     }).join('')}</div></details>`).join('');
+    for(const Name of ['DetailAutoCoverage','DetailAutoSize','DetailAutoFalloff','DetailAutoSeed','DetailAutoHeightBias'])Element('AutoMaskControls').append(Element(Name).closest('.Property'));
     for (const [, ,Fields] of ControlGroups) for (const [Name] of Fields)
     {
         const Input=Element(Name);
@@ -491,7 +493,7 @@ function BuildControls()
         });
     }
     ViewportEditor?.sync();
-    for (const Name of ['Seed','FractureSeed','DetailSeed']) Element(`New${Name}`).onclick=()=>
+    for (const Name of ['Seed','FractureSeed','DetailSeed','DetailAutoSeed']) Element(`New${Name}`).onclick=()=>
     {
         const Next=crypto.getRandomValues(new Uint32Array(1))[0]%1000000;
         State.Specification[Name]=Next===State.Specification[Name]?(Next+1)%1000000:Next;
@@ -566,7 +568,7 @@ Element('LightAngle').oninput=Event=>
     Element('LightValue').textContent=`${Event.target.value}°`;
 };
 Element('ExportObj').onclick=()=>Download(`Cliff_${State.Specification.Profile}_${State.Specification.Seed}_Stage${State.Stage}.obj`,ObjText(),'text/plain');
-Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:10,Specification:State.Specification},null,2),'application/json');
+Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:11,Specification:State.Specification},null,2),'application/json');
 Element('ImportRecipe').onclick=()=>Element('RecipeFile').click();
 Element('RecipeFile').onchange=async Event=>
 {

@@ -9,8 +9,16 @@ export function CreateDetailPainter({state,canvas,camera,scene,bodies,orbit,edit
  const number=id=>{const input=el(id),v=Number(input.value);return Math.max(Number(input.min),Math.min(Number(input.max),Number.isFinite(v)?v:Number(input.min)));};
  function save(){history.push({DetailMaskBase:state.Specification.DetailMaskBase,DetailPaint:structuredClone(state.Specification.DetailPaint)});if(history.length>20)history.shift();}
  function refresh(){
+  const mode=state.Specification.DetailMaskMode,auto=mode==='Auto';
+  el('DetailMaskMode').value=mode;
+  el('AutoMaskControls').hidden=mode==='Paint';el('ManualPaintTools').hidden=auto;
+  el('MaskModeHelp').textContent=auto?'Auto is active: seeded patches leave other areas protected. Adjust coverage, patch size and gradient falloff below. Blue is protected; orange allows the cut. Stored paint is ignored.':mode==='AutoPaint'?'Procedural patches plus painted additions/protection. Strokes are applied after the Auto mask.':'Manual painting only. Auto settings are ignored.';
+  for(const id of ['PaintAction','PaintRadius','PaintStrength','PaintSoftness'])el(id).disabled=auto;
+  for(const id of ['PaintProtectAll','PaintCutAll'])el(id).disabled=mode!=='Paint';
+  for(const id of ['DetailAutoCoverage','DetailAutoSize','DetailAutoFalloff','DetailAutoSeed','NewDetailAutoSeed','DetailAutoHeightBias'])if(el(id))el(id).disabled=mode==='Paint';
+  if(el('DetailCoverage'))el('DetailCoverage').disabled=auto;
   el('PaintPanel').hidden=state.Stage!==6;
-  el('PaintToggle').textContent=state.Painting?'Stop painting · return to rock':'Paint influence in viewport';
+  el('PaintToggle').textContent=state.Painting?'Return to rock':auto?'Preview Auto mask':'Paint influence in viewport';
   el('PaintToggle').disabled=state.Busy||!state.Result?.Stages[0]||(!state.Painting&&!state.DisplayStage);
   el('PaintUndo').disabled=!history.length;
   el('PaintCount').textContent=`${state.Specification.DetailPaint.length} / 3,000 stamps · blue = protected; orange = affected`;
@@ -35,7 +43,7 @@ export function CreateDetailPainter({state,canvas,camera,scene,bodies,orbit,edit
   return {p:bodies.worldToLocal(h.point.clone()),n:h.face.normal.clone().normalize()};
  }
  function cursor(h){
-  ring.visible=!!h&&state.Painting;
+  ring.visible=!!h&&state.Painting&&state.Specification.DetailMaskMode!=='Auto';
   if(h){const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),h.n),r=number('PaintRadius');ring.matrix.copy(bodies.matrixWorld).multiply(new THREE.Matrix4().compose(h.p.clone().addScaledVector(h.n,.015),q,new THREE.Vector3(r,r,r)));ring.matrixWorldNeedsUpdate=true;}
   render();
  }
@@ -52,14 +60,14 @@ export function CreateDetailPainter({state,canvas,camera,scene,bodies,orbit,edit
   pointer=null;last=null;if(changed)dirty();else history.pop();refresh();
  }
  canvas.addEventListener('pointerdown',e=>{
-  if(!state.Painting||state.Busy||e.button!==0)return;
+  if(!state.Painting||state.Specification.DetailMaskMode==='Auto'||state.Busy||e.button!==0)return;
   e.preventDefault();e.stopImmediatePropagation();const h=hit(e);if(!h)return;
   save();drawing=true;changed=false;last=null;pointer=e.pointerId;stroke=Math.max(0,...state.Specification.DetailPaint.map(s=>s.stroke))+1;
   orbit.enabled=false;canvas.setPointerCapture(e.pointerId);dab(h);cursor(h);
  },true);
  canvas.addEventListener('pointermove',e=>{
   for(const id of ['ToolView','ToolSpline','ToolMove','ToolRotate','ToolScale','ToolReset']){if(state.Painting)el(id).disabled=true;else if(id!=='ToolSpline')el(id).disabled=false;}
-  if(!state.Painting)return;const h=hit(e);cursor(h);
+  if(!state.Painting||state.Specification.DetailMaskMode==='Auto')return;const h=hit(e);cursor(h);
   if(drawing){e.preventDefault();e.stopImmediatePropagation();if(h)dab(h);else last=null;}
  },true);
  for(const event of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(event,e=>{if(drawing){e.stopImmediatePropagation();finish();}},true);
@@ -67,12 +75,14 @@ export function CreateDetailPainter({state,canvas,camera,scene,bodies,orbit,edit
  window.addEventListener('keydown',e=>{if(state.Painting&&e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();stop();view(state.Stage);refresh();return;}if(state.Painting&&!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)&&['q','w','e','r','Delete','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();e.stopImmediatePropagation();}},true);
  el('PaintToggle').onclick=()=>{
   finish();state.Painting=!state.Painting;ring.visible=false;
-  if(state.Painting&&!state.Specification.DetailPaint.length)el('PaintAction').value=state.Specification.DetailMaskBase>=.5?'0':'1';
+  if(state.Painting&&state.Specification.DetailMaskMode==='Paint'&&!state.Specification.DetailPaint.length)el('PaintAction').value=state.Specification.DetailMaskBase>=.5?'0':'1';
   editor().setMode('View');editor().sync();state.DetailView='Final';el('DetailView').value='Final';state.Isolated=false;
   view(6);refresh();
-  if(state.Painting)status('Painting ORIGINAL stage-1 surface · left drag to paint · stop painting to orbit · rebuild to apply');
+  if(state.Painting)status(state.Specification.DetailMaskMode==='Auto'?'Auto mask preview · orbit to inspect · rebuild after changing controls':'Painting ORIGINAL stage-1 surface · left drag to paint · rebuild to apply');
  };
  for(const [id,base]of [['PaintProtectAll',0],['PaintCutAll',1]])el(id).onclick=()=>{finish();save();state.Specification.DetailMaskBase=base;state.Specification.DetailPaint=[];el('PaintAction').value=base?'0':'1';dirty();refresh();};
+ el('DetailMaskMode').onchange=()=>{stop();state.Specification.DetailMaskMode=el('DetailMaskMode').value;dirty();refresh();};
+ el('PaintClearCorrections').onclick=()=>{finish();save();state.Specification.DetailPaint=[];dirty();refresh();};
  el('PaintUndo').onclick=()=>{finish();const previous=history.pop();if(previous){Object.assign(state.Specification,previous);dirty();refresh();}};
  function stop(){if(!state.Painting&&!drawing)return;finish();state.Painting=false;ring.visible=false;orbit.enabled=true;editor().sync();}
  return {refresh,stop,resetHistory(){history.length=0;},get material(){return material;}};

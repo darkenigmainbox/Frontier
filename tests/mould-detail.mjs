@@ -34,7 +34,7 @@ function check(r){
  reports.push({profile:r.Specification.Profile,seed:r.Specification.DetailSeed,...s,numericalExcessVolume:excess,thinTriangles:d.Metrics.ThinTriangles});
  console.log(JSON.stringify(reports.at(-1)));
 }
-let spec=ReadSpecification({...SolidPresets.Headland,Profile:'Headland'});
+let spec=ReadSpecification({...SolidPresets.Headland,Profile:'Headland',DetailMaskMode:'Paint'});
 let r=await sequence.Generate(spec);check(r);
 const source=JSON.stringify(r.Stages.slice(0,5));
 assert.strictEqual((await sequence.Generate(spec)).Stages[5],r.Stages[5]);
@@ -48,7 +48,7 @@ assert(Math.abs(neutral.Stages[5].Detail.removedVolume)<.1,'neutral mould should
 assert.equal(EarliestStage(spec,{...spec,DetailSeed:43}),6);
 assert.deepEqual(ReadRecipe({Format:'Frontier.PolygonCliff',Version:9,Specification:spec}),spec);
 for(const Profile of ['WideWall','RockArch','Canyon','Spire','RouteCliff']){
- r=await sequence.Generate({...SolidPresets[Profile],Profile});check(r);
+ r=await sequence.Generate({...SolidPresets[Profile],Profile,DetailMaskMode:'Paint'});check(r);
 }
 fs.mkdirSync('.arena',{recursive:true});fs.writeFileSync('.arena/mould-results.json',JSON.stringify({passed:true,reports},null,2));
 console.log('PASS: topology, conservative subtraction, signed warp, cache, placement, neutral control, recipe round-trip and six formations.');

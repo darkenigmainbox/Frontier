@@ -5,7 +5,7 @@ import {CliffSequence} from '../terrain/FractureSequence.js';
 const identity={TransformPosition:[0,0,0],TransformRotation:[0,0,0],TransformScale:[1,1,1]};
 assert.deepEqual(ReadPlacement(),identity);
 for(const bad of [{TransformScale:[0,1,1]},{TransformScale:[-1,1,1]},{TransformScale:[11,1,1]},{TransformPosition:[Infinity,0,0]},{TransformRotation:[NaN,0,0]},{TransformPosition:[0,0]},{TransformPosition:['1',0,0]}])assert.throws(()=>ReadSpecification(bad));
-const a=ReadSpecification(),b=ReadSpecification({...a,TransformPosition:[5,2,-7],TransformRotation:[.2,.4,.1],TransformScale:[1.2,.8,2]});
+const a=ReadSpecification({DetailMaskMode:'Paint'}),b=ReadSpecification({...a,TransformPosition:[5,2,-7],TransformRotation:[.2,.4,.1],TransformScale:[1.2,.8,2]});
 assert.equal(EarliestStage(a,b),7,'placement must not invalidate geometry');
 const seq=new CliffSequence(),before=seq.Generate(a,()=>{},1);const after=seq.Generate(b,()=>{},1);
 assert.deepEqual(after.ExecutedStages,[]);assert.deepEqual(after.Stages[0].Meshes,before.Stages[0].Meshes);
