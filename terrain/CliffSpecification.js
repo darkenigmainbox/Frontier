@@ -9,7 +9,7 @@ import {SolidLabels,SolidCountRanges} from './SolidFormation.js';
 
 export const ShapeModes={Solid:'3D masses · distinct structures',Procedural:'Legacy · folded ridge',Authored:'Legacy · authored profiles'};
 
-export const CliffDefaults = Object.freeze({...ReadPlacement(),ShapeMode:'Solid',RoutePoints:RoutePresets.Sweep,RouteSegments:8,RouteWidth:6,RouteSmooth:1,ArchThickness:5,CanyonGap:10,PeakCount:0,PeakSpread:.85,PeakSharpness:.65,Lean:.15,Taper:.4,Terraces:.4,BayDepth:.8,Profile:'Headland', Seed:42, Width:32, Height:18, Depth:12, Relief:1,
+export const CliffDefaults = Object.freeze({DetailSeed:42,DetailSpacing:.65,DetailAmplitude:.5,DetailBias:.08,DetailScale:2.8,DetailAnisotropy:1.6,...ReadPlacement(),ShapeMode:'Solid',RoutePoints:RoutePresets.Sweep,RouteSegments:8,RouteWidth:6,RouteSmooth:1,ArchThickness:5,CanyonGap:10,PeakCount:0,PeakSpread:.85,PeakSharpness:.65,Lean:.15,Taper:.4,Terraces:.4,BayDepth:.8,Profile:'Headland', Seed:42, Width:32, Height:18, Depth:12, Relief:1,
     NoiseMode:'Ridged', Variation:.8, NoiseScale:2.6, FractureStyle:'Conjugate', FractureSeed:42,
     Retreat:0.48, Beds:7, Dip:4, Aperture:0.07, FractureBend:1, JointSpacing:4.6, Penetration:0.78, FaceRecess:0.65, SpallSize:0.8,
     SpallDensity:0.8, CrackLength:1.4, CrackWidth:0.12, CrackDepth:0.18, CrackDensity:0.55, TriangleSpan:1.4});
@@ -113,7 +113,7 @@ export function SelectCatalogue(Seed)
 export function ReadSpecification(Input = {})
 {
     const Result = {...CliffDefaults, ...Input};
-    const Limits = {RouteSegments:[4,12],RouteWidth:[3,10],RouteSmooth:[0,1],ArchThickness:[3,9],CanyonGap:[5,16],PeakCount:[0,7],PeakSpread:[0,1],PeakSharpness:[0,1],Lean:[-1,1],Taper:[0,.75],Terraces:[0,1],BayDepth:[0,1.5],Seed:[0,999999],FractureSeed:[0,999999],Variation:[0,1],NoiseScale:[1,5],Width:[10,80],Height:[10,56],Depth:[8,24],Relief:[.35,1.3],Retreat:[.25,.65],
+    const Limits = {DetailSeed:[0,999999],DetailSpacing:[.4,1.8],DetailAmplitude:[0,.8],DetailBias:[-.15,.3],DetailScale:[1,6],DetailAnisotropy:[1,3],RouteSegments:[4,12],RouteWidth:[3,10],RouteSmooth:[0,1],ArchThickness:[3,9],CanyonGap:[5,16],PeakCount:[0,7],PeakSpread:[0,1],PeakSharpness:[0,1],Lean:[-1,1],Taper:[0,.75],Terraces:[0,1],BayDepth:[0,1.5],Seed:[0,999999],FractureSeed:[0,999999],Variation:[0,1],NoiseScale:[1,5],Width:[10,80],Height:[10,56],Depth:[8,24],Relief:[.35,1.3],Retreat:[.25,.65],
         Beds:[4,10],Dip:[-8,8],Aperture:[.035,.18],FractureBend:[0,1.5],JointSpacing:[3,7],Penetration:[.55,.9],FaceRecess:[0,1.5],SpallSize:[.25,1.3],
         SpallDensity:[0,1],CrackLength:[.5,2.2],CrackWidth:[.07,.22],CrackDepth:[.06,.3],CrackDensity:[0,1],TriangleSpan:[.8,2.2]};
     if (!Object.hasOwn(ShapeModes,Result.ShapeMode)) throw new Error('Unknown shape mode');
@@ -134,6 +134,7 @@ export function ReadSpecification(Input = {})
         if(Result.PeakCount||Result.Profile==='Spire')Result.PeakCount=Math.max(Minimum,Math.min(Maximum,Result.PeakCount));
     }
     Result.Seed = Math.round(Result.Seed);
+    Result.DetailSeed=Math.round(Result.DetailSeed);
     Result.Beds = Math.round(Result.Beds);
     Result.FractureSeed = Math.round(Result.FractureSeed);
     return Result;
@@ -144,18 +145,19 @@ export const StageProperties=[
     ['FractureSeed','FractureStyle','Beds','Dip','Aperture','FractureBend'],
     ['JointSpacing','Penetration','FaceRecess'],
     ['SpallSize','SpallDensity'],
-    ['CrackLength','CrackWidth','CrackDepth','CrackDensity']];
+    ['CrackLength','CrackWidth','CrackDepth','CrackDensity'],
+    ['DetailSeed','DetailSpacing','DetailAmplitude','DetailBias','DetailScale','DetailAnisotropy']];
 
 export function EarliestStage(Before,After)
 {
     if (!Before) return 1;
     const Index=StageProperties.findIndex(Names=>Names.some(Name=>JSON.stringify(Before[Name])!==JSON.stringify(After[Name])));
-    return Index<0?6:Index+1;
+    return Index<0?7:Index+1;
 }
 
 export function ReadRecipe(Recipe)
 {
-    if (Recipe.Format!=='Frontier.PolygonCliff' || ![1,2,3,4,5,6,7].includes(Recipe.Version)) throw new Error('Unsupported cliff recipe');
+    if (Recipe.Format!=='Frontier.PolygonCliff' || ![1,2,3,4,5,6,7,8,9].includes(Recipe.Version)) throw new Error('Unsupported cliff recipe');
     const Specification={...Recipe.Specification};
     if(Recipe.Version<4) Specification.ShapeMode='Authored';
     else if(Recipe.Version===4&&!Specification.ShapeMode)Specification.ShapeMode='Procedural';

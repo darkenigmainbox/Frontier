@@ -1,0 +1,123 @@
+{
+  "detail": {
+    "operation": "Stage5 − noisy(Box − Stage1)",
+    "spacing": 0.65,
+    "amplitude": 0.5,
+    "bias": 0.08,
+    "refinedTriangles": 35192,
+    "mouldVerticesMoved": 6026,
+    "minimumOffset": -0.2689908131438435,
+    "maximumOffset": 0.4652575718034883,
+    "stage5Volume": 4509.297149940037,
+    "finalVolume": 4398.2405592663,
+    "removedVolume": 111.05659067373745,
+    "outputTriangles": 21506,
+    "cleanupTolerance": 0.001,
+    "cleanupPasses": 1,
+    "exchangeRepairs": 0,
+    "appliedVertices": 6026,
+    "sourceSpalls": 122,
+    "sourceCracks": 15,
+    "milliseconds": 1351.8000000000466
+  },
+  "metrics": {
+    "Stage": 6,
+    "Bodies": 1,
+    "Vertices": 10851,
+    "Triangles": 21506,
+    "ZeroArea": 0,
+    "Volume": 4398.2405592663,
+    "MinimumAngle": 0.000007244509618354405,
+    "ThinTriangles": 4550,
+    "NonmanifoldVertices": 0,
+    "DuplicateTriangles": 0,
+    "OpenEdges": 0,
+    "NonmanifoldEdges": 0,
+    "WindingErrors": 0,
+    "Name": "Mould-detailed cliff",
+    "Spalls": 0,
+    "Cracks": 0,
+    "RejectedSpalls": 0,
+    "RejectedCracks": 0
+  },
+  "specification": {
+    "DetailSeed": 42,
+    "DetailSpacing": 0.65,
+    "DetailAmplitude": 0.5,
+    "DetailBias": 0.08,
+    "DetailScale": 2.8,
+    "DetailAnisotropy": 1.6,
+    "TransformPosition": [
+      0,
+      0,
+      0
+    ],
+    "TransformRotation": [
+      0,
+      0,
+      0
+    ],
+    "TransformScale": [
+      1,
+      1,
+      1
+    ],
+    "ShapeMode": "Solid",
+    "RoutePoints": [
+      [
+        -0.85,
+        0.55
+      ],
+      [
+        -0.3,
+        -0.5
+      ],
+      [
+        0.3,
+        0.5
+      ],
+      [
+        0.85,
+        -0.55
+      ]
+    ],
+    "RouteSegments": 8,
+    "RouteWidth": 6,
+    "RouteSmooth": 1,
+    "ArchThickness": 5,
+    "CanyonGap": 10,
+    "PeakCount": 0,
+    "PeakSpread": 0.65,
+    "PeakSharpness": 0.35,
+    "Lean": 0.1,
+    "Taper": 0.3,
+    "Terraces": 0.45,
+    "BayDepth": 0.8,
+    "Profile": "Headland",
+    "Seed": 42,
+    "Width": 26,
+    "Height": 18,
+    "Depth": 22,
+    "Relief": 1,
+    "NoiseMode": "Ridged",
+    "Variation": 0.8,
+    "NoiseScale": 2.6,
+    "FractureStyle": "Conjugate",
+    "FractureSeed": 42,
+    "Retreat": 0.48,
+    "Beds": 7,
+    "Dip": 4,
+    "Aperture": 0.07,
+    "FractureBend": 1,
+    "JointSpacing": 4.6,
+    "Penetration": 0.78,
+    "FaceRecess": 0.65,
+    "SpallSize": 0.8,
+    "SpallDensity": 0.8,
+    "CrackLength": 1.4,
+    "CrackWidth": 0.12,
+    "CrackDepth": 0.18,
+    "CrackDensity": 0.55,
+    "TriangleSpan": 1.4
+  }
+}

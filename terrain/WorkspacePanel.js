@@ -20,16 +20,18 @@ const StageDescriptions=[
     ['Primary fractures','Joint sets, not just bedding','Geological orientation families with rough polygon cuts. New fractures terminate at existing boundaries; bedding is an optional preset.'],
     ['Bounded joints','Finite-depth rock blocks','Kinked joints split front, rear and end exposures, terminating against a retained interior core.'],
     ['Edge spalls','Local fracture cavities','Localized, asymmetric bites with four or six fracture facets. The original edge survives on both sides—not a full-edge bevel.'],
-    ['Surface fissures','Shallow polygon incisions','Finite, kinked V-grooves cut into individual rock faces. Closed bottoms, bounded depth; no SDF erosion.']
+    ['Surface fissures','Shallow polygon incisions','Finite, kinked V-grooves cut into individual rock faces. Closed bottoms, bounded depth; no SDF erosion.'],
+    ['Mould detail','Noisy negative · triangle boolean','Stage 5 minus a noisy hollow mould made from the ORIGINAL stage-1 mass. Subtraction only: existing fracture voids are not filled. Low-resolution geometry prototype; no textures.']
 ];
-const State={Specification:{...CliffDefaults,...SolidPresets.Headland},Result:null,Stage:1,Busy:false,DisplayStage:0,Revision:0,ReadyRevision:0,Worker:null,Dirty:false,
-    Mode:'Clay',Wire:false,Selected:null,Isolated:false,Exploded:false,Milliseconds:0,Error:null};
+const State={Specification:{...CliffDefaults,...SolidPresets.Headland},Result:null,Stage:Math.max(1,Math.min(6,Math.round(Number(new URLSearchParams(location.search).get('stage')))||1)),Busy:false,DisplayStage:0,Revision:0,ReadyRevision:0,Worker:null,Dirty:false,
+    DetailView:'Final',Mode:'Clay',Wire:false,Selected:null,Isolated:false,Exploded:false,Milliseconds:0,Error:null};
 const Scene=new THREE.Scene();
 Scene.background=new THREE.Color('#282e38');
 const Camera=new THREE.PerspectiveCamera(38,1,.05,500);
 const Renderer=new THREE.WebGLRenderer({canvas:Element('SceneCanvas'),antialias:true,preserveDrawingBuffer:true});
 Renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 Renderer.shadowMap.enabled=true;
+Renderer.localClippingEnabled=true;
 Renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 Renderer.shadowMap.autoUpdate=false;
 Renderer.toneMapping=THREE.ACESFilmicToneMapping;
@@ -75,6 +77,7 @@ const WireMaterial=new THREE.LineBasicMaterial({color:'#111820',transparent:true
 const SelectionMaterial=new THREE.LineBasicMaterial({color:'#efb063',transparent:true,opacity:.9,depthTest:true});
 const CutColours={Cliff:'#929aa5',Crown:'#929aa5',Base:'#929aa5',End:'#929aa5',Back:'#929aa5',Bedding:'#8ca49d',
     Fracture:'#8ca49d',Joint:'#8ca49d',Termination:'#8ca49d',Spall:'#e0a570',Crack:'#d07969'};
+let MouldSection=null;
 let ViewportEditor=null;
 let SelectionOutline=null;
 let ResizePending=true;
@@ -138,13 +141,13 @@ function ViewStage(StageNumber)
 {
     RenderRequested=true;
     Renderer.shadowMap.needsUpdate=true;
-    State.Stage=Math.max(1,Math.min(5,StageNumber));
+    State.Stage=Math.max(1,Math.min(6,StageNumber));
     const [Title,,Description]=StageDescriptions[State.Stage-1];
     Element('StageTitle').textContent=State.Stage===1&&State.Specification.ShapeMode==='Solid'?SolidLabels[State.Specification.Profile]:Title;
     Element('StageDescription').textContent=State.Stage===1&&State.Specification.ShapeMode!=='Solid'?'Legacy generator retained for old recipes. Switch to 3D masses for genuinely different footprints.':Description;
-    Element('StageNumber').textContent=`0${State.Stage} / 05`;
+    Element('StageNumber').textContent=`0${State.Stage} / 06`;
     Element('PreviousStage').disabled=State.Stage===1;
-    Element('NextStage').disabled=State.Stage===5;
+    Element('NextStage').disabled=State.Stage===6;
     document.querySelectorAll('.StageButton').forEach(Button=>
     {
         const Selected=Number(Button.dataset.stage)===State.Stage;
@@ -157,6 +160,8 @@ function ViewStage(StageNumber)
     document.querySelectorAll('#ParameterControls details').forEach((Section,Index)=>{Section.open=Index===State.Stage-1;});
     const ValidThrough=Math.min(State.Stage,EarliestStage(State.Result?.Specification,State.Specification)-1);
     const Stage=State.Result?.Stages.slice(0,ValidThrough).at(-1);
+    Element('MouldStudy').hidden=Stage?.Number!==6||State.Dirty;
+    MouldSection=null;ClayMaterial.clippingPlanes=[];CutMaterial.clippingPlanes=[];ClayMaterial.side=THREE.FrontSide;CutMaterial.side=THREE.FrontSide;
     State.DisplayStage=Stage?.Number||0;
     if (State.Dirty)
     {
@@ -173,7 +178,19 @@ function ViewStage(StageNumber)
         Element('TriangleCount').textContent='— triangles';
         return;
     }
-    Stage.Meshes.forEach((Mesh,Index)=>BodyGroup.add(BuildRenderBody(Mesh,Index)));
+    const Study=Stage.Number===6&&State.DetailView!=='Final';
+    const Meshes=Study?Stage.Study[State.DetailView]:Stage.Meshes;
+    Meshes.forEach((Mesh,Index)=>BodyGroup.add(BuildRenderBody(Mesh,Index)));
+    if(Study&&['Hollow','Noisy'].includes(State.DetailView)){
+        BodyGroup.updateWorldMatrix(true,false);
+        MouldSection=new THREE.Plane(new THREE.Vector3(0,0,-1),-State.Specification.Depth*.45);
+        ClayMaterial.clippingPlanes=[MouldSection.clone().applyMatrix4(BodyGroup.matrixWorld)];CutMaterial.clippingPlanes=ClayMaterial.clippingPlanes;
+        ClayMaterial.side=THREE.DoubleSide;CutMaterial.side=THREE.DoubleSide;
+        BodyGroup.children.forEach(Body=>{Body.castShadow=false;Body.receiveShadow=false;});
+    }
+    Element('ExportObj').textContent=State.Stage===6?'Export final OBJ':'Export OBJ';
+    Element('Explode').disabled=State.Stage===6;
+    if(Stage.Detail){const D=Stage.Detail;Element('MouldNumbers').textContent=`${D.refinedTriangles.toLocaleString()} mould triangles · signed offsets ${D.minimumOffset.toFixed(2)} to +${D.maximumOffset.toFixed(2)} m · ${D.removedVolume.toFixed(1)} m³ removed · ${(D.milliseconds/1000).toFixed(2)} s detail pass. ${Study?'Inspection only — export and diagnostics still describe the final rock.':'One combined output mesh; source face tags consolidated.'}`;}
     if (Name)
     {
         const Match=BodyGroup.children.find(Body=>Body.name===Name);
@@ -195,7 +212,7 @@ function UpdateMetrics()
         <span>Open / nonmanifold edges</span><b class="Pass">${Metrics.OpenEdges} / ${Metrics.NonmanifoldEdges}</b>
         <span>Nonmanifold vertices / duplicates</span><b class="Pass">${Metrics.NonmanifoldVertices} / ${Metrics.DuplicateTriangles}</b>
         <span>Degenerate / flipped winding</span><b class="Pass">${Metrics.ZeroArea} / ${Metrics.WindingErrors}</b>
-        <span>Local spalls / fissures</span><b>${Metrics.Spalls} / ${Metrics.Cracks}</b>
+        <span>${Stage.Detail?'Upstream spalls / fissures¹':'Local spalls / fissures'}</span><b>${Stage.Detail?.sourceSpalls??Metrics.Spalls} / ${Stage.Detail?.sourceCracks??Metrics.Cracks}</b>
         <span>Rejected spalls / fissures</span><b>${Metrics.RejectedSpalls} / ${Metrics.RejectedCracks}</b>
         <span>Triangles below 5°</span><b class="${Metrics.ThinTriangles?'Warn':'Pass'}">${Metrics.ThinTriangles}</b>
         <span>Minimum triangle angle</span><b>${Metrics.MinimumAngle.toFixed(2)}°</b>
@@ -203,6 +220,7 @@ function UpdateMetrics()
     Element('QualityNote').textContent=State.Dirty ? `Showing stage ${State.DisplayStage} input, not the selected stage output. Export is disabled.` : Metrics.ThinTriangles ?
         'Narrow triangles remain at some clipped intersections; counted above, not hidden. Topology checks do not prove absence of all surface intersections.' :
         'Indexed export topology checked per body. No n-gons. Display wireframe includes every triangulation edge.';
+    if(Stage.Detail)Element('QualityNote').textContent+=' ¹Source-stage counts, not a recount after carving. Face tags and per-block selection are consolidated in this prototype.';
     Element('BodyCount').textContent=`${Metrics.Bodies} closed mesh objects`;
     Element('TriangleCount').textContent=`${Format(Metrics.Triangles)} triangles`;
     if (!State.Dirty) SetStatus(`Stage ${State.Stage} · ${Metrics.ThinTriangles ? `${Metrics.ThinTriangles} narrow-triangle warnings` : 'Topology checked'} · seed ${State.Result.Specification.Seed}`,!!Metrics.ThinTriangles);
@@ -245,7 +263,7 @@ function ApplyVisibility()
     {
         Body.visible=!State.Isolated || Body===State.Selected;
         const Centre=Body.userData.Centre;
-        Body.position.set(State.Exploded?Centre.x*.15:0,State.Exploded?Centre.y*.14:0,State.Exploded?Centre.z*.13:0);
+        Body.position.set(State.Exploded&&State.Stage!==6?Centre.x*.15:0,State.Exploded&&State.Stage!==6?Centre.y*.14:0,State.Exploded&&State.Stage!==6?Centre.z*.13:0);
     });
     Element('Isolate').textContent=State.Isolated?'Restore cliff':'Isolate rock';
 }
@@ -333,7 +351,7 @@ function Generate()
             if (Message.Revision!==State.Revision) return;
             if (Message.Progress)
             {
-                Element('LoadingDetail').textContent=`Stage ${Message.Progress} · ${StageDescriptions[Message.Progress-1][0]}`;
+                Element('LoadingDetail').textContent=`Stage ${Message.Progress} · ${Message.Message||StageDescriptions[Message.Progress-1][0]}`;
                 return;
             }
             if (Message.Error) {FailGeneration(Message.Error);return;}
@@ -426,6 +444,7 @@ const Groups=[
     ['Edge spalls',true,[['SpallSize','Spall scale',.25,1.3,.05,'m'],['SpallDensity','Edge occupancy',0,1,.05,'×']]],
     ['Surface fissures',false,[['CrackLength','Maximum length',.5,2.2,.1,'m'],['CrackWidth','Mouth width',.07,.22,.01,'m'],
         ['CrackDepth','Maximum depth',.06,.3,.01,'m'],['CrackDensity','Face occupancy',0,1,.05,'×']]],
+    ['Mould detail · stage 6',false,[['DetailSeed','Noise seed',0,999999,1,''],['DetailSpacing','Mould triangle spacing',.4,1.8,.05,'m'],['DetailAmplitude','Noise displacement',0,.8,.05,'m'],['DetailBias','Mean inward cut',-.15,.3,.01,'m'],['DetailScale','Noise wavelength',1,6,.1,'m'],['DetailAnisotropy','Vertical frequency',1,3,.1,'×']]],
     ['Triangulation',false,[['TriangleSpan','Target edge span',.8,2.2,.1,'m']]]
 ];
 function BuildControls()
@@ -463,7 +482,7 @@ function BuildControls()
         });
     }
     ViewportEditor?.sync();
-    for (const Name of ['Seed','FractureSeed']) Element(`New${Name}`).onclick=()=>
+    for (const Name of ['Seed','FractureSeed','DetailSeed']) Element(`New${Name}`).onclick=()=>
     {
         const Next=crypto.getRandomValues(new Uint32Array(1))[0]%1000000;
         State.Specification[Name]=Next===State.Specification[Name]?(Next+1)%1000000:Next;
@@ -481,6 +500,7 @@ function UpdateRange(Input)
     if (Output) Output.textContent=`${Number(Input.value).toFixed(Number(Input.step)<.01?3:Number(Input.step)<1?2:0)} ${Input.dataset.unit||''}`;
 }
 
+Element('DetailView').onchange=Event=>{State.DetailView=Event.target.value;ViewStage(State.Stage);};
 StageDescriptions.forEach(([Title,Subtitle],Index)=>
 {
     const Button=document.createElement('button');
@@ -537,7 +557,7 @@ Element('LightAngle').oninput=Event=>
     Element('LightValue').textContent=`${Event.target.value}°`;
 };
 Element('ExportObj').onclick=()=>Download(`Cliff_${State.Specification.Profile}_${State.Specification.Seed}_Stage${State.Stage}.obj`,ObjText(),'text/plain');
-Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:7,Specification:State.Specification},null,2),'application/json');
+Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:9,Specification:State.Specification},null,2),'application/json');
 Element('ImportRecipe').onclick=()=>Element('RecipeFile').click();
 Element('RecipeFile').onchange=async Event=>
 {
@@ -597,6 +617,7 @@ function Animate()
     if (Moved || RenderRequested)
     {
         RenderRequested=false;
+        if(MouldSection){BodyGroup.updateWorldMatrix(true,false);ClayMaterial.clippingPlanes[0].copy(MouldSection).applyMatrix4(BodyGroup.matrixWorld);}
         Renderer.render(Scene,Camera);
         const Along=new THREE.Vector3(1,0,0).applyQuaternion(Camera.quaternion).multiplyScalar(5);
         const A=Controls.target.clone().project(Camera);

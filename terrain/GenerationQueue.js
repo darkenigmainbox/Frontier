@@ -3,15 +3,18 @@
 //============================================================================================================================================
 // 📦 Cancellable browser worker with generation revisions and explicit topology rejection.
 
-import {CliffSequence} from './FractureSequence.js';
-const Sequence=new CliffSequence();
-self.onmessage=Event=>
+import {MouldSequence} from './MouldSequence.js';
+import init from 'manifold-3d';
+import WasmURL from 'manifold-3d/manifold.wasm?url';
+let Kernel;
+const Sequence=new MouldSequence(()=>Kernel??=init({locateFile:()=>WasmURL}).then(lib=>{lib.setup();return lib;}));
+self.onmessage=async Event=>
 {
     const {Revision,Specification,Through}=Event.data;
     try
     {
         const Started=performance.now();
-        const Result=Sequence.Generate(Specification,Stage=>self.postMessage({Revision,Progress:Stage}),Through);
+        const Result=await Sequence.Generate(Specification,(Stage,Message)=>self.postMessage({Revision,Progress:Stage,Message}),Through);
         const Invalid=Result.Stages.find(Stage=>Stage.Metrics.OpenEdges || Stage.Metrics.NonmanifoldEdges || Stage.Metrics.WindingErrors || Stage.Metrics.ZeroArea || Stage.Metrics.NonmanifoldVertices || Stage.Metrics.DuplicateTriangles);
         if (Result.Stages.some(Stage=>Stage.Records.some(Record=>!Number.isFinite(Record.Volume) || Record.Volume<=0)))
             throw new Error('Non-finite or inverted solid; result rejected.');

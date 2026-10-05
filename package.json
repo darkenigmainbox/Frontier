@@ -19,12 +19,15 @@
     "test:routes": "node tests/formation-routes.mjs",
     "test:routes:browser": "npm run build:githack && node tests/formation-routes-browser.mjs",
     "test:placement": "node tests/formation-placement.mjs",
-    "test:viewport:browser": "npm run build:githack && node tests/viewport-editor-browser.mjs"
+    "test:viewport:browser": "npm run build:githack && node tests/viewport-editor-browser.mjs",
+    "test:mould-detail": "node tests/mould-detail.mjs",
+    "test:mould-detail:browser": "npm run build:githack && node tests/mould-detail-browser.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "lucide": "^0.468.0",
+    "manifold-3d": "^3.5.4",
     "three": "^0.180.0"
   },
   "devDependencies": {

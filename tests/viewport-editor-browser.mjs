@@ -5,6 +5,7 @@ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,ar
 try{
  const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[],failed=[];
  page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack);});page.on('response',r=>{if(r.status()>=400)failed.push(r.url());});
+ page.setDefaultTimeout(90000);
  await page.goto('http://127.0.0.1:5196/terrain/index.html');
  const ready=()=>page.waitForFunction(()=>window.CliffApp?.State.Result&&!CliffApp.State.Busy&&!CliffApp.State.Dirty,null,{timeout:120000});await ready();
  assert.equal(await page.locator('#RouteCanvas').count(),0,'no inspector spline editor');
@@ -77,7 +78,7 @@ try{
  const pp=await project(2);await page.mouse.move(pp.x,pp.y);await page.mouse.down();await page.mouse.move(pp.x+14,pp.y+8,{steps:4});await page.mouse.up();await ready();
  assert.notEqual(await page.evaluate(()=>JSON.stringify(CliffApp.State.Specification.RoutePoints)),posed);
  const saved=await page.evaluate(()=>structuredClone(CliffApp.State.Specification));
- const download=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await (await download).path(),'utf8'));assert.equal(recipe.Version,7);
+ const download=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await (await download).path(),'utf8'));assert.equal(recipe.Version,9);
  await page.click('#ToolReset');assert.deepEqual(await page.evaluate(()=>CliffApp.State.Specification.TransformScale),[1,1,1]);
  await page.setInputFiles('#RecipeFile',{name:'viewport.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(recipe))});await ready();
  assert.deepEqual(await page.evaluate(()=>CliffApp.State.Specification),saved);
@@ -86,5 +87,5 @@ try{
  fs.mkdirSync('.arena',{recursive:true});fs.writeFileSync('.arena/viewport-move.png',Buffer.from((await page.evaluate(()=>CliffApp.Renderer.domElement.toDataURL())).split(',')[1],'base64'));
  await page.click('#Top');await page.click('#ToolSpline');await frame();fs.writeFileSync('.arena/viewport-spline.png',Buffer.from((await page.evaluate(()=>CliffApp.Renderer.domElement.toDataURL())).split(',')[1],'base64'));
  assert.deepEqual(errors,[]);assert.deepEqual(failed,[]);
- console.log(JSON.stringify({passed:true,viewportDragging:true,realGizmoDrags:3,posedSplineDragging:true,pointEditing:true,placementExport:true,recipeVersion:7,errors,failedRequests:failed},null,2));
+ console.log(JSON.stringify({passed:true,viewportDragging:true,realGizmoDrags:3,posedSplineDragging:true,pointEditing:true,placementExport:true,recipeVersion:9,errors,failedRequests:failed},null,2));
 }finally{await browser.close();await server.close();}

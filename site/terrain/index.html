@@ -12,9 +12,9 @@
 <title>Cliff formation · Frontier</title>
 <link rel="icon" href="data:,">
 
-  <script type="module" crossorigin src="../assets/terrain-CEO-SLhI.js"></script>
+  <script type="module" crossorigin src="../assets/terrain-D6nDR-Rk.js"></script>
   <link rel="modulepreload" crossorigin href="../assets/modulepreload-polyfill-B5Qt9EMX.js">
-  <link rel="modulepreload" crossorigin href="../assets/three-BqVN134K.js">
+  <link rel="modulepreload" crossorigin href="../assets/three-CCoVyHfa.js">
   <link rel="stylesheet" crossorigin href="../assets/terrain-YRsgXs48.css">
 </head>
 <body>
@@ -47,13 +47,14 @@
 <canvas id="SceneCanvas"></canvas>
 <div class="ViewCaption"><span class="Eyebrow">GEOLOGICAL CONSTRUCTION</span><h1 id="StageTitle">Edge spalls</h1><p id="StageDescription"></p></div>
 <div class="ScaleBadge"><span></span><b>5 m</b></div>
-<div class="StageStepper"><button id="PreviousStage" title="Previous stage">‹</button><span id="StageNumber">04 / 05</span><button id="NextStage" title="Next stage">›</button></div>
+<div class="StageStepper"><button id="PreviousStage" title="Previous stage">‹</button><span id="StageNumber">01 / 06</span><button id="NextStage" title="Next stage">›</button></div>
 <div class="ViewportHint">Drag orbit <i>·</i> Right-drag pan <i>·</i> Scroll zoom <i>·</i> Double-click inspect <i>·</i> F frame</div>
 <div class="Loading" id="Loading"><div class="Spinner"></div><strong id="LoadingTitle">Constructing cliff</strong><p id="LoadingDetail">Polygon boundary construction…</p></div>
 <div id="Failure" class="Failure" hidden></div>
 </section>
 <aside class="Inspector"><div class="PanelHeader">Inspector <span>Cliff formation</span></div><div class="InspectorScroll">
 <div class="ObjectHeader"><svg><use href="#RockIcon"/></svg><div><b>Cliff formation</b><small>Procedural polygon solid</small></div><span class="Tile">●</span></div>
+<div id="MouldStudy" hidden><details open><summary>Stage 6 · inspect construction</summary><div class="ControlGroup"><label for="DetailView">Displayed geometry</label><select id="DetailView"><option value="Final">06 · Final carved rock</option><option value="Before">05 · Before detail</option><option value="Base">01 · Original base</option><option value="Hollow">Box − base · cutaway</option><option value="Noisy">Noisy mould · cutaway</option></select><p class="Small">Mould views use a display-only section plane. Use Front to look into the hollow. Export always saves the complete final rock.</p><p class="Small" id="MouldNumbers"></p></div></details></div>
 <div id="ParameterControls"></div>
 <details open><summary>Display</summary><div class="ControlGroup"><label class="FieldLabel" for="LightAngle">Light azimuth <output id="LightValue">−35°</output></label><input id="LightAngle" type="range" min="-160" max="160" step="1" value="-35"><label class="Check"><input id="Shadows" type="checkbox" checked> Cast shadows</label><label class="Check"><input id="Ground" type="checkbox" checked> Ground plane</label><label class="Check"><input id="Explode" type="checkbox"> Explode blocks <span class="Subtle">inspection only</span></label></div></details>
 <details open><summary>Diagnostics</summary><div class="ControlGroup"><div id="Metrics" class="Metrics">Awaiting generated mesh.</div><p class="Small" id="QualityNote"></p></div></details>
