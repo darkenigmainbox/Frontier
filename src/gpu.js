@@ -1,5 +1,5 @@
 import { cascade, gather, render, blit, probeOverlay } from './shaders.js';
-import { triangleData, analyticData, lightData, cameraState, settings, sceneVersion } from './scene.js';
+import { triangleData, emitterTriangleData, lightData, objects, cameraState, settings, sceneVersion } from './scene.js';
 import { TriangleBVH } from './bvh.js';
 export class GPURenderer {
  async init(canvas){
@@ -15,7 +15,7 @@ export class GPURenderer {
   this.buffer=buffer;this.bvh=new TriangleBVH();
   this.uniform=buffer(144,GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST);
   this.sceneBuffers={};
-  this.ensureSceneBuffer('triangles',80);this.ensureSceneBuffer('nodes',48);this.ensureSceneBuffer('shapes',64);this.ensureSceneBuffer('emitters',64);
+  this.ensureSceneBuffer('triangles',80);this.ensureSceneBuffer('nodes',48);this.ensureSceneBuffer('emitterTriangles',48);this.ensureSceneBuffer('emitters',64);
   this.fields=[13824,6912,4608,5184].map(n=>buffer(n*16,GPUBufferUsage.STORAGE));
   this.levels=[0,1,2].map(i=>{const b=buffer(16,GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST);d.queue.writeBuffer(b,0,new Uint32Array([i,0,0,0]));return b;});
   const compute=async(code,label)=>{const m=d.createShaderModule({code,label});const info=await m.getCompilationInfo();const errors=info.messages.filter(m=>m.type==='error');if(errors.length)throw new Error(errors.map(m=>`${label}:${m.lineNum}: ${m.message}`).join('\n'));return d.createComputePipelineAsync({label,layout:'auto',compute:{module:m,entryPoint:'main'}});};
@@ -39,7 +39,7 @@ export class GPURenderer {
   if(previous){previous.destroy();this.allocations.splice(this.allocations.indexOf(previous),1);}
   this.sceneBuffers[name]=this.buffer(capacity,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST);return true;
  }
- sceneEntries(){return [{binding:0,resource:{buffer:this.uniform}},{binding:1,resource:{buffer:this.sceneBuffers.triangles}},...this.fields.map((buffer,i)=>({binding:i+2,resource:{buffer}})),...['nodes','shapes','emitters'].map((key,i)=>({binding:i+7,resource:{buffer:this.sceneBuffers[key]}}))];}
+ sceneEntries(){return [{binding:0,resource:{buffer:this.uniform}},{binding:1,resource:{buffer:this.sceneBuffers.triangles}},...this.fields.map((buffer,i)=>({binding:i+2,resource:{buffer}})),...['nodes','emitterTriangles','emitters'].map((key,i)=>({binding:i+7,resource:{buffer:this.sceneBuffers[key]}}))];}
  rebindScene(){
   const entries=this.sceneEntries();this.cbg=this.levels.map(buffer=>this.device.createBindGroup({layout:this.cp.getBindGroupLayout(0),entries:[...entries.filter(e=>e.binding!==5),{binding:6,resource:{buffer}}]}));
   if(this.texture)this.bindOutput();
@@ -61,8 +61,8 @@ export class GPURenderer {
    if(this.sceneVersion!==sceneVersion){this.bvh.build(raw);this.sceneVersion=sceneVersion;}else this.bvh.refit(raw);
    tris=this.bvh.triangles;this.nodeCount=this.bvh.nodes.length;this.bvhMs=performance.now()-start;
   }
-  const shapes=analyticData(),lights=lightData();this.triangleCount=tris.length/20;this.analyticCount=shapes.length/16;
-  const payloads={triangles:tris,shapes,emitters:lights};
+  const lights=lightData(),emitterTriangles=emitterTriangleData();this.triangleCount=tris.length/20;this.meshCount=objects.length;
+  const payloads={triangles:tris,emitterTriangles,emitters:lights};
   // BVH OFF is a real baseline: no build, refit, reordering, or node upload.
   // Retain its allocation so re-enabling doesn't cause allocation churn.
   if(settings.bvh)payloads.nodes=this.bvh.data;
@@ -71,9 +71,9 @@ export class GPURenderer {
   if(changed)this.rebindScene();
   const data=new Float32Array([...cam.eye,0,...cam.forward,0,...cam.right,0,...cam.up,0,
    this.canvas.width,this.canvas.height,this.triangleCount,settings.time,
-   settings.emission,settings.bounce,lights.length/16,settings.bvh?1:0,
+   settings.emission,settings.bounce,lights.length/8,settings.bvh?1:0,
    settings.gi?1:0,settings.view,settings.probes?1:0,settings.wireframe?1:0,
-   this.analyticCount,this.nodeCount,settings.shadowSamples,settings.probeVisibility?1:0,
+   this.meshCount,this.nodeCount,settings.shadowSamples,settings.probeVisibility?1:0,
    settings.probeLevel,settings.probeMode,settings.reflections?1:0,settings.emitterSize]);
   d.queue.writeBuffer(this.uniform,0,data);this.cpuMs=performance.now()-cpuStart;
   const e=d.createCommandEncoder();const measure=this.timestamp&&!this.pending;const frameId=this.frameId=(this.frameId||0)+1;

@@ -12,7 +12,7 @@ export const sceneInfo={
  chamber:['The light chamber','Warm and cool panels, a moving emissive orb, and deforming triangles.'],
  deform:['Deforming mesh','A connected 3,072-triangle sheet: vertices bend every frame while its object transform stays fixed. No SDF.'],
  windows:['Window / penumbra lab','Real window openings and mullions. An exterior area emitter casts soft shadows through the room.'],
- primitives:['Analytic playground','Exact sphere, axis-aligned box, and capsule intersections. No triangle tessellation on WebGPU.'],
+ primitives:['Triangle playground','Spheres, capsules, boxes and the emissive ball are tessellated meshes. Every ray intersects their triangles.'],
  stress:['Geometry stress test','A seeded field of animated triangle meshes. Change object count and compare BVH vs brute force.'],
  swarm:['Triangle swarm','64 orbiting, deforming triangles around an emissive orb.'],
  cornell:['Stack study','Tall blocks, reflective surfaces, and contrasting emissive materials.'],
@@ -21,17 +21,17 @@ const material=(color,emission=0,metal=0)=>({color,emission,metal});
 const concrete=material([.46,.48,.46]);
 const graphite=material([.16,.19,.19],0,.1);
 const p=new THREE.Vector3(),q=new THREE.Quaternion(),s=new THREE.Vector3();
-function add(kind,geometry,mat,pos,scale=[1,1,1],motion=null,analytic=null){
- const o={kind,geometry,mat,pos,scale,motion,analytic,matrix:new THREE.Matrix4(),rotation:new THREE.Euler()};objects.push(o);return o;
+function add(kind,geometry,mat,pos,scale=[1,1,1],motion=null){
+ const o={kind,geometry,mat,pos,scale,motion,matrix:new THREE.Matrix4(),rotation:new THREE.Euler()};objects.push(o);return o;
 }
 function box(kind,size,pos,mat=concrete,motion=null){return add(kind,new THREE.BoxGeometry(...size),mat,pos,[1,1,1],motion);}
 function plane(kind,size,pos,mat,angle=0){const o=add(kind,new THREE.PlaneGeometry(...size),mat,pos);o.rotation.y=angle;return o;}
-function sphere(kind,r,pos,mat,motion){return add(kind,new THREE.SphereGeometry(r,24,16),mat,pos,[1,1,1],motion,{type:0,size:[r,r,r]});}
-function analyticBox(size,pos,mat){return add('analytic-box',new THREE.BoxGeometry(...size),mat,pos,[1,1,1],null,{type:1,size:size.map(v=>v/2)});}
-function capsule(radius,halfSegment,pos,mat){return add('capsule',new THREE.CapsuleGeometry(radius,halfSegment*2,6,16),mat,pos,[1,1,1],null,{type:2,size:[radius,halfSegment,0]});}
+function sphere(kind,r,pos,mat,motion){return add(kind,new THREE.SphereGeometry(r,24,16),mat,pos,[1,1,1],motion);}
+function meshBox(size,pos,mat){return box('mesh-box',size,pos,mat);}
+function capsule(radius,halfSegment,pos,mat){return add('capsule',new THREE.CapsuleGeometry(radius,halfSegment*2,6,16),mat,pos);}
 function panel(kind,width,height,pos,color,emission,angle=0){
  const o=plane(kind,[width,height],pos,material(color,emission),angle);o.areaEmitter=true;
- lights.push({object:o,u:[Math.cos(angle)*width/2,0,-Math.sin(angle)*width/2],v:[0,height/2,0],radius:0});return o;
+ lights.push({object:o});return o;
 }
 export function makeScene(){
  const disposed=new Set();for(const o of objects)if(!disposed.has(o.geometry)){disposed.add(o.geometry);o.geometry.dispose();}
@@ -79,15 +79,15 @@ export function makeScene(){
   sphere('matte-sphere',.7,[0,.7,-2.2],material([.68,.28,.12]));
   capsule(.45,.95,[2.6,1.4,-1.4],material([.22,.58,.51],0,.65));
   capsule(.28,.55,[-3.7,.83,-3.2],material([.45,.24,.7]));
-  analyticBox([1.3,1.8,1.3],[.1,.9,.5],material([.65,.68,.54],0,.3));
-  analyticBox([.8,.8,.8],[2.7,.4,1.6],material([.38,.55,.74]));
+  meshBox([1.3,1.8,1.3],[.1,.9,.5],material([.65,.68,.54],0,.3));
+  meshBox([.8,.8,.8],[2.7,.4,1.6],material([.38,.55,.74]));
  }else if(settings.scene!=='windows'){
   box('platform',[4.8,.28,3.5],[0,.14,-.4],graphite);
   box('plinth',[2,1.25,2],[-1.15,.9,-.8],material([.55,.56,.50]));
   box('cube',[1.35,1.35,1.35],[-1.15,2.32,-.8],material([.61,.64,.56],0,.22),'cube');
   sphere('sphere',.91,[1.5,1.23,.25],material([.63,.71,.68],0,.82),'sphere');
   capsule(.3,.6,[3.8,.9,-3.8],graphite);
-  analyticBox([.6,1.8,.6],[-4.4,.9,-3.6],graphite);
+  meshBox([.6,1.8,.6],[-4.4,.9,-3.6],graphite);
   for(let i=0;i<(settings.scene==='swarm'?64:5);i++){
    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute([-.55,-.35,0,.6,-.25,.08,0,.72,0],3));geo.computeVertexNormals();
    add('shard',geo,material(i%2?[.63,.79,.73]:[.8,.51,.25],0,.45),[.3,3.2+i*.25,-1],[1,1,1],`shard${i}`);
@@ -95,10 +95,11 @@ export function makeScene(){
  }
  const orb=sphere('emissive-orb',.38,[0,1.2,1],material([1,.15,.035],12),'orb');
  orb.directEmitter=true;
- lights.push({object:orb,u:[.38,0,0],v:[0,.38,0],radius:.38});
+ lights.push({object:orb});
  updateScene(settings.time);return objects;
 }
 export function updateScene(time){
+ lightCache=null;
  for(const o of objects){
   p.fromArray(o.pos);s.fromArray(o.scale);
   if(o.motion==='wave'){
@@ -127,23 +128,40 @@ export function updateScene(time){
 const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();
 export function triangleData(){
  const data=[];
- for(const o of objects){if(o.analytic)continue;const positions=o.geometry.attributes.position,index=o.geometry.index,n=index?index.count:positions.count;
+ for(const o of objects){const positions=o.geometry.attributes.position,index=o.geometry.index,n=index?index.count:positions.count;
   for(let i=0;i<n;i+=3){a.fromBufferAttribute(positions,index?index.getX(i):i).applyMatrix4(o.matrix);b.fromBufferAttribute(positions,index?index.getX(i+1):i+1).applyMatrix4(o.matrix);c.fromBufferAttribute(positions,index?index.getX(i+2):i+2).applyMatrix4(o.matrix);
-   data.push(a.x,a.y,a.z,0,b.x,b.y,b.z,0,c.x,c.y,c.z,0,...o.mat.color,o.mat.emission,o.mat.metal,o.kind==='floor'?1:0,o.areaEmitter?1:0,0);
+   data.push(a.x,a.y,a.z,0,b.x,b.y,b.z,0,c.x,c.y,c.z,0,...o.mat.color,o.mat.emission,o.mat.metal,o.kind==='floor'?1:0,(o.areaEmitter||o.directEmitter)?1:0,0);
   }
  }
  return new Float32Array(data);
 }
-export function analyticData(){
- const data=[];for(const o of objects){if(!o.analytic)continue;const m=o.matrix.elements;
-  data.push(m[12],m[13],m[14],o.analytic.type,...o.analytic.size,0,...o.mat.color,o.mat.emission,o.mat.metal,o.directEmitter?1:0,0,0);
- }return new Float32Array(data);
+// Direct lighting samples the ACTUAL emitter triangles, not a sphere/disk or
+// rectangle proxy. The same world-space vertices also enter the scene BVH.
+let lightCache=null;
+const ab=new THREE.Vector3(),ac=new THREE.Vector3();
+function packEmitterMeshes(){
+ if(lightCache)return lightCache;
+ const data=[],samples=[];
+ for(const light of lights){
+  const o=light.object,positions=o.geometry.attributes.position,index=o.geometry.index;
+  const start=samples.length/12;let totalArea=0;
+  const n=index?index.count:positions.count;
+  for(let i=0;i<n;i+=3){
+   a.fromBufferAttribute(positions,index?index.getX(i):i).applyMatrix4(o.matrix);
+   b.fromBufferAttribute(positions,index?index.getX(i+1):i+1).applyMatrix4(o.matrix);
+   c.fromBufferAttribute(positions,index?index.getX(i+2):i+2).applyMatrix4(o.matrix);
+   const area=ab.subVectors(b,a).cross(ac.subVectors(c,a)).length()*.5;
+   if(area<1e-10)continue;totalArea+=area;
+   samples.push(a.x,a.y,a.z,totalArea,b.x,b.y,b.z,0,c.x,c.y,c.z,0);
+  }
+  const count=samples.length/12-start;
+  for(let i=start;i<start+count;i++)samples[i*12+3]/=totalArea;
+  data.push(start,count,totalArea,o.areaEmitter?1:0,...o.mat.color,o.mat.emission);
+ }
+ lightCache={lights:new Float32Array(data),triangles:new Float32Array(samples)};return lightCache;
 }
-export function lightData(){
- const data=[];for(const l of lights){const o=l.object,m=o.matrix.elements,size=l.radius?1:settings.emitterSize;
-  data.push(m[12],m[13],m[14],l.radius,...l.u.map(x=>x*size),0,...l.v.map(x=>x*size),0,...o.mat.color,o.mat.emission);
- }return new Float32Array(data);
-}
+export function lightData(){return packEmitterMeshes().lights;}
+export function emitterTriangleData(){return packEmitterMeshes().triangles;}
 export function cameraState(aspect){
  const target=new THREE.Vector3(0,1.65,-.8),yaw=settings.cameraYaw,pitch=.27+settings.cameraPitch;
  const eye=new THREE.Vector3(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch)).multiplyScalar(settings.distance).add(target);

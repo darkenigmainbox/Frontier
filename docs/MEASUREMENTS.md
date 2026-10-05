@@ -1,5 +1,7 @@
 # BVH investigation · 2026-10-05
 
+> **Historical v0.3/v0.4 results.** v0.5 replaces every analytic primitive with a triangle mesh and samples actual emitter triangles. The current Triangle playground has 3,052 triangles, not 36. Do not use the numbers below as current performance claims; rerun Measure A/B for the triangle-only workload.
+
 ## The report being investigated
 
 The user observed approximately 22 FPS / 23.4 ms GPU with BVH enabled, and reported a fall to 1 FPS with BVH disabled, in the **Analytic playground**. The screenshot shows 16 shadow samples and 75% render scale. The screenshot does not supply the disabled-mode GPU time or device model, so it does not establish the source of that drop.

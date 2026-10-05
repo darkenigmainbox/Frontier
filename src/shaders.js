@@ -12,10 +12,10 @@ struct Hit {t:f32, normal:vec3f, color:vec3f, emission:f32, metal:f32, floor:f32
 @group(0) @binding(4) var<storage,read_write> farField:array<vec4f>;
 @group(0) @binding(5) var<storage,read_write> irradiance:array<vec4f>;
 struct BVHNode { lo:vec4f, hi:vec4f, leafInfo:vec4f };
-struct Shape { center:vec4f, size:vec4f, color:vec4f, info:vec4f };
-struct Emitter { center:vec4f, axisU:vec4f, axisV:vec4f, color:vec4f };
+struct EmitterTriangle {a:vec4f,b:vec4f,c:vec4f};
+struct Emitter {range:vec4f,color:vec4f};
 @group(0) @binding(7) var<storage,read> nodes:array<BVHNode>;
-@group(0) @binding(8) var<storage,read> shapes:array<Shape>;
+@group(0) @binding(8) var<storage,read> emitterTriangles:array<EmitterTriangle>;
 @group(0) @binding(9) var<storage,read> emitters:array<Emitter>;
 fn invDir(rd:vec3f)->vec3f {return select(vec3f(-1),vec3f(1),rd>=vec3f(0))/max(abs(rd),vec3f(.00000001));}
 fn slab(ro:vec3f,inv:vec3f,lo:vec3f,hi:vec3f)->vec2f {
@@ -31,10 +31,6 @@ fn triangleHit(index:u32,ro:vec3f,rd:vec3f,tmin:f32,previous:Hit)->Hit {
  var n=normalize(cross(e1,e2));if(dot(n,rd)>0.){n=-n;}
  return Hit(dist,n,t.color.xyz,t.color.w,t.info.x,t.info.y,min(v,min(w,1.-v-w)),t.info.z);
 }
-fn sphereRoots(oc:vec3f,rd:vec3f,r:f32)->vec2f {
- let b=dot(oc,rd);let disc=b*b-dot(oc,oc)+r*r;if(disc<0.){return vec2f(-1);}
- let root=sqrt(disc);return vec2f(-b-root,-b+root);
-}
 fn trace(ro:vec3f,rd:vec3f,tmin:f32,tmax:f32)->Hit {
  var hit=Hit(tmax,vec3f(0),vec3f(0),0.,0.,0.,1.,0.);let inv=invDir(rd);
  if(u.light.w>.5){
@@ -45,25 +41,6 @@ fn trace(ro:vec3f,rd:vec3f,tmin:f32,tmax:f32)->Hit {
    let first=u32(node.hi.w);for(var j=0u;j<u32(node.leafInfo.x);j++){hit=triangleHit(first+j,ro,rd,tmin,hit);}index++;
   }
  }else{for(var i=0u;i<u32(u.screen.z);i++){hit=triangleHit(i,ro,rd,tmin,hit);}}
- for(var i=0u;i<u32(u.counts.x);i++){
-  let shape=shapes[i];let local=ro-shape.center.xyz;var distance=hit.t;var normal=vec3f(0);
-  if(shape.center.w<.5){
-   let roots=sphereRoots(local,rd,shape.size.x);for(var j=0u;j<2u;j++){let t=roots[j];if(t>tmin&&t<distance){distance=t;normal=normalize(local+rd*t);}}
-  }else if(shape.center.w<1.5){
-   let roots=slab(local,inv,-shape.size.xyz,shape.size.xyz);
-   if(roots.x<=roots.y){for(var j=0u;j<2u;j++){let t=roots[j];if(t>tmin&&t<distance){distance=t;let pos=local+rd*t;let ratio=abs(pos/shape.size.xyz);normal=vec3f(0);if(ratio.x>=ratio.y&&ratio.x>=ratio.z){normal.x=sign(pos.x);}else if(ratio.y>=ratio.z){normal.y=sign(pos.y);}else{normal.z=sign(pos.z);}}}}
-  }else{
-   // Vertical capsule: finite cylinder plus two hemispherical caps, exact intersections.
-   let radius=shape.size.x;let halfLength=shape.size.y;let aa=dot(rd.xz,rd.xz);let bb=dot(local.xz,rd.xz);let cc=dot(local.xz,local.xz)-radius*radius;let disc=bb*bb-aa*cc;
-   if(aa>.000001&&disc>=0.){let roots=vec2f(-bb-sqrt(disc),-bb+sqrt(disc))/aa;
-    for(var j=0u;j<2u;j++){let t=roots[j];let pos=local+rd*t;if(t>tmin&&t<distance&&abs(pos.y)<=halfLength){distance=t;normal=normalize(vec3f(pos.x,0,pos.z));}}
-   }
-   for(var cap=0u;cap<2u;cap++){let signY=select(-1.,1.,cap==1u);let center=vec3f(0,signY*halfLength,0);let roots=sphereRoots(local-center,rd,radius);
-    for(var j=0u;j<2u;j++){let t=roots[j];let pos=local+rd*t;if(t>tmin&&t<distance&&pos.y*signY>=halfLength){distance=t;normal=normalize(pos-center);}}
-   }
-  }
-  if(distance<hit.t){if(dot(normal,rd)>0.){normal=-normal;}hit=Hit(distance,normal,shape.color.xyz,shape.color.w,shape.info.x,0.,1.,shape.info.y);}
- }
  return hit;
 }
 fn direction(uv:vec2f)->vec3f {
@@ -84,21 +61,29 @@ fn coarseRadiance(level:u32,pos:vec3f,uv:vec2f)->vec3f {
  return result;
 }
 fn lightAt(p:vec3f,n:vec3f,samples:u32)->vec3f {
- var sum=vec3f(0);let side=u32(sqrt(f32(samples)));
+ var sum=vec3f(0);
  for(var i=0u;i<u32(u.light.z);i++){
-  let light=emitters[i];let toSurface=normalize(p-light.center.xyz);var axisU=light.axisU.xyz;var axisV=light.axisV.xyz;let radius=light.center.w;
-  var area=4.*length(axisU)*length(axisV);var sourceNormal=normalize(cross(axisU,axisV));
-  if(radius>0.){axisU=normalize(cross(toSurface,select(vec3f(0,1,0),vec3f(1,0,0),abs(toSurface.y)>.95)))*radius;axisV=normalize(cross(toSurface,axisU))*radius;area=3.14159265*radius*radius;sourceNormal=toSurface;}
+  let light=emitters[i];let first=u32(light.range.x);let count=u32(light.range.y);
+  if(count==0u||light.range.z<=0.){continue;}
   for(var j=0u;j<samples;j++){
-   let uv=(vec2f(f32(j%side),f32(j/side))+.5)/f32(side);var sampleXY=uv*2.-1.;
-   if(radius>0.){sampleXY=sqrt(uv.x)*vec2f(cos(uv.y*6.2831853),sin(uv.y*6.2831853));}
-   let lp=light.center.xyz+axisU*sampleXY.x+axisV*sampleXY.y;let delta=lp-p;let dist=length(delta);let dir=delta/max(dist,.0001);let nd=max(dot(n,dir),0.);let sourceCos=abs(dot(sourceNormal,-dir));
-   if(nd>0. && dist>radius+.05){let end=dist-radius-.045;let shadow=trace(p+n*.02,dir,.015,end);
-    if(shadow.t>=end){sum+=light.color.xyz*light.color.w*u.light.x*nd*sourceCos*area/(3.14159265*(.05+dist*dist)*f32(samples));}
+   // Area-weighted triangle selection, then uniform barycentric sampling.
+   let pick=(f32(j)+.5)/f32(samples);var lo=first;var hi=first+count-1u;
+   loop{if(lo>=hi){break;}let mid=(lo+hi)/2u;if(pick<=emitterTriangles[mid].a.w){hi=mid;}else{lo=mid+1u;}}
+   let t=emitterTriangles[lo];let root=sqrt(fract((f32(j)+.5)*.754877666));let v=fract((f32(j)+.5)*.569840296);
+   let lp=t.a.xyz*(1.-root)+t.b.xyz*(root*(1.-v))+t.c.xyz*(root*v);
+   let delta=lp-p;let dist=length(delta);let dir=delta/max(dist,.0001);let nd=max(dot(n,dir),0.);
+   let emitterNormal=normalize(cross(t.b.xyz-t.a.xyz,t.c.xyz-t.a.xyz));let cosine=dot(emitterNormal,-dir);
+   let sourceCos=select(max(cosine,0.),abs(cosine),light.range.w>.5);
+   if(nd>0.&&sourceCos>0.&&dist>.03){
+    // Aim at the sampled mesh point from the biased origin. The segment stops
+    // just before that triangle; other triangles (including the emitter's back
+    // side) remain real occluders. There is no radius-based intersection shortcut.
+    let ro=p+n*.01;let ray=lp-ro;let lengthToSample=length(ray);let end=lengthToSample-.003;
+    let shadow=trace(ro,ray/lengthToSample,.002,end);
+    if(shadow.t>=end){sum+=light.color.xyz*light.color.w*u.light.x*nd*sourceCos*light.range.z/(3.14159265*(.05+dist*dist)*f32(samples));}
    }
   }
  }
- // Small, explicit non-GI fill; not a baked lightmap or volumetric scattering.
  return sum+vec3f(.025,.032,.04)*max(n.y*.5+.5,0.);
 }
 fn sampleIrradiance(p:vec3f,n:vec3f)->vec3f{

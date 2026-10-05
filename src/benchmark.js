@@ -33,7 +33,7 @@ export async function runBenchmark(renderer,{signal,onProgress=()=>{},warmup=2,s
   }
  }catch(error){report.status='error';report.reason=error.message||String(error);}
  finally{Object.assign(settings,original);updateScene(original.time);}
- report.output={width:renderer.canvas.width,height:renderer.canvas.height,triangles:renderer.triangleCount,analyticShapes:renderer.analyticCount};
+ report.output={width:renderer.canvas.width,height:renderer.canvas.height,triangles:renderer.triangleCount,meshObjects:renderer.meshCount};
  report.summary={bvh:summarize(report.rows.filter(r=>r.bvh)),brute:summarize(report.rows.filter(r=>!r.bvh))};
  return report;
 }
