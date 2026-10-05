@@ -1,13 +1,14 @@
 {
   "name": "cascade-lab",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node tests/smoke.mjs",
-    "build:githack": "vite build --outDir site"
+    "build:githack": "vite build --outDir site",
+    "measure": "node tests/measure.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",

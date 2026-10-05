@@ -1,0 +1,200 @@
+{
+  "adapter": "WebGPU device",
+  "width": 160,
+  "height": 100,
+  "settings": {
+    "running": false,
+    "gi": true,
+    "emission": 2.8,
+    "bounce": 1,
+    "speed": 1,
+    "resolution": 1,
+    "view": 0,
+    "probes": false,
+    "probeLevel": 1,
+    "probeMode": 0,
+    "wireframe": false,
+    "scene": "primitives",
+    "time": 74.4,
+    "cameraYaw": 0,
+    "cameraPitch": 0,
+    "distance": 14.8,
+    "stressCount": 256,
+    "shadowSamples": 16,
+    "emitterSize": 1,
+    "bvh": true,
+    "reflections": true,
+    "waveAmplitude": 1
+  },
+  "triangles": 36,
+  "analyticShapes": 7,
+  "errors": [],
+  "rows": [
+    {
+      "bvh": true,
+      "wallMs": 1431.0999999996275,
+      "cpuMs": 0.2999999998137355,
+      "refitMs": 0.10000000009313226,
+      "gpuMs": 1429.363056,
+      "passes": null
+    },
+    {
+      "bvh": true,
+      "wallMs": 1416.2000000001863,
+      "cpuMs": 0.3000000002793968,
+      "refitMs": 0.10000000009313226,
+      "gpuMs": 1414.822587,
+      "passes": null
+    },
+    {
+      "bvh": true,
+      "wallMs": 1403.7999999998137,
+      "cpuMs": 0.6000000000931323,
+      "refitMs": 0,
+      "gpuMs": 1401.407783,
+      "passes": null
+    },
+    {
+      "bvh": true,
+      "wallMs": 1359.5,
+      "cpuMs": 0.39999999990686774,
+      "refitMs": 0.10000000009313226,
+      "gpuMs": 1357.93239,
+      "passes": null
+    },
+    {
+      "bvh": true,
+      "wallMs": 1443.2000000001863,
+      "cpuMs": 0.20000000018626451,
+      "refitMs": 0,
+      "gpuMs": 1441.496609,
+      "passes": null
+    },
+    {
+      "bvh": false,
+      "wallMs": 1102.1000000000931,
+      "cpuMs": 0.19999999972060323,
+      "refitMs": 0,
+      "gpuMs": 1100.599926,
+      "passes": null
+    },
+    {
+      "bvh": false,
+      "wallMs": 1106.7999999998137,
+      "cpuMs": 0.19999999972060323,
+      "refitMs": 0,
+      "gpuMs": 1104.725982,
+      "passes": null
+    },
+    {
+      "bvh": false,
+      "wallMs": 1071.2000000001863,
+      "cpuMs": 0.10000000009313226,
+      "refitMs": 0,
+      "gpuMs": 1069.244058,
+      "passes": null
+    },
+    {
+      "bvh": false,
+      "wallMs": 1104.5999999996275,
+      "cpuMs": 0.19999999972060323,
+      "refitMs": 0,
+      "gpuMs": 1102.915631,
+      "passes": null
+    },
+    {
+      "bvh": false,
+      "wallMs": 1108.4000000003725,
+      "cpuMs": 0.10000000009313226,
+      "refitMs": 0,
+      "gpuMs": 1107.159118,
+      "passes": null
+    },
+    {
+      "bvh": false,
+      "wallMs": 1082.3000000002794,
+      "cpuMs": 0.10000000009313226,
+      "refitMs": 0,
+      "gpuMs": 1080.123807,
+      "passes": null
+    },
+    {
+      "bvh": false,
+      "wallMs": 1125.7999999998137,
+      "cpuMs": 0.09999999962747097,
+      "refitMs": 0,
+      "gpuMs": 1124.595781,
+      "passes": null
+    },
+    {
+      "bvh": false,
+      "wallMs": 1090.7000000001863,
+      "cpuMs": 0.10000000009313226,
+      "refitMs": 0,
+      "gpuMs": 1088.568972,
+      "passes": null
+    },
+    {
+      "bvh": false,
+      "wallMs": 1061.3999999999069,
+      "cpuMs": 0.19999999972060323,
+      "refitMs": 0,
+      "gpuMs": 1059.731759,
+      "passes": null
+    },
+    {
+      "bvh": false,
+      "wallMs": 1165,
+      "cpuMs": 0.19999999972060323,
+      "refitMs": 0,
+      "gpuMs": 1163.383125,
+      "passes": null
+    },
+    {
+      "bvh": true,
+      "wallMs": 1349.5999999996275,
+      "cpuMs": 0.10000000009313226,
+      "refitMs": 0,
+      "gpuMs": 1348.212321,
+      "passes": null
+    },
+    {
+      "bvh": true,
+      "wallMs": 1462.4000000003725,
+      "cpuMs": 0.20000000018626451,
+      "refitMs": 0,
+      "gpuMs": 1458.943947,
+      "passes": null
+    },
+    {
+      "bvh": true,
+      "wallMs": 1392.8999999999069,
+      "cpuMs": 0.10000000009313226,
+      "refitMs": 0,
+      "gpuMs": 1390.91927,
+      "passes": null
+    },
+    {
+      "bvh": true,
+      "wallMs": 1241.1000000000931,
+      "cpuMs": 0.19999999972060323,
+      "refitMs": 0,
+      "gpuMs": 1239.46912,
+      "passes": null
+    },
+    {
+      "bvh": true,
+      "wallMs": 1366.1999999997206,
+      "cpuMs": 0.19999999972060323,
+      "refitMs": 0,
+      "gpuMs": 1364.383314,
+      "passes": null
+    }
+  ],
+  "sourceRevision": "b6752171352fd991f5bb35cfc8de0b4a26ca3a71",
+  "note": "Offscreen software/selected-adapter benchmark; not a measurement of the user device. Source may include uncommitted changes.",
+  "applicationVersion": "0.3.0",
+  "sourceNote": "b675217 plus exposing the existing timestamp-readback promise; unchanged render/shader logic.",
+  "backend": "Chromium forced SwiftShader software rendering",
+  "protocol": "BVH/brute/brute/BVH, 2 warmups and 5 recorded frames per block (10 samples per mode). Fixed pose and default camera; not the user camera/device."
+}

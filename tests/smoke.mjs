@@ -23,6 +23,7 @@ try {
  await page.locator('#bounce').fill('1.5');await page.locator('#bounce').dispatchEvent('input');assert.equal(await page.locator('#bounce-value').textContent(),'1.50×');
  await page.locator('[data-view="3"]').click();assert.equal(await page.locator('[data-view="3"]').getAttribute('aria-selected'),'true');
  await page.locator('#show-probes').click();assert.equal(await page.locator('#show-probes').getAttribute('aria-checked'),'false');
+ assert.equal(await page.locator('#benchmark').isDisabled(),true);assert.equal(await page.locator('#probe-visibility').isDisabled(),true);
  assert.ok(await page.locator('#bvh-quick').isVisible());assert.equal(await page.locator('#bvh-quick').isDisabled(),true);
  await page.locator('#scene-select').selectOption('deform');assert.ok(await page.locator('#deform-controls').isVisible());
  await page.locator('#wave-amplitude').fill('0.5');await page.locator('#wave-amplitude').dispatchEvent('input');assert.equal(await page.locator('#wave-amplitude-value').textContent(),'0.50×');
@@ -77,7 +78,29 @@ try {
   const objectTransformUnchanged=difference(transformBefore,sheet.matrix.toArray())===0;
   const lightsUnchanged=difference(lightsBefore,Array.from(lightData()))===0;
   settings.waveAmplitude=0;updateScene(1.7);const flattened=sheet.geometry.attributes.position.array.every((v,i)=>i%3!==2||v===0);
-  const result={errors,colors:colors.size,giChanges:difference(lit,direct),motionChanges:difference(lit,moving),normalChanges:difference(moving,normals),probeChanges:difference(normals,probes),captureBytes:capture.size,triangles:initialTriangles,bruteRefitMs,
+  const {runBenchmark}=await import('/src/benchmark.js');
+  settings.scene='primitives';settings.view=0;settings.shadowSamples=1;settings.gi=false;settings.probes=false;settings.running=true;settings.time=3;settings.bvh=false;makeScene();
+  const snapshot=JSON.stringify(settings);const benchmark=await runBenchmark(renderer,{warmup:0,samples:1,maxDurationMs:20000,slowFrameMs:10000});
+  const benchmarkRestored=snapshot===JSON.stringify(settings);
+  const abort=new AbortController();abort.abort();const cancelled=await runBenchmark(renderer,{signal:abort.signal});
+  // Isolated wall-leak fixture: all eight probes contain white irradiance. A
+  // horizontal wall separates the surface from its front-facing probes. No
+  // cascade-merging correctness claim is made by this final-interpolation test.
+  const {common}=await import('/src/shaders.js');
+  const fixtureModule=device.createShaderModule({code:common+`
+    @group(0) @binding(6) var<storage,read_write> testOutput:array<vec4f>;
+    @compute @workgroup_size(1) fn main(){testOutput[0]=vec4f(sampleIrradiance(vec3f(0,1,0),vec3f(0,1,0)),1);}
+  `});
+  const fixturePipeline=await device.createComputePipelineAsync({layout:'auto',compute:{module:fixtureModule,entryPoint:'main'}});
+  const fixtureBuffer=(size,usage)=>device.createBuffer({size,usage});
+  const uniform=fixtureBuffer(144,GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST),triangles=fixtureBuffer(160,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST),irrad=fixtureBuffer(5184*16,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST),emptyNodes=fixtureBuffer(48,GPUBufferUsage.STORAGE),emptyShapes=fixtureBuffer(64,GPUBufferUsage.STORAGE),out=fixtureBuffer(16,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC),read=fixtureBuffer(16,GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ);
+  const vertices=[-10,1.2,-10,0,10,1.2,-10,0,10,1.2,10,0,1,1,1,0,0,0,0,0,-10,1.2,-10,0,10,1.2,10,0,-10,1.2,10,0,1,1,1,0,0,0,0,0];
+  device.queue.writeBuffer(triangles,0,new Float32Array(vertices));device.queue.writeBuffer(irrad,0,new Float32Array(5184*4).fill(1));
+  const bind=device.createBindGroup({layout:fixturePipeline.getBindGroupLayout(0),entries:[[0,uniform],[1,triangles],[5,irrad],[6,out],[7,emptyNodes],[8,emptyShapes]].map(([binding,buffer])=>({binding,resource:{buffer}}))});
+  async function visibilityFixture(blocked,guard){const u=new Float32Array(36);u[18]=blocked?2:0;u[31]=guard?1:0;device.queue.writeBuffer(uniform,0,u);const encoder=device.createCommandEncoder();const pass=encoder.beginComputePass();pass.setPipeline(fixturePipeline);pass.setBindGroup(0,bind);pass.dispatchWorkgroups(1);pass.end();encoder.copyBufferToBuffer(out,0,read,0,16);device.queue.submit([encoder.finish()]);await read.mapAsync(GPUMapMode.READ);const v=new Float32Array(read.getMappedRange())[0];read.unmap();return v;}
+  const visibility={naiveBlocked:await visibilityFixture(true,false),guardedBlocked:await visibilityFixture(true,true),guardedClear:await visibilityFixture(false,true)};
+  for(const b of [uniform,triangles,irrad,emptyNodes,emptyShapes,out,read])b.destroy();
+  const result={errors,visibility,benchmarkRestored,benchmarkStatus:benchmark.status,benchmarkRows:benchmark.rows.length,benchmarkBVHOffCPU:benchmark.rows.filter(r=>!r.bvh).every(r=>r.refitMs===0),benchmarkHasPasses:!renderer.timestamp||benchmark.rows.every(r=>r.cascadeMs!=null&&r.shadingMs!=null&&r.presentMs!=null),benchmarkCancelled:cancelled.status,colors:colors.size,giChanges:difference(lit,direct),motionChanges:difference(lit,moving),normalChanges:difference(moving,normals),probeChanges:difference(normals,probes),captureBytes:capture.size,triangles:initialTriangles,bruteRefitMs,
    waveVertices,waveTriangles,reusedWaveTree,connectedTopologyUnchanged,objectTransformUnchanged,lightsUnchanged,flattened,
    waveVertexChanges:difference(positionsBefore,positionsAfter),waveImageChanges:difference(wave0,wave1),waveAtlasChanges:difference(waveAtlas0,waveAtlas1),waveBVHDifference:difference(wave1,waveBrute),waveEdgeChanges:difference(wave1,waveEdges),waveBruteRefit,
    bvhDifference:difference(lit,brute),bvhMaxDifference:maxDifference(lit,brute),analyticBVHDifference:difference(analytical,analyticalBrute),atlasChanges:difference(atlas,farAtlas),penumbraChanges:difference(hard,soft),emitterSizeChanges:difference(soft,smallEmitter),analyticalCount,orbChanges:difference(orbBefore,orbAfter),stressTriangles,baseMemory,stressMemory};renderer.destroy();return result;
@@ -90,6 +113,31 @@ try {
   assert.equal(results.bruteRefitMs,0);assert.equal(results.waveBruteRefit,0);assert.equal(results.waveVertices,1617);assert.equal(results.waveTriangles,3072);
   assert.ok(results.reusedWaveTree);assert.ok(results.connectedTopologyUnchanged);assert.ok(results.objectTransformUnchanged);assert.ok(results.lightsUnchanged);assert.ok(results.flattened);
   assert.ok(results.waveVertexChanges>1000);assert.ok(results.waveImageChanges>100);assert.ok(results.waveAtlasChanges>100);assert.ok(results.waveEdgeChanges>100);assert.equal(results.waveBVHDifference,0);
+  assert.ok(results.benchmarkRestored);assert.equal(results.benchmarkStatus,'complete');assert.equal(results.benchmarkRows,4);assert.ok(results.benchmarkBVHOffCPU);assert.ok(results.benchmarkHasPasses);assert.equal(results.benchmarkCancelled,'partial');
+  assert.ok(Math.abs(results.visibility.naiveBlocked-1)<.0001);assert.equal(results.visibility.guardedBlocked,0);assert.ok(Math.abs(results.visibility.guardedClear-1)<.0001);
   console.log('✓ GPU: WGSL compilation, cascade dispatch + merge, GI toggle, dynamic geometry, normals, readback',results);
  }
+ // Real WebGPU UI lifecycle, with only presentation redirected to an offscreen
+ // texture because this headless browser cannot composite a WebGPU swap chain.
+ if(!results.skip){
+  const uiGPU=await browser.newPage({viewport:{width:1000,height:800},deviceScaleFactor:1});const uiErrors=[];uiGPU.on('pageerror',e=>uiErrors.push(e.message));
+  await uiGPU.addInitScript(()=>{
+   const original=HTMLCanvasElement.prototype.getContext;
+   HTMLCanvasElement.prototype.getContext=function(type,...args){
+    if(type!=='webgpu')return original.call(this,type,...args);
+    const canvas=this;let device,format,target,width,height;
+    return {configure:options=>{device=options.device;format=options.format;},getCurrentTexture:()=>{if(!target||width!==canvas.width||height!==canvas.height){target?.destroy();width=canvas.width;height=canvas.height;target=device.createTexture({size:[width,height],format,usage:GPUTextureUsage.RENDER_ATTACHMENT});}return target;}};
+   };
+  });
+  await uiGPU.route('**/src/scene.js*',async route=>{const response=await route.fetch();await route.fulfill({response,body:(await response.text()).replace('resolution:.75','resolution:.05').replace('probes:true','probes:false').replace('shadowSamples:4','shadowSamples:1')});});
+  await uiGPU.goto(url+'/?scene=primitives');await uiGPU.locator('#loading.loaded').waitFor();
+  assert.equal(await uiGPU.locator('#engine-status').textContent(),'WebGPU active');
+  await uiGPU.locator('#bvh-quick').click();assert.equal(await uiGPU.locator('#bvh').getAttribute('aria-checked'),'false');
+  await uiGPU.locator('#benchmark').click();await uiGPU.locator('#run-benchmark').click();assert.equal(await uiGPU.locator('#scene-select').isDisabled(),true);
+  await uiGPU.locator('#download-benchmark').waitFor({timeout:60000});assert.equal(await uiGPU.locator('#benchmark-status').textContent(),'Completed all four blocks.');
+  assert.equal(await uiGPU.locator('#scene-select').isDisabled(),false);assert.equal(await uiGPU.locator('#bvh-quick').getAttribute('aria-checked'),'false');
+  const downloaded=uiGPU.waitForEvent('download');await uiGPU.locator('#download-benchmark').click();assert.equal((await downloaded).suggestedFilename(),'cascade-benchmark.json');assert.deepEqual(uiErrors,[]);await uiGPU.close();
+  console.log('✓ WebGPU UI benchmark: control locking, complete ABBA run, restore, export');
+ }
+
 }finally{await browser.close();await server.close();}

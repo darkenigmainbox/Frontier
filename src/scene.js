@@ -3,7 +3,7 @@ export const settings = {
  running:true, gi:true, emission:2.8, bounce:1, speed:1, resolution:.75, view:0,
  probes:true, probeLevel:1, probeMode:0, wireframe:false, scene:'chamber', time:0,
  cameraYaw:0, cameraPitch:0, distance:14.8, stressCount:256,
- shadowSamples:4, emitterSize:1, bvh:true, reflections:true, waveAmplitude:1,
+ shadowSamples:4, emitterSize:1, bvh:true, reflections:true, waveAmplitude:1, probeVisibility:false,
 };
 export const objects=[];
 export const lights=[];
@@ -94,6 +94,7 @@ export function makeScene(){
   }
  }
  const orb=sphere('emissive-orb',.38,[0,1.2,1],material([1,.15,.035],12),'orb');
+ orb.directEmitter=true;
  lights.push({object:orb,u:[.38,0,0],v:[0,.38,0],radius:.38});
  updateScene(settings.time);return objects;
 }
@@ -128,14 +129,14 @@ export function triangleData(){
  const data=[];
  for(const o of objects){if(o.analytic)continue;const positions=o.geometry.attributes.position,index=o.geometry.index,n=index?index.count:positions.count;
   for(let i=0;i<n;i+=3){a.fromBufferAttribute(positions,index?index.getX(i):i).applyMatrix4(o.matrix);b.fromBufferAttribute(positions,index?index.getX(i+1):i+1).applyMatrix4(o.matrix);c.fromBufferAttribute(positions,index?index.getX(i+2):i+2).applyMatrix4(o.matrix);
-   data.push(a.x,a.y,a.z,0,b.x,b.y,b.z,0,c.x,c.y,c.z,0,...o.mat.color,o.mat.emission,o.mat.metal,o.kind==='floor'?1:0,0,0);
+   data.push(a.x,a.y,a.z,0,b.x,b.y,b.z,0,c.x,c.y,c.z,0,...o.mat.color,o.mat.emission,o.mat.metal,o.kind==='floor'?1:0,o.areaEmitter?1:0,0);
   }
  }
  return new Float32Array(data);
 }
 export function analyticData(){
  const data=[];for(const o of objects){if(!o.analytic)continue;const m=o.matrix.elements;
-  data.push(m[12],m[13],m[14],o.analytic.type,...o.analytic.size,0,...o.mat.color,o.mat.emission,o.mat.metal,0,0,0);
+  data.push(m[12],m[13],m[14],o.analytic.type,...o.analytic.size,0,...o.mat.color,o.mat.emission,o.mat.metal,o.directEmitter?1:0,0,0);
  }return new Float32Array(data);
 }
 export function lightData(){

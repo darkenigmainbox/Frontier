@@ -4,7 +4,7 @@ struct Params {
  screen:vec4f, light:vec4f, flags:vec4f, counts:vec4f, debug:vec4f,
 };
 struct Triangle {a:vec4f,b:vec4f,c:vec4f,color:vec4f,info:vec4f};
-struct Hit {t:f32, normal:vec3f, color:vec3f, emission:f32, metal:f32, floor:f32, edge:f32};
+struct Hit {t:f32, normal:vec3f, color:vec3f, emission:f32, metal:f32, floor:f32, edge:f32, directEmitter:f32};
 @group(0) @binding(0) var<uniform> u:Params;
 @group(0) @binding(1) var<storage,read> tris:array<Triangle>;
 @group(0) @binding(2) var<storage,read_write> nearField:array<vec4f>;
@@ -29,14 +29,14 @@ fn triangleHit(index:u32,ro:vec3f,rd:vec3f,tmin:f32,previous:Hit)->Hit {
  let q=cross(offset,e1);let w=dot(rd,q)*inv;if(w<0. || v+w>1.){return previous;}
  let dist=dot(e2,q)*inv;if(dist<=tmin || dist>=previous.t){return previous;}
  var n=normalize(cross(e1,e2));if(dot(n,rd)>0.){n=-n;}
- return Hit(dist,n,t.color.xyz,t.color.w,t.info.x,t.info.y,min(v,min(w,1.-v-w)));
+ return Hit(dist,n,t.color.xyz,t.color.w,t.info.x,t.info.y,min(v,min(w,1.-v-w)),t.info.z);
 }
 fn sphereRoots(oc:vec3f,rd:vec3f,r:f32)->vec2f {
  let b=dot(oc,rd);let disc=b*b-dot(oc,oc)+r*r;if(disc<0.){return vec2f(-1);}
  let root=sqrt(disc);return vec2f(-b-root,-b+root);
 }
 fn trace(ro:vec3f,rd:vec3f,tmin:f32,tmax:f32)->Hit {
- var hit=Hit(tmax,vec3f(0),vec3f(0),0.,0.,0.,1.);let inv=invDir(rd);
+ var hit=Hit(tmax,vec3f(0),vec3f(0),0.,0.,0.,1.,0.);let inv=invDir(rd);
  if(u.light.w>.5){
   var index=0u;
   loop {
@@ -62,7 +62,7 @@ fn trace(ro:vec3f,rd:vec3f,tmin:f32,tmax:f32)->Hit {
     for(var j=0u;j<2u;j++){let t=roots[j];let pos=local+rd*t;if(t>tmin&&t<distance&&pos.y*signY>=halfLength){distance=t;normal=normalize(pos-center);}}
    }
   }
-  if(distance<hit.t){if(dot(normal,rd)>0.){normal=-normal;}hit=Hit(distance,normal,shape.color.xyz,shape.color.w,shape.info.x,0.,1.);}
+  if(distance<hit.t){if(dot(normal,rd)>0.){normal=-normal;}hit=Hit(distance,normal,shape.color.xyz,shape.color.w,shape.info.x,0.,1.,shape.info.y);}
  }
  return hit;
 }
@@ -102,13 +102,21 @@ fn lightAt(p:vec3f,n:vec3f,samples:u32)->vec3f {
  return sum+vec3f(.025,.032,.04)*max(n.y*.5+.5,0.);
 }
 fn sampleIrradiance(p:vec3f,n:vec3f)->vec3f{
- let d=vec3u(12,6,12);let coord=(p-vec3f(-6,0,-5.5))/vec3f(12,6,11)*vec3f(d)-.5;let base=vec3i(floor(coord));let f=fract(coord);var result=vec3f(0);
+ let d=vec3u(12,6,12);let coord=(p-vec3f(-6,0,-5.5))/vec3f(12,6,11)*vec3f(d)-.5;let base=vec3i(floor(coord));let f=fract(coord);var result=vec3f(0);var totalWeight=0.;
  for(var z=0;z<2;z++){for(var y=0;y<2;y++){for(var x=0;x<2;x++){
- let c=vec3u(clamp(base+vec3i(x,y,z),vec3i(0),vec3i(d)-1));let w=mix(1.-f,f,vec3f(f32(x),f32(y),f32(z)));let idx=(c.x+c.y*d.x+c.z*d.x*d.y)*6u;
+ let c=vec3u(clamp(base+vec3i(x,y,z),vec3i(0),vec3i(d)-1));let w=mix(1.-f,f,vec3f(f32(x),f32(y),f32(z)));let probe=c.x+c.y*d.x+c.z*d.x*d.y;let idx=probe*6u;let weight=w.x*w.y*w.z;
+ if(weight<.00001){continue;}
+ if(u.counts.w>.5){
+  // Optional, costly surface-to-probe visibility guard. It cannot repair errors
+  // already introduced by coarse directional merging, so this is not a full cure.
+  let delta=probePos(probe,d)-p;let dist=length(delta);
+  if(dot(delta,n)<-.015){continue;}
+  if(dist>.035){let visibility=trace(p,delta/dist,.005,dist-.015);if(visibility.t<dist-.015){continue;}}
+ }
  let value=irradiance[idx+select(1u,0u,n.x>=0.)].xyz*n.x*n.x+irradiance[idx+select(3u,2u,n.y>=0.)].xyz*n.y*n.y+irradiance[idx+select(5u,4u,n.z>=0.)].xyz*n.z*n.z;
- result+=value*w.x*w.y*w.z;
+ result+=value*weight;totalWeight+=weight;
  }}}
- return result;
+ return result/max(totalWeight,.00001);
 }
 `;
 export const cascade = common + /* wgsl */`
@@ -120,8 +128,10 @@ fn main(@builtin(global_invocation_id) id:vec3u){
  let pi=id.x/rays;let ri=id.x%rays;let uv=(vec2f(f32(ri%n),f32(ri/n))+.5)/f32(n);let dir=direction(uv);let pos=probePos(pi,d);
  var start=0.02;var end=.9;if(l==1u){start=.9;end=3.;}if(l==2u){start=3.;end=24.;}
  let hit=trace(pos,dir,start,end);var rad=vec3f(0);var visibility=1.;
- if(hit.t<end){visibility=0.;let p=pos+dir*hit.t;rad=hit.color*hit.emission*u.light.x;if(hit.emission==0.){rad=hit.color*lightAt(p,hit.normal,1u)*.32;}}
- else if(l<2u){rad=coarseRadiance(l+1u,pos,uv);}else{rad=vec3f(.018,.023,.03);}
+ if(hit.t<end){visibility=0.;let p=pos+dir*hit.t;// Registered emitters are already integrated by lightAt at the shaded surface.
+ // Do not inject that same direct contribution through the coarse GI field again.
+ rad=hit.color*hit.emission*u.light.x*(1.-hit.directEmitter);if(hit.emission==0.){rad=hit.color*lightAt(p,hit.normal,1u)*.32;}}
+ else if(l<2u){rad=coarseRadiance(l+1u,pos,uv);}else{rad=vec3f(0);}
  let value=vec4f(min(rad,vec3f(12)),visibility);
  if(l==0u){nearField[id.x]=value;}else if(l==1u){midField[id.x]=value;}else{farField[id.x]=value;}
 }
@@ -144,11 +154,13 @@ fn shade(ro:vec3f,rd:vec3f)->vec3f{
  if(hit.floor>0.){
   let grid=abs(fract(p.xz*.5+.5)-.5);let seam=1.-smoothstep(.008,.023,min(grid.x,grid.y));color*=1.-seam*.5;
  }
- let direct=lightAt(p,hit.normal,u32(u.counts.z));let indirect=sampleIrradiance(p+hit.normal*.16,hit.normal)*u.light.y;
+ var direct=vec3f(0);var indirect=vec3f(0);
+ if(u.flags.y==0.||u.flags.y==1.){direct=lightAt(p,hit.normal,u32(u.counts.z));}
+ if((u.flags.y==0.&&u.flags.x>.5)||u.flags.y==2.){indirect=sampleIrradiance(p+hit.normal*.025,hit.normal)*u.light.y;}
  var lit=color*(direct+indirect*u.flags.x)*.65+color*hit.emission*u.light.x;
  if(hit.metal>.1 && u.flags.y==0. && u.debug.z>.5){
   let reflectedDir=reflect(rd,hit.normal);let rh=trace(p+hit.normal*.035,reflectedDir,.02,35.);var reflection=vec3f(.04,.055,.065);
-  if(rh.t<35.){let rp=p+reflectedDir*rh.t;reflection=rh.color*(rh.emission*u.light.x+lightAt(rp,rh.normal,u32(u.counts.z))*.5+sampleIrradiance(rp+rh.normal*.16,rh.normal)*u.flags.x*.4);}
+  if(rh.t<35.){let rp=p+hit.normal*.035+reflectedDir*rh.t;reflection=rh.color*(rh.emission*u.light.x+lightAt(rp,rh.normal,u32(u.counts.z))*.5+sampleIrradiance(rp+rh.normal*.025,rh.normal)*u.flags.x*.4);}
   let fresnel=.12+.88*pow(1.-max(dot(-rd,hit.normal),0.),5.);lit=mix(lit,reflection,hit.metal*(.45+fresnel*.55));
  }
  if(u.flags.y==1.){lit=color*direct*.65+color*hit.emission*u.light.x;}

@@ -1,4 +1,4 @@
-# Cascade / lab · v0.3
+# Cascade / lab · v0.4
 
 An interactive **WebGPU 3D radiance-cascade prototype** with animated/deforming triangles, a moving emissive sphere, analytic primitives, traced reflections, area-light shadows, and a triangle BVH. Built with Vite, JavaScript, WGSL, and Three.js (scene math and the explicitly labeled WebGL fallback).
 
@@ -43,7 +43,7 @@ Add `?scene=deform`, `?scene=windows`, `?scene=primitives`, or `?scene=stress` t
 
 For a clear **penumbra comparison**, open the window room, pause motion, use **Direct only**, disable probes, and compare 1 shadow sample against 16 or 64. Change **Area emitter size** to see shadow softness change. Size changes emitting area at constant radiance, so total power also changes. This is surface lighting, **not volumetric fog or god rays**. The window scene selects 16 samples; stress selects 1 to keep workloads manageable.
 
-The ball's emissive material is visible to primary, reflected, and cascade rays. Its direct light is sampled using a camera-independent disk facing the shaded surface, with a conservative endpoint offset to avoid self-shadowing inside the analytic emitter. This is an approximation, not exact spherical-light integration.
+The ball's emissive material is visible to primary and reflected rays. Cascade rays intersect it as an occluder but exclude its directly sampled emission from the indirect field, avoiding a second direct-light contribution. Its direct light is sampled using a camera-independent disk facing the shaded surface, with a conservative endpoint offset to avoid self-shadowing inside the analytic emitter. This is an approximation, not exact spherical-light integration.
 
 ## Controls and visualization
 
@@ -59,7 +59,7 @@ The ball's emissive material is visible to primary, reflected, and cascade rays.
 
 The default overlay shows **C1's 108 probes**. Select C0 (864), C1 (108), or C2 (18). Markers are drawn through geometry intentionally:
 
-- **Radiance:** average merged radiance from that probe's actual GPU buffer, tonemapped.
+- **Radiance:** average merged indirect-field radiance from that probe's actual GPU buffer, tonemapped.
 - **Cascade ID:** a fixed color identifying the selected level.
 - **Visibility:** fraction of directions with no intersection in that probe's own distance interval; not full-scene visibility.
 
@@ -123,17 +123,25 @@ Reflections trace **one perfect reflected ray** at reflective surfaces and blend
 **990 probes, 25,344 interval rays per update.** Directions use a uniform-solid-angle spherical parameterization. Spatial sampling becomes coarser as directional sampling becomes finer.
 
 1. `src/scene.js` transforms/deforms geometry and produces triangle, analytic-shape, and emitter data. `src/bvh.js` builds/refits triangle bounds.
-2. `src/shaders.js` traces **C2 → C1 → C0**. Unoccluded interval rays merge coarse radiance with trilinear spatial interpolation and nearest directional-bin lookup. Hits evaluate emission and a scaled direct-light term. Cascade hit lighting uses one representative sample per emitter for cost control.
+2. `src/shaders.js` traces **C2 → C1 → C0**. Unoccluded interval rays merge coarse radiance with trilinear spatial interpolation and nearest directional-bin lookup. Non-emissive hits evaluate a scaled direct-light term. Registered direct emitters block the ray but do not inject emission into this indirect cache; unregistered emissive backdrops can still contribute. Cascade hit lighting uses one representative sample per emitter for cost control.
 3. A gather pass integrates C0 into six cosine-weighted irradiance lobes per probe.
 4. Primary rays trace the scene, interpolate gathered irradiance, sample area-light visibility, and optionally trace one reflection. Direct/reflection lighting uses the selected shadow-sample count.
 5. A full-screen pass presents the compute texture; an instanced pass draws probe markers.
 
 `src/gpu.js` owns buffers, bind groups, dispatch order, output texture, timing, and readback. Allocations grow when scene capacity increases. The renderer waits for completed submitted work before scheduling another frame, avoiding an unbounded command backlog.
 
+## Measurement and lighting diagnosis
+
+Click **Measure A/B** above the viewport for a controlled comparison on your own GPU. It freezes the scene/camera/settings, alternates modes with warm-ups, reports medians and p95/raw samples in a downloadable JSON, and restores the original settings. See [the measured software-GPU results and limitations](docs/MEASUREMENTS.md). A sandbox software renderer did **not** reproduce the reported BVH-off slowdown; it must be measured on the affected hardware rather than assumed normal.
+
+Blocky indirect light is a real limitation: C0 uses only 16 directions per probe, directional merging is coarse, interpolation normally ignores walls, and probe origins differ. Soft direct shadows come from separate visibility rays and do not validate the cascade solve. v0.4 removes duplicate registered-emitter energy from the probe cache, and offers **GI visibility guard** to test surface-to-probe visibility at additional cost. The guard is OFF by default and is not a complete leakage fix. No antialiasing is implemented, so 75% render scale can also produce visibly jagged outlines.
+
+Use **Direct only** versus **Indirect** with overlays disabled to distinguish the two lighting paths. Direct-only and normals views now skip unneeded cascade and shading work; turning off GI while inspecting probes still runs the solve for that debug data.
+
 ## Performance / VRAM telemetry
 
 - **FPS:** completed browser/render-loop throughput, not a synthetic engine benchmark.
-- **GPU time:** hardware timestamp queries when available; covers compute passes, excludes presentation/overlay rendering. Otherwise shown as unavailable.
+- **GPU time:** hardware timestamp queries when available; compute total excludes presentation. The pass strip separately reports cascades/gather, primary/shadow/reflection shading, and presentation/overlay. Otherwise shown as unavailable.
 - **CPU pack + BVH:** triangle packing, BVH build/refit, buffer writes/rebinding, and resize preparation. Excludes the preceding object-transform update and UI work.
 - **VRAM allocation · est.:** sum of known renderer-owned GPU buffer capacities, RGBA8 output texture, and temporary capture allocations while active. Click the metric for a breakdown.
 
@@ -144,8 +152,8 @@ At 64×48 output, the software-GPU tests recorded approximately 0.49 MiB owned f
 ## Limits before game integration
 
 - CPU median-split BVH construction/refitting is simple, not a production SAH builder or GPU scene acceleration system. Large motions can degrade a refitted hierarchy.
-- Cascade merging remains approximate: no parallax correction, visibility-aware interpolation, or probe relocation. Probes inside geometry and coarse interpolation can leak light or produce bands.
-- The gathered term contains visible emitter energy and direct-lit hit surfaces: it is **not** a clean indirect-only physical decomposition or iterative multi-bounce solver.
+- Cascade merging remains approximate: no parallax correction, visibility-aware coarse merging, or probe relocation. The optional final surface-to-probe visibility guard can reject some invalid interpolation connections, but probes inside geometry and incorrect merged radiance can still leak or produce bands.
+- The gathered term estimates reflected direct light and includes unregistered emissive backdrops; registered directly sampled lamps are excluded to prevent duplicate direct energy. It is **not** an exact indirect-light decomposition or iterative multi-bounce solver.
 - Deterministic area-light sampling can show stepped penumbrae at low sample counts. There is no temporal accumulation or denoiser. Cascade-hit direct lighting is lower quality than primary-hit lighting.
 - No production material model, light importance sampling, adaptive cascade layout, or guaranteed frame rate. Measure on your target devices.
 
@@ -169,6 +177,7 @@ Tests start an isolated Vite server on port 5180 and check fallback labeling, co
 - Window shadow-sample and emitter-size image changes.
 - Analytic geometry and moving emitter updates.
 - An **18,468-triangle** dispatch and corresponding allocation growth.
+- Benchmark state restoration, cancellation, timestamp stages, full WebGPU UI control locking and JSON export; an isolated blocked-probe fixture verifies the optional visibility guard.
 - Isolated connected-mesh deformation: fixed topology, fixed transform, fixed lights, changing vertices and cascade atlas; BVH refit reuses the same tree, and BVH OFF records zero refit time.
 
 GPU tests explicitly skip if no adapter exists. Set `CHROMIUM_PATH=/path/to/chromium` to use an existing browser. Linux may need `npx playwright install-deps chromium` or equivalent native libraries.

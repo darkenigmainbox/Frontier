@@ -8,7 +8,8 @@ export class GPURenderer {
   this.timestamp=adapter.features.has('timestamp-query');
   this.device=await adapter.requestDevice({requiredFeatures:this.timestamp?['timestamp-query']:[]});const d=this.device;
   this.canvas=canvas;this.context=canvas.getContext('webgpu');this.format=navigator.gpu.getPreferredCanvasFormat();this.context.configure({device:d,format:this.format,alphaMode:'opaque'});
-  this.name=adapter.info?.description||adapter.info?.device||'WebGPU device';
+  this.adapterInfo=Object.fromEntries(['vendor','architecture','device','description'].map(k=>[k,adapter.info?.[k]||'']));
+  this.name=adapter.info?.description||adapter.info?.architecture||adapter.info?.device||'WebGPU device';
   this.allocations=[];
   const buffer=(size,usage)=>{const b=d.createBuffer({size,usage});this.allocations.push(b);return b;};
   this.buffer=buffer;this.bvh=new TriangleBVH();
@@ -26,7 +27,7 @@ export class GPURenderer {
   this.pp=d.createRenderPipeline({layout:'auto',vertex:{module:pm,entryPoint:'vs'},fragment:{module:pm,entryPoint:'fs',targets:[{format:this.format,blend:{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}}]},primitive:{topology:'triangle-list'}});
   this.pbg=d.createBindGroup({layout:this.pp.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform}},...this.fields.slice(0,3).map((buffer,i)=>({binding:i+1,resource:{buffer}}))]});
   this.sampler=d.createSampler({magFilter:'linear',minFilter:'linear'});
-  if(this.timestamp){this.queries=d.createQuerySet({type:'timestamp',count:2});this.queryBuffer=buffer(16,GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC);this.readBuffer=buffer(16,GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ);}
+  if(this.timestamp){this.queries=d.createQuerySet({type:'timestamp',count:6});this.queryBuffer=buffer(48,GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC);this.readBuffer=buffer(48,GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ);}
   this.gpuMs=null;this.pending=false;
   d.lost.then(info=>this.onError?.(new Error(`GPU device lost: ${info.message}`)));
   d.addEventListener('uncapturederror',e=>{console.error(e.error);this.onError?.(e.error);});
@@ -72,18 +73,20 @@ export class GPURenderer {
    this.canvas.width,this.canvas.height,this.triangleCount,settings.time,
    settings.emission,settings.bounce,lights.length/16,settings.bvh?1:0,
    settings.gi?1:0,settings.view,settings.probes?1:0,settings.wireframe?1:0,
-   this.analyticCount,this.nodeCount,settings.shadowSamples,0,
+   this.analyticCount,this.nodeCount,settings.shadowSamples,settings.probeVisibility?1:0,
    settings.probeLevel,settings.probeMode,settings.reflections?1:0,settings.emitterSize]);
   d.queue.writeBuffer(this.uniform,0,data);this.cpuMs=performance.now()-cpuStart;
-  const e=d.createCommandEncoder();const measure=this.timestamp&&!this.pending;
+  const e=d.createCommandEncoder();const measure=this.timestamp&&!this.pending;const frameId=this.frameId=(this.frameId||0)+1;
   const p=e.beginComputePass(measure?{timestampWrites:{querySet:this.queries,beginningOfPassWriteIndex:0,endOfPassWriteIndex:1}}:{});
   p.setPipeline(this.cp);
-  if(settings.gi||settings.view===2||settings.view===4||settings.probes){for(const l of [2,1,0]){p.setBindGroup(0,this.cbg[l]);p.dispatchWorkgroups(Math.ceil([13824,6912,4608][l]/64));}p.setPipeline(this.gp);p.setBindGroup(0,this.gbg);p.dispatchWorkgroups(81);}
-  p.setPipeline(this.rp);p.setBindGroup(0,this.rbg);p.dispatchWorkgroups(Math.ceil(this.canvas.width/8),Math.ceil(this.canvas.height/8));p.end();
-  const pass=e.beginRenderPass({colorAttachments:[{view:this.context.getCurrentTexture().createView(),loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:1}}]});pass.setPipeline(this.bp);pass.setBindGroup(0,this.bbg);pass.draw(3);if(settings.probes&&settings.view!==4){pass.setPipeline(this.pp);pass.setBindGroup(0,this.pbg);pass.draw(6,[864,108,18][settings.probeLevel]);}pass.end();
-  if(measure){e.resolveQuerySet(this.queries,0,2,this.queryBuffer,0);e.copyBufferToBuffer(this.queryBuffer,0,this.readBuffer,0,16);}
+  if((settings.gi&&settings.view===0)||settings.view===2||settings.view===4||settings.probes){for(const l of [2,1,0]){p.setBindGroup(0,this.cbg[l]);p.dispatchWorkgroups(Math.ceil([13824,6912,4608][l]/64));}p.setPipeline(this.gp);p.setBindGroup(0,this.gbg);p.dispatchWorkgroups(81);}
+  p.end();
+  const shading=e.beginComputePass(measure?{timestampWrites:{querySet:this.queries,beginningOfPassWriteIndex:2,endOfPassWriteIndex:3}}:{});
+  shading.setPipeline(this.rp);shading.setBindGroup(0,this.rbg);shading.dispatchWorkgroups(Math.ceil(this.canvas.width/8),Math.ceil(this.canvas.height/8));shading.end();
+  const pass=e.beginRenderPass({...(measure?{timestampWrites:{querySet:this.queries,beginningOfPassWriteIndex:4,endOfPassWriteIndex:5}}:{}),colorAttachments:[{view:this.context.getCurrentTexture().createView(),loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:1}}]});pass.setPipeline(this.bp);pass.setBindGroup(0,this.bbg);pass.draw(3);if(settings.probes&&settings.view!==4){pass.setPipeline(this.pp);pass.setBindGroup(0,this.pbg);pass.draw(6,[864,108,18][settings.probeLevel]);}pass.end();
+  if(measure){e.resolveQuerySet(this.queries,0,6,this.queryBuffer,0);e.copyBufferToBuffer(this.queryBuffer,0,this.readBuffer,0,48);}
   d.queue.submit([e.finish()]);
-  if(measure){this.pending=true;this.readBuffer.mapAsync(GPUMapMode.READ).then(()=>{const times=new BigUint64Array(this.readBuffer.getMappedRange());this.gpuMs=Number(times[1]-times[0])/1e6;this.readBuffer.unmap();this.pending=false;}).catch(()=>{this.pending=false;});}
+  if(measure){this.pending=true;this.timingReady=this.readBuffer.mapAsync(GPUMapMode.READ).then(()=>{const times=new BigUint64Array(this.readBuffer.getMappedRange());this.passMs={cascades:Number(times[1]-times[0])/1e6,shading:Number(times[3]-times[2])/1e6,present:Number(times[5]-times[4])/1e6};this.gpuMs=this.passMs.cascades+this.passMs.shading;this.timingFrameId=frameId;this.readBuffer.unmap();this.pending=false;}).catch(()=>{this.pending=false;});}
   return d.queue.onSubmittedWorkDone();
  }
  async capture(){

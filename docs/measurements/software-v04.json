@@ -1,0 +1,281 @@
+{
+  "adapter": "swiftshader",
+  "width": 160,
+  "height": 100,
+  "settings": {
+    "running": false,
+    "gi": true,
+    "emission": 2.8,
+    "bounce": 1,
+    "speed": 1,
+    "resolution": 1,
+    "view": 0,
+    "probes": false,
+    "probeLevel": 1,
+    "probeMode": 0,
+    "wireframe": false,
+    "scene": "primitives",
+    "time": 74.4,
+    "cameraYaw": 0,
+    "cameraPitch": 0,
+    "distance": 14.8,
+    "stressCount": 256,
+    "shadowSamples": 16,
+    "emitterSize": 1,
+    "bvh": true,
+    "reflections": true,
+    "waveAmplitude": 1,
+    "probeVisibility": false
+  },
+  "triangles": 36,
+  "analyticShapes": 7,
+  "errors": [],
+  "rows": [
+    {
+      "bvh": true,
+      "wallMs": 1631.3999999999069,
+      "cpuMs": 0.2999999998137355,
+      "refitMs": 0,
+      "gpuMs": 1629.5548050000002,
+      "passes": {
+        "cascades": 148.85298,
+        "shading": 1480.701825,
+        "present": 0.220126
+      }
+    },
+    {
+      "bvh": true,
+      "wallMs": 1589.3000000002794,
+      "cpuMs": 0.3000000002793968,
+      "refitMs": 0,
+      "gpuMs": 1587.774844,
+      "passes": {
+        "cascades": 155.711053,
+        "shading": 1432.063791,
+        "present": 0.263846
+      }
+    },
+    {
+      "bvh": true,
+      "wallMs": 1472.0999999996275,
+      "cpuMs": 0.40000000037252903,
+      "refitMs": 0.10000000009313226,
+      "gpuMs": 1469.228367,
+      "passes": {
+        "cascades": 151.869316,
+        "shading": 1317.359051,
+        "present": 0.263713
+      }
+    },
+    {
+      "bvh": true,
+      "wallMs": 1615.8000000002794,
+      "cpuMs": 0.3000000002793968,
+      "refitMs": 0.10000000009313226,
+      "gpuMs": 1614.137785,
+      "passes": {
+        "cascades": 162.894139,
+        "shading": 1451.243646,
+        "present": 0.228976
+      }
+    },
+    {
+      "bvh": true,
+      "wallMs": 1573.6999999997206,
+      "cpuMs": 0.39999999990686774,
+      "refitMs": 0.10000000009313226,
+      "gpuMs": 1571.776705,
+      "passes": {
+        "cascades": 148.041925,
+        "shading": 1423.73478,
+        "present": 0.269692
+      }
+    },
+    {
+      "bvh": false,
+      "wallMs": 1350.1000000000931,
+      "cpuMs": 0.20000000018626451,
+      "refitMs": 0,
+      "gpuMs": 1347.983157,
+      "passes": {
+        "cascades": 142.642118,
+        "shading": 1205.341039,
+        "present": 0.241738
+      }
+    },
+    {
+      "bvh": false,
+      "wallMs": 1273.2999999998137,
+      "cpuMs": 0.10000000009313226,
+      "refitMs": 0,
+      "gpuMs": 1270.7560090000002,
+      "passes": {
+        "cascades": 130.395799,
+        "shading": 1140.36021,
+        "present": 0.208463
+      }
+    },
+    {
+      "bvh": false,
+      "wallMs": 1250.3000000002794,
+      "cpuMs": 0.10000000009313226,
+      "refitMs": 0,
+      "gpuMs": 1248.2193809999999,
+      "passes": {
+        "cascades": 137.082039,
+        "shading": 1111.137342,
+        "present": 0.267816
+      }
+    },
+    {
+      "bvh": false,
+      "wallMs": 1302.6999999997206,
+      "cpuMs": 0.19999999972060323,
+      "refitMs": 0,
+      "gpuMs": 1300.175327,
+      "passes": {
+        "cascades": 123.577227,
+        "shading": 1176.5981,
+        "present": 0.255401
+      }
+    },
+    {
+      "bvh": false,
+      "wallMs": 1262.5,
+      "cpuMs": 0.20000000018626451,
+      "refitMs": 0,
+      "gpuMs": 1260.778488,
+      "passes": {
+        "cascades": 146.699897,
+        "shading": 1114.078591,
+        "present": 0.265685
+      }
+    },
+    {
+      "bvh": false,
+      "wallMs": 1247,
+      "cpuMs": 0.10000000009313226,
+      "refitMs": 0,
+      "gpuMs": 1245.238374,
+      "passes": {
+        "cascades": 126.680129,
+        "shading": 1118.558245,
+        "present": 0.262669
+      }
+    },
+    {
+      "bvh": false,
+      "wallMs": 1153.4000000003725,
+      "cpuMs": 0.20000000018626451,
+      "refitMs": 0,
+      "gpuMs": 1151.647991,
+      "passes": {
+        "cascades": 120.544582,
+        "shading": 1031.103409,
+        "present": 0.269441
+      }
+    },
+    {
+      "bvh": false,
+      "wallMs": 1276.8999999999069,
+      "cpuMs": 0.09999999962747097,
+      "refitMs": 0,
+      "gpuMs": 1274.480215,
+      "passes": {
+        "cascades": 120.852198,
+        "shading": 1153.628017,
+        "present": 0.268353
+      }
+    },
+    {
+      "bvh": false,
+      "wallMs": 1252.7999999998137,
+      "cpuMs": 0.19999999972060323,
+      "refitMs": 0,
+      "gpuMs": 1251.224456,
+      "passes": {
+        "cascades": 144.504958,
+        "shading": 1106.719498,
+        "present": 0.275347
+      }
+    },
+    {
+      "bvh": false,
+      "wallMs": 1213.5,
+      "cpuMs": 0.10000000009313226,
+      "refitMs": 0,
+      "gpuMs": 1211.0297269999999,
+      "passes": {
+        "cascades": 126.327558,
+        "shading": 1084.702169,
+        "present": 0.224624
+      }
+    },
+    {
+      "bvh": true,
+      "wallMs": 1472.8999999999069,
+      "cpuMs": 0.10000000009313226,
+      "refitMs": 0,
+      "gpuMs": 1470.2891809999999,
+      "passes": {
+        "cascades": 151.671486,
+        "shading": 1318.617695,
+        "present": 0.230868
+      }
+    },
+    {
+      "bvh": true,
+      "wallMs": 1559.1999999997206,
+      "cpuMs": 0.10000000009313226,
+      "refitMs": 0,
+      "gpuMs": 1556.946061,
+      "passes": {
+        "cascades": 148.910051,
+        "shading": 1408.03601,
+        "present": 0.253062
+      }
+    },
+    {
+      "bvh": true,
+      "wallMs": 1534.7000000001863,
+      "cpuMs": 0.20000000018626451,
+      "refitMs": 0.10000000009313226,
+      "gpuMs": 1532.888536,
+      "passes": {
+        "cascades": 149.580245,
+        "shading": 1383.308291,
+        "present": 0.222716
+      }
+    },
+    {
+      "bvh": true,
+      "wallMs": 1535.7000000001863,
+      "cpuMs": 0.20000000018626451,
+      "refitMs": 0,
+      "gpuMs": 1534.0942200000002,
+      "passes": {
+        "cascades": 164.329762,
+        "shading": 1369.764458,
+        "present": 0.208356
+      }
+    },
+    {
+      "bvh": true,
+      "wallMs": 1501.5999999996275,
+      "cpuMs": 0.10000000009313226,
+      "refitMs": 0,
+      "gpuMs": 1499.829187,
+      "passes": {
+        "cascades": 150.239424,
+        "shading": 1349.589763,
+        "present": 0.252625
+      }
+    }
+  ],
+  "sourceRevision": "b6752171352fd991f5bb35cfc8de0b4a26ca3a71",
+  "note": "Offscreen software/selected-adapter benchmark; not a measurement of the user device. Source may include uncommitted changes.",
+  "applicationVersion": "0.4.0",
+  "sourceNote": "v0.4 working tree: split pass timing, emitter double-count removal and optional visibility guard (OFF).",
+  "backend": "Chromium forced SwiftShader software rendering",
+  "protocol": "BVH/brute/brute/BVH, 2 warmups and 5 recorded frames per block (10 samples per mode). Fixed pose and default camera; not the user camera/device."
+}
