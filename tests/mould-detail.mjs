@@ -17,7 +17,8 @@ for(const fraction of [.5,1e-7]){
  assert.equal(MeshMetrics(mesh).OpenEdges,0);assert.equal(MeshMetrics(mesh).ZeroArea,1);
  assert(RepairExchange(mesh)>0);const m=MeshMetrics(mesh);
  for(const key of ['OpenEdges','NonmanifoldEdges','NonmanifoldVertices','WindingErrors','ZeroArea','DuplicateTriangles'])assert.equal(m[key],0,key);
- assert(Math.abs(m.Volume-8)<1e-8);
+ // A diagonal flip does not move points; the endpoint collapse can move a corner by 0.2 micrometres.
+ assert(Math.abs(m.Volume-8)<(fraction===.5?1e-8:1e-6));
 }
 const sequence=new MouldSequence(async()=>lib), reports=[];
 function solid(meshes){const p=[],t=[];let n=0;for(const m of meshes){for(const v of m.Vertices)p.push(...v);for(const tri of m.Triangles)t.push(...tri.map(i=>i+n));n+=m.Vertices.length;}return new lib.Manifold(new lib.Mesh({numProp:3,vertProperties:new Float32Array(p),triVerts:new Uint32Array(t)}));}
