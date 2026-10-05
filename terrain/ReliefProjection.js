@@ -3,6 +3,7 @@
 //============================================================================================================================================
 // 📦 Seeded coherent geological relief: gradient, ridged and cellular fields constrained by cliff cross-sections.
 
+import {ConstructFormation} from './FormationShape.js';
 import {CliffProfiles,SectionPlans} from './CliffSpecification.js';
 
 function HashCoordinate(Horizontal,Vertical,Seed)
@@ -56,6 +57,18 @@ export function SampleRelief(Horizontal,Vertical,Seed,Mode)
 export function ConstructRelief(Specification)
 {
     const {Width,Height,Depth,Relief,Retreat,Seed,NoiseMode,NoiseScale}=Specification;
+    if(Specification.ShapeMode==='Procedural')
+    {
+        const Shape=ConstructFormation(Specification);
+        for(let i=0;i<Shape.Rows.length;i++)for(let j=0;j<Shape.Sections.length;j++)
+        {
+            const u=Shape.Stations[i][0]*NoiseScale,t=Shape.Sections[j][0]*1.6;
+            Shape.Rows[i][j][2]+=SampleRelief(u,t,Seed+19,NoiseMode)*Specification.Variation*Depth*.07;
+            Shape.RearRows[i][j][2]+=SampleRelief(u,t,Seed+811,NoiseMode)*Specification.Variation*Depth*.07;
+            Shape.RearRows[i][j][2]=Math.min(Shape.RearRows[i][j][2],Shape.Rows[i][j][2]-Depth*.12);
+        }
+        return Shape;
+    }
     const Variation=NoiseMode==='None'?0:Specification.Variation;
     const Profile=CliffProfiles[Specification.Profile];
     const Noise=(Position,Elevation,Channel=0)=>SampleRelief(Position*NoiseScale+.371,Elevation*1.6+.613,Seed+Channel*7907,NoiseMode);

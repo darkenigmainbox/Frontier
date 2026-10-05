@@ -30,7 +30,7 @@ function ConstructMass(Specification)
                 return Math.min(...Edges.map((Edge,Index)=>Area/(Edge*Edges[(Index+1)%3])));
             })));
             // 📝 Tall crowns require the short, well-conditioned loft diagonal rather than a fixed strip direction.
-            if (Specification.NoiseMode!=='None' && Specification.Variation && Quality(Alternatives[1])>Quality(Alternatives[0])) Alternatives.reverse();
+            if ((Specification.ShapeMode==='Procedural'||Specification.NoiseMode!=='None' && Specification.Variation) && Quality(Alternatives[1])>Quality(Alternatives[0])) Alternatives.reverse();
             for (const Triangle of Alternatives[0])
             {
                 const Indices=Triangle.map(Index=>CornerIndices[Index]);

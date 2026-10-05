@@ -159,3 +159,9 @@ The separate terrain page at `terrain/index.html?particles` (deployed under `sit
 Try sandstone, granite or limestone; run chemical weathering, inspect crystals, compare fresh/current grains and use **On rock** to locate the patch. This is a bounded millimetre-scale coating experiment, not a calibrated geological model or whole-cliff grain simulation. No SDF stage. See [scope, controls and tests](docs/terrain/PARTICLES.md).
 
 Tests: `npm run test:particles`; built-site browser checks: `npm run test:particles:browser` (Playwright Chromium, optionally `CHROMIUM_PATH`).
+
+## Procedural base formations
+
+Stage 1 now generates seeded macro formations rather than only perturbing authored profiles. Open `site/terrain/index.html`, leave **Major peaks** on **Seeded**, and try **New seed**. Peak contrast, sharpness, lean, taper, shelves and recess depth are independent of small surface noise. Stage 1 auto-previews; later stages rebuild on demand. Old cliff recipes retain a legacy mode. The particle model—including its deferred stacking issue—is unchanged. See [formation controls, scope and checks](docs/terrain/FORMATIONS.md).
+
+Tests: `npm run test:formations` and `npm run test:formations:browser`.

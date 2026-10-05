@@ -11,7 +11,9 @@
     "measure": "node tests/measure.mjs",
     "compare": "node tests/compare.mjs",
     "test:particles": "node tests/particles.mjs",
-    "test:particles:browser": "npm run build:githack && node tests/particles-browser.mjs"
+    "test:particles:browser": "npm run build:githack && node tests/particles-browser.mjs",
+    "test:formations": "node tests/formations.mjs",
+    "test:formations:browser": "npm run build:githack && node tests/formations-browser.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",

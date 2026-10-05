@@ -1,6 +1,8 @@
 # Slate terrain generator: initial baseline audit (historical)
 
-**Current direction:** the proposed stage-6 displacement was implemented, reviewed and rejected, then reverted in `1dd8397`. The replacement uses actual mineral particles; see [the particle implementation](PARTICLES.md). The legacy grain study described below is no longer the active material tab.
+**Latest:** Stage 1 now has a separate procedural macro-shape generator and automatic preview. See [formation notes](FORMATIONS.md). Grain stacking is deferred; particle implementation unchanged.
+
+**Earlier direction:** the proposed stage-6 displacement was implemented, reviewed and rejected, then reverted in `1dd8397`. The replacement uses actual mineral particles; see [the particle implementation](PARTICLES.md). The legacy grain study described below is no longer the active material tab.
 
 ## Source inspected
 

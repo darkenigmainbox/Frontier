@@ -9,11 +9,11 @@ import * as THREE from 'three';
 import {CreateGrainPanel} from './ParticlePanel.js';
 import {CaptureGrainSource} from './GrainSequence.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {CliffDefaults, CliffProfiles, ReadSpecification, EarliestStage, NoiseModes, FractureStyles, FormationPresets, ReadRecipe} from './CliffSpecification.js';
+import {CliffDefaults, CliffProfiles, ReadSpecification, EarliestStage, NoiseModes, FractureStyles, FormationPresets, ReadRecipe, ShapeModes} from './CliffSpecification.js';
 
 const Element=Id=>document.getElementById(Id);
 const StageDescriptions=[
-    ['Cliff mass','Buttresses, bays & crown','Seeded, all-sided cliff relief. Choose a landform preset and noise family, or use New seed for a different formation.'],
+    ['Cliff mass','Procedural peaks, shelves & bays','New seed rebuilds the large formation, not just its noise. Major peaks, contrast, sharpness, lean and taper control the silhouette. Small surface relief is separate.'],
     ['Primary fractures','Joint sets, not just bedding','Geological orientation families with rough polygon cuts. New fractures terminate at existing boundaries; bedding is an optional preset.'],
     ['Bounded joints','Finite-depth rock blocks','Kinked joints split front, rear and end exposures, terminating against a retained interior core.'],
     ['Edge spalls','Local fracture cavities','Localized, asymmetric bites with four or six fracture facets. The original edge survives on both sides—not a full-edge bevel.'],
@@ -266,6 +266,7 @@ function FrameView(Body=null, Direction=null)
     Controls.update();
 }
 
+let ShapePreviewTimer=null;
 function MarkDirty()
 {
     if (State.Busy)
@@ -277,10 +278,13 @@ function MarkDirty()
         Element('Loading').hidden=true;
     }
     ViewStage(State.Stage);
+    clearTimeout(ShapePreviewTimer);
+    if(State.Stage===1) ShapePreviewTimer=setTimeout(()=>Generate(),350);
 }
 
 function Generate()
 {
+    clearTimeout(ShapePreviewTimer);
     if (State.Busy)
     {
         State.Worker?.terminate();
@@ -394,8 +398,9 @@ function ObjText()
 }
 
 const Groups=[
-    ['Cliff mass',true,[['Profile','Landform preset · applies size'],['Seed','Formation seed'],
-        ['NoiseMode','Relief noise'],['Variation','Variation strength',0,1,.05,'×'],['NoiseScale','Feature frequency',1,5,.1,'×'],
+    ['Cliff mass',true,[['ShapeMode','Base shape generator'],['Profile','Landform preset · applies size'],['Seed','Formation seed'],
+        ['PeakCount','Major peaks · 0 = seeded',0,7,1,''],['PeakSpread','Peak / valley contrast',0,1,.05,''],['PeakSharpness','Peak sharpness',0,1,.05,''],['Lean','Formation lean',-1,1,.05,''],['Taper','Crown taper',0,.75,.05,''],['Terraces','Large shelves',0,1,.05,''],['BayDepth','Buttress / recess depth',0,1.5,.05,''],
+        ['NoiseMode','Small surface relief'],['Variation','Small relief strength',0,1,.05,'×'],['NoiseScale','Small relief frequency',1,5,.1,'×'],
         ['Width','Width',10,80,.5,'m'],['Height','Height',10,56,.5,'m'],['Depth','Depth',8,24,.5,'m'],
         ['Relief','Buttress / bay relief',.35,1.3,.05,'×'],['Retreat','Crown retreat',.25,.65,.01,'×']]],
     ['Primary fractures',false,[['FractureStyle','Fracture preset'],['FractureSeed','Fracture seed'],
@@ -409,7 +414,7 @@ const Groups=[
 ];
 function BuildControls()
 {
-    const Choices={Profile:Object.fromEntries(Object.entries(CliffProfiles).map(([Key,Profile])=>[Key,Profile.Label])),NoiseMode:NoiseModes,FractureStyle:FractureStyles};
+    const Choices={ShapeMode:ShapeModes,Profile:Object.fromEntries(Object.entries(CliffProfiles).map(([Key,Profile])=>[Key,Profile.Label])),NoiseMode:NoiseModes,FractureStyle:FractureStyles};
     Element('ParameterControls').innerHTML=Groups.map(([Title,Open,Fields])=>`<details ${Open?'open':''}><summary>${Title}</summary><div class="ControlGroup">${Fields.map(([Name,Label,Minimum,Maximum,Step,Unit])=>
     {
         if (Choices[Name]) return `<div class="Property"><label class="FieldLabel" for="${Name}">${Label}</label><select id="${Name}">${Object.entries(Choices[Name]).map(([Key,Title])=>`<option value="${Key}">${Title}</option>`).join('')}</select></div>`;
@@ -420,10 +425,12 @@ function BuildControls()
     {
         const Input=Element(Name);
         Input.value=State.Specification[Name];
+        if(['PeakCount','PeakSpread','PeakSharpness','Lean','Taper','Terraces','BayDepth'].includes(Name))Input.disabled=State.Specification.ShapeMode==='Authored';
         UpdateRange(Input);
         Input.addEventListener('input',()=>
         {
             State.Specification[Name]=Choices[Name]?Input.value:Number(Input.value);
+            if(Name==='ShapeMode')BuildControls();
             if (Name==='Profile')
             {
                 Object.assign(State.Specification,FormationPresets[Input.value]);
@@ -447,6 +454,7 @@ function UpdateRange(Input)
     if (Input.type!=='range') return;
     Input.style.setProperty('--Fill',`${(Number(Input.value)-Number(Input.min))/(Number(Input.max)-Number(Input.min))*100}%`);
     const Output=Element(`${Input.id}Value`);
+    if(Input.id==='PeakCount'&&Number(Input.value)===0){Output.textContent='Seeded';return;}
     if (Output) Output.textContent=`${Number(Input.value).toFixed(Number(Input.step)<.01?3:Number(Input.step)<1?2:0)} ${Input.dataset.unit||''}`;
 }
 
@@ -503,7 +511,7 @@ Element('LightAngle').oninput=Event=>
     Element('LightValue').textContent=`${Event.target.value}°`;
 };
 Element('ExportObj').onclick=()=>Download(`Cliff_${State.Specification.Profile}_${State.Specification.Seed}_Stage${State.Stage}.obj`,ObjText(),'text/plain');
-Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:2,Specification:State.Specification},null,2),'application/json');
+Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:4,Specification:State.Specification},null,2),'application/json');
 Element('ImportRecipe').onclick=()=>Element('RecipeFile').click();
 Element('RecipeFile').onchange=async Event=>
 {
@@ -607,7 +615,7 @@ function ViewDocument(Material)
     }
     Element('DocumentName').value=DocumentNames[Material?'Material':'Geometry'];
     Element('DocumentExtension').textContent=Material?'.grain':'.cliff';
-    Element('DocumentNote').textContent=Material?'Mineral particles · attached cliff patch · chemical weathering':'Procedural geometry · selected-stage rebuilds';
+    Element('DocumentNote').textContent=Material?'Mineral particles · attached cliff patch · chemical weathering':'Stage 1 auto-preview · later stages rebuild on demand';
     Element('SaveActive').textContent=Material?'Save study':'Save recipe';
     Element('OpenActive').textContent=Material?'Open study':'Open recipe';
     Element('Status').textContent=Material?'Particle weathering · accelerated cycles, not geological years':'Cliff geometry · selected-stage rebuilds';

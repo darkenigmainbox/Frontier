@@ -3,7 +3,9 @@
 //============================================================================================================================================
 // 📦 Authored geological feature catalogues and bounded polygon cliff parameters.
 
-export const CliffDefaults = Object.freeze({Profile:'Headland', Seed:42, Width:32, Height:18, Depth:12, Relief:1,
+export const ShapeModes={Procedural:'Procedural · seeded formations',Authored:'Legacy · authored profiles'};
+
+export const CliffDefaults = Object.freeze({ShapeMode:'Procedural',PeakCount:0,PeakSpread:.85,PeakSharpness:.65,Lean:.15,Taper:.4,Terraces:.4,BayDepth:.8,Profile:'Headland', Seed:42, Width:32, Height:18, Depth:12, Relief:1,
     NoiseMode:'Ridged', Variation:.8, NoiseScale:2.6, FractureStyle:'Conjugate', FractureSeed:42,
     Retreat:0.48, Beds:7, Dip:4, Aperture:0.07, FractureBend:1, JointSpacing:4.6, Penetration:0.78, FaceRecess:0.65, SpallSize:0.8,
     SpallDensity:0.8, CrackLength:1.4, CrackWidth:0.12, CrackDepth:0.18, CrackDensity:0.55, TriangleSpan:1.4});
@@ -65,12 +67,12 @@ export const CliffProfiles = Object.freeze(
 export const NoiseModes={None:'None · authored profiles',Gradient:'Layered gradient',Ridged:'Ridged gradient',Cellular:'Cellular ridges'};
 export const FractureStyles={Conjugate:'Conjugate fractures',Orthogonal:'Block-jointed rock',Vertical:'Steep joint set',Bedding:'Dipping bedding'};
 export const FormationPresets={
-    Headland:{Width:32,Height:18,Depth:12,Relief:1,Retreat:.48,NoiseMode:'Ridged',Variation:.8,NoiseScale:2.6},
-    Escarpment:{Width:42,Height:22,Depth:14,Relief:.85,Retreat:.42,NoiseMode:'Gradient',Variation:.7,NoiseScale:2.8},
-    Amphitheatre:{Width:36,Height:22,Depth:16,Relief:1,Retreat:.45,NoiseMode:'Cellular',Variation:.7,NoiseScale:2.4},
-    Spire:{Width:16,Height:44,Depth:14,Relief:.7,Retreat:.42,NoiseMode:'Ridged',Variation:.65,NoiseScale:2.2},
-    Needles:{Width:36,Height:42,Depth:13,Relief:1,Retreat:.44,NoiseMode:'Ridged',Variation:.75,NoiseScale:3.2},
-    WideWall:{Width:64,Height:22,Depth:16,Relief:.85,Retreat:.4,NoiseMode:'Gradient',Variation:.9,NoiseScale:3.4}};
+    Headland:{PeakCount:3,PeakSpread:.75,PeakSharpness:.4,Taper:.35,Lean:.1,Terraces:.35,BayDepth:.9,Width:32,Height:18,Depth:12,Relief:1,Retreat:.48,NoiseMode:'Ridged',Variation:.8,NoiseScale:2.6},
+    Escarpment:{PeakCount:4,PeakSpread:.35,PeakSharpness:.15,Taper:.15,Lean:0,Terraces:1,BayDepth:.5,Width:42,Height:22,Depth:14,Relief:.85,Retreat:.42,NoiseMode:'Gradient',Variation:.7,NoiseScale:2.8},
+    Amphitheatre:{PeakCount:3,PeakSpread:.65,PeakSharpness:.3,Taper:.25,Lean:0,Terraces:.6,BayDepth:1.4,Width:36,Height:22,Depth:16,Relief:1,Retreat:.45,NoiseMode:'Cellular',Variation:.7,NoiseScale:2.4},
+    Spire:{PeakCount:1,PeakSpread:1,PeakSharpness:.9,Taper:.65,Lean:.5,Terraces:.1,BayDepth:.6,Width:16,Height:44,Depth:14,Relief:.7,Retreat:.42,NoiseMode:'Ridged',Variation:.65,NoiseScale:2.2},
+    Needles:{PeakCount:5,PeakSpread:1,PeakSharpness:.95,Taper:.55,Lean:-.15,Terraces:0,BayDepth:1,Width:36,Height:42,Depth:13,Relief:1,Retreat:.44,NoiseMode:'Ridged',Variation:.75,NoiseScale:3.2},
+    WideWall:{PeakCount:6,PeakSpread:.25,PeakSharpness:.25,Taper:.15,Lean:0,Terraces:.6,BayDepth:.7,Width:64,Height:22,Depth:16,Relief:.85,Retreat:.4,NoiseMode:'Gradient',Variation:.9,NoiseScale:3.4}};
 
 export const SectionPlans = [[0,-.08,-.23,-.29,-.43],[0,-.035,-.09,-.21,-.43],
     [-.06,-.22,-.25,-.34,-.47],[0,-.13,-.16,-.38,-.33]];
@@ -107,9 +109,10 @@ export function SelectCatalogue(Seed)
 export function ReadSpecification(Input = {})
 {
     const Result = {...CliffDefaults, ...Input};
-    const Limits = {Seed:[0,999999],FractureSeed:[0,999999],Variation:[0,1],NoiseScale:[1,5],Width:[10,80],Height:[10,56],Depth:[8,24],Relief:[.35,1.3],Retreat:[.25,.65],
+    const Limits = {PeakCount:[0,7],PeakSpread:[0,1],PeakSharpness:[0,1],Lean:[-1,1],Taper:[0,.75],Terraces:[0,1],BayDepth:[0,1.5],Seed:[0,999999],FractureSeed:[0,999999],Variation:[0,1],NoiseScale:[1,5],Width:[10,80],Height:[10,56],Depth:[8,24],Relief:[.35,1.3],Retreat:[.25,.65],
         Beds:[4,10],Dip:[-8,8],Aperture:[.035,.18],FractureBend:[0,1.5],JointSpacing:[3,7],Penetration:[.55,.9],FaceRecess:[0,1.5],SpallSize:[.25,1.3],
         SpallDensity:[0,1],CrackLength:[.5,2.2],CrackWidth:[.07,.22],CrackDepth:[.06,.3],CrackDensity:[0,1],TriangleSpan:[.8,2.2]};
+    if (!Object.hasOwn(ShapeModes,Result.ShapeMode)) throw new Error('Unknown shape mode');
     if (!Object.hasOwn(CliffProfiles,Result.Profile)) throw new Error('Unknown cliff profile');
     if (!Object.hasOwn(NoiseModes,Result.NoiseMode)) throw new Error('Unknown noise mode');
     if (!Object.hasOwn(FractureStyles,Result.FractureStyle)) throw new Error('Unknown fracture style');
@@ -118,6 +121,7 @@ export function ReadSpecification(Input = {})
         if (!Number.isFinite(Number(Result[Name]))) throw new Error(`${Name} must be finite`);
         Result[Name] = Math.max(Minimum, Math.min(Maximum, Number(Result[Name])));
     }
+    Result.PeakCount=Math.round(Result.PeakCount);
     Result.Seed = Math.round(Result.Seed);
     Result.Beds = Math.round(Result.Beds);
     Result.FractureSeed = Math.round(Result.FractureSeed);
@@ -125,7 +129,7 @@ export function ReadSpecification(Input = {})
 }
 
 export const StageProperties=[
-    ['Profile','Seed','NoiseMode','Variation','NoiseScale','Width','Height','Depth','Relief','Retreat','TriangleSpan'],
+    ['ShapeMode','PeakCount','PeakSpread','PeakSharpness','Lean','Taper','Terraces','BayDepth','Profile','Seed','NoiseMode','Variation','NoiseScale','Width','Height','Depth','Relief','Retreat','TriangleSpan'],
     ['FractureSeed','FractureStyle','Beds','Dip','Aperture','FractureBend'],
     ['JointSpacing','Penetration','FaceRecess'],
     ['SpallSize','SpallDensity'],
@@ -140,8 +144,9 @@ export function EarliestStage(Before,After)
 
 export function ReadRecipe(Recipe)
 {
-    if (Recipe.Format!=='Frontier.PolygonCliff' || ![1,2].includes(Recipe.Version)) throw new Error('Unsupported cliff recipe');
+    if (Recipe.Format!=='Frontier.PolygonCliff' || ![1,2,3,4].includes(Recipe.Version)) throw new Error('Unsupported cliff recipe');
     const Specification={...Recipe.Specification};
+    if(Recipe.Version<4) Specification.ShapeMode='Authored';
     if (Recipe.Version===1)
     {
         Object.assign(Specification,{NoiseMode:'None',Variation:0,FractureStyle:'Bedding',FractureSeed:Specification.Seed??42});

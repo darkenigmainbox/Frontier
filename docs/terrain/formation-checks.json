@@ -1,0 +1,170 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "name": "Seed 1",
+      "peaks": 5,
+      "triangles": 2070,
+      "volume": 2173.604510045376,
+      "thinTriangles": 5,
+      "digest": "17519b2993dc039ff770ca5f53bfd537d64dcf32afd9c0f96212432664c22a6d"
+    },
+    {
+      "name": "Seed 2",
+      "peaks": 3,
+      "triangles": 1262,
+      "volume": 2105.1674168211084,
+      "thinTriangles": 6,
+      "digest": "230783b7a4e19e17ef21baff946df1783da910245d0162af6258ef3d2ea6366f"
+    },
+    {
+      "name": "Seed 17",
+      "peaks": 2,
+      "triangles": 980,
+      "volume": 2410.8528111065434,
+      "thinTriangles": 10,
+      "digest": "87dfc4640b5de0ec5e8a01a874a10058486bd102f89bcfd6e486f182e5a8eae8"
+    },
+    {
+      "name": "Seed 42",
+      "peaks": 2,
+      "triangles": 924,
+      "volume": 2399.9460984374828,
+      "thinTriangles": 4,
+      "digest": "f1bf68806a1718402ff936b45c6decfec3d1bbe74c485861c6ec1fee2f440c1c"
+    },
+    {
+      "name": "Seed 73",
+      "peaks": 1,
+      "triangles": 592,
+      "volume": 2327.2864846877837,
+      "thinTriangles": 15,
+      "digest": "11852bf0c62b4c89e2120f9b1f2dda166fa7be831c6c1524d01557fe911743db"
+    },
+    {
+      "name": "Seed 913",
+      "peaks": 4,
+      "triangles": 1770,
+      "volume": 2203.8938378579187,
+      "thinTriangles": 4,
+      "digest": "3242b46022d8be12c73c05d99ff36f167e56ebdc0eee9121f0635e5801c7b113"
+    },
+    {
+      "name": "Headland",
+      "triangles": 880,
+      "volume": 2804.867722843374,
+      "thinTriangles": 2
+    },
+    {
+      "name": "Escarpment",
+      "triangles": 1244,
+      "volume": 7238.394380133814,
+      "thinTriangles": 4
+    },
+    {
+      "name": "Amphitheatre",
+      "triangles": 944,
+      "volume": 5524.999724642332,
+      "thinTriangles": 0
+    },
+    {
+      "name": "Spire",
+      "triangles": 2510,
+      "volume": 2101.717256715728,
+      "thinTriangles": 5
+    },
+    {
+      "name": "Needles",
+      "triangles": 7484,
+      "volume": 3844.794947986386,
+      "thinTriangles": 4
+    },
+    {
+      "name": "WideWall",
+      "triangles": 1822,
+      "volume": 13915.506511721798,
+      "thinTriangles": 1
+    }
+  ],
+  "parameters": [
+    "PeakCount",
+    "PeakSpread",
+    "PeakSharpness",
+    "Lean",
+    "Taper",
+    "Terraces",
+    "BayDepth"
+  ],
+  "fullPipelines": [
+    {
+      "specification": {},
+      "triangles": [
+        902,
+        8872,
+        17330,
+        27162,
+        29164
+      ],
+      "thin": [
+        5,
+        0,
+        4,
+        3,
+        3
+      ]
+    },
+    {
+      "specification": {
+        "Seed": 73
+      },
+      "triangles": [
+        612,
+        6894,
+        14538,
+        23162,
+        25162
+      ],
+      "thin": [
+        16,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "specification": {
+        "Profile": "Escarpment",
+        "PeakCount": 4,
+        "PeakSpread": 0.35,
+        "PeakSharpness": 0.15,
+        "Taper": 0.15,
+        "Lean": 0,
+        "Terraces": 1,
+        "BayDepth": 0.5,
+        "Width": 42,
+        "Height": 22,
+        "Depth": 14,
+        "Relief": 0.85,
+        "Retreat": 0.42,
+        "NoiseMode": "Gradient",
+        "Variation": 0.7,
+        "NoiseScale": 2.8
+      },
+      "triangles": [
+        1244,
+        11506,
+        26510,
+        39820,
+        44496
+      ],
+      "thin": [
+        4,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ]
+}

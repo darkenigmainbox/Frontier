@@ -6,7 +6,7 @@ import {ParticleSimulation,ReadParticles,Minerals} from '../terrain/ParticleSimu
 const hash=s=>createHash('sha256').update(Buffer.from(s.snapshot().attributes.buffer)).digest('hex');
 const check=s=>{const m=s.metrics();assert(Math.abs(m.massResidual)<1e-12);assert(Object.values(m).every(Number.isFinite));assert.equal(m.bound+m.loose+m.removed,m.particles);for(const p of s.particles){assert(p.r>=0&&p.mass>=0);assert(p.water>=0&&p.water<=1&&p.oxide>=0&&p.oxide<=1&&p.bond>=0&&p.bond<=1);assert([p.x,p.y,p.z,p.vx,p.vy,p.vz,p.r].every(Number.isFinite));if(!Minerals[p.type].iron)assert.equal(p.oxide,0);}};
 const baseline=JSON.parse(fs.readFileSync(new URL('./fixtures/terrain-baseline.json',import.meta.url)));
-const cliff=GenerateCliff({});assert.equal(cliff.Stages.length,5);for(const fixture of baseline.checks)assert.equal(createHash('sha256').update(JSON.stringify(cliff.Stages[fixture.stage-1].Meshes)).digest('hex'),fixture.digest,'original cliff stage changed');
+const cliff=GenerateCliff({ShapeMode:'Authored'});assert.equal(cliff.Stages.length,5);for(const fixture of baseline.checks)assert.equal(createHash('sha256').update(JSON.stringify(cliff.Stages[fixture.stage-1].Meshes)).digest('hex'),fixture.digest,'original cliff stage changed');
 const small={Count:800,Size:.02,Thickness:.001,Radius:.0004};
 const a=new ParticleSimulation(small),b=new ParticleSimulation(small);assert.equal(hash(a),hash(b));assert.notEqual(hash(a),hash(new ParticleSimulation({...small,Seed:99})));
 // Packing occupies continuous 3D coordinates, not columns or a regular layered lattice.
