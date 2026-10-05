@@ -1,4 +1,6 @@
-# Slate terrain generator: baseline and proposed next steps
+# Slate terrain generator: initial baseline audit (historical)
+
+**Current direction:** the proposed stage-6 displacement was implemented, reviewed and rejected, then reverted in `1dd8397`. The replacement uses actual mineral particles; see [the particle implementation](PARTICLES.md). The legacy grain study described below is no longer the active material tab.
 
 ## Source inspected
 

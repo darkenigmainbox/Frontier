@@ -4,6 +4,6 @@ Imported from `unassignedinbox/Slate`, branch `arena/01a0fd48-slate`, commit `8d
 Shared theme: `Frontier/Experimental/Fluid/src/ThemeSpecification.css`.
 Baseline integration changes only: use this repository's Three.js/OrbitControls and DM Sans dependencies, local theme path, Vite multi-page build. Bundled planar triangulation retains its upstream license.
 
-The material study is legacy experimental code. It is NOT the requested particle-based grain simulation; that correction is deferred until after stage 6. Do not interpret stage-6 surface relief as a particle simulation.
+The original GrainPanel/GrainSequence material study is retained as legacy code, but is no longer the active material tab. The user rejected the stage-6 relief experiment and it was reverted in 1dd8397. The active replacement is ParticlePanel/ParticleSimulation/ParticleWorker: actual discrete mineral particles on an attached cliff patch. See docs/terrain/PARTICLES.md for scope and limitations.
 
 The original RC/atrium entry remains at `/index.html`; this independent authoring demo is at `/terrain/index.html`. No SDF stage is included.

@@ -6,7 +6,7 @@ import '@fontsource/dm-sans/400.css';
 // 📦 Static polygon cliff authoring workspace, clay viewport, stage inspection and triangle OBJ exchange.
 
 import * as THREE from 'three';
-import {CreateGrainPanel} from './GrainPanel.js';
+import {CreateGrainPanel} from './ParticlePanel.js';
 import {CaptureGrainSource} from './GrainSequence.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {CliffDefaults, CliffProfiles, ReadSpecification, EarliestStage, NoiseModes, FractureStyles, FormationPresets, ReadRecipe} from './CliffSpecification.js';
@@ -325,6 +325,7 @@ function Generate()
             State.Busy=false;
             Element('Loading').hidden=true;
             ViewStage(State.Stage);
+            if (new URLSearchParams(location.search).has('particles')&&Initial) ViewDocument(true);
             if (Reframe) FrameView();
             if (!State.Dirty)
             {
@@ -593,7 +594,7 @@ function AcquireGrainSource()
     if (!Source) throw new Error('Select a larger exposed cliff face to sample.');
     return CaptureGrainSource(Source.Triangle,Source.BodyName,Source.Stage,Source.TriangleIndex);
 }
-const GrainStudy=CreateGrainPanel(Element('GrainWorkspace'),AcquireGrainSource);
+const GrainStudy=CreateGrainPanel(Element('GrainWorkspace'),AcquireGrainSource,()=>State.Result?.Stages[State.Stage-1]);
 const DocumentNames={Geometry:'Cliff formation',Material:'Grain weathering'};
 function ViewDocument(Material)
 {
@@ -606,10 +607,10 @@ function ViewDocument(Material)
     }
     Element('DocumentName').value=DocumentNames[Material?'Material':'Geometry'];
     Element('DocumentExtension').textContent=Material?'.grain':'.cliff';
-    Element('DocumentNote').textContent=Material?'Discrete grains · isolated source-face study · no baking':'Procedural geometry · selected-stage rebuilds';
+    Element('DocumentNote').textContent=Material?'Mineral particles · attached cliff patch · chemical weathering':'Procedural geometry · selected-stage rebuilds';
     Element('SaveActive').textContent=Material?'Save study':'Save recipe';
     Element('OpenActive').textContent=Material?'Open study':'Open recipe';
-    Element('Status').textContent=Material?'Grain material study · illustrative cycles, not geological time':'Cliff geometry · selected-stage rebuilds';
+    Element('Status').textContent=Material?'Particle weathering · accelerated cycles, not geological years':'Cliff geometry · selected-stage rebuilds';
     Element('TriangleCount').hidden=Material;
     ResizePending=true;RenderRequested=true;
 }

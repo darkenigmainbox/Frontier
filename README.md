@@ -151,3 +151,11 @@ See [measurements and caveats](docs/MEASUREMENTS.md), especially the v0.7 compar
 Remaining work includes more robust probe classification/placement, less biased merging, object motion vectors, better sampling/denoising, antialiasing, higher-quality acceleration trees/GPU refits and hardware-target profiling. Full-refresh visibility checks can be **slower** than the old leaking approximation. Temporal lag, noisy moving surfaces, dark corners and residual GI errors remain possible.
 
 WebGL fallback is a labelled conventional raster preview with point lights/shadow maps. It does **not** run these cascade/reconstruction compute stages. Character loading/skinning and cloth simulation are not implemented; the sheet is procedural vertex deformation.
+
+## Particle grain weathering demo
+
+The separate terrain page at `terrain/index.html?particles` (deployed under `site/`) now uses discrete mineral particles attached to a cliff face. The rejected stage-6 displacement was reverted. The original five cliff stages and RC/atrium demo are preserved.
+
+Try sandstone, granite or limestone; run chemical weathering, inspect crystals, compare fresh/current grains and use **On rock** to locate the patch. This is a bounded millimetre-scale coating experiment, not a calibrated geological model or whole-cliff grain simulation. No SDF stage. See [scope, controls and tests](docs/terrain/PARTICLES.md).
+
+Tests: `npm run test:particles`; built-site browser checks: `npm run test:particles:browser` (Playwright Chromium, optionally `CHROMIUM_PATH`).

@@ -1,0 +1,77 @@
+{
+  "date": "2026-10-05",
+  "revertCommit": "1dd8397",
+  "cpu": {
+    "passed": true,
+    "fresh": {
+      "cycle": 0,
+      "particles": 5000,
+      "bound": 4861,
+      "loose": 139,
+      "removed": 0,
+      "solidMass": 0.002428838924577961,
+      "dissolved": 0,
+      "escaped": 0,
+      "initialMass": 0.002428838924577961,
+      "massResidual": 0,
+      "oxidation": 0,
+      "wetness": 0
+    },
+    "weathered200": {
+      "cycle": 200,
+      "particles": 5000,
+      "bound": 1342,
+      "loose": 3642,
+      "removed": 16,
+      "solidMass": 0.0023233806932872764,
+      "dissolved": 0.00010285490961998513,
+      "escaped": 2.6033216707015535e-06,
+      "initialMass": 0.002428838924577961,
+      "massResidual": -2.0481256664608982e-18,
+      "oxidation": 0.03842258161729593,
+      "wetness": 1
+    },
+    "acidDissolutionRatio": 24.33735409865971,
+    "calciteVsQuartzFractionalLoss": 182.68616275017675,
+    "checks": [
+      "packing separation",
+      "continuous 3D positions",
+      "determinism",
+      "mineral selectivity",
+      "dry/anoxic controls",
+      "particle motion",
+      "radius loss",
+      "mass ledger",
+      "parameter validation",
+      "parameter-event replay"
+    ]
+  },
+  "browser": {
+    "passed": true,
+    "initial": {
+      "cycle": 0,
+      "particles": 5000,
+      "bound": 4861,
+      "loose": 139,
+      "removed": 0,
+      "solidMass": 0.002428838924577961,
+      "dissolved": 0,
+      "escaped": 0,
+      "initialMass": 0.002428838924577961,
+      "massResidual": 0,
+      "oxidation": 0,
+      "wetness": 0
+    },
+    "savedCycles": 50,
+    "exactReplay": true,
+    "stageCount": 5,
+    "errors": [],
+    "failedRequests": []
+  },
+  "existingRegressionSuite": "npm test passed (smoke + modern)",
+  "notes": [
+    "CPU fixture uses local downward gravity; attached browser patch projects world gravity into the source triangle frame.",
+    "Mineral mass accounting excludes atmospheric oxygen incorporation.",
+    "Qualitative rates, not geological time."
+  ]
+}
