@@ -27,7 +27,9 @@
     "test:auto-detail": "node tests/auto-detail-mask.mjs",
     "test:auto-detail:browser": "npm run build:githack && node tests/auto-detail-browser.mjs",
     "test:face-erosion": "node tests/face-erosion.mjs",
-    "test:face-erosion:browser": "npm run build:githack && node tests/face-erosion-browser.mjs"
+    "test:face-erosion:browser": "npm run build:githack && node tests/face-erosion-browser.mjs",
+    "test:exchange-repair": "node tests/exchange-ground-corner.mjs && node tests/exchange-repair-pipeline.mjs",
+    "test:exchange-repair:browser": "npm run build:githack && node tests/exchange-repair-browser.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",

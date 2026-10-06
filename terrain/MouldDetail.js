@@ -94,7 +94,19 @@ export function BuildMouldDetail(baseStage,cutStage,s,lib,progress=()=>{}){
    const result=keep(candidate.setTolerance(cleanupTolerance));
    mesh=output(result,'Mould-detailed cliff','Cliff');record={...MeshMetrics(mesh),Name:mesh.Name};
    if(!defects.some(k=>record[k])&&Number.isFinite(record.Volume)&&record.Volume>0)break;
-   if(pass===2){exchangeRepairs=RepairExchange(mesh);record={...MeshMetrics(mesh),Name:mesh.Name};if(!defects.some(k=>record[k])&&record.Volume>0)break;throw Error('Stage 6 validation failed: '+defects.filter(k=>record[k]).map(k=>`${k}=${record[k]}`).join(', '));}
+   if(pass===2){
+    exchangeRepairs=RepairExchange(mesh);
+    record={...MeshMetrics(mesh),Name:mesh.Name};
+    // A microscopic corner may need a modest normal change beyond the usual
+    // 8-degree cap. Keep the same 10-micrometre motion bound, manifold link and
+    // area checks; the fallback also checks every altered face for new overlaps.
+    if(record.ZeroArea&&!defects.filter(k=>k!=='ZeroArea').some(k=>record[k])){
+     exchangeRepairs+=RepairExchange(mesh,1e-5,.95);
+     record={...MeshMetrics(mesh),Name:mesh.Name};
+    }
+    if(!defects.some(k=>record[k])&&Number.isFinite(record.Volume)&&record.Volume>0)break;
+    throw Error('Stage 6 validation failed: '+defects.filter(k=>record[k]).map(k=>`${k}=${record[k]}`).join(', '));
+   }
    const r=result.getMesh();
    const reconstructed=keep(new Manifold(new Mesh({numProp:3,vertProperties:r.vertProperties,triVerts:r.triVerts,mergeFromVert:r.mergeFromVert,mergeToVert:r.mergeToVert,tolerance:.0003})));
    if(reconstructed.status()!=='NoError')throw Error('Float32 exchange validation failed: '+reconstructed.status());

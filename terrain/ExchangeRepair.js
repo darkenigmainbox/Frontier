@@ -1,10 +1,11 @@
 // Float32 exchange can make an extremely thin triangle exactly collinear.
 // Repair only those triangles: a link-safe microscopic edge collapse, or a
-// diagonal flip across a collinear corner. Never delete a face on its own.
+// midpoint collapse, or diagonal flip across a collinear corner. Never delete a face on its own.
 import {Cross,Subtract,Dot,Length} from './PolyhedronSolver.js';
+import {TriangleOverlap} from './TriangleSolver.js';
 const normal=(t,v)=>Cross(Subtract(v[t[1]],v[t[0]]),Subtract(v[t[2]],v[t[0]]));
 const key=(a,b)=>a<b?`${a}/${b}`:`${b}/${a}`;
-export function RepairExchange(mesh,tolerance=1e-5){
+export function RepairExchange(mesh,tolerance=1e-5,normalCosine=.99){
  let repairs=0;const blocked=new Set();
  for(let pass=0;pass<64;pass++){
   const bad=mesh.Triangles.findIndex((t,i)=>!blocked.has(i)&&Length(normal(t,mesh.Vertices))<2e-10);
@@ -20,20 +21,42 @@ export function RepairExchange(mesh,tolerance=1e-5){
   for(const {a,b,length}of sides){
    if(length>tolerance||edges.get(key(a,b)).length!==2)continue;
    if([...neighbours.get(a)].filter(x=>neighbours.get(b).has(x)).length!==2)continue;
-   for(const [keep,drop]of [[a,b],[b,a]]){
+   // Endpoints first; a quantized midpoint can distribute the normal change
+   // across both sides of a microscopic corner rather than rotating one side too far.
+   const midpoint=v[a].map((x,k)=>Math.fround((x+v[b][k])*.5));
+   for(const [keep,drop,target]of [[a,b,v[a]],[b,a,v[b]],[a,b,midpoint]]){
+    const moved=target!==v[keep];
+    if(Length(Subtract(target,v[keep]))>tolerance||Length(Subtract(target,v[drop]))>tolerance)continue;
+    const proposed=moved?v.slice():v;if(moved)proposed[keep]=target;
+    const changed=[];
     const next=[],tags=[];let valid=true;
     mesh.Triangles.forEach((old,i)=>{
      if(old.includes(keep)&&old.includes(drop))return;
      const triangle=old.map(x=>x===drop?keep:x);
-     if(old.includes(drop)){
-      const n=normal(triangle,v),previous=normal(old,v);
+     if(old.includes(drop)||(moved&&old.includes(keep))){
+      changed.push({old,triangle});
+      const n=normal(triangle,proposed),previous=normal(old,v);
       // A cluster of already-degenerate faces may need several link-safe collapses.
       // Never turn a previously valid face into a degenerate or inverted one.
-      if(Length(previous)>=2e-10&&(Length(n)<2e-10||Dot(n,previous)<.99*Length(n)*Length(previous)))valid=false;
+      if(Length(previous)>=2e-10&&(Length(n)<2e-10||Dot(n,previous)<normalCosine*Length(n)*Length(previous)))valid=false;
      }
      next.push(triangle);tags.push(mesh.Tags[i]);
     });
     if(!valid)continue;
+    if(moved||normalCosine<.99){
+     // Check all altered faces against the complete candidate surface. Tolerate
+     // existing input contacts, but do not introduce newly detected intersections.
+     const originals=mesh.Triangles.filter(t=>!(t.includes(keep)&&t.includes(drop)));
+     for(const entry of changed){
+      for(let i=0;i<next.length;i++){
+       if(next[i]===entry.triangle)continue;
+       if(TriangleOverlap(entry.triangle,next[i],proposed)&&!TriangleOverlap(entry.old,originals[i],v)){valid=false;break;}
+      }
+      if(!valid)break;
+     }
+     if(!valid)continue;
+     if(moved)v[keep]=target;
+    }
     mesh.Triangles=next;mesh.Tags=tags;repaired=true;break;
    }
    if(repaired)break;
