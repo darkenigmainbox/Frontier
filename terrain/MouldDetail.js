@@ -77,10 +77,10 @@ export function BuildMouldDetail(baseStage,cutStage,s,lib,progress=()=>{}){
   if(noisy.status()!=='NoError')throw Error('Displaced mould is invalid: '+noisy.status());
   // Fresh cutter identity. Final exchange cleanup consolidates face tags, not geometry.
   const cutter=keep(noisy.asOriginal());
-  progress('Stage 5 minus the noisy mould · triangle boolean');
+  progress(`Stage ${cutStage.Number} minus the noisy mould · triangle boolean`);
   // A fully protected mask is exactly stage 5, not a numerically recut approximation.
   if(!affected)return {Number:6,Meshes:cutStage.Meshes,Records:cutStage.Records,Metrics:{...cutStage.Metrics,Stage:6},
-   Detail:{operation:'Protected mask — unchanged stage 5',refinedTriangles:refined.numTri(),mouldVerticesMoved:moved,appliedVertices:applied,affectedVertices:0,minimumOffset:0,maximumOffset:0,stage5Volume:cutStage.Metrics.Volume,finalVolume:cutStage.Metrics.Volume,removedVolume:0,outputTriangles:cutStage.Metrics.Triangles,sourceSpalls:cutStage.Metrics.Spalls,sourceCracks:cutStage.Metrics.Cracks,milliseconds:performance.now()-started},
+   Detail:{operation:`Protected mask — unchanged stage ${cutStage.Number}`,refinedTriangles:refined.numTri(),mouldVerticesMoved:moved,appliedVertices:applied,affectedVertices:0,minimumOffset:0,maximumOffset:0,stage5Volume:cutStage.Metrics.Volume,finalVolume:cutStage.Metrics.Volume,removedVolume:0,outputTriangles:cutStage.Metrics.Triangles,sourceSpalls:cutStage.Metrics.Spalls,sourceCracks:cutStage.Metrics.Cracks,milliseconds:performance.now()-started},
    Study:{Base:baseStage.Meshes,Before:cutStage.Meshes,Hollow:[output(hollow,'Box minus base','Mould')],Noisy:[output(noisy,'Protected mould','Mould')]}};
   const difference=keep(rock.subtract(cutter));
   if(difference.status()!=='NoError'||difference.isEmpty())throw Error('Detail boolean failed: '+difference.status());
@@ -90,7 +90,7 @@ export function BuildMouldDetail(baseStage,cutStage,s,lib,progress=()=>{}){
   const defects=['OpenEdges','NonmanifoldEdges','NonmanifoldVertices','WindingErrors','ZeroArea','DuplicateTriangles'];
   let candidate=keep(difference.asOriginal()),mesh,record,cleanupTolerance,cleanupPasses,exchangeRepairs=0;
   for(let pass=0;pass<3;pass++){
-   cleanupPasses=pass+1;cleanupTolerance=.001*(pass+1);
+   cleanupPasses=pass+1;cleanupTolerance=Math.min(.003,.001*(pass+1));
    const result=keep(candidate.setTolerance(cleanupTolerance));
    mesh=output(result,'Mould-detailed cliff','Cliff');record={...MeshMetrics(mesh),Name:mesh.Name};
    if(!defects.some(k=>record[k])&&Number.isFinite(record.Volume)&&record.Volume>0)break;
@@ -101,7 +101,7 @@ export function BuildMouldDetail(baseStage,cutStage,s,lib,progress=()=>{}){
    candidate=keep(reconstructed.asOriginal());
   }
   const before=rock.volume();if(record.Volume>before+Math.max(.001,before*.00001))throw Error('Subtraction unexpectedly increased rock volume.');
-  const stats={operation:'Stage5 − noisy(Box − Stage1)',pattern:s.DetailPattern,affectedVertices:affected,spacing:s.DetailSpacing,amplitude:s.DetailAmplitude,bias:s.DetailBias,refinedTriangles:refined.numTri(),mouldVerticesMoved:moved,minimumOffset:minOffset,maximumOffset:maxOffset,stage5Volume:before,finalVolume:record.Volume,removedVolume:before-record.Volume,outputTriangles:mesh.Triangles.length,cleanupTolerance,cleanupPasses,exchangeRepairs,appliedVertices:applied,sourceSpalls:cutStage.Metrics.Spalls,sourceCracks:cutStage.Metrics.Cracks,milliseconds:performance.now()-started};
+  const stats={operation:`Stage${cutStage.Number} − noisy(Box − Stage1)`,inputStage:cutStage.Number,pattern:s.DetailPattern,affectedVertices:affected,spacing:s.DetailSpacing,amplitude:s.DetailAmplitude,bias:s.DetailBias,refinedTriangles:refined.numTri(),mouldVerticesMoved:moved,minimumOffset:minOffset,maximumOffset:maxOffset,stage5Volume:before,finalVolume:record.Volume,removedVolume:before-record.Volume,outputTriangles:mesh.Triangles.length,cleanupTolerance,cleanupPasses,exchangeRepairs,appliedVertices:applied,sourceSpalls:cutStage.Metrics.Spalls,sourceCracks:cutStage.Metrics.Cracks,milliseconds:performance.now()-started};
   return {Number:6,Meshes:[mesh],Records:[record],Metrics:{Stage:6,Bodies:1,...record,Spalls:0,Cracks:0,RejectedSpalls:0,RejectedCracks:0},Detail:stats,Study:{Base:baseStage.Meshes,Before:cutStage.Meshes,Hollow:[output(hollow,'Box minus base','Mould')],Noisy:[output(noisy,'Displaced hollow mould','Mould')]}};
  }finally{for(const m of owned.reverse())m.delete();}
 }

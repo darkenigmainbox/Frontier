@@ -17,15 +17,18 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {CliffDefaults, ReadSpecification, EarliestStage, NoiseModes, FractureStyles, ReadRecipe} from './CliffSpecification.js';
 
 const Element=Id=>document.getElementById(Id);
+const StageOrder=[1,2,3,4,5,5.1,6];
+const StageAt=(Result,Number)=>Number===5.1?Result?.Erosion:Result?.Stages[Number-1];
 const StageDescriptions=[
     ['Cliff mass','3D masses · distinct footprints','Closed rock volumes assembled in three dimensions. Choose a formation, then inspect its footprint using Top and Side. No folded front/back sheet.'],
     ['Primary fractures','Joint sets, not just bedding','Geological orientation families with rough polygon cuts. New fractures terminate at existing boundaries; bedding is an optional preset.'],
     ['Bounded joints','Finite-depth rock blocks','Kinked joints split front, rear and end exposures, terminating against a retained interior core.'],
     ['Edge spalls','Local fracture cavities','Localized, asymmetric bites with four or six fracture facets. The original edge survives on both sides—not a full-edge bevel.'],
     ['Surface fissures','Shallow polygon incisions','Finite, kinked V-grooves cut into individual rock faces. Closed bottoms, bounded depth; no SDF erosion.'],
-    ['Mould detail','Noisy negative · triangle boolean','Stage 5 minus a noisy hollow mould made from the ORIGINAL stage-1 mass. Subtraction only: existing fracture voids are not filled. Low-resolution geometry prototype; no textures.']
+    ['Face erosion','5.1 · deform individual rocks','Push broad face regions inward toward each rock’s own centre, with seeded outward bulges. Shared vertices remain connected. Unsafe deformations are reduced or rejected.'],
+    ['Mould detail','Noisy negative · triangle boolean','Stage 5.1 minus a noisy hollow mould made from the ORIGINAL stage-1 mass. Subtraction only: existing fracture voids are not filled. Low-resolution geometry prototype; no textures.']
 ];
-const State={Specification:{...CliffDefaults,...SolidPresets.Headland},Result:null,Stage:Math.max(1,Math.min(6,Math.round(Number(new URLSearchParams(location.search).get('stage')))||1)),Busy:false,DisplayStage:0,Revision:0,ReadyRevision:0,Worker:null,Dirty:false,
+const State={Specification:{...CliffDefaults,...SolidPresets.Headland},Result:null,Stage:StageOrder.includes(Number(new URLSearchParams(location.search).get('stage')))?Number(new URLSearchParams(location.search).get('stage')):1,Busy:false,DisplayStage:0,Revision:0,ReadyRevision:0,Worker:null,Dirty:false,
     DetailView:'Final',Mode:'Clay',Wire:false,Selected:null,Isolated:false,Exploded:false,Milliseconds:0,Error:null};
 const Scene=new THREE.Scene();
 Scene.background=new THREE.Color('#282e38');
@@ -145,11 +148,11 @@ function ViewStage(StageNumber)
     RenderRequested=true;
     Renderer.shadowMap.needsUpdate=true;
     if(StageNumber!==6)DetailPainter?.stop();
-    State.Stage=Math.max(1,Math.min(6,StageNumber));
-    const [Title,,Description]=StageDescriptions[State.Stage-1];
+    State.Stage=StageOrder.includes(Number(StageNumber))?Number(StageNumber):1;
+    const [Title,,Description]=StageDescriptions[StageOrder.indexOf(State.Stage)];
     Element('StageTitle').textContent=State.Stage===1&&State.Specification.ShapeMode==='Solid'?SolidLabels[State.Specification.Profile]:Title;
     Element('StageDescription').textContent=State.Stage===1&&State.Specification.ShapeMode!=='Solid'?'Legacy generator retained for old recipes. Switch to 3D masses for genuinely different footprints.':Description;
-    Element('StageNumber').textContent=`0${State.Stage} / 06`;
+    Element('StageNumber').textContent=`${State.Stage===5.1?'5.1':'0'+State.Stage} / 06`;
     Element('PreviousStage').disabled=State.Stage===1;
     Element('NextStage').disabled=State.Stage===6;
     document.querySelectorAll('.StageButton').forEach(Button=>
@@ -158,12 +161,13 @@ function ViewStage(StageNumber)
         Button.classList.toggle('Active',Selected);
         Button.setAttribute('aria-pressed',String(Selected));
     });
-    State.Dirty=State.Busy || !State.Result?.Stages[State.Stage-1] || State.Stage>=EarliestStage(State.Result?.Specification,State.Specification);
+    document.querySelector('.StageButton.Active')?.scrollIntoView({block:'nearest'});
+    State.Dirty=State.Busy || !StageAt(State.Result,State.Stage) || State.Stage>=EarliestStage(State.Result?.Specification,State.Specification);
     Element('ExportObj').disabled=State.Dirty;
-    Element('Regenerate').textContent=State.Busy?'Cancel & rebuild':`Rebuild through 0${State.Stage}`;
-    document.querySelectorAll('#ParameterControls details').forEach((Section,Index)=>{Section.open=Index===State.Stage-1;});
-    const ValidThrough=Math.min(State.Stage,EarliestStage(State.Result?.Specification,State.Specification)-1);
-    const Stage=State.Result?.Stages.slice(0,ValidThrough).at(-1);
+    Element('Regenerate').textContent=State.Busy?'Cancel & rebuild':`Rebuild through ${State.Stage===5.1?'5.1':'0'+State.Stage}`;
+    document.querySelectorAll('#ParameterControls details').forEach((Section,Index)=>{Section.open=Index===StageOrder.indexOf(State.Stage);});
+    const Changed=EarliestStage(State.Result?.Specification,State.Specification);
+    const Stage=StageOrder.filter(n=>n<=State.Stage&&n<Changed).map(n=>StageAt(State.Result,n)).filter(Boolean).at(-1);
     Element('PaintPanel').hidden=State.Stage!==6;
     Element('MouldStudy').hidden=Stage?.Number!==6||State.Dirty||State.Painting;
     MouldSection=null;ClayMaterial.clippingPlanes=[];CutMaterial.clippingPlanes=[];ClayMaterial.side=THREE.FrontSide;CutMaterial.side=THREE.FrontSide;
@@ -196,7 +200,7 @@ function ViewStage(StageNumber)
     }
     Element('ExportObj').textContent=State.Stage===6?'Export final OBJ':'Export OBJ';
     Element('Explode').disabled=State.Stage===6;
-    if(Stage.Detail){const D=Stage.Detail;Element('MouldNumbers').textContent=`${D.refinedTriangles.toLocaleString()} mould triangles · ${D.affectedVertices??D.mouldVerticesMoved}/${D.mouldVerticesMoved} inner vertices influenced · signed offsets ${D.minimumOffset.toFixed(2)} to +${D.maximumOffset.toFixed(2)} m · ${D.removedVolume.toFixed(1)} m³ removed · ${(D.milliseconds/1000).toFixed(2)} s detail pass. ${Study?'Inspection only — export and diagnostics still describe the final rock.':D.affectedVertices===0?'All protected: original stage-5 meshes retained exactly.':'One combined output mesh; source face tags consolidated.'}`;}
+    if(Stage.Detail){const D=Stage.Detail;Element('MouldNumbers').textContent=`${D.refinedTriangles.toLocaleString()} mould triangles · ${D.affectedVertices??D.mouldVerticesMoved}/${D.mouldVerticesMoved} inner vertices influenced · signed offsets ${D.minimumOffset.toFixed(2)} to +${D.maximumOffset.toFixed(2)} m · ${D.removedVolume.toFixed(1)} m³ removed · ${(D.milliseconds/1000).toFixed(2)} s detail pass. ${Study?'Inspection only — export and diagnostics still describe the final rock.':D.affectedVertices===0?'All protected: stage-5.1 meshes retained exactly.':'One combined output mesh; source face tags consolidated.'}`;}
     if (Name)
     {
         const Match=BodyGroup.children.find(Body=>Body.name===Name);
@@ -211,7 +215,7 @@ function ViewStage(StageNumber)
 
 function UpdateMetrics()
 {
-    const Stage=State.Result?.Stages[State.DisplayStage-1];
+    const Stage=StageAt(State.Result,State.DisplayStage);
     if (!Stage) return;
     const Metrics=Stage.Metrics;
     const Format=Value=>Value.toLocaleString('en');
@@ -229,6 +233,7 @@ function UpdateMetrics()
         'Narrow triangles remain at some clipped intersections; counted above, not hidden. Topology checks do not prove absence of all surface intersections.' :
         'Indexed export topology checked per body. No n-gons. Display wireframe includes every triangulation edge.';
     if(Stage.Detail&&Stage.Detail.affectedVertices!==0)Element('QualityNote').textContent+=' ¹Source-stage counts, not a recount after carving. Face tags and per-block selection are consolidated in this prototype.';
+    if(Stage.Erosion){const E=Stage.Erosion;Element('QualityNote').textContent+=` Face erosion: ${E.changedRocks} rocks changed, ${E.limitedRocks} limited, ${E.rejectedRocks} rejected; max move ${E.maximumDisplacement.toFixed(3)} m; ${E.inwardVertices} inward / ${E.outwardVertices} outward vertices. ${(E.milliseconds/1000).toFixed(2)} s including intersection checks.`;}
     Element('BodyCount').textContent=`${Metrics.Bodies} closed mesh objects`;
     Element('TriangleCount').textContent=`${Format(Metrics.Triangles)} triangles`;
     if (!State.Dirty) SetStatus(`Stage ${State.Stage} · ${Metrics.ThinTriangles ? `${Metrics.ThinTriangles} narrow-triangle warnings` : 'Topology checked'} · seed ${State.Result.Specification.Seed}`,!!Metrics.ThinTriangles);
@@ -360,7 +365,7 @@ function Generate()
             if (Message.Revision!==State.Revision) return;
             if (Message.Progress)
             {
-                Element('LoadingDetail').textContent=`Stage ${Message.Progress} · ${Message.Message||StageDescriptions[Message.Progress-1][0]}`;
+                Element('LoadingDetail').textContent=`Stage ${Message.Progress} · ${Message.Message||StageDescriptions[StageOrder.indexOf(Message.Progress)][0]}`;
                 return;
             }
             if (Message.Error) {FailGeneration(Message.Error);return;}
@@ -374,7 +379,7 @@ function Generate()
             if (Reframe) FrameView();
             if (!State.Dirty)
             {
-                const Warnings=Message.Result.Stages[State.Stage-1].Metrics.ThinTriangles;
+                const Warnings=StageAt(Message.Result,State.Stage).Metrics.ThinTriangles;
                 const Quality=Warnings?` · ${Warnings} narrow-triangle warnings`:'';
                 SetStatus(`Stage ${State.Stage} ready · calculated ${Message.Result.ExecutedStages.join(', ')||'none'} · reused ${Message.Result.ReusedStages.join(', ')||'none'}${Quality}`,Warnings>0);
             }
@@ -424,7 +429,7 @@ function Download(Name, Content, Type)
 function ObjText()
 {
     if (!State.Result || State.Dirty) throw new Error('Rebuild the current recipe before exporting.');
-    const Stage=State.Result.Stages[State.Stage-1];
+    const Stage=StageAt(State.Result,State.Stage);
     const Lines=[`# Frontier polygon cliff | stage ${State.Stage} | seed ${State.Result.Specification.Seed}`,
         '# metres; triangles only; formation placement applied; explosion view excluded; no textures or SDF','s off'];
     BodyGroup.updateWorldMatrix(true,false);
@@ -453,6 +458,7 @@ const Groups=[
     ['Edge spalls',true,[['SpallSize','Spall scale',.25,1.3,.05,'m'],['SpallDensity','Edge occupancy',0,1,.05,'×']]],
     ['Surface fissures',false,[['CrackLength','Maximum length',.5,2.2,.1,'m'],['CrackWidth','Mouth width',.07,.22,.01,'m'],
         ['CrackDepth','Maximum depth',.06,.3,.01,'m'],['CrackDensity','Face occupancy',0,1,.05,'×']]],
+    ['Face erosion · 5.1',false,[['ErosionSeed','Face erosion seed'],['ErosionInward','Inward face depth',0,1.5,.05,'m'],['ErosionOutward','Outward bulge',0,.8,.025,'m'],['ErosionOutwardShare','Outward region share',0,.75,.05,''],['ErosionVariation','Face variation',0,1,.05,'']]],
     ['Mould detail · stage 6',false,[['DetailAutoCoverage','Auto coverage · threshold',0,1,.05,''],['DetailAutoSize','Auto patch size',2,20,.5,'m'],['DetailAutoFalloff','Auto gradient falloff',0,.8,.05,''],['DetailAutoSeed','Auto patch seed'],['DetailAutoHeightBias','Auto height bias · lower / upper',-1,1,.1,''],['DetailPattern','Noise shape'],['DetailCoverage','Paint trim · ignored in Auto',0,1,.05,''],['DetailSeed','Noise seed',0,999999,1,''],['DetailSpacing','Mould triangle spacing',.4,1.8,.05,'m'],['DetailAmplitude','Noise displacement',0,.8,.05,'m'],['DetailBias','Cut depth / penetration',-.15,1.5,.01,'m'],['DetailScale','Noise wavelength',1,6,.1,'m'],['DetailAnisotropy','Vertical frequency',1,3,.1,'×']]],
     ['Triangulation',false,[['TriangleSpan','Target edge span',.8,2.2,.1,'m']]]
 ];
@@ -493,7 +499,7 @@ function BuildControls()
         });
     }
     ViewportEditor?.sync();
-    for (const Name of ['Seed','FractureSeed','DetailSeed','DetailAutoSeed']) Element(`New${Name}`).onclick=()=>
+    for (const Name of ['Seed','FractureSeed','DetailSeed','DetailAutoSeed','ErosionSeed']) Element(`New${Name}`).onclick=()=>
     {
         const Next=crypto.getRandomValues(new Uint32Array(1))[0]%1000000;
         State.Specification[Name]=Next===State.Specification[Name]?(Next+1)%1000000:Next;
@@ -516,17 +522,18 @@ StageDescriptions.forEach(([Title,Subtitle],Index)=>
 {
     const Button=document.createElement('button');
     Button.className='StageButton';
-    Button.dataset.stage=Index+1;
-    Button.innerHTML=`<span class="Number">0${Index+1}</span><span><strong>${Title}</strong><small>${Subtitle}</small></span>`;
-    Button.onclick=()=>ViewStage(Index+1);
+    const Number=StageOrder[Index];
+    Button.dataset.stage=Number;
+    Button.innerHTML=`<span class="Number">${Number===5.1?'5.1':'0'+Number}</span><span><strong>${Title}</strong><small>${Subtitle}</small></span>`;
+    Button.onclick=()=>ViewStage(Number);
     Element('StageList').appendChild(Button);
 });
 ViewportEditor=CreateViewportEditor({scene:Scene,camera:Camera,renderer:Renderer,orbit:Controls,bodies:BodyGroup,getSpec:()=>State.Specification,onRouteChange:()=>MarkDirty(),onRender:()=>{RenderRequested=true;Renderer.shadowMap.needsUpdate=true;},onStatus:SetStatus});
 BuildControls();
 ViewStage(State.Stage);
 Element('Regenerate').onclick=Generate;
-Element('PreviousStage').onclick=()=>ViewStage(State.Stage-1);
-Element('NextStage').onclick=()=>ViewStage(State.Stage+1);
+Element('PreviousStage').onclick=()=>ViewStage(StageOrder[StageOrder.indexOf(State.Stage)-1]);
+Element('NextStage').onclick=()=>ViewStage(StageOrder[StageOrder.indexOf(State.Stage)+1]);
 Element('Frame').onclick=()=>FrameView();
 Element('Front').onclick=()=>FrameView(null,new THREE.Vector3(0,.04,1));
 Element('Top').onclick=()=>FrameView(null,new THREE.Vector3(0,1,.001));
@@ -568,7 +575,7 @@ Element('LightAngle').oninput=Event=>
     Element('LightValue').textContent=`${Event.target.value}°`;
 };
 Element('ExportObj').onclick=()=>Download(`Cliff_${State.Specification.Profile}_${State.Specification.Seed}_Stage${State.Stage}.obj`,ObjText(),'text/plain');
-Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:11,Specification:State.Specification},null,2),'application/json');
+Element('ExportRecipe').onclick=()=>Download(`Cliff_${State.Specification.Seed}.json`,JSON.stringify({Format:'Frontier.PolygonCliff',Version:12,Specification:State.Specification},null,2),'application/json');
 Element('ImportRecipe').onclick=()=>Element('RecipeFile').click();
 Element('RecipeFile').onchange=async Event=>
 {
@@ -647,7 +654,7 @@ function AcquireGrainSource()
     if (!Source)
     {
         let Best=-Infinity;
-        for (const Content of State.Result.Stages[State.Stage-1].Meshes) for (let Index=0;Index<Content.Triangles.length;++Index)
+        for (const Content of StageAt(State.Result,State.Stage).Meshes) for (let Index=0;Index<Content.Triangles.length;++Index)
         {
             if (State.Selected&&State.Selected.name!==Content.Name) continue;
             if (Content.Tags[Index]!=='Cliff') continue;
@@ -661,7 +668,7 @@ function AcquireGrainSource()
     if (!Source) throw new Error('Select a larger exposed cliff face to sample.');
     return CaptureGrainSource(Source.Triangle,Source.BodyName,Source.Stage,Source.TriangleIndex);
 }
-const GrainStudy=CreateGrainPanel(Element('GrainWorkspace'),AcquireGrainSource,()=>State.Result?.Stages[State.Stage-1]);
+const GrainStudy=CreateGrainPanel(Element('GrainWorkspace'),AcquireGrainSource,()=>StageAt(State.Result,State.Stage));
 const DocumentNames={Geometry:'Cliff formation',Material:'Grain weathering'};
 function ViewDocument(Material)
 {

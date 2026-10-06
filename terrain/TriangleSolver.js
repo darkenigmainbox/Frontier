@@ -18,7 +18,7 @@ function MinimumAngle(Triangle, Vertices)
     return Angle;
 }
 
-function TriangleOverlap(First, Second, Vertices)
+export function TriangleOverlap(First, Second, Vertices)
 {
     let A=First.map(Index=>Vertices[Index]), B=Second.map(Index=>Vertices[Index]);
     for (let Axis=0;Axis<3;++Axis)

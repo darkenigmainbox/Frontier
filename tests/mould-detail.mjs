@@ -34,13 +34,13 @@ function check(r){
  reports.push({profile:r.Specification.Profile,seed:r.Specification.DetailSeed,...s,numericalExcessVolume:excess,thinTriangles:d.Metrics.ThinTriangles});
  console.log(JSON.stringify(reports.at(-1)));
 }
-let spec=ReadSpecification({...SolidPresets.Headland,Profile:'Headland',DetailMaskMode:'Paint'});
+let spec=ReadSpecification({...SolidPresets.Headland,Profile:'Headland',ErosionInward:0,ErosionOutward:0,DetailMaskMode:'Paint'});
 let r=await sequence.Generate(spec);check(r);
 const source=JSON.stringify(r.Stages.slice(0,5));
 assert.strictEqual((await sequence.Generate(spec)).Stages[5],r.Stages[5]);
 assert.deepEqual((await sequence.Generate({...spec,TransformPosition:[2,3,4]})).ExecutedStages,[]);
 const changed=await sequence.Generate({...spec,DetailSeed:43});check(changed);
-assert.deepEqual(changed.ExecutedStages,[6]);assert.deepEqual(changed.ReusedStages,[1,2,3,4,5]);
+assert.deepEqual(changed.ExecutedStages,[6]);assert.deepEqual(changed.ReusedStages,[1,2,3,4,5,5.1]);
 assert.equal(JSON.stringify(changed.Stages.slice(0,5)),source,'stages 1–5 stay untouched');
 assert.notDeepEqual(changed.Stages[5].Meshes,r.Stages[5].Meshes);
 const neutral=await sequence.Generate({...spec,DetailAmplitude:0,DetailBias:0});check(neutral);
@@ -48,7 +48,7 @@ assert(Math.abs(neutral.Stages[5].Detail.removedVolume)<.1,'neutral mould should
 assert.equal(EarliestStage(spec,{...spec,DetailSeed:43}),6);
 assert.deepEqual(ReadRecipe({Format:'Frontier.PolygonCliff',Version:9,Specification:spec}),spec);
 for(const Profile of ['WideWall','RockArch','Canyon','Spire','RouteCliff']){
- r=await sequence.Generate({...SolidPresets[Profile],Profile,DetailMaskMode:'Paint'});check(r);
+ r=await sequence.Generate({...SolidPresets[Profile],Profile,ErosionInward:0,ErosionOutward:0,DetailMaskMode:'Paint'});check(r);
 }
 fs.mkdirSync('.arena',{recursive:true});fs.writeFileSync('.arena/mould-results.json',JSON.stringify({passed:true,reports},null,2));
 console.log('PASS: topology, conservative subtraction, signed warp, cache, placement, neutral control, recipe round-trip and six formations.');

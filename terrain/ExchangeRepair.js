@@ -5,9 +5,9 @@ import {Cross,Subtract,Dot,Length} from './PolyhedronSolver.js';
 const normal=(t,v)=>Cross(Subtract(v[t[1]],v[t[0]]),Subtract(v[t[2]],v[t[0]]));
 const key=(a,b)=>a<b?`${a}/${b}`:`${b}/${a}`;
 export function RepairExchange(mesh,tolerance=1e-5){
- let repairs=0;
+ let repairs=0;const blocked=new Set();
  for(let pass=0;pass<64;pass++){
-  const bad=mesh.Triangles.findIndex(t=>Length(normal(t,mesh.Vertices))<2e-10);
+  const bad=mesh.Triangles.findIndex((t,i)=>!blocked.has(i)&&Length(normal(t,mesh.Vertices))<2e-10);
   if(bad<0)break;
   const edges=new Map(),neighbours=new Map();
   mesh.Triangles.forEach((t,i)=>t.forEach((a,k)=>{
@@ -27,7 +27,9 @@ export function RepairExchange(mesh,tolerance=1e-5){
      const triangle=old.map(x=>x===drop?keep:x);
      if(old.includes(drop)){
       const n=normal(triangle,v),previous=normal(old,v);
-      if(Length(n)<2e-10||(Length(previous)>=2e-10&&Dot(n,previous)<.99*Length(n)*Length(previous)))valid=false;
+      // A cluster of already-degenerate faces may need several link-safe collapses.
+      // Never turn a previously valid face into a degenerate or inverted one.
+      if(Length(previous)>=2e-10&&(Length(n)<2e-10||Dot(n,previous)<.99*Length(n)*Length(previous)))valid=false;
      }
      next.push(triangle);tags.push(mesh.Tags[i]);
     });
@@ -46,8 +48,8 @@ export function RepairExchange(mesh,tolerance=1e-5){
    if(next.some(triangle=>{const n=normal(triangle,v);return Length(n)<2e-10||Dot(n,reference)<.99*Length(n)*Length(reference);}))continue;
    mesh.Triangles[bad]=next[0];mesh.Triangles[other]=next[1];repaired=true;break;
   }
-  if(!repaired)break;
-  repairs++;
+  if(!repaired){blocked.add(bad);continue;}
+  blocked.clear();repairs++;
  }
  // Remove unreferenced vertices without welding any additional points.
  const ids=new Map(),vertices=[];

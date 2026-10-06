@@ -17,7 +17,7 @@ assert.deepEqual(ReadDetailPaint(ReadDetailPaint([{...stamp,n:[.3,.4,.8660254037
 assert.throws(()=>ReadDetailPaint([{...stamp,radius:NaN}]));
 assert.throws(()=>ReadDetailPaint(Array(3001).fill(stamp)));
 const lib=await init();lib.setup();const seq=new MouldSequence(async()=>lib);
-let spec=ReadSpecification({...SolidPresets.Headland,Profile:'Headland',DetailMaskMode:'Paint',DetailMaskBase:0});
+let spec=ReadSpecification({...SolidPresets.Headland,Profile:'Headland',ErosionInward:0,ErosionOutward:0,DetailMaskMode:'Paint',DetailMaskBase:0});
 const protectedResult=await seq.Generate(spec),before=protectedResult.Stages[4];
 assert.deepEqual(protectedResult.Stages[5].Meshes,before.Meshes,'all protected is EXACT stage 5');
 const m=protectedResult.Stages[0].Meshes[0];

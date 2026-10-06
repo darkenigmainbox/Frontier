@@ -1,5 +1,7 @@
 # Stage 6 — noisy hollow-mould prototype
 
+**New preceding stage:** [5.1 · Face erosion](FACE_EROSION.md). Stage 6 now cuts the deformed stage-5.1 rock while retaining the original stage-1 mould construction.
+
 **Current default:** [Auto procedural influence, with Paint and Auto + paint options](AUTO_DETAIL.md).
 
 **Update:** [Painted influence masks, new patterns, coverage and independent depth](PAINTED_DETAIL.md) are now available. The measurements below document the original unmasked prototype.

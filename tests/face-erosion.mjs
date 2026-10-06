@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import init from 'manifold-3d';
+import {MouldSequence} from '../terrain/MouldSequence.js';
+import {BuildFaceErosion,NewErosionIntersections} from '../terrain/FaceErosion.js';
+import {ReadSpecification,ReadRecipe,EarliestStage} from '../terrain/CliffSpecification.js';
+import {SolidPresets} from '../terrain/SolidFormation.js';
+const lib=await init();lib.setup();
+function cube(size,position){const a=lib.Manifold.cube([size,size,size]),b=a.translate(position),raw=b.getMesh();a.delete();b.delete();return {Vertices:Array.from({length:raw.vertProperties.length/3},(_,i)=>Array.from(raw.vertProperties.slice(i*3,i*3+3))),Triangles:Array.from({length:raw.triVerts.length/3},(_,i)=>Array.from(raw.triVerts.slice(i*3,i*3+3)))};}
+const input=[cube(4,[0,0,0]),cube(1,[8,0,0])];assert.equal(NewErosionIntersections(input,input).count,0);
+assert(NewErosionIntersections(input,[input[0],cube(1,[3.5,1,1])]).count>0,'new surface crossing rejected');
+assert(NewErosionIntersections(input,[input[0],cube(1,[1,1,1])]).count>0,'swallowed component rejected');
+const s=ReadSpecification({...SolidPresets.Headland,Profile:'Headland'}),seq=new MouldSequence(async()=>lib);
+const r=await seq.Generate(s,()=>{},5.1),e=r.Erosion;
+assert.equal(r.Through,5.1);assert.equal(r.Stages.length,5);assert.equal(e.Number,5.1);
+assert(e.Erosion.changedRocks>0);assert(e.Erosion.inwardVertices>0);assert(e.Erosion.outwardVertices>0);
+for(const k of ['OpenEdges','NonmanifoldEdges','NonmanifoldVertices','ZeroArea','WindingErrors','DuplicateTriangles'])assert.equal(e.Metrics[k],0,k);
+assert.equal(NewErosionIntersections(r.Stages[4].Meshes,e.Meshes).count,0);
+e.Meshes.forEach((m,i)=>{assert.deepEqual(m.Triangles,r.Stages[4].Meshes[i].Triangles);assert.equal(m.Vertices.length,r.Stages[4].Meshes[i].Vertices.length);m.Vertices.forEach((p,j)=>{if(r.Stages[4].Meshes[i].Vertices[j][1]===0)assert.deepEqual(p,r.Stages[4].Meshes[i].Vertices[j]);});});
+const original=JSON.stringify(r.Stages);
+const repeated=await seq.Generate(s,()=>{},5.1);assert.deepEqual(repeated.ExecutedStages,[]);assert.strictEqual(repeated.Erosion,e);
+const final=await seq.Generate(s);assert.deepEqual(final.ExecutedStages,[6]);assert.equal(final.Stages[5].Detail.inputStage,5.1);assert.deepEqual(final.Stages[5].Study.Before,e.Meshes);assert.equal(JSON.stringify(final.Stages.slice(0,5)),original);
+const neutral=await seq.Generate({...s,ErosionInward:0,ErosionOutward:0},()=>{},5.1);assert.deepEqual(neutral.ExecutedStages,[5.1]);assert.deepEqual(neutral.Erosion.Meshes,neutral.Stages[4].Meshes);
+assert.equal(EarliestStage(s,{...s,ErosionSeed:43}),5.1);assert.equal(EarliestStage(s,{...s,DetailSeed:43}),6);
+assert.deepEqual(ReadRecipe({Format:'Frontier.PolygonCliff',Version:12,Specification:s}),s);
+assert.equal(ReadRecipe({Format:'Frontier.PolygonCliff',Version:11,Specification:s}).ErosionInward,0);
+console.log(JSON.stringify({passed:true,topologyPreserved:true,collisionAndContainmentChecks:true,stage6Uses51:true,cache:true,erosion:e.Erosion,finalTriangles:final.Stages[5].Metrics.Triangles},null,2));

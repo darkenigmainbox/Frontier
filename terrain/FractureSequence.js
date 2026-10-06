@@ -433,7 +433,7 @@ export class CliffSequence
     {
         const Specification=ReadSpecification(Input);
         Through=Math.max(1,Math.min(5,Math.round(Through)));
-        const Changed=EarliestStage(this.Specification,Specification);
+        const Changed=Math.ceil(EarliestStage(this.Specification,Specification));
         this.Stages.length=Math.min(this.Stages.length,Changed-1);
         this.Construction.length=this.Stages.length;
         this.Specification=Specification;

@@ -4,7 +4,7 @@ import {AutoDetailMask,DetailMask} from '../terrain/DetailMask.js';
 import {ReadSpecification,ReadRecipe,EarliestStage} from '../terrain/CliffSpecification.js';
 import {SolidPresets} from '../terrain/SolidFormation.js';
 import {MouldSequence} from '../terrain/MouldSequence.js';
-const s=ReadSpecification({...SolidPresets.Headland,Profile:'Headland'});
+const s=ReadSpecification({...SolidPresets.Headland,Profile:'Headland',ErosionInward:0,ErosionOutward:0});
 assert.equal(s.DetailMaskMode,'Auto');
 const points=[];for(let x=-20;x<=20;x+=2)for(let y=0;y<=20;y+=2)points.push([x,y,-7]);
 const weights=points.map(p=>AutoDetailMask(p,s));assert(weights.includes(0));assert(weights.includes(1));assert(weights.some(w=>w>0&&w<1));

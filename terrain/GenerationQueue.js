@@ -15,8 +15,9 @@ self.onmessage=async Event=>
     {
         const Started=performance.now();
         const Result=await Sequence.Generate(Specification,(Stage,Message)=>self.postMessage({Revision,Progress:Stage,Message}),Through);
-        const Invalid=Result.Stages.find(Stage=>Stage.Metrics.OpenEdges || Stage.Metrics.NonmanifoldEdges || Stage.Metrics.WindingErrors || Stage.Metrics.ZeroArea || Stage.Metrics.NonmanifoldVertices || Stage.Metrics.DuplicateTriangles);
-        if (Result.Stages.some(Stage=>Stage.Records.some(Record=>!Number.isFinite(Record.Volume) || Record.Volume<=0)))
+        const AllStages=[...Result.Stages,...(Result.Erosion?[Result.Erosion]:[])];
+        const Invalid=AllStages.find(Stage=>Stage.Metrics.OpenEdges || Stage.Metrics.NonmanifoldEdges || Stage.Metrics.WindingErrors || Stage.Metrics.ZeroArea || Stage.Metrics.NonmanifoldVertices || Stage.Metrics.DuplicateTriangles);
+        if (AllStages.some(Stage=>Stage.Records.some(Record=>!Number.isFinite(Record.Volume) || Record.Volume<=0)))
             throw new Error('Non-finite or inverted solid; result rejected.');
         if (Invalid) throw new Error(`Stage ${Invalid.Number} failed topology validation; result rejected.`);
         self.postMessage({Revision,Result,Milliseconds:performance.now()-Started});

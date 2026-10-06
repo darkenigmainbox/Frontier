@@ -48,7 +48,7 @@ try{
  console.log('captures done, testing cached rebuild');await page.evaluate(()=>{CliffApp.Renderer.shadowMap.enabled=false;CliffApp.State.Worker.addEventListener('message',e=>console.log('worker',e.data.Progress??e.data.Error??'ready'));CliffApp.SetSpecification({DetailSeed:43});});await ready();
  console.log('generation ready');assert.equal(await page.evaluate(()=>CliffApp.State.Error),null);
  assert.deepEqual(await page.evaluate(()=>CliffApp.State.Result.ExecutedStages),[6]);
- assert.deepEqual(await page.evaluate(()=>CliffApp.State.Result.ReusedStages),[1,2,3,4,5]);
+ assert.deepEqual(await page.evaluate(()=>CliffApp.State.Result.ReusedStages),[1,2,3,4,5,5.1]);
  assert.deepEqual(errors,[]);assert.deepEqual(failed,[]);
  console.log(JSON.stringify({passed:true,wasmLoaded:true,stage6:true,exportTriangles:stages[5].Triangles,cache:true,errors,failed,...result.detail},null,2));
 }finally{await browser.close();await server.close();}

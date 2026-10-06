@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';
+import {chromium} from '@playwright/test';import {createServer} from 'vite';
+const server=await createServer({configFile:false,root:'site',server:{host:'0.0.0.0',port:5194}});await server.listen();
+const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+try{
+ const page=await browser.newPage({viewport:{width:1600,height:1050}}),errors=[];page.setDefaultTimeout(90000);page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:5194/terrain/index.html?stage=5.1');
+ const ready=()=>page.waitForFunction(()=>CliffApp.State.Result&&!CliffApp.State.Busy&&!CliffApp.State.Dirty,null,{timeout:240000});await ready();
+ assert.equal(await page.locator('#StageTitle').textContent(),'Face erosion');
+ assert.equal(await page.locator('#StageNumber').textContent(),'5.1 / 06');
+ assert.equal(await page.locator('#Regenerate').textContent(),'Rebuild through 5.1');
+ assert(await page.locator('[data-stage="5.1"]').isVisible());assert(await page.locator('#ErosionInward').isVisible());
+ const data=await page.evaluate(()=>({metrics:CliffApp.State.Result.Erosion.Metrics,erosion:CliffApp.State.Result.Erosion.Erosion,recipe:CliffApp.State.Specification}));
+ assert(data.erosion.inwardVertices>0&&data.erosion.outwardVertices>0);
+ assert.equal(await page.evaluate(()=>(CliffApp.ObjText().match(/^f /gm)||[]).length),data.metrics.Triangles);
+ fs.mkdirSync('docs/terrain/erosion-renders',{recursive:true});
+ const capture=async name=>{const url=await page.evaluate(()=>{const a=CliffApp;a.Renderer.shadowMap.needsUpdate=true;a.Renderer.render(a.Scene,a.Camera);return a.Renderer.domElement.toDataURL();});fs.writeFileSync(`docs/terrain/erosion-renders/${name}.png`,Buffer.from(url.split(',')[1],'base64'));};
+ await capture('stage51');await page.click('#PreviousStage');assert.equal(await page.evaluate(()=>CliffApp.State.Stage),5);await capture('stage5');
+ await page.click('#NextStage');assert.equal(await page.evaluate(()=>CliffApp.State.Stage),5.1);
+ const download=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await(await download).path(),'utf8'));assert.equal(recipe.Version,12);
+ await page.click('#NextStage');assert.equal(await page.evaluate(()=>CliffApp.State.Stage),6);await page.click('#Regenerate');await ready();
+ assert.deepEqual(await page.evaluate(()=>CliffApp.State.Result.ExecutedStages),[6]);
+ assert.equal(await page.evaluate(()=>CliffApp.State.Result.Stages[5].Detail.inputStage),5.1);
+ assert.equal(await page.evaluate(()=>CliffApp.State.Specification.DetailMaskMode),'Auto');
+ await capture('stage6');await page.selectOption('#DetailView','Before');assert.equal(await page.evaluate(()=>CliffApp.BodyGroup.children.length),data.metrics.Bodies);
+ const revision=await page.evaluate(()=>CliffApp.State.Revision);await page.setInputFiles('#RecipeFile',{name:'erosion.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(recipe))});await page.waitForFunction(r=>CliffApp.State.Revision>r,revision);await ready();
+ assert.equal(await page.evaluate(()=>CliffApp.State.Specification.ErosionInward),recipe.Specification.ErosionInward);
+ fs.writeFileSync('docs/terrain/erosion-renders/recipe.json',JSON.stringify(recipe,null,2));fs.writeFileSync('docs/terrain/erosion-renders/measurements.json',JSON.stringify(data,null,2));
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,menu51:true,controls:true,navigation:true,export:true,stage6Input:true,autoPreserved:true,errors,erosion:data.erosion},null,2));
+}finally{await browser.close();await server.close();}

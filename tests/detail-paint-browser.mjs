@@ -36,7 +36,7 @@ try{
  const d=await page.evaluate(()=>CliffApp.State.Result.Stages[5].Detail);assert(d.affectedVertices>0&&d.affectedVertices<d.mouldVerticesMoved*.5);assert(d.removedVolume>0);
  assert.deepEqual(await page.evaluate(()=>CliffApp.State.Result.ExecutedStages),[6]);
  await capture('localized-cut');
- const download=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await(await download).path(),'utf8'));assert.equal(recipe.Version,11);assert.deepEqual(recipe.Specification.DetailPaint,stamps);
+ const download=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await(await download).path(),'utf8'));assert.equal(recipe.Version,12);assert.deepEqual(recipe.Specification.DetailPaint,stamps);
  fs.writeFileSync('docs/terrain/paint-renders/recipe.json',JSON.stringify(recipe,null,2));
  fs.writeFileSync('docs/terrain/paint-renders/measurements.json',JSON.stringify(d,null,2));
  const importRevision=await page.evaluate(()=>CliffApp.State.Revision);

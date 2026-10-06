@@ -19,6 +19,6 @@ try{
  assert.deepEqual(await page.evaluate(()=>CliffApp.State.Result.ExecutedStages),[6]);
  await page.locator('#DetailAutoCoverage').fill('0.45');await page.click('#Regenerate');await ready();
  assert.equal(await page.evaluate(()=>CliffApp.State.Specification.DetailMaskMode),'Auto');
- const download=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await(await download).path(),'utf8'));assert.equal(recipe.Version,11);assert.equal(recipe.Specification.DetailMaskMode,'Auto');
- assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,default:'Auto',threeModes:true,previewCannotPaint:true,zeroCoverage:true,stage6Only:true,recipe11:true,errors,detail:first},null,2));
+ const download=page.waitForEvent('download');await page.click('#ExportRecipe');const recipe=JSON.parse(fs.readFileSync(await(await download).path(),'utf8'));assert.equal(recipe.Version,12);assert.equal(recipe.Specification.DetailMaskMode,'Auto');
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,default:'Auto',threeModes:true,previewCannotPaint:true,zeroCoverage:true,stage6Only:true,recipe12:true,errors,detail:first},null,2));
 }finally{await browser.close();await server.close();}
