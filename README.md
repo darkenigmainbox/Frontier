@@ -27,6 +27,10 @@ https://raw.githack.com/darkenigmainbox/Frontier/<commit-sha>/site/index.html?sc
 
 Rebuild and commit `site/` before publishing a new immutable link. raw.githack may show an external-content notice before opening the app.
 
+## Quad tyre workshop
+
+Open `/tyre/index.html` in the dev server or `site/tyre/index.html` in a published build. Editable vector patches, mirrored/repeated tread blocks, indexed quad caps/bevels/walls, and four-index OBJ export. This first replacement uses separate closed blocks and a quad casing, not a welded single surface. See [method, tests and limitations](docs/tyre/QUAD_EDITOR.md). The pinned original Slate generator is preserved in `tyre/upstream/`.
+
 ## New: Aurum atrium
 
 An original procedural, modern Sponza-style architectural test scene: **24 × 22 × 10 m**, with two-storey cylindrical colonnades, upper galleries and balustrades, solid stairs with actual stairwell openings, recessed wall panels, timber soffit fins, a skylight lattice, planted seating bays and a connected bronze ribbon sculpture. Terracotta and teal banners deform at their vertices while their top edges remain pinned.

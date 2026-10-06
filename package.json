@@ -31,7 +31,9 @@
     "test:exchange-repair": "node tests/exchange-ground-corner.mjs && node tests/exchange-repair-pipeline.mjs",
     "test:exchange-repair:browser": "npm run build:githack && node tests/exchange-repair-browser.mjs",
     "test:erosion-budget": "node tests/erosion-validation-budget.mjs",
-    "test:erosion-budget:browser": "npm run build:githack && node tests/erosion-budget-browser.mjs"
+    "test:erosion-budget:browser": "npm run build:githack && node tests/erosion-budget-browser.mjs",
+    "test:tyre": "node tests/tyre-quads.mjs",
+    "test:tyre:browser": "npm run build:githack && node tests/tyre-browser.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",

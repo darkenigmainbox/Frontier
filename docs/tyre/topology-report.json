@@ -1,0 +1,27 @@
+{
+  "preset": "Trail",
+  "separateClosedSolids": true,
+  "quadFaces": 21760,
+  "casing": {
+    "volume": 20931637.25847158,
+    "vertices": 9472,
+    "quads": 9472,
+    "nonQuad": 0,
+    "degenerate": 0,
+    "openEdges": 0,
+    "nonmanifold": 0,
+    "windingErrors": 0,
+    "maxValence": 4
+  },
+  "exampleTread": {
+    "volume": 28847.193465149147,
+    "vertices": 98,
+    "quads": 96,
+    "nonQuad": 0,
+    "degenerate": 0,
+    "openEdges": 0,
+    "nonmanifold": 0,
+    "windingErrors": 0,
+    "maxValence": 4
+  }
+}

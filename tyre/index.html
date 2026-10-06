@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Frontier · Quad tyre workshop</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <b>FRONTIER <span>/ TYRE WORKSHOP</span></b
+        ><small>VECTOR PATCHES → REAL QUAD GEOMETRY</small>
+      </div>
+      <nav>
+        <button id="undo">Undo</button><button id="redo">Redo</button
+        ><button id="load">Open recipe</button
+        ><button id="save">Save recipe</button
+        ><button class="primary" id="export">Export quad OBJ ↗</button
+        ><input type="file" id="file" accept="application/json" hidden />
+      </nav>
+    </header>
+    <main>
+      <aside>
+        <h2>01 / Tyre & pattern</h2>
+        <label
+          >Starting layout<select id="preset">
+            <option>Trail</option>
+            <option>Chevron</option>
+            <option>Touring</option>
+          </select></label
+        >
+        <div id="parameters"></div>
+        <h2>02 / Tread blocks</h2>
+        <div id="blocks"></div>
+        <div class="buttonGrid">
+          <button id="add">+ Rectangle</button
+          ><button id="draw">Draw 4 corners</button
+          ><button id="duplicate">Duplicate</button
+          ><button id="mirror">Mirror copy ↔</button
+          ><button id="delete">Delete block</button>
+        </div>
+        <h2>03 / Selected patch</h2>
+        <label>Block name<input id="name" maxlength="50" /></label>
+        <div class="buttonGrid">
+          <button id="columns">Double columns</button
+          ><button id="rows">Double rows</button
+          ><button id="rotateLeft">Rotate −5°</button
+          ><button id="rotateRight">Rotate +5°</button
+          ><button id="shrink">Scale −10%</button
+          ><button id="grow">Scale +10%</button>
+        </div>
+        <p class="hint">
+          Drag any grid point to shape the block. Drag inside it to move. Mirror
+          copy reflects across the tyre centreline. Convex, non-folding grid
+          cells are required.
+        </p>
+        <p class="hint">
+          For a notch or branching lug, compose several patches. Arbitrary hole
+          filling and a welded tread-to-casing surface are not implemented.
+        </p>
+      </aside>
+      <section class="workspace">
+        <div class="panelHead">
+          <div>
+            <h1>Pattern studio</h1>
+            <p>One repeating tile · millimetres</p>
+          </div>
+          <label class="check"
+            ><input type="checkbox" id="snap" checked /> Snap 1 mm</label
+          ><button id="fit2d">Fit</button>
+        </div>
+        <div id="editorWrap">
+          <svg
+            id="editor"
+            tabindex="0"
+            aria-label="Editable tread pattern"
+            role="application"
+          ></svg>
+          <div class="legend">
+            <i></i> Editable patch <span>○ control vertex</span
+            ><span>Faint outlines = neighbouring repeats</span>
+          </div>
+        </div>
+        <div class="panelHead">
+          <div>
+            <h1>Quad mesh preview</h1>
+            <p id="stats">Building…</p>
+          </div>
+          <label class="check"
+            ><input type="checkbox" id="isolate" /> Isolate block</label
+          ><label class="check"
+            ><input type="checkbox" id="wire" checked /> Quad edges</label
+          ><button id="frame">Frame</button>
+        </div>
+        <div id="viewport"></div>
+        <footer>
+          <span id="status">Ready</span
+          ><span>Wheel zoom · middle/right-drag to pan 2D</span>
+        </footer>
+      </section>
+      <aside class="inspect">
+        <h2>Topology report</h2>
+        <div id="report"></div>
+        <div class="note">
+          <b>Quads are the source.</b>
+          <p>
+            The OBJ contains four-vertex faces. The preview’s diagonals are
+            hidden because they are only GPU rendering triangles—not the
+            editable topology.
+          </p>
+        </div>
+        <div class="note">
+          <b>Separate closed solids.</b>
+          <p>
+            Each tread block has a grid cap, matching chamfer/wall loops and a
+            quad underside. Its base is seated 0.6 mm into the casing. This is
+            not a welded single-surface tyre.
+          </p>
+        </div>
+        <div class="note">
+          <b>Pattern checks</b>
+          <p id="warnings"></p>
+        </div>
+        <h2>Controls</h2>
+        <p class="hint">
+          Click to select · drag to move<br />Drag circles to edit vertices<br />Delete
+          removes selection<br />Arrow keys nudge 1 mm<br />Shift + arrows nudge
+          5 mm<br />Ctrl/⌘ Z undo · Shift Z redo<br />Escape cancels drawing or
+          drag
+        </p>
+        <p class="hint">
+          No heightmap, displacement texture, triangle-to-quad conversion, or
+          triangle-fan caps.
+        </p>
+      </aside>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
