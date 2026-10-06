@@ -1,0 +1,5 @@
+/* icon wrapper sizing */
+.ico { display: inline-flex; align-items: center; justify-content: center; line-height: 0; }
+.ico svg { width: 1em; height: 1em; display: block; }
+.btn .ico svg, .vp-btn .ico svg { width: 13px; height: 13px; }
+.btn.icon .ico svg { width: 13px; height: 13px; }

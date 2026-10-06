@@ -1,0 +1,25 @@
+{
+  "name": "frontier-automotive-material-studio",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Real-time procedural automotive material & shader studio \u2014 metallic flake paint, brake discs, ceramics, fabric, rubber and glass. Zero textures.",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "smoke": "node tools/smoke.mjs",
+    "validate": "node tools/validate-shaders.mjs",
+    "validate:glsl": "node tools/compile-all.cjs",
+    "test": "npm run smoke && npm run test:ui && npm run validate && npm run validate:glsl",
+    "test:ui": "node tools/ui-smoke.mjs"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@webgpu/glslang": "^0.0.15",
+    "jsdom": "^30.1.2",
+    "vite": "^6.0.0"
+  }
+}
