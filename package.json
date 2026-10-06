@@ -9,7 +9,8 @@
     "test": "node --test tests/*.test.js",
     "preview": "vite preview --host 0.0.0.0",
     "test:e2e": "playwright test",
-    "export:meshes": "node scripts/export-meshes.js"
+    "export:meshes": "node scripts/export-meshes.js",
+    "build:githack": "vite build --base=./ --outDir docs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",

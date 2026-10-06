@@ -1,0 +1,3 @@
+docs/** linguist-generated=true
+# Bundled Three.js shader strings contain intentional trailing whitespace.
+docs/assets/*.js whitespace=-trailing-space

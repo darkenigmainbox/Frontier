@@ -245,3 +245,27 @@ Revision 6 extends construction tests to all eight designs, adds unchanged-mud r
 Revision 7 tests preserve every preset contour/sipe during conversion, mirror transforms, custom axes, phase and visibility, empty designs, actual custom geometry/sipe floors, invalid outlines/imports, SVG escaping, and browser vertex editing, mirror baking, polygon/sipe drawing, history, project reopening, custom STL exports, dark theme and mobile overflow.
 
 Point-editing tests cover Ctrl/Cmd insertion, Alt removal and minimum-point guards, phase-B local coordinates, Shift constraints, independent cut dragging, endpoint extension, open-polyline insertion, mirror protection, pan, and one-step undo/redo.
+
+## GitHack static deployment
+
+`docs/` contains the committed, production-built website for GitHack. It includes
+JavaScript, CSS, fonts and reference photographs; no Vite server is needed.
+
+```sh
+npm ci
+npm run build:githack
+```
+
+Commit and push both source changes and the refreshed `docs/` directory on the
+working branch. Then use the resulting full commit SHA in this URL:
+
+```text
+https://raw.githack.com/darkenigmainbox/Frontier/<COMMIT_SHA>/docs/index.html
+```
+
+A commit-pinned link avoids branch-name ambiguity and stale cached builds.
+The bundle uses relative asset paths so it works under GitHack's repository/commit
+URL prefix. Reference images and the home link are relative too. Rebuild `docs/`
+after source changes; editing only `src/` does not update the published bundle.
+Projects are saved in browser storage per hosting origin: use Save JSON/Open JSON
+to transfer a draft from Arena's preview to the GitHack-hosted app.
