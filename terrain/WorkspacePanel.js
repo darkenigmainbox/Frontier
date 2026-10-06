@@ -164,9 +164,12 @@ function ViewStage(StageNumber)
     document.querySelector('.StageButton.Active')?.scrollIntoView({block:'nearest'});
     State.Dirty=State.Busy || !StageAt(State.Result,State.Stage) || State.Stage>=EarliestStage(State.Result?.Specification,State.Specification);
     Element('ExportObj').disabled=State.Dirty;
-    Element('Regenerate').textContent=State.Busy?'Cancel & rebuild':`Rebuild through ${State.Stage===5.1?'5.1':'0'+State.Stage}`;
+    Element('Regenerate').textContent=State.Busy?'Cancel build':`Rebuild through ${State.Stage===5.1?'5.1':'0'+State.Stage}`;
     document.querySelectorAll('#ParameterControls details').forEach((Section,Index)=>{Section.open=Index===StageOrder.indexOf(State.Stage);});
     const Changed=EarliestStage(State.Result?.Specification,State.Specification);
+    const ErosionSkipped=State.Stage>=5.1&&Changed>5.1&&State.Result?.Erosion?.Erosion.budgetExceeded;
+    Element('ErosionNotice').hidden=!ErosionSkipped;
+    Element('ErosionNotice').textContent=ErosionSkipped?'5.1 skipped: validation budget reached. Current stage-5 geometry was retained unchanged. Reduce erosion amounts or set both to zero to bypass it.':'';
     const Stage=StageOrder.filter(n=>n<=State.Stage&&n<Changed).map(n=>StageAt(State.Result,n)).filter(Boolean).at(-1);
     Element('PaintPanel').hidden=State.Stage!==6;
     Element('MouldStudy').hidden=Stage?.Number!==6||State.Dirty||State.Painting;
@@ -342,11 +345,12 @@ function Generate()
     State.Busy=true;
     State.Dirty=true;
     Element('ExportObj').disabled=true;
+    Element('ErosionNotice').hidden=true;
     Element('Failure').hidden=true;
     Element('Loading').hidden=false;
     Element('LoadingTitle').textContent=`Rebuilding through stage ${State.Stage}`;
     Element('LoadingDetail').textContent='Reusing valid upstream checkpoints…';
-    Element('Regenerate').textContent='Cancel & rebuild';
+    Element('Regenerate').textContent='Cancel build';
     SetStatus(`Building through stage ${State.Stage} only`);
     try
     {
@@ -380,8 +384,9 @@ function Generate()
             if (!State.Dirty)
             {
                 const Warnings=StageAt(Message.Result,State.Stage).Metrics.ThinTriangles;
-                const Quality=Warnings?` · ${Warnings} narrow-triangle warnings`:'';
-                SetStatus(`Stage ${State.Stage} ready · calculated ${Message.Result.ExecutedStages.join(', ')||'none'} · reused ${Message.Result.ReusedStages.join(', ')||'none'}${Quality}`,Warnings>0);
+                const Skipped=Message.Result.Erosion?.Erosion.budgetExceeded;
+                const Quality=(Skipped?' · WARNING: 5.1 skipped (validation budget); current stage 5 retained':'')+(Warnings?` · ${Warnings} narrow-triangle warnings`:'');
+                SetStatus(`Stage ${State.Stage} ready · calculated ${Message.Result.ExecutedStages.join(', ')||'none'} · reused ${Message.Result.ReusedStages.join(', ')||'none'}${Quality}`,Warnings>0||Skipped);
             }
         };
         GenerationWorker.onerror=Event=>
@@ -394,6 +399,16 @@ function Generate()
     {
         FailGeneration(Error.message);
     }
+}
+
+function CancelGeneration()
+{
+    if(!State.Busy)return;
+    clearTimeout(ShapePreviewTimer);
+    State.Worker?.terminate();State.Worker=null;State.Busy=false;++State.Revision;
+    Element('Loading').hidden=true;
+    ViewStage(State.Stage);
+    SetStatus('Build cancelled · no new output generated',true);
 }
 
 function FailGeneration(Message)
@@ -531,7 +546,7 @@ StageDescriptions.forEach(([Title,Subtitle],Index)=>
 ViewportEditor=CreateViewportEditor({scene:Scene,camera:Camera,renderer:Renderer,orbit:Controls,bodies:BodyGroup,getSpec:()=>State.Specification,onRouteChange:()=>MarkDirty(),onRender:()=>{RenderRequested=true;Renderer.shadowMap.needsUpdate=true;},onStatus:SetStatus});
 BuildControls();
 ViewStage(State.Stage);
-Element('Regenerate').onclick=Generate;
+Element('Regenerate').onclick=()=>State.Busy?CancelGeneration():Generate();
 Element('PreviousStage').onclick=()=>ViewStage(StageOrder[StageOrder.indexOf(State.Stage)-1]);
 Element('NextStage').onclick=()=>ViewStage(StageOrder[StageOrder.indexOf(State.Stage)+1]);
 Element('Frame').onclick=()=>FrameView();

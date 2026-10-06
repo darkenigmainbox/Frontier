@@ -12,7 +12,7 @@
 <title>Cliff formation · Frontier</title>
 <link rel="icon" href="data:,">
 
-  <script type="module" crossorigin src="../assets/terrain-CvEtrCkk.js"></script>
+  <script type="module" crossorigin src="../assets/terrain-CqY9S-sI.js"></script>
   <link rel="modulepreload" crossorigin href="../assets/modulepreload-polyfill-B5Qt9EMX.js">
   <link rel="modulepreload" crossorigin href="../assets/three-BIGa2p6d.js">
   <link rel="stylesheet" crossorigin href="../assets/terrain-YRsgXs48.css">
@@ -72,7 +72,7 @@
 <details open><summary>Display</summary><div class="ControlGroup"><label class="FieldLabel" for="LightAngle">Light azimuth <output id="LightValue">−35°</output></label><input id="LightAngle" type="range" min="-160" max="160" step="1" value="-35"><label class="Check"><input id="Shadows" type="checkbox" checked> Cast shadows</label><label class="Check"><input id="Ground" type="checkbox" checked> Ground plane</label><label class="Check"><input id="Explode" type="checkbox"> Explode blocks <span class="Subtle">inspection only</span></label></div></details>
 <details open><summary>Diagnostics</summary><div class="ControlGroup"><div id="Metrics" class="Metrics">Awaiting generated mesh.</div><p class="Small" id="QualityNote"></p></div></details>
 <details><summary>Method & scope</summary><div class="ControlGroup Small"><p>Landform presets establish cliff proportions. Gradient, ridged and cellular noise vary the crown, bays and cross-sections coherently. Formation and fracture seeds are independent. The same seeds reproduce the same geometry.</p><p>Kinked joints enter all four exposures and terminate against an interior core. Stage 2 offers conjugate fractures, block jointing, steep joints or optional bedding. Non-bedded cuts split selected volumes, rather than drawing rows across the entire cliff. Local edge spalls cut four- or six-facet cavities while preserving both edge ends. Surface fissures are closed-bottom polygon V-grooves.</p><p>Constrained planar triangulation and bounded topology cleanup. This is a geological modelling tool, not a fracture-mechanics or erosion simulation. SDF erosion is excluded.</p></div></details>
-</div><div class="InspectorFooter"><button id="Regenerate" class="Primary">Rebuild through 01</button><div><button id="ExportObj">Export OBJ</button><button id="ExportRecipe">Save recipe</button><button id="ImportRecipe">Load</button></div><input id="RecipeFile" type="file" accept="application/json,.json" hidden></div></aside>
+</div><div class="InspectorFooter"><p id="ErosionNotice" class="Small" role="status" hidden></p><button id="Regenerate" class="Primary">Rebuild through 01</button><div><button id="ExportObj">Export OBJ</button><button id="ExportRecipe">Save recipe</button><button id="ImportRecipe">Load</button></div><input id="RecipeFile" type="file" accept="application/json,.json" hidden></div></aside>
 </main>
 <main class="Workspace" id="GrainWorkspace" hidden></main>
 <footer class="StatusBar"><span id="StatusDot" class="Dot"></span><span id="Status">Building geometry</span><span class="ToolbarSpace"></span><span id="TriangleCount">— triangles</span><span class="StatusDivider">|</span><span>Units: metres</span><span class="StatusDivider">|</span><span>Raster · WebGL</span></footer>

@@ -12,6 +12,7 @@ export class MouldSequence {
   if(EarliestStage(this.specification,result.Specification)<=6)this.detail=null;
   this.specification=result.Specification;
   result.Stages=result.Stages.slice(0,Math.min(5,through));result.Through=through;
+  if(through===5.1&&this.erosion?.Erosion.budgetExceeded){this.erosion=null;this.detail=null;}
   if(through>=5.1){
    if(this.erosion)result.ReusedStages.push(5.1);
    else{progress(5.1,'Deforming individual rock faces');this.erosion=BuildFaceErosion(result.Stages[4],result.Specification,message=>progress(5.1,message));result.ExecutedStages.push(5.1);result.Timings[5.1]=this.erosion.Erosion.milliseconds;}

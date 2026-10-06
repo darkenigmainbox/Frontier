@@ -24,3 +24,9 @@ assert.equal(EarliestStage(s,{...s,ErosionSeed:43}),5.1);assert.equal(EarliestSt
 assert.deepEqual(ReadRecipe({Format:'Frontier.PolygonCliff',Version:12,Specification:s}),s);
 assert.equal(ReadRecipe({Format:'Frontier.PolygonCliff',Version:11,Specification:s}).ErosionInward,0);
 console.log(JSON.stringify({passed:true,topologyPreserved:true,collisionAndContainmentChecks:true,stage6Uses51:true,cache:true,erosion:e.Erosion,finalTriangles:final.Stages[5].Metrics.Triangles},null,2));
+
+// Simulate a cached budget rejection: explicit 5.1 rebuild must retry it.
+seq.erosion.Erosion.budgetExceeded=true;
+const retry=await seq.Generate({...s,ErosionInward:0,ErosionOutward:0},()=>{},5.1);
+assert.deepEqual(retry.ExecutedStages,[5.1]);assert.equal(seq.detail,null);
+assert.notEqual(retry.Erosion.Erosion.budgetExceeded,true);

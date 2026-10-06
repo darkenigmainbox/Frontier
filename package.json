@@ -29,7 +29,9 @@
     "test:face-erosion": "node tests/face-erosion.mjs",
     "test:face-erosion:browser": "npm run build:githack && node tests/face-erosion-browser.mjs",
     "test:exchange-repair": "node tests/exchange-ground-corner.mjs && node tests/exchange-repair-pipeline.mjs",
-    "test:exchange-repair:browser": "npm run build:githack && node tests/exchange-repair-browser.mjs"
+    "test:exchange-repair:browser": "npm run build:githack && node tests/exchange-repair-browser.mjs",
+    "test:erosion-budget": "node tests/erosion-validation-budget.mjs",
+    "test:erosion-budget:browser": "npm run build:githack && node tests/erosion-budget-browser.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",
