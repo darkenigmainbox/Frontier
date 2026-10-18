@@ -1,0 +1,17 @@
+{
+  "name": "frontier-road-studio",
+  "version": "1.0.0",
+  "description": "Frontier — robust 2D/3D city road network editor: roads, bridges, rails, terrain, water. Clean quad-flow topology for games.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

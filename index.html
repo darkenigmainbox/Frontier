@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Frontier — Road Studio · 2D/3D City Road Network Editor</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div class="brand">
+        <div class="brand-mark">F</div>
+        <div class="brand-text">
+          <strong>FRONTIER</strong>
+          <span>Road Studio · countryside → city → offroad</span>
+        </div>
+      </div>
+      <div class="toolbar" id="mainToolbar">
+        <div class="tool-group" id="toolGroup">
+          <button data-tool="select" class="tool-btn active" title="Select / move nodes & roads (V)">⌖ Select</button>
+          <button data-tool="road" class="tool-btn" title="Draw road — click to place points, double-click / Enter to finish (R)">🛣 Road</button>
+          <button data-tool="rail" class="tool-btn" title="Draw heavy rail track (T)">🛤 Rail</button>
+          <button data-tool="monorail" class="tool-btn" title="Draw monorail beam (M)">🚝 Monorail</button>
+          <button data-tool="bridge" class="tool-btn" title="Draw bridge (elevated road) (B)">🌉 Bridge</button>
+          <button data-tool="roundabout" class="tool-btn" title="Place roundabout (O)">🔄 Roundabout</button>
+          <button data-tool="terrainUp" class="tool-btn" title="Terrain raise brush (U)">⛰ Raise</button>
+          <button data-tool="terrainDown" class="tool-btn" title="Terrain lower brush (J)">🕳 Lower</button>
+          <button data-tool="water" class="tool-btn" title="Water / lake brush — carve below water level (W)">🌊 Water</button>
+          <button data-tool="erase" class="tool-btn danger" title="Delete road / node (Del)">🗑 Erase</button>
+        </div>
+        <div class="tool-group">
+          <button id="btnUndo" title="Undo (Ctrl+Z)">↩</button>
+          <button id="btnRedo" title="Redo (Ctrl+Y)">↪</button>
+        </div>
+        <div class="tool-group">
+          <button id="btnSnap" class="toggle active" title="Snap to nodes / roads">🧲 Snap</button>
+          <button id="btnAutoMerge" class="toggle active" title="Auto-split & merge intersecting roads (clean topology)">🔗 Merge</button>
+          <button id="btnFollowTerrain" class="toggle active" title="Roads follow / carve terrain">⛰ Follow</button>
+        </div>
+        <div class="tool-group">
+          <button id="btnDemo" title="Load demo city project">🏙 Demo city</button>
+          <button id="btnClear" title="New empty project">📄 New</button>
+          <button id="btnSave" title="Save project JSON">💾 Save</button>
+          <button id="btnLoad" title="Load project JSON">📂 Load</button>
+          <button id="btnOBJ" title="Export game-ready OBJ (quad faces)">🎮 OBJ</button>
+          <input type="file" id="fileInput" accept=".json" hidden />
+        </div>
+      </div>
+    </header>
+
+    <div id="workbench">
+      <aside id="leftPanel">
+        <div class="panel-section">
+          <h3>Preset library <span class="hint">click = draw · ⇧click = apply</span></h3>
+          <div class="preset-filter">
+            <button data-cat="all" class="active">All</button>
+            <button data-cat="highway">Highway</button>
+            <button data-cat="urban">Urban</button>
+            <button data-cat="rural">Rural</button>
+            <button data-cat="rail">Rail</button>
+            <button data-cat="bridge">Bridge</button>
+          </div>
+          <div id="presetList"></div>
+        </div>
+        <div class="panel-section">
+          <h3>Active preset</h3>
+          <div id="activePreset"></div>
+        </div>
+        <div class="panel-section">
+          <h3>Layers</h3>
+          <div id="layerList"></div>
+        </div>
+      </aside>
+
+      <main id="viewports">
+        <section id="pane2d">
+          <div class="pane-header">
+            <span><strong>2D</strong> · Road editor <span class="kbd">drag = pan · wheel = zoom</span></span>
+            <span id="toolStatus">Select</span>
+          </div>
+          <canvas id="canvas2d"></canvas>
+          <div id="hint2d" class="pane-hint"></div>
+        </section>
+        <div id="splitter" title="Drag to resize"></div>
+        <section id="pane3d">
+          <div class="pane-header">
+            <span><strong>3D</strong> · Live game preview <span class="kbd">drag = orbit · wheel = zoom · RMB = pan</span></span>
+            <span class="view3d-toggles">
+              <label><input type="checkbox" id="tglCars" checked /> cars</label>
+              <label><input type="checkbox" id="tglTrains" checked /> trains</label>
+              <label><input type="checkbox" id="tglWire" /> wireframe</label>
+              <button id="btnFlyover" title="Cinematic flyover">✈ Flyover</button>
+            </span>
+          </div>
+          <div id="viewport3d"></div>
+          <div id="stats3d" class="pane-hint"></div>
+        </section>
+      </main>
+
+      <aside id="rightPanel">
+        <div class="panel-section">
+          <h3>Selection</h3>
+          <div id="propsPanel"><p class="muted">Nothing selected. Click a road or node in 2D.</p></div>
+        </div>
+        <div class="panel-section">
+          <h3>Topology & validation <button id="btnValidate" class="mini">re-check</button></h3>
+          <div id="validationList"><p class="muted">—</p></div>
+        </div>
+        <div class="panel-section">
+          <h3>Terrain & water</h3>
+          <div id="terrainPanel"></div>
+        </div>
+        <div class="panel-section">
+          <h3>Mesh stats <span class="hint">quad-flow</span></h3>
+          <div id="meshStats"><p class="muted">—</p></div>
+        </div>
+      </aside>
+    </div>
+
+    <footer id="statusbar">
+      <span id="statusLeft">Ready</span>
+      <span id="statusMid"></span>
+      <span id="statusRight"></span>
+    </footer>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
