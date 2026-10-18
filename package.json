@@ -1,0 +1,20 @@
+{
+  "name": "frontier",
+  "version": "1.0.0",
+  "description": "Frontier — 2D/3D road network & city editor with clean quad-flow topology, terrain, water, rails and monorails",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "smoke": "tsc --noEmit && node --experimental-strip-types src/demo/smoke.ts"
+  },
+  "dependencies": {
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.170.0",
+    "typescript": "5.6",
+    "vite": "6"
+  }
+}
