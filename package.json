@@ -1,0 +1,17 @@
+{
+  "name": "frontier-city-road-editor",
+  "version": "1.0.0",
+  "description": "Frontier — AAA City Road Network Editor — 2D vector editor + 3D PBR viewport with clean quad topology",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 5173"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "vite": "^5.2.0"
+  }
+}

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Frontier — AAA City Road Editor</title>
+<link rel="stylesheet" href="/src/styles/main.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div class="brand">
+      <div class="brand-badge">F</div>
+      <div>FRONTIER <small>— CITY ROAD NETWORK EDITOR</small></div>
+      <span class="pill"><b>AAA</b> Quad-Flow • PBR</span>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="btnUndo" title="Undo (Ctrl+Z)">↩ Undo</button>
+    <button class="btn" id="btnRedo" title="Redo (Ctrl+Y)">↪ Redo</button>
+    <div class="divider"></div>
+    <button class="btn" id="btnSnap">🧩 Clean Topology</button>
+    <button class="btn" id="btnTerrain">⛰ Terrain Sculpt</button>
+    <div class="divider"></div>
+    <button class="btn" id="btnImport">⤓ Import</button>
+    <button class="btn" id="btnExport">⤒ Export</button>
+    <button class="btn primary" id="btnDemo">★ Build Demo City</button>
+    <button class="btn" id="btnClear" style="background:#2a1a1f;border-color:#4a2a36">Clear</button>
+  </div>
+
+  <div id="toolstrip">
+    <button class="tool active" data-tool="select" title="Select / Move (1)"><i>↖</i><span>Select / Move — drag nodes, click roads</span></button>
+    <button class="tool" data-tool="draw" title="Draw Road (2)"><i>✒</i><span>Draw Road — click node → click node, snap auto</span></button>
+    <button class="tool" data-tool="terrain" title="Terrain Sculpt"><i>⛰</i><span>Terrain Sculpt — drag to raise/lower (Shift to lower)</span></button>
+    <div class="divider" style="width:32px;height:1px;background:var(--line)"></div>
+    <button class="tool" data-tool="delete" title="Delete (Del)"><i>⌫</i><span>Delete — select then Del</span></button>
+    <button class="tool" id="btnFocus2D" title="Reset 2D view"><i>◎</i><span>Reset 2D View</span></button>
+  </div>
+
+  <div id="canvas2d-wrap">
+    <div class="canvas-topbar">
+      <div class="chip"><b>2D PLAN</b> • Vector Editor</div>
+      <div class="chip">Tool: <b id="status-tool">select</b> <span class="kbd">1</span><span class="kbd">2</span><span class="kbd">Del</span></div>
+      <div class="chip">Preset: <b id="status-preset">avenue</b></div>
+    </div>
+    <div class="view-label">WORLD UNITS • 1 unit = 1m • <b>Grid 100m</b></div>
+    <canvas id="editor2d" tabindex="0"></canvas>
+    <div class="legend">
+      <div class="chip"><span class="mini" style="background:#2e323a"></span> Asphalt</div>
+      <div class="chip"><span class="mini" style="background:#4a3f2e"></span> Dirt</div>
+      <div class="chip"><span class="mini" style="background:#3a7fb8"></span> Water / Bridge</div>
+      <div class="chip"><span class="mini" style="background:#7af0c5"></span> Highway</div>
+      <div class="chip"><span class="mini" style="background:#785aff"></span> Monorail</div>
+      <div class="chip"><span class="mini" style="background:#b45028"></span> Train</div>
+    </div>
+  </div>
+
+  <div id="viewport3d-wrap">
+    <div class="canvas-topbar">
+      <div class="chip"><b>3D VIEWPORT</b> • PBR • Shadows • Orbit</div>
+      <div class="chip">
+        <button class="btn small" data-view="overview">Overview</button>
+        <button class="btn small" data-view="city">City</button>
+        <button class="btn small" data-view="country">Countryside</button>
+        <button class="btn small" data-view="offroad">Offroad</button>
+        <button class="btn small" data-view="river">River</button>
+      </div>
+    </div>
+    <div class="view-label" style="top:50px">Z-UP • <b>Clean Quad Topology</b> • Pavements • Ramps • Bridges • Rails</div>
+    <canvas id="three-canvas"></canvas>
+  </div>
+
+  <div id="inspector">
+    <div class="tabs">
+      <div class="tab active" data-tab="road">ROADS</div>
+      <div class="tab" data-tab="scene">SCENE</div>
+      <div class="tab" data-tab="help">GUIDE</div>
+    </div>
+    <div class="ins-scroll" id="inspectorScroll">
+      <div class="card">
+        <h3>Preset Library</h3>
+        <div class="preset-grid" id="presetGrid"></div>
+        <div class="help" style="margin-top:8px">All presets carry lane count, width, sidewalk, curb 0.12m, markings and PBR materials. Intersections auto-merge with quad flow fillets.</div>
+      </div>
+      <div id="inspectorContent">
+        <div class="help">Select a road or node to inspect.</div>
+      </div>
+      <div class="card" id="sceneCard">
+        <h3>Scene Stats</h3>
+        <div class="row"><label>Nodes</label><b id="statNodes">0</b></div>
+        <div class="row"><label>Segments</label><b id="statSegs">0</b></div>
+        <div class="row"><label>Rails</label><b id="statRails">0</b></div>
+        <div class="row"><label>Topology</label><span style="color:#7af0c5">Clean Quad Flow</span></div>
+        <hr class="sep">
+        <h3>Full Demo Network</h3>
+        <div class="help">
+          <b>Countryside (NW)</b> — rolling hills, rural 2L winding + dirt trails, pond, farmsteads.<br>
+          <b>Highway (N→S)</b> — 6L controlled-access, median, ramps, bridges over river.<br>
+          <b>City Center</b> — gridded avenues, boulevard + central tram, old-town cobble, monorail loop, elevated & ground train cutting through streets.<br>
+          <b>Industrial (S)</b> — wide 2L, sheds, southern bridge.<br>
+          <b>Offroad (E)</b> — gravel/dirt forest trails, lake bridge.<br>
+          <b>Terrain</b> — 85m hills → flat downtown → river valley. Roads carve/embank; bridges auto-spawn piers + railings where water/height delta.<br>
+          <b>Pavements</b> — 2–4m sidewalks, 0.12m curb, ADA ramps + tactile at every intersection, zebra crosswalks.<br>
+          <b>Rails</b> — Monorail 8.5m elevated on beams + pillars, ground train with ballast/sleepers cutting through roads at grade.
+        </div>
+      </div>
+      <div class="card" id="helpCard" style="display:none">
+        <h3>How to Use</h3>
+        <div class="help">
+          <b>1 — Draw:</b> Press <span class="kbd">2</span>, pick preset, click existing node or empty ground to create nodes & segments. Keep clicking to extend. Intersections auto-split.<br>
+          <b>2 — Edit:</b> Press <span class="kbd">1</span>, drag nodes, click segment to change type in inspector. <span class="kbd">Del</span> to delete. <span class="kbd">Ctrl+Z</span>/<span class="kbd">Ctrl+Y</span> undo.<br>
+          <b>3 — Terrain:</b> Click ⛰, drag to raise, <span class="kbd">Shift+Drag</span> to lower. Height drives road embankments & bridge triggers.<br>
+          <b>4 — 3D:</b> Orbit/dolly in right viewport. <span class="kbd">Double-click</span> road to focus. Use Overview/City/Countryside/Offroad buttons.<br>
+          <b>5 — Topology:</b> Hit <b>Clean Topology</b> to re-merge intersections — handles same-type and mixed-type crossings (highway × street, dirt × rural, rail × road) with topology-safe caps & UV continuity.<br>
+          <b>6 — Export:</b> Export JSON and re-import to share networks.<br>
+          <b>GTA-6 Grade:</b> All roads build as contiguous quad strips with mitered joins, continuous UVs, curb bevels, bridge decks/piers/beams/railings, crosswalks, ramps. No low-poly — PBR materials, soft shadows, ACES tonemapping.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="statusbar">
+    <span class="dot"></span>
+    <span id="status-msg">Ready — Build Demo City for full AAA showcase, or start drawing.</span>
+    <span class="spacer"></span>
+    <span>Nodes <b id="statNodes2" style="color:var(--text)">0</b> • Segments <b id="statSegs2" style="color:var(--text)">0</b> • </span>
+    <span>Drag + Scroll to pan/zoom • Alt+Drag to pan • Wheel to zoom • Hold middle-mouse in 3D to orbit</span>
+  </div>
+</div>
+
+<script type="module" src="/src/main.js"></script>
+<script>
+  // Tab switching
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.addEventListener('click',()=>{
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+      t.classList.add('active');
+      const tab=t.dataset.tab;
+      document.getElementById('sceneCard').style.display = tab==='scene' ? '' : (tab==='road' ? '' : 'none');
+      document.getElementById('helpCard').style.display = tab==='help' ? '' : 'none';
+      document.getElementById('presetGrid').parentElement.style.display = tab==='road' ? '' : 'none';
+      document.getElementById('inspectorContent').style.display = tab==='road' || tab==='scene' ? '' : 'none';
+      if(tab==='help') document.getElementById('helpCard').style.display='';
+    });
+  });
+  document.getElementById('btnFocus2D').addEventListener('click',()=>{ window.editor2d.view={x:0,y:20,scale:1.1}; window.editor2d.draw(); });
+  // Mirror stats
+  setInterval(()=>{
+    const n=document.getElementById('statNodes')?.textContent, s=document.getElementById('statSegs')?.textContent;
+    if(n) document.getElementById('statNodes2').textContent=n;
+    if(s) document.getElementById('statSegs2').textContent=s;
+  },300);
+</script>
+</body>
+</html>
