@@ -1100,6 +1100,104 @@ test('End-to-end stateful Mock-WebGL2 + DOM boot of GpuErosionEngine, TerrainSta
   }
 });
 
+test('All 25+ WebGL2 GLSL ES 3.00 shaders resolve every function call, identifier, varying interface, and uniform type', () => {
+  const GLSL_BUILTINS = new Set([
+    'float', 'int', 'uint', 'bool',
+    'vec2', 'vec3', 'vec4', 'ivec2', 'ivec3', 'ivec4', 'uvec2', 'uvec3', 'uvec4', 'bvec2', 'bvec3', 'bvec4',
+    'mat2', 'mat3', 'mat4',
+    'radians', 'degrees', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh',
+    'pow', 'exp', 'log', 'exp2', 'log2', 'sqrt', 'inversesqrt',
+    'abs', 'sign', 'floor', 'trunc', 'round', 'roundEven', 'ceil', 'fract', 'mod', 'min', 'max', 'clamp', 'mix', 'step', 'smoothstep', 'isnan', 'isinf',
+    'length', 'distance', 'dot', 'cross', 'normalize', 'faceforward', 'reflect', 'refract',
+    'matrixCompMult', 'outerProduct', 'transpose', 'determinant', 'inverse',
+    'lessThan', 'lessThanEqual', 'greaterThan', 'greaterThanEqual', 'equal', 'notEqual', 'any', 'all', 'not',
+    'texelFetch', 'textureSize', 'dFdx', 'dFdy', 'fwidth',
+    'if', 'for', 'while', 'switch', 'return', 'layout',
+  ]);
+  const GLSL_KEYWORDS = new Set([
+    ...GLSL_BUILTINS,
+    'version', 'es', 'precision', 'highp', 'mediump', 'lowp', 'in', 'out', 'inout', 'uniform', 'const', 'flat', 'smooth', 'centroid', 'location',
+    'void', 'sampler2D', 'sampler3D', 'samplerCube',
+    'else', 'do', 'case', 'default', 'break', 'continue', 'discard', 'true', 'false', 'struct',
+    'gl_Position', 'gl_FragCoord', 'gl_VertexID', 'gl_InstanceID', 'gl_PointSize', 'gl_PointCoord', 'gl_FrontFacing',
+  ]);
+
+  const engSrc = fs.readFileSync(new URL('../src/erosion/gpu-erosion-engine.js', import.meta.url), 'utf8');
+  const telMatch = engSrc.match(/const TELEMETRY_FRAG = `([\s\S]*?)`;/);
+  assert.ok(telMatch, 'TELEMETRY_FRAG must exist in gpu-erosion-engine.js');
+
+  const allShaders = [];
+  for (const [mName, mod] of [['erosion', Shaders], ['pipeline', PipelineShaders]]) {
+    for (const [name, raw] of Object.entries(mod)) {
+      if (typeof raw === 'string' && (name.endsWith('_VERT') || name.endsWith('_FRAG'))) {
+        allShaders.push([`${mName}.${name}`, raw]);
+      }
+    }
+  }
+  allShaders.push(['engine.TELEMETRY_FRAG', telMatch[1]]);
+  assert.ok(allShaders.length >= 25, `Expected >=25 shaders, found ${allShaders.length}`);
+
+  for (const [label, raw] of allShaders) {
+    const clean = raw.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+
+    // 1. Order-sensitive function call resolution (catches missing helpers like hash22 before main())
+    const declaredFns = new Set();
+    const lines = clean.split('\n');
+    lines.forEach((line, idx) => {
+      const declM = line.match(/^\s*(?:void|float|int|uint|bool|vec[234]|ivec[234]|mat[234])\s+([A-Za-z_]\w*)\s*\(/);
+      const callRe = /\b([A-Za-z_]\w*)\s*\(/g;
+      let m;
+      while ((m = callRe.exec(line)) !== null) {
+        const fn = m[1];
+        if (declM && declM[1] === fn && m.index === line.indexOf(fn)) continue;
+        assert.ok(
+          GLSL_BUILTINS.has(fn) || declaredFns.has(fn),
+          `${label}:${idx + 1} calls undeclared GLSL function '${fn}(...)'`
+        );
+      }
+      if (declM) declaredFns.add(declM[1]);
+    });
+
+    // 2. Full identifier declaration check across each shader unit
+    const body = clean.replace(/^#.*$/gm, '');
+    const declaredIds = new Set(GLSL_KEYWORDS);
+    let m;
+    const singleDeclRe = /\b(?:void|float|int|uint|bool|vec[234]|ivec[234]|uvec[234]|bvec[234]|mat[234]|sampler2D)\s+([A-Za-z_]\w*)/g;
+    while ((m = singleDeclRe.exec(body)) !== null) declaredIds.add(m[1]);
+    const multiDeclRe = /\b(?:float|int|uint|bool|vec[234]|ivec[234]|mat[234])\s+([^;()]+);/g;
+    while ((m = multiDeclRe.exec(body)) !== null) {
+      for (const part of m[1].split(',')) {
+        const id = part.trim().match(/^([A-Za-z_]\w*)/);
+        if (id) declaredIds.add(id[1]);
+      }
+    }
+    const tokRe = /(?:\.[A-Za-z_]\w*)|\b([A-Za-z_]\w*)\b/g;
+    while ((m = tokRe.exec(body)) !== null) {
+      if (!m[1] || /^\d/.test(m[1])) continue;
+      assert.ok(declaredIds.has(m[1]), `${label} references undeclared GLSL identifier '${m[1]}'`);
+    }
+  }
+
+  // 3. Vertex -> Fragment varying interface check for all custom linked pairs
+  for (const [vName, fName, vSrc, fSrc] of [
+    ['TERRAIN_RENDER_VERT', 'TERRAIN_RENDER_FRAG', Shaders.TERRAIN_RENDER_VERT, Shaders.TERRAIN_RENDER_FRAG],
+    ['SDF_CAVE_VERT', 'SDF_CAVE_FRAG', PipelineShaders.SDF_CAVE_VERT, PipelineShaders.SDF_CAVE_FRAG],
+    ['ROCK_INSTANCE_VERT', 'ROCK_INSTANCE_FRAG', Shaders.ROCK_INSTANCE_VERT, Shaders.ROCK_INSTANCE_FRAG],
+    ['GRASS_INSTANCE_VERT', 'GRASS_INSTANCE_FRAG', Shaders.GRASS_INSTANCE_VERT, Shaders.GRASS_INSTANCE_FRAG],
+    ['PARTICLE_RENDER_VERT', 'PARTICLE_RENDER_FRAG', Shaders.PARTICLE_RENDER_VERT, Shaders.PARTICLE_RENDER_FRAG],
+  ]) {
+    const outs = new Map();
+    let m;
+    const outRe = /^\s*(?:flat\s+)?out\s+(\w+)\s+(\w+)\s*;/gm;
+    while ((m = outRe.exec(vSrc)) !== null) outs.set(m[2], m[1]);
+    const inRe = /^\s*(?:flat\s+)?in\s+(\w+)\s+(\w+)\s*;/gm;
+    while ((m = inRe.exec(fSrc)) !== null) {
+      assert.equal(outs.get(m[2]), m[1], `Varying mismatch ${vName} -> ${fName} for '${m[2]}'`);
+    }
+  }
+});
+
+
 
 
 

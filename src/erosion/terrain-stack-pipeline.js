@@ -494,6 +494,9 @@ export class TerrainStackPipeline {
     const span = this.engine.params.worldSpan;
     const { cfg1, cfg2 } = this._packMaskUniforms(mask);
 
+    gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.BLEND);
+    gl.disable(gl.CULL_FACE);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboMask);
     gl.viewport(0, 0, R, R);
     gl.useProgram(this.progMaskBake);
