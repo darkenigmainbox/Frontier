@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Frontier — GPU Particle Erosion &amp; 3D Rock Studio</title>
+  <link rel="stylesheet" href="/src/app/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- =====================================================================
+         LEFT DOCK (Switches cleanly between GPU Erosion Lab & 3D Rock Studio)
+         ===================================================================== -->
+    <aside class="dock dock-left">
+      <header class="brand">
+        <div class="brand-badge">F</div>
+        <div style="flex:1;min-width:0;">
+          <h1>FRONTIER</h1>
+          <p id="brand-subtitle">GPU Particle Erosion &amp; Sedimentation</p>
+        </div>
+        <span class="tag-pill" id="brand-badge-pill">WebGL2 GPGPU</span>
+      </header>
+
+      <!-- EROSION LEFT PANELS -->
+      <div id="left-erosion-panels">
+        <section class="panel-section">
+          <div class="section-header">
+            <span>STARTING LANDSCAPE</span>
+            <span class="tag-pill">512² Float32</span>
+          </div>
+          <div id="erosion-landscape-list" class="archetype-grid"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <span>TOP-DROP PARTICLE EMITTER</span>
+          </div>
+          <label class="field-row">
+            <span>Drop Source</span>
+            <select id="select-emitter-mode">
+              <option value="glacial-blizzard">Glacial Blizzard (Snow + Ice + Meltwater)</option>
+              <option value="all-weather">Multi-Agent (Rain + Snow + Wind + Rockfall)</option>
+              <option value="sky-rain">Hydraulic Rainstorm (Top Drop)</option>
+              <option value="aeolian-wind">Aeolian Wind &amp; Sandblasting</option>
+              <option value="rockfall-avalanche">Cliff Rockfall &amp; Scree Avalanches</option>
+              <option value="storm-cell">Focused Storm / Blizzard Cell</option>
+            </select>
+          </label>
+
+          <p class="export-note" style="margin-top:0;">
+            Multi-agent GPU particles: rainfall runoff, blizzard snowpack &amp; creeping glacier ice,
+            saltating aeolian sand, and ballistic cliff rockfall &mdash; all simulated on the GPU.
+          </p>
+
+          <div class="section-header" style="margin-top:10px;margin-bottom:6px;">
+            <span>INTERACTIVE VIEWPORT TOOL</span>
+          </div>
+          <div class="tool-seg" id="erosion-brush-buttons">
+            <button data-brush="orbit" class="active" title="Orbit / Pan / Zoom">Orbit</button>
+            <button data-brush="cloudburst" title="Pour concentrated rainstorm where you drag">Pour Rain</button>
+            <button data-brush="raise" title="Uplift tectonic bedrock">Uplift</button>
+            <button data-brush="carve" title="Carve gorge / fault channel">Carve</button>
+          </div>
+          <div class="slider-group" style="margin-top:8px;margin-bottom:2px;">
+            <div class="slider-label">
+              <span>Storm / Brush Radius</span>
+              <output id="out-brush-radius">32m</output>
+            </div>
+            <input id="slider-brush-radius" type="range" min="10" max="95" step="1" value="32" />
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <span>TERRAIN SEED</span>
+            <button id="btn-erosion-random-seed" class="btn-mini accent">Randomize [R]</button>
+          </div>
+          <div class="seed-row">
+            <input id="input-erosion-seed" type="number" step="1" value="4029" />
+            <button id="btn-erosion-apply-seed" class="btn-mini">Apply</button>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <span>GEOLOGY &amp; SEDIMENT VIEW</span>
+          </div>
+          <label class="field-row">
+            <span>Layer Map</span>
+            <select id="select-erosion-view">
+              <option value="natural">Natural Strata &amp; Sediment</option>
+              <option value="sediment">Cut vs Sedimentation Map</option>
+              <option value="hardness">3D Rock Hardness &amp; Faults</option>
+              <option value="flow">Hydraulic Discharge &amp; Shear</option>
+              <option value="clay">Pure Sculptor Matte Clay</option>
+              <option value="cryo">Cryosphere (Snowpack &amp; Glacier Ice)</option>
+            </select>
+          </label>
+
+          <label class="field-row">
+            <span>Rock Palette</span>
+            <select id="select-erosion-material">
+              <option value="0">Utah Desert Sandstone</option>
+              <option value="1">Icelandic Volcanic Basalt &amp; Moss</option>
+              <option value="2">Himalayan Gneiss &amp; Glacier</option>
+            </select>
+          </label>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span>Sun Azimuth</span>
+              <output id="out-erosion-sun-az">48°</output>
+            </div>
+            <input id="slider-erosion-sun-az" type="range" min="-180" max="180" step="1" value="48" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span>Sun Elevation</span>
+              <output id="out-erosion-sun-el">28°</output>
+            </div>
+            <input id="slider-erosion-sun-el" type="range" min="10" max="82" step="1" value="28" />
+          </div>
+
+          <div class="toggle-grid">
+            <label class="check-pill">
+              <input id="chk-erosion-particles" type="checkbox" checked />
+              <span>Falling &amp; Flow Drops</span>
+            </label>
+            <label class="check-pill">
+              <input id="chk-erosion-water" type="checkbox" checked />
+              <span>Water Channels</span>
+            </label>
+          </div>
+        </section>
+      </div>
+
+      <!-- ROCK STUDIO LEFT PANELS -->
+      <div id="left-rock-panels" class="hidden-panel">
+        <section class="panel-section">
+          <div class="section-header">
+            <span>FORMATION ARCHETYPE</span>
+            <span class="tag-pill" id="active-category">Arch</span>
+          </div>
+          <div id="cat-filter-bar" class="cat-filter-bar"></div>
+          <div id="archetype-list" class="archetype-grid"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <span>CURVE DRAWING &amp; 3D GIZMO</span>
+            <span class="tag-pill" id="curve-mode-pill">Off</span>
+          </div>
+          <p class="export-note" style="margin-top:0;">
+            Draw your own arches: click to place control points, then drag the red/green/blue
+            3D axis arrows to reshape the curve. Boulders are rebuilt along the exact spline.
+          </p>
+          <div class="export-buttons">
+            <button id="btn-curve-draw" class="btn-primary">✏️ Draw My Own Arch</button>
+            <button id="btn-curve-reset" class="btn-secondary">↺ Reset Curve</button>
+          </div>
+          <div class="export-buttons" style="margin-top:8px;">
+            <button id="btn-curve-branch" class="btn-secondary">+ Branch Arch</button>
+            <button id="btn-curve-delete" class="btn-secondary">– Delete Point</button>
+          </div>
+          <div class="slider-group" style="margin-top:10px;">
+            <div class="slider-label">
+              <span>Selected Point Boulder Radius</span>
+              <output id="out-curve-radius">1.00×</output>
+            </div>
+            <input id="slider-curve-radius" type="range" min="0.4" max="2.4" step="0.05" value="1.0" />
+          </div>
+          <p class="export-note" id="curve-point-readout" style="margin-bottom:0;">Crown P3: x 0.0 · y 8.6 · z 0.2</p>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <span>PROCEDURAL SEED</span>
+            <button id="btn-random-seed" class="btn-mini accent" title="Shortcut: R">Randomize [R]</button>
+          </div>
+          <div class="seed-row">
+            <input id="input-seed" type="number" step="1" value="4029" />
+            <button id="btn-apply-seed" class="btn-mini">Apply</button>
+          </div>
+          <div id="seed-strip" class="seed-strip" title="Quick procedural seed variations"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <span>STUDIO SHADING &amp; RIG</span>
+          </div>
+
+          <label class="field-row">
+            <span>Surface Mode</span>
+            <select id="select-shading">
+              <option value="lithology">AAA Lithology &amp; Strata (No Texture)</option>
+              <option value="flat-stone">Neutral Grey Stone</option>
+              <option value="pure-clay">Pure Sculptor Matte Clay</option>
+              <option value="ao">Baked Volumetric AO (R)</option>
+              <option value="curvature">Cavity / Edge Mask (G/B)</option>
+              <option value="normals">World Crease Normals</option>
+            </select>
+          </label>
+
+          <label class="field-row" id="row-lithology">
+            <span>Stone Tone</span>
+            <select id="select-lithology"></select>
+          </label>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span>Sun Azimuth</span>
+              <output id="out-sun-az">42°</output>
+            </div>
+            <input id="slider-sun-az" type="range" min="-180" max="180" step="1" value="42" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span>Sun Elevation</span>
+              <output id="out-sun-el">44°</output>
+            </div>
+            <input id="slider-sun-el" type="range" min="8" max="85" step="1" value="44" />
+          </div>
+
+          <div class="toggle-grid">
+            <label class="check-pill">
+              <input id="chk-human" type="checkbox" checked />
+              <span>1.8m Scale Ref</span>
+            </label>
+            <label class="check-pill">
+              <input id="chk-wireframe" type="checkbox" />
+              <span>Wireframe [W]</span>
+            </label>
+            <label class="check-pill">
+              <input id="chk-turntable" type="checkbox" />
+              <span>Turntable [Space]</span>
+            </label>
+          </div>
+        </section>
+      </div>
+    </aside>
+
+    <!-- =====================================================================
+         CENTER 3D VIEWPORT STAGE (Mode Switcher + Dual WebGL2 Canvases)
+         ===================================================================== -->
+    <main class="viewport-stage">
+      <div id="progress-bar" class="progress-bar hidden">
+        <div id="progress-fill" class="progress-fill"></div>
+      </div>
+
+      <!-- Top-Center Mode Switcher -->
+      <div class="studio-mode-switcher" id="studio-mode-switcher">
+        <button id="mode-btn-erosion" class="mode-tab active">
+          <span class="mode-dot live"></span>
+          GPU Particle Erosion &amp; Sedimentation
+        </button>
+        <button id="mode-btn-rock" class="mode-tab">
+          3D Rock &amp; Cliff Studio (19 Presets)
+        </button>
+      </div>
+
+      <!-- GPU Erosion Telemetry HUD -->
+      <div id="hud-erosion" class="hud-top hud-below-switcher">
+        <div class="hud-stat">
+          <span class="hud-k">GPU GRID</span>
+          <span class="hud-v" id="er-stat-grid">512 × 512</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-k">PARTICLES</span>
+          <span class="hud-v" id="er-stat-parts">24,576</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-k">STEPS</span>
+          <span class="hud-v" id="er-stat-steps">0</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-k">ROCK CUT</span>
+          <span class="hud-v" id="er-stat-cut">0 m³</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-k">SEDIMENT</span>
+          <span class="hud-v" id="er-stat-sed">0 m³</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-k">GPU FPS</span>
+          <span class="hud-v" id="er-stat-fps">60</span>
+        </div>
+      </div>
+
+      <!-- Rock Studio Telemetry HUD -->
+      <div id="hud-rock" class="hud-top hud-below-switcher hidden-panel">
+        <div class="hud-stat">
+          <span class="hud-k">DIMENSIONS</span>
+          <span class="hud-v" id="stat-dims">—</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-k">TRIANGLES</span>
+          <span class="hud-v" id="stat-tris">—</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-k">VERTICES</span>
+          <span class="hud-v" id="stat-verts">—</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-k">LITHONS</span>
+          <span class="hud-v" id="stat-blocks">—</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-k">SYNTHESIS</span>
+          <span class="hud-v" id="stat-time">—</span>
+        </div>
+      </div>
+
+      <div id="status-toast" class="status-toast hidden">Synthesizing...</div>
+
+      <!-- GPU Particle Erosion Canvas -->
+      <canvas id="erosion-canvas" class="erosion-canvas"></canvas>
+
+      <!-- 3D Rock & Cliff Studio Three.js Container -->
+      <div id="viewport-canvas" class="viewport-canvas hidden-panel"></div>
+
+      <!-- GPU Erosion Transport Controls -->
+      <div id="erosion-transport-bar" class="camera-bar">
+        <button id="btn-er-play" class="cam-btn active-play">⏸ Pause [Space]</button>
+        <button id="btn-er-burst100" class="cam-btn">+100 Steps</button>
+        <button id="btn-er-burst400" class="cam-btn accent-burst">⚡ +400 Epoch Burst</button>
+        <button id="btn-er-reset" class="cam-btn">↺ Reset Terrain</button>
+        <button id="btn-er-frame" class="cam-btn">Frame View [F]</button>
+      </div>
+
+      <!-- Rock Studio Camera Presets -->
+      <div id="rock-camera-bar" class="camera-bar hidden-panel">
+        <button data-cam="hero" class="cam-btn">3/4 Hero [F]</button>
+        <button data-cam="front" class="cam-btn">Front Face</button>
+        <button data-cam="low" class="cam-btn">Low Player Eye</button>
+        <button data-cam="side" class="cam-btn">Side Profile</button>
+        <button data-cam="top" class="cam-btn">Top Plan</button>
+      </div>
+    </main>
+
+    <!-- =====================================================================
+         RIGHT DOCK (Switches cleanly between GPU Erosion Params & Rock Params)
+         ===================================================================== -->
+    <aside class="dock dock-right">
+      <!-- EROSION RIGHT PANELS -->
+      <div id="right-erosion-panels">
+        <section class="panel-section">
+          <div class="section-header">
+            <span>SKY PARTICLES &amp; RAINFALL</span>
+            <button id="btn-erosion-reset-params" class="btn-mini">Reset Preset</button>
+          </div>
+          <div id="er-sliders-particles"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <span>3D ROCK HARDNESS &amp; STRATA</span>
+          </div>
+          <div id="er-sliders-hardness"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <span>CUTTING &amp; SEDIMENTATION</span>
+          </div>
+          <div id="er-sliders-hydraulics"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <span>GLACIAL &amp; CLIMATE PARTICLES</span>
+            <span class="tag-pill">Snow / Ice / Wind</span>
+          </div>
+          <div id="er-sliders-climate"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <span>EXPORT ERODED TERRAIN MESH</span>
+          </div>
+          <div class="export-buttons">
+            <button id="btn-er-export-glb" class="btn-primary">Export Eroded Terrain (.GLB)</button>
+            <button id="btn-er-export-obj" class="btn-secondary">Export Wavefront (.OBJ)</button>
+          </div>
+          <p class="export-note" style="margin-top:8px;margin-bottom:0;">
+            Exports GPU-carved heightfield with smooth normals and baked bedrock vs coarse gravel &amp; fine alluvial fan vertex colors.
+          </p>
+        </section>
+      </div>
+
+      <!-- ROCK STUDIO RIGHT PANELS -->
+      <div id="right-rock-panels" class="hidden-panel">
+        <section class="panel-section">
+          <div class="section-header">
+            <span>VOXEL DENSITY &amp; TOPOLOGY</span>
+          </div>
+          <div class="quality-seg" id="quality-buttons">
+            <button data-q="fast">Fast</button>
+            <button data-q="medium" class="active">Interactive</button>
+            <button data-q="high">High</button>
+            <button data-q="ultra">Ultra</button>
+          </div>
+
+          <label class="field-row" style="margin-top:8px;">
+            <span>QEM Game Target</span>
+            <select id="select-decimation">
+              <option value="1">Source Mesh (100%)</option>
+              <option value="0.55">Clean Planar (55%)</option>
+              <option value="0.30">Game LOD0 (30%)</option>
+              <option value="0.14">Game LOD1 (14%)</option>
+              <option value="0.06">Game LOD2 (6%)</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <span>TECTONICS &amp; BEDDING</span>
+            <button id="btn-reset-params" class="btn-mini">Reset Preset</button>
+          </div>
+          <div id="sliders-tectonics"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <span>MACRO ARCHITECTURE</span>
+          </div>
+          <div id="sliders-macro"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <span>SURFACE &amp; CLEAVAGE</span>
+          </div>
+          <div id="sliders-detail"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <span>GAME ENGINE EXPORT</span>
+          </div>
+          <div class="export-buttons">
+            <button id="btn-export-glb" class="btn-primary">Export Binary GLB (glTF 2.0)</button>
+            <button id="btn-export-obj" class="btn-secondary">Export Wavefront OBJ</button>
+          </div>
+          <p class="export-note" style="margin-top:8px;margin-bottom:0;">
+            Exports watertight 3D mesh with crease-split normals, UVs, and baked RGBA vertex masks
+            (<code>R=AO</code>, <code>G=Cavity</code>, <code>B=Edge</code>, <code>A=Slope</code>).
+          </p>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script type="module" src="/src/app/main.js"></script>
+</body>
+</html>
