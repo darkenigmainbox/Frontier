@@ -33,20 +33,20 @@ const ALL_SHADER_EXPORTS = [
   'ROCK_INSTANCE_FRAG',
 ];
 
-test('GPU Erosion presets cover all 15 landscapes including Himalayan Snow Mountains & Namib/Sahara wind deserts', () => {
+test('GPU Erosion presets cover all 19 landscapes including non-periodic Himalayas, Sahara Grand Erg, Rugged Desert, Moon, Icelandic Green Highlands & Oasis', () => {
   const landKeys = Object.keys(EROSION_LANDSCAPES);
-  assert.equal(landKeys.length, 15);
+  assert.equal(landKeys.length, 19);
   const seenTypes = new Set();
   for (const k of landKeys) {
     const p = EROSION_LANDSCAPES[k];
     assert.equal(p.id, k);
-    assert.ok(p.defaults.relief >= 80 && p.defaults.relief <= 220);
+    assert.ok(p.defaults.relief >= 80 && p.defaults.relief <= 230);
     assert.ok(p.defaults.rockHardness > 0 && p.defaults.rockHardness < 1);
     seenTypes.add(p.terrainType);
   }
-  assert.equal(seenTypes.size, 15, 'Each landscape preset should map to a unique GPU terrain generator mode');
+  assert.equal(seenTypes.size, 19, 'Each landscape preset should map to a unique GPU terrain generator mode');
 
-  // Verify all 8 baseline terrainTypes (0..7) and default boot preset remain intact!
+  // Verify all untouched baseline & v2.2 terrainTypes (0..6, 8..13), upgraded 7 & 14, and new 15..18!
   assert.equal(DEFAULT_EROSION_PARAMS.landscape, 'icelandic-highlands');
   assert.equal(EROSION_LANDSCAPES['alpine-divide'].terrainType, 0);
   assert.equal(EROSION_LANDSCAPES['layered-plateau'].terrainType, 1);
@@ -57,8 +57,6 @@ test('GPU Erosion presets cover all 15 landscapes including Himalayan Snow Mount
   assert.equal(EROSION_LANDSCAPES['icelandic-highlands'].terrainType, 6);
   assert.equal(EROSION_LANDSCAPES['himalayan-karakoram'].terrainType, 7);
   assert.equal(EROSION_LANDSCAPES['himalayan-karakoram'].name, 'Himalayan Snow Mountains');
-
-  // Verify the 7 researched landscapes (8..14), 7 rock themes, and 5 stone fabric modes
   assert.equal(EROSION_LANDSCAPES['grand-canyon'].terrainType, 8);
   assert.equal(EROSION_LANDSCAPES['studlagil-basalt'].terrainType, 9);
   assert.equal(EROSION_LANDSCAPES['fjadrargljufur-palagonite'].terrainType, 10);
@@ -66,8 +64,17 @@ test('GPU Erosion presets cover all 15 landscapes including Himalayan Snow Mount
   assert.equal(EROSION_LANDSCAPES['yardang-wind-corridor'].terrainType, 12);
   assert.equal(EROSION_LANDSCAPES['glacial-lake-watershed'].terrainType, 13);
   assert.equal(EROSION_LANDSCAPES['sahara-tassili-erg'].terrainType, 14);
-  assert.equal(Object.keys(MATERIAL_THEMES).length, 7);
+  assert.equal(EROSION_LANDSCAPES['rugged-desert-crags'].terrainType, 15);
+  assert.equal(EROSION_LANDSCAPES['lunar-mare-craters'].terrainType, 16);
+  assert.equal(EROSION_LANDSCAPES['icelandic-green-highlands'].terrainType, 17);
+  assert.equal(EROSION_LANDSCAPES['desert-oasis-erg'].terrainType, 18);
+  assert.equal(EROSION_LANDSCAPES['desert-oasis-erg'].defaults.oasisSpring, true);
+  assert.equal(Object.keys(MATERIAL_THEMES).length, 10);
   assert.equal(Object.keys(ROCK_FABRIC_MODES).length, 5);
+
+  // Ensure periodic fract(spurPhase) and stair-stepped floor(mesaMask) artifacts are gone from INIT_TERRAIN_FRAG
+  assert.ok(!Shaders.INIT_TERRAIN_FRAG.includes('spurPhase1'), 'Himalayan terrain must not use periodic fract(spurPhase) ribs');
+  assert.ok(!Shaders.INIT_TERRAIN_FRAG.includes('mesaMask'), 'Sahara terrain must not use stair-stepped Tassili mesaMask blobs');
 
   // Glacial mountain archetypes must exist and snow across broad mountain elevation ranges
   const iceland = EROSION_LANDSCAPES['icelandic-highlands'];
@@ -351,13 +358,53 @@ test('3D RockCalvingSystem synthesizes outward-normal CCW polyhedral outcrops & 
 
   const outcrops = sys.rocks.filter((r) => r.isOutcrop);
   const boulders = sys.rocks.filter((r) => !r.isOutcrop);
-  assert.ok(outcrops.length >= 20, `Expected >= 20 cliff outcrops, got ${outcrops.length}`);
+  assert.ok(outcrops.length >= 10, `Expected >= 10 crown outcrops on gentle rim, got ${outcrops.length}`);
   assert.ok(boulders.length >= 50, `Expected >= 50 calved boulders, got ${boulders.length}`);
 
-  // Step boulder gravity rolling until boulders settle at the cliff toe / apron
-  for (let s = 0; s < 120; s++) sys.stepPhysics(0.05);
+  // Verify NO rooted outcrop clings to steep slopes (all outcrops must sit on gentle slope <= 0.40)
+  for (const out of outcrops) {
+    const s = sys.sampleTerrain(out.x, out.z).slope;
+    assert.ok(s <= 0.40, `Rooted outcrop must never cling to steep slope, got slope=${s}`);
+  }
+
+  // Verify brisk rockfall speed: a boulder on the steep cliff face x=0 must travel >12m in 1.0s!
+  const cliffSample = sys.sampleTerrain(0.0, 0.0);
+  assert.ok(cliffSample.slope > 1.0, `Expected steep cliff at x=0, got slope=${cliffSample.slope}`);
+  const testRock = {
+    submesh: 2,
+    isOutcrop: false,
+    settled: false,
+    x: 0.0,
+    y: cliffSample.totalH + 1.5,
+    z: 0.0,
+    vx: 2.0,
+    vy: 0.0,
+    vz: 0.0,
+    sx: 2.0,
+    sy: 1.8,
+    sz: 2.0,
+    radiusY: 1.8,
+    yaw: 0.0,
+    upX: 0.0,
+    upY: 1.0,
+    upZ: 0.0,
+    isSlab: false,
+    wakeTimer: 4.0,
+    wear: 0.2,
+    seedHash: 0.5,
+  };
+  sys.rocks.push(testRock);
+  for (let s = 0; s < 20; s++) sys.stepPhysics(0.05); // 1.0 second elapsed
+  assert.ok(testRock.x > 12.0, `Cliff boulder must slide briskly (>12m in 1.0s), moved ${testRock.x.toFixed(2)}m`);
+
+  // Step boulder gravity rolling until boulders reach the gentle cliff toe / apron
+  for (let s = 0; s < 100; s++) sys.stepPhysics(0.05);
   const settled = sys.rocks.filter((r) => !r.isOutcrop && r.settled);
   assert.ok(settled.length >= boulders.length * 0.75, 'Calved boulders must naturally decelerate and settle on gentler terrain');
+  for (const b of settled) {
+    const s = sys.sampleTerrain(b.x, b.z).slope;
+    assert.ok(s <= 0.43, `Settled boulder must NEVER cling on steep slope (>0.43), got slope=${s}`);
+  }
 
   // Verify hydraulic undercutting wakes settled boulders up to roll further!
   const target = settled[0];

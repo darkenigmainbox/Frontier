@@ -376,6 +376,8 @@ function syncErosionSliders() {
     erEl.value = String(erosionEngine.params.sunElevation);
     document.getElementById('out-erosion-sun-el').textContent = `${erosionEngine.params.sunElevation}°`;
   }
+  const chkWater = document.getElementById('chk-erosion-water');
+  if (chkWater) chkWater.checked = Boolean(erosionEngine.params.showWater);
 }
 
 // ============================================================================

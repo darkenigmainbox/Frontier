@@ -198,6 +198,21 @@ float evalStarArmDuneM(vec2 uvRot, vec2 origin, float armAng, float armLen, floa
   }
 }
 
+float evalLunarCraterElev(vec2 p, vec2 center, float rad, float depthFrac, bool hasPeak) {
+  float d = length(p - center) / max(rad, 1e-4);
+  if (d > 2.6) return 0.0;
+  if (d < 1.0) {
+    // Bowl cavity + raised rim lip at d -> 1.0 + optional central rebound peak!
+    float bowl = -depthFrac * (1.0 - d * d * (0.72 + 0.28 * d * d));
+    float rimLip = depthFrac * 0.30 * smoothstep(0.68, 1.0, d);
+    float cPeak = hasPeak ? depthFrac * 0.38 * exp(-d * d * 24.0) : 0.0;
+    return bowl + rimLip + cPeak;
+  } else {
+    // Raised overturned ejecta rim decaying exponentially onto surrounding lunar mare
+    return depthFrac * 0.30 * exp(-(d - 1.0) * 3.4);
+  }
+}
+
 void main() {
   float relief = uInitParams.x;
   float rough = uInitParams.y;
@@ -282,49 +297,57 @@ void main() {
     float highland = plateau * (0.40 + 0.30 * fbm2D(q * 2.4 + seedVec, 5, 0.55)) + tuyaTop + ridgeSwarm;
     baseElev = 0.045 + mix(highland, troughFloor, troughMask * 0.82) + sandur * (1.0 - plateau);
   } else if (kind == 7) {
-    // 7. GREATER HIMALAYAN SNOW MOUNTAINS (Himadri / Annapurna-Kangchenjunga Massif):
-    // Continuous thrust-faulted mountain range & branching spur ridges spanning the ENTIRE domain
-    // (NOT isolated conical horns!), with asymmetric steep fluted south headwalls, broad glaciated
-    // snowfield backslopes, cirque amphitheaters, and dendritic U-shaped glacier valleys.
-    vec2 h = p;
-    vec2 hw = wp * 1.05;
+    // 7. GREATER HIMALAYAN SNOW MOUNTAINS (Non-Periodic Asymmetric Sanctuary Massif):
+    // Zero repeating fract() stripes! One towering asymmetric Monarch massif off-center with a
+    // sheer fluted south-east cirque wall, distinct satellite peaks of varied heights & angles,
+    // multi-scale domain-warped dendritic arête divides, and a winding U-shaped glacier gorge.
+    vec2 q1 = p + warp * 0.52;
+    vec2 q2 = q1 + vec2(
+      fbm2D(q1 * 1.35 + seedVec * 1.4, 3, 0.52) - 0.5,
+      fbm2D(q1 * 1.35 + seedVec * 1.9 + 11.7, 3, 0.52) - 0.5
+    ) * 0.38;
 
-    // Primary Main Central Thrust (MCT) crest sweeping across the entire terrain width + 2 parallel sub-ranges
-    float crestY1 = 0.24 + 0.16 * sin(h.x * 2.35 + seedPh) + 0.07 * sin(h.x * 5.1 - seedPh * 0.6) + warp.y * 0.24;
-    float dy1 = h.y - crestY1;
-    // Asymmetric thrust profile: sheer fluted south face (dy1 < 0), gentler snowfield north slope (dy1 > 0)
-    float slopeScale1 = dy1 < 0.0 ? 2.65 : 1.55;
-    float mainRange = exp(-abs(dy1) * slopeScale1) * (0.78 + 0.34 * ridgedFbm2D(hw * 2.1 + seedVec, 5, 0.50));
+    // 1. Asymmetric tectonic blocks of distinctly different heights, footprints & orientations:
+    // - Monarch massif (NW-N, 1.06x): elongated WNW-ESE, steep south face, broad north snowfield
+    vec2 dMon = q1 - vec2(-0.24, 0.28);
+    vec2 rMon = vec2(dMon.x * 0.88 - dMon.y * 0.47, dMon.x * 0.47 + dMon.y * 0.88);
+    float monAsymY = rMon.y < 0.0 ? rMon.y * 1.85 : rMon.y * 0.95;
+    float monarch = exp(-(rMon.x * rMon.x * 2.1 + monAsymY * monAsymY * 3.4)) * 0.92;
 
-    // Secondary parallel fore-range & high northwestern massif wall so mountains fill the full horizon
-    float crestY2 = -0.34 + 0.18 * cos(h.x * 2.05 - seedPh * 0.8) + warp.x * 0.22;
-    float dy2 = h.y - crestY2;
-    float subRange = exp(-abs(dy2) * (dy2 < 0.0 ? 2.9 : 1.85))
-                   * (0.52 + 0.28 * ridgedFbm2D(hw * 2.5 + seedVec + 11.3, 5, 0.52));
+    // - Eastern Kangchen-style shoulder ridge (NE-E, 0.78x)
+    vec2 dEast = q1 - vec2(0.46, 0.16);
+    vec2 rEast = vec2(dEast.x * 0.76 + dEast.y * 0.65, -dEast.x * 0.65 + dEast.y * 0.76);
+    float eastPeak = exp(-(rEast.x * rEast.x * 2.8 + rEast.y * rEast.y * 4.8)) * 0.74;
 
-    // Branching transverse spur ridges & high snow-covered saddles (cols) linking the ranges
-    float spurPhase1 = (h.x * 0.86 - h.y * 0.50) * 3.6 + 0.45 * sin(h.y * 2.8 + seedPh);
-    float spurRibs1 = pow(max(0.0, 1.0 - abs(fract(spurPhase1) - 0.5) * 2.0), 1.55);
-    float spurPhase2 = (h.x * 0.62 + h.y * 0.78) * 3.1 + 0.40 * cos(h.x * 2.6 - seedPh);
-    float spurRibs2 = pow(max(0.0, 1.0 - abs(fract(spurPhase2) - 0.5) * 2.0), 1.65);
-    float ridgeNetwork = (spurRibs1 * 0.34 + spurRibs2 * 0.24) * (0.55 + 0.45 * ridgedFbm2D(hw * 3.2 + seedVec, 5, rough));
+    // - Southwestern jagged spur massif (SW, 0.64x) + SE foothill buttress (0.48x)
+    vec2 dSW = q1 - vec2(-0.54, -0.26);
+    float swSpur = exp(-(dSW.x * dSW.x * 3.6 + dSW.y * dSW.y * 2.4)) * 0.62;
+    vec2 dSE = q1 - vec2(0.56, -0.38);
+    float seButtress = exp(-(dSE.x * dSE.x * 3.8 + dSE.y * dSE.y * 3.2)) * 0.48;
 
-    // Towering Himalayan fluted snow couloirs & jagged gneiss arête ribs on upper mountain walls
-    float rawMassif = max(mainRange, subRange * 0.92) + ridgeNetwork;
-    float upperWall = smoothstep(0.32, 0.82, rawMassif);
-    float flutedCouloirs = (ridgedFbm2D(hw * vec2(7.8, 2.6) + seedVec + vec2(19.4, 7.2), 4, 0.52) - 0.46) * 0.12 * upperWall;
-    float rockShoulders = (fbm2D(hw * 2.8 + seedVec + vec2(41.3, 17.9), 4, 0.52) - 0.45) * 0.18;
+    // High northern Tibetan/Himadri backdrop ramp so the horizon is a continuous mountain wall
+    float northBackdrop = smoothstep(-0.45, 0.85, q1.y + 0.12 * q1.x) * 0.42;
 
-    // Dendritic U-shaped trunk & tributary glacier troughs incised between the ranges
-    float trunkX = 0.08 + 0.24 * sin(h.y * 2.2 + seedPh * 0.5) + warp.x * 0.18;
-    float trunkValley = exp(-sq((h.x - trunkX) * 4.6)) * smoothstep(0.42, -0.88, h.y);
-    float interRangeTrough = exp(-sq((h.y - 0.5 * (crestY1 + crestY2)) * 5.2)) * 0.68;
-    float valleyCarve = clamp(max(trunkValley * 0.82, interRangeTrough * (1.0 - 0.35 * spurRibs1)), 0.0, 0.88);
+    // 2. Non-periodic multi-scale dendritic arêtes & watershed ridges (wavelength ~420m -> zero repetition!)
+    float macroRidges = ridgedFbm2D(q2 * 1.28 + seedVec, 5, 0.52);
+    float mesoSpurs   = ridgedFbm2D(q1 * 2.65 + seedVec + vec2(17.3, 31.9), 5, rough);
+    float rawMassif   = max(max(monarch, eastPeak), max(swSpur, max(seButtress, northBackdrop)));
+    float ridgeSculpt = rawMassif * (0.58 + 0.56 * macroRidges + 0.26 * mesoSpurs) + 0.18 * macroRidges * smoothstep(0.05, 0.45, rawMassif);
 
-    float regionalBase = 0.16 + 0.10 * (0.5 + 0.5 * h.y);
-    float valleyFloor = 0.09 + 0.03 * fbm2D(hw * 4.2 + seedVec, 3, 0.5);
-    baseElev = mix(regionalBase + rawMassif * 0.72 + rockShoulders + flutedCouloirs, valleyFloor, valleyCarve);
-    initCoarse = valleyCarve * (1.0 - trunkValley * 0.5) * 0.015 * relief; // Lateral moraine till!
+    // Asymmetric steep-headwall snow flutes & gendarme crags ONLY on high steep walls
+    float highWall = smoothstep(0.36, 0.84, ridgeSculpt);
+    float snowFlutes = (ridgedFbm2D(q1 * vec2(6.4, 3.1) + warp * 1.8 + seedVec, 4, 0.50) - 0.46) * 0.11 * highWall;
+
+    // 3. Winding U-shaped trunk glacier canyon + 1 western cirque tributary carving deep relief contrast
+    float gorgeSpine = 0.08 + 0.26 * sin(p.y * 1.85 + 0.4) + warp.x * 0.28;
+    float dGorge = abs(p.x - gorgeSpine);
+    float uTrough = smoothstep(0.26, 0.045, dGorge) * smoothstep(0.36, -0.85, p.y);
+    float cirqueBowl = exp(-length((q1 - vec2(0.05, 0.06)) * vec2(2.6, 2.9))) * 0.65;
+    float carve = clamp(max(uTrough * 0.84, cirqueBowl), 0.0, 0.86);
+
+    float valleyFloor = 0.085 + 0.030 * fbm2D(q1 * 3.8 + seedVec, 3, 0.5) + 0.04 * (0.5 + 0.5 * p.y);
+    baseElev = mix(0.11 + ridgeSculpt + snowFlutes, valleyFloor, carve);
+    initCoarse = carve * (1.0 - uTrough * 0.45) * 0.016 * relief;
   } else if (kind == 8) {
     // 8. Grand Canyon Gorge: sinuous entrenched Colorado inner gorge + 5 cliff-bench strata tiers + side amphitheaters
     float riverCenter = 0.24 * sin(p.y * 2.65 + seedPh) + 0.09 * sin(p.y * 5.4 - seedPh * 0.7) + warp.x * 0.22;
@@ -481,27 +504,174 @@ void main() {
       initWater = max(initWater, (1.0 - smoothstep(0.015, 0.035, dChannel)) * 1.65);
     }
   } else if (kind == 14) {
-    // 14. Sahara Desert Erg & Tassili-n'Ajjer Sandstone Outcrops:
-    // Wind-hollowed stratified Saharan sandstone plateaus & desert towers engulfed by migrating
-    // golden Saharan barchanoid & linear seif sand dunes!
+    // 14. Sahara Grand Erg (Erg Chebbi / Grand Erg Oriental):
+    // Pure, monumental Saharan multi-armed pyramidal Star Dunes (ghourds) + long sweeping linear
+    // seif sword-dunes rising cleanly from dark wind-deflated desert reg corridors (ZERO terraced blobs!).
     float wAng = 34.0 * 0.01745329;
     vec2 wDir = vec2(cos(wAng), sin(wAng));
     vec2 cDir = vec2(-wDir.y, wDir.x);
     float u = dot(p, wDir);
     float v = dot(p, cDir);
+    vec2 uvRot = vec2(u, v);
 
-    // Eroded Tassili sandstone mesas & towers separated by wide wind-scoured corridors
-    float tassiliField = ridgedFbm2D(wp * 2.3 + seedVec, 5, rough);
-    float mesaMask = smoothstep(0.60, 0.78, tassiliField) * (1.0 - smoothstep(0.72, 0.96, abs(v)));
-    float stepMesa = floor(mesaMask * 4.0) / 4.0 * 0.45 + mesaMask * 0.55;
-    float bedrockM = (0.045 + stepMesa * 0.58 + 0.025 * fbm2D(p * 2.5 + seedVec, 3, 0.5)) * relief;
+    float regSubtle = fbm2D(p * 1.7 + seedVec, 3, 0.45);
+    float bedrockM = 4.2 + 3.4 * regSubtle;
 
-    // Sweeping Saharan barchanoid & seif dune chains threading around the Tassili sandstone towers
-    float sd1 = evalAsymmetricDuneM(u, v, -0.44, 0.42, 0.48, seedPh + 0.9, relief, uWorldSpan);
-    float sd2 = evalAsymmetricDuneM(u, v,  0.14, 0.56, 0.58, seedPh + 2.8, relief, uWorldSpan);
-    float sd3 = evalStarArmDuneM(vec2(u, v), vec2(0.46, 0.06), 0.74, 0.80, 0.42, relief, uWorldSpan);
-    float sandM = max(max(sd1, sd2), sd3) * (1.0 - smoothstep(0.18, 0.52, mesaMask));
-    outTerrain = vec4(max(2.0, bedrockM), 0.0, sandM, 0.0);
+    // Hero 4-armed Saharan Star Dune (ghourd) + secondary 3-armed Star Dune
+    vec2 starA = vec2(-0.14, 0.10);
+    float sa1 = evalStarArmDuneM(uvRot, starA,  0.32, 0.88, 0.68, relief, uWorldSpan);
+    float sa2 = evalStarArmDuneM(uvRot, starA,  1.95, 0.78, 0.60, relief, uWorldSpan);
+    float sa3 = evalStarArmDuneM(uvRot, starA, -1.35, 0.82, 0.58, relief, uWorldSpan);
+    float sa4 = evalStarArmDuneM(uvRot, starA, -2.75, 0.66, 0.48, relief, uWorldSpan);
+    float starDuneA = max(max(sa1, sa2), max(sa3, sa4));
+
+    vec2 starB = vec2(0.42, -0.26);
+    float sb1 = evalStarArmDuneM(uvRot, starB,  0.55, 0.74, 0.54, relief, uWorldSpan);
+    float sb2 = evalStarArmDuneM(uvRot, starB,  2.35, 0.70, 0.48, relief, uWorldSpan);
+    float sb3 = evalStarArmDuneM(uvRot, starB, -1.55, 0.68, 0.46, relief, uWorldSpan);
+    float starDuneB = max(max(sb1, sb2), sb3);
+
+    // Sweeping linear seif & barchanoid dune chains linking the star dunes
+    float seif1 = evalAsymmetricDuneM(u, v, -0.52, 0.42, 0.46, seedPh + 0.8, relief, uWorldSpan);
+    float seif2 = evalAsymmetricDuneM(u, v,  0.36, 0.48, 0.52, seedPh + 2.7, relief, uWorldSpan);
+
+    float sandM = max(max(starDuneA, starDuneB), max(seif1, seif2));
+    outTerrain = vec4(bedrockM, 0.0, sandM, 0.0);
+    return;
+  } else if (kind == 15) {
+    // 15. Wadi Rum Rugged Desert & Crags (2nd Desert Type with Rugged Outcrops & Sand Dunes):
+    // Steep, deeply joint-fissured desert sandstone/granite crag massifs (jebels) rising abruptly
+    // from wide wind-swept terracotta sand corridors & climbing leeward sand dunes!
+    float wAng = 26.0 * 0.01745329;
+    vec2 wDir = vec2(cos(wAng), sin(wAng));
+    vec2 cDir = vec2(-wDir.y, wDir.x);
+    float u = dot(p, wDir);
+    float v = dot(p, cDir);
+
+    // 3 asymmetric rugged jebel massifs separated by wide open desert sand corridors
+    vec2 qw = p + warp * 0.34;
+    float dJ1 = length((qw - vec2(-0.46,  0.34)) * vec2(1.05, 1.45));
+    float dJ2 = length((qw - vec2( 0.44,  0.22)) * vec2(1.25, 0.95));
+    float dJ3 = length((qw - vec2(-0.12, -0.52)) * vec2(0.92, 1.55));
+    float jebelEnv = max(
+      smoothstep(0.46, 0.14, dJ1) * 0.96,
+      max(smoothstep(0.44, 0.13, dJ2) * 0.84, smoothstep(0.42, 0.12, dJ3) * 0.76)
+    );
+
+    // Conjugate vertical joint slot canyons (siqs) & craggy weathered pinnacles cutting the jebels
+    float jointSlots = ridgedFbm2D(wp * 4.4 + seedVec, 5, 0.56);
+    float cragSpires = ridgedFbm2D(wp * 2.6 + seedVec + 19.3, 6, rough);
+    float fissuredJebel = jebelEnv * (0.48 + 0.44 * cragSpires) * mix(0.42, 1.08, smoothstep(0.28, 0.72, jointSlots));
+
+    float desertPlain = 0.042 + 0.024 * fbm2D(p * 2.2 + seedVec, 3, 0.48);
+    baseElev = desertPlain + fissuredJebel * 0.78;
+    // Scree talus skirts hugging the base of the rugged desert cliffs
+    float cliffApron = smoothstep(0.04, 0.24, jebelEnv) * (1.0 - smoothstep(0.24, 0.56, jebelEnv));
+    initCoarse = cliffApron * 0.026 * relief;
+
+    // Sweeping desert dunes in the open corridor + wind-blown sand ramps banking against leeward cliffs!
+    float openSandMask = 1.0 - smoothstep(0.08, 0.36, jebelEnv);
+    float wd1 = evalAsymmetricDuneM(u, v, -0.18, 0.32, 0.44, seedPh + 1.1, relief, uWorldSpan);
+    float wd2 = evalAsymmetricDuneM(u, v,  0.38, 0.38, 0.48, seedPh + 3.4, relief, uWorldSpan);
+    float sandSheet = (1.2 + 2.4 * fbm2D(p * 1.9 + seedVec + 5.1, 3, 0.45)) * openSandMask;
+    initFine = max(wd1, wd2) * openSandMask + sandSheet;
+  } else if (kind == 16) {
+    // 16. Moon Mare & Impact Craters (Apollo 15 Hadley-Apennine / Tycho Lunar Terrain):
+    // Ancient anorthosite lunar highlands + flat basaltic Mare plain + multi-scale impact craters
+    // (raised ejecta rims, complex central rebound peak) + meandering sinuous Hadley Rille!
+    vec2 qm = p + warp * 0.22;
+    // Montes Apenninus lunar highland massif rising in the NE quadrant
+    float highlandMask = smoothstep(-0.10, 0.62, qm.x * 0.62 + qm.y * 0.78);
+    float highlandMassif = highlandMask * (0.34 + 0.48 * ridgedFbm2D(wp * 2.1 + seedVec, 6, rough));
+    float marePlain = 0.16 + 0.028 * fbm2D(p * 2.4 + seedVec, 4, 0.48);
+
+    // Multi-scale analytical impact craters (1 complex crater with central peak + 6 crisp bowl craters)
+    float craters = 0.0;
+    craters += evalLunarCraterElev(p, vec2(-0.24, -0.14), 0.31, 0.145, true);
+    craters += evalLunarCraterElev(p, vec2( 0.34, -0.34), 0.18, 0.095, false);
+    craters += evalLunarCraterElev(p, vec2(-0.56,  0.38), 0.16, 0.085, false);
+    craters += evalLunarCraterElev(p, vec2( 0.06,  0.44), 0.13, 0.072, false);
+    craters += evalLunarCraterElev(p, vec2(-0.04, -0.58), 0.11, 0.062, false);
+    craters += evalLunarCraterElev(p, vec2( 0.56,  0.10), 0.12, 0.068, false);
+    craters += evalLunarCraterElev(p, vec2(-0.34,  0.08), 0.075, 0.044, false);
+
+    // Secondary micro-crater regolith gardening across mare & highlands
+    vec2 mc = p * 5.5 + seedVec;
+    vec2 mcCell = floor(mc);
+    vec2 mcFrac = fract(mc) - 0.5;
+    vec3 mcRnd = hash32(mcCell);
+    float microD = length(mcFrac - (mcRnd.xy - 0.5) * 0.45) / (0.18 + 0.16 * mcRnd.z);
+    float microCrater = mcRnd.z > 0.42
+      ? (microD < 1.0 ? -0.016 * (1.0 - microD * microD) : 0.004 * exp(-(microD - 1.0) * 3.5))
+      : 0.0;
+
+    // Sinuous volcanic Hadley Rille collapse canyon winding across the lunar mare!
+    float rilleCenter = -0.32 + 0.18 * sin(p.y * 3.4 + seedPh) + 0.06 * cos(p.y * 7.1);
+    float dRille = abs(p.x - rilleCenter);
+    float rilleCut = (1.0 - smoothstep(0.014, 0.048, dRille)) * (1.0 - highlandMask) * 0.085;
+
+    baseElev = clamp(marePlain + highlandMassif + craters + microCrater - rilleCut, 0.025, 1.15);
+    initCoarse = (0.008 + 0.014 * highlandMask) * relief;
+    initFine = 0.012 * (1.0 - highlandMask) * relief;
+  } else if (kind == 17) {
+    // 17. Icelandic Green Highlands & Basalt Cliffs (Thorsmork / Skaftafell):
+    // Steep emerald-moss-draped volcanic ridges, sheer dark basalt cliff amphitheaters, incised
+    // hanging waterfall gorges, and a lush green highland valley with braided meltwater streams!
+    vec2 qi = p + warp * 0.36;
+    float valleyX = 0.18 * sin(p.y * 2.4 + seedPh) + warp.x * 0.18;
+    float dVal = abs(p.x - valleyX);
+
+    // Broad lush highland valley floor + sheer glaciated volcanic valley walls & knife-edge spurs
+    float sideGorge1 = exp(-sq((p.y - 0.18 - 0.35 * dVal) * 7.5)) * smoothstep(0.06, 0.55, dVal);
+    float sideGorge2 = exp(-sq((p.y + 0.34 + 0.30 * dVal) * 8.0)) * smoothstep(0.06, 0.55, dVal);
+    float wallRise = smoothstep(0.09, 0.38 + 0.18 * (sideGorge1 + sideGorge2), dVal);
+
+    float knifeRidges = ridgedFbm2D(qi * 2.75 + seedVec, 6, rough);
+    float basaltBenches = floor(clamp(wallRise * 3.6 + fbm2D(qi * 3.2 + seedVec, 3, 0.5) * 0.55, 0.0, 3.0)) / 3.0;
+    float mountainWall = wallRise * (0.42 + 0.54 * knifeRidges) * 0.78 + basaltBenches * wallRise * 0.16;
+
+    float valleyGrad = 0.048 + 0.032 * (0.5 + 0.5 * p.y) + 0.016 * fbm2D(p * 4.5 + seedVec, 3, 0.5);
+    baseElev = valleyGrad + mountainWall;
+
+    // Braided glacial-meltwater river threads weaving down the lush green Thorsmork valley floor!
+    float braid1 = abs(p.x - valleyX - 0.032 * sin(p.y * 9.5 + seedPh));
+    float braid2 = abs(p.x - valleyX + 0.028 * cos(p.y * 11.2 - seedPh));
+    float inRiver = 1.0 - smoothstep(0.008, 0.026, min(braid1, braid2));
+    if (dVal < 0.09 && inRiver > 0.05) {
+      initWater = inRiver * 1.45;
+    }
+  } else if (kind == 18) {
+    // 18. Desert Dunes & Lush Artesian Oasis (Ubari / Huacachina Sahara Oasis):
+    // Sweeping golden-apricot 34-deg slipface Saharan sand dunes encircling a wind-deflated
+    // artesian oasis depression with a crystal-emerald 2.5D hydrostatic lake & rocky rim!
+    float wAng = 30.0 * 0.01745329;
+    vec2 wDir = vec2(cos(wAng), sin(wAng));
+    vec2 cDir = vec2(-wDir.y, wDir.x);
+    float u = dot(p, wDir);
+    float v = dot(p, cDir);
+
+    // Crescent-shaped central oasis basin + weathered sandstone rocky rim on the NW flank
+    vec2 oasisP = p - vec2(-0.04, -0.03);
+    float crescentBend = oasisP.y + 0.22 * sq(oasisP.x * 1.8);
+    float dOasis = length(vec2(oasisP.x * 1.15, crescentBend * 1.55)) + 0.045 * (fbm2D(p * 4.2 + seedVec, 3, 0.5) - 0.5);
+
+    float basinDip = 1.0 - smoothstep(0.06, 0.34, dOasis);
+    float nwRockyRim = smoothstep(0.28, 0.58, dOasis) * smoothstep(0.05, 0.55, -p.x * 0.6 + p.y * 0.8)
+                     * (0.14 + 0.18 * ridgedFbm2D(wp * 3.4 + seedVec, 5, rough));
+    float bedrockM = mix(11.5 + 3.2 * fbm2D(p * 2.0 + seedVec, 3, 0.45), 4.2, basinDip) + nwRockyRim * relief;
+
+    // 4 sweeping golden Saharan dunes curving around (never burying!) the central oasis lagoon
+    float duneMask = smoothstep(0.27, 0.46, dOasis);
+    float od1 = evalAsymmetricDuneM(u, v, -0.54, 0.52, 0.50, seedPh + 0.5, relief, uWorldSpan);
+    float od2 = evalAsymmetricDuneM(u, v,  0.04, 0.58, 0.54, seedPh + 2.2, relief, uWorldSpan);
+    float od3 = evalAsymmetricDuneM(u, v,  0.56, 0.48, 0.50, seedPh + 4.0, relief, uWorldSpan);
+    float odArm = evalStarArmDuneM(vec2(u, v), vec2(0.02, -0.44), 0.65, 0.78, 0.44, relief, uWorldSpan);
+    float sandM = max(max(od1, od2), max(od3, odArm)) * duneMask;
+
+    // Fill the oasis depression up to hydrostatic water surface elevation 9.8m!
+    float groundM = bedrockM + sandM;
+    float oasisWater = dOasis < 0.32 ? max(0.0, 9.8 - groundM) : 0.0;
+    outTerrain = vec4(bedrockM, 0.0, sandM, oasisWater);
     return;
   } else {
     // 0. Tectonic Mountain Divide
@@ -1394,6 +1564,14 @@ void main() {
     float upstreamBand = smoothstep(0.32, 0.47, -vUv.y + 0.5) * (1.0 - smoothstep(0.47, 0.50, abs(vUv.y - 0.5)));
     float channelLow = 1.0 - smoothstep(0.06, 0.24, elevN);
     water += upstreamBand * channelLow * uHydrology.y * 0.16 * dt;
+  } else if (uHydrology.y < -0.01) {
+    // Artesian desert oasis groundwater spring: maintains crystal oasis lake at water-table 9.8m!
+    vec2 oasisD = (vUv * 2.0 - 1.0) - vec2(-0.04, -0.03);
+    float dO = length(vec2(oasisD.x * 1.15, (oasisD.y + 0.22 * sq(oasisD.x * 1.8)) * 1.55));
+    float hSurfNow = bedrock + coarse + fine + water;
+    if (dO < 0.28 && hSurfNow < 9.85) {
+      water += min(9.85 - hSurfNow, (-uHydrology.y) * 0.18 * dt);
+    }
   }
 
   // ==========================================================================
@@ -1943,6 +2121,35 @@ void main() {
     basinFloorCol  = vec3(0.335, 0.315, 0.292); // Pale clay pan in lowest interdune hollows!
     coarseGravelCol = vec3(0.245, 0.178, 0.132);
     fineAlluvialCol = vec3(0.575, 0.295, 0.138); // Iconic Namib Sossusvlei burnt-apricot quartz sand!
+  } else if (uMaterialTheme == 7) {
+    // LUNAR MARE & ANORTHOSITE HIGHLANDS: dark ilmenite mare basalt, impact breccia & bright regolith
+    softRockCol    = vec3(0.088, 0.090, 0.096); // Mare basalt regolith
+    midRockCol     = vec3(0.168, 0.170, 0.178); // Fra Mauro impact breccia
+    hardRockCol    = vec3(0.315, 0.318, 0.326); // Bright anorthosite highland & crater rim ejecta
+    summitCol      = vec3(0.365, 0.368, 0.378); // Highland massif crests
+    basinFloorCol  = vec3(0.070, 0.072, 0.078); // Dark flooded lunar mare floor
+    coarseGravelCol = vec3(0.225, 0.228, 0.236); // Bright crater-rim ejecta blocks
+    fineAlluvialCol = vec3(0.112, 0.115, 0.122); // Fine lunar mare regolith dust
+  } else if (uMaterialTheme == 8) {
+    // ICELANDIC GREEN HIGHLANDS (THORSMORK): dark basalt cliffs, palagonite tuff & lush emerald moss!
+    softRockCol    = vec3(0.048, 0.050, 0.056); // Wet charcoal volcanic basalt cliff
+    midRockCol     = vec3(0.118, 0.098, 0.078); // Hyaloclastite palagonite tuff
+    hardRockCol    = vec3(0.175, 0.148, 0.122); // Columnar flood-basalt sill
+    summitCol      = vec3(0.220, 0.215, 0.210);
+    basinFloorCol  = vec3(0.042, 0.044, 0.046); // Braided black volcanic sandur
+    coarseGravelCol = vec3(0.082, 0.084, 0.088);
+    fineAlluvialCol = vec3(0.058, 0.056, 0.056);
+    mossCol         = vec3(0.115, 0.245, 0.048); // Vivid Thorsmork emerald moss & birch carpet!
+  } else if (uMaterialTheme == 9) {
+    // SAHARAN GOLDEN ERG & ARTESIAN OASIS: luminous golden sand, ochre rim & verdant oasis fringe!
+    softRockCol    = vec3(0.175, 0.132, 0.098);
+    midRockCol     = vec3(0.335, 0.232, 0.148); // Weathered oasis sandstone ledge
+    hardRockCol    = vec3(0.445, 0.355, 0.245); // Pale limestone/evaporite shoreline crust
+    summitCol      = vec3(0.285, 0.215, 0.155);
+    basinFloorCol  = vec3(0.395, 0.355, 0.285); // Wet oasis beach sand
+    coarseGravelCol = vec3(0.275, 0.210, 0.152);
+    fineAlluvialCol = vec3(0.595, 0.385, 0.178); // Warm golden Ubari Saharan dune sand!
+    mossCol         = vec3(0.072, 0.215, 0.055); // Lush date-palm & reed oasis greenery!
   } else {
     // UTAH DESERT: Moenkopi shale, Wingate sandstone, Navajo caprock, ochre alluvial fans
     softRockCol    = vec3(0.115, 0.068, 0.062);
@@ -1970,6 +2177,15 @@ void main() {
       * smoothstep(0.05, 0.42, fbm2D(vWorldPos.xz * 0.030 + 11.7, 3, 0.55));
     mossCol *= (0.85 + 0.30 * patchN + 0.20 * grain);
     rockAlbedo = mix(rockAlbedo, mossCol, mossFlora * 0.80);
+  } else if (uMaterialTheme == 8) {
+    // Thorsmork Green Highlands: lush emerald moss & arctic birch blanket valleys, benches & steep ridge shoulders!
+    float floraNoise = fbm2D(vWorldPos.xz * 0.028 + 7.3, 4, 0.55);
+    float mossFlora = smoothstep(0.26, 0.76, bedNormal.y)
+      * (1.0 - smoothstep(0.52, 0.86, elevFrac))
+      * smoothstep(0.02, 0.34, floraNoise + 0.14);
+    vec3 lushGreen = mix(vec3(0.068, 0.165, 0.038), mossCol * vec3(1.18, 1.12, 0.95), clamp(floraNoise * 1.3, 0.0, 1.0));
+    lushGreen *= (0.88 + 0.26 * grain);
+    rockAlbedo = mix(rockAlbedo, lushGreen, mossFlora * 0.90);
   }
 
   // ==========================================================================
@@ -2047,7 +2263,7 @@ void main() {
   // JOURNEY / NAMIB SAND DUNE SURFACE SHADER (Asymmetric Windward Ripples + Silky Slipfaces!)
   // ==========================================================================
   float sandRippleMask = 0.0;
-  float sandCover = (!isSideSkirt && (uMaterialTheme == 6 || uMaterialTheme == 5))
+  float sandCover = (!isSideSkirt && (uMaterialTheme == 6 || uMaterialTheme == 5 || uMaterialTheme == 9))
     ? smoothstep(0.04, 0.45, tC.b) * (1.0 - snowCover)
     : 0.0;
   if (sandCover > 0.01) {
@@ -2085,6 +2301,20 @@ void main() {
 
   float wetness = isSideSkirt ? 0.0 : smoothstep(0.001, 0.025, tC.a);
   surfaceAlbedo *= mix(1.0, 0.68, wetness * 0.55 * (1.0 - snowCover));
+
+  // Verdant Oasis Date-Palm & Reed Vegetation Belt hugging the moist groundwater shoreline!
+  if (!isSideSkirt && uMaterialTheme == 9) {
+    vec2 oasisUv = (vUv * 2.0 - 1.0) - vec2(-0.04, -0.03);
+    float dO = length(vec2(oasisUv.x * 1.15, (oasisUv.y + 0.22 * sq(oasisUv.x * 1.8)) * 1.55));
+    float canopyPatch = fbm2D(vWorldPos.xz * 0.14 + 3.7, 3, 0.55);
+    float shoreBand = smoothstep(9.75, 10.15, hC) * (1.0 - smoothstep(11.6, 13.8, hC))
+                    * (1.0 - smoothstep(0.24, 0.42, dO))
+                    * (1.0 - smoothstep(0.005, 0.05, tC.a))
+                    * smoothstep(0.45, 0.85, bedNormal.y);
+    float palmMask = clamp(shoreBand * smoothstep(0.22, 0.62, canopyPatch + 0.16), 0.0, 1.0);
+    vec3 oasisFoliage = mix(vec3(0.045, 0.145, 0.038), mossCol * vec3(1.22, 1.15, 0.95), canopyPatch);
+    surfaceAlbedo = mix(surfaceAlbedo, oasisFoliage, palmMask * 0.92);
+  }
 
   if (uViewMode == 1) {
     float initB = sampleGridBilinear(uInitialTex, vUv, res).r;
@@ -2128,16 +2358,23 @@ void main() {
 
   // Warm Oren-Nayar backscatter + golden backlit rim-sheen on desert sand dunes!
   float diffuseTerm = sandCover > 0.02 ? mix(ndotl, pow(max(0.0, ndotl), 0.86) * 1.06, sandCover) : ndotl;
-  vec3 sunColor = uMaterialTheme == 6 ? vec3(2.48, 2.16, 1.82) : vec3(2.35, 2.20, 1.98);
+  vec3 sunColor = uMaterialTheme == 7
+    ? vec3(2.65, 2.62, 2.58) // Unfiltered solar spectrum in lunar vacuum!
+    : ((uMaterialTheme == 6 || uMaterialTheme == 9) ? vec3(2.48, 2.16, 1.82) : vec3(2.35, 2.20, 1.98));
   vec3 sunRadiance = sunColor * diffuseTerm * shadow;
   float skyHemi = 0.5 + 0.5 * bedNormal.y;
-  vec3 groundBounce = (uMaterialTheme == 1 || uMaterialTheme == 4)
-    ? vec3(0.085, 0.090, 0.105)
+  vec3 groundBounce = (uMaterialTheme == 1 || uMaterialTheme == 4 || uMaterialTheme == 8)
+    ? vec3(0.085, 0.095, 0.100)
     : (uMaterialTheme == 2 ? vec3(0.130, 0.150, 0.185)
-    : (uMaterialTheme == 6 ? vec3(0.145, 0.095, 0.108) : vec3(0.18, 0.15, 0.13)));
-  vec3 skyTopAmb = uMaterialTheme == 6 ? vec3(0.28, 0.33, 0.48) : vec3(0.36, 0.44, 0.56);
+    : ((uMaterialTheme == 6 || uMaterialTheme == 9) ? vec3(0.145, 0.095, 0.108) : vec3(0.18, 0.15, 0.13)));
+  vec3 skyTopAmb = (uMaterialTheme == 6 || uMaterialTheme == 9) ? vec3(0.28, 0.33, 0.48) : vec3(0.36, 0.44, 0.56);
   vec3 ambient = mix(groundBounce, skyTopAmb, skyHemi) * (sandCover > 0.02 ? mix(ao, 1.0, sandCover * 0.55) : ao);
-  ambient = mix(ambient, vec3(0.42, 0.52, 0.68) * ao, max(snowCover * 0.72, iceCover * 0.55));
+  if (uMaterialTheme == 7) {
+    // Airless Moon: crisp high-contrast vacuum shadows with subtle regolith bounce & Earthshine!
+    ambient = mix(vec3(0.024, 0.025, 0.030), vec3(0.048, 0.055, 0.072), skyHemi) * ao;
+  } else {
+    ambient = mix(ambient, vec3(0.42, 0.52, 0.68) * ao, max(snowCover * 0.72, iceCover * 0.55));
+  }
 
   vec3 litColor = surfaceAlbedo * (sunRadiance + ambient);
 
@@ -2174,10 +2411,12 @@ void main() {
     vec3 waterN = safeNorm3(vec3(wH_L - wH_R + ripX * 0.08, 2.0 * cellSize, wH_D - wH_U + ripZ * 0.08), vec3(0.0, 1.0, 0.0));
 
     float turbidity = clamp(flowD.z * 0.35 + fineMask * 0.45, 0.0, 1.0);
-    // Deep 2.5D hydrostatic lakes & Studlagil glacial-flour turquoise rivers!
+    // Deep 2.5D hydrostatic lakes, Oasis emerald lagoons & Studlagil glacial-flour turquoise rivers!
     vec3 clearWaterCol = uMaterialTheme == 4
       ? vec3(0.05, 0.36, 0.40) // Studlagil milky glacial-flour turquoise!
-      : mix(vec3(0.04, 0.24, 0.32), vec3(0.02, 0.14, 0.26), smoothstep(0.35, 3.0, wDepth));
+      : (uMaterialTheme == 9
+          ? mix(vec3(0.04, 0.38, 0.34), vec3(0.015, 0.18, 0.24), smoothstep(0.25, 2.8, wDepth)) // Crystal-emerald desert oasis!
+          : mix(vec3(0.04, 0.24, 0.32), vec3(0.02, 0.14, 0.26), smoothstep(0.35, 3.0, wDepth)));
     vec3 waterTint = mix(clearWaterCol, vec3(0.24, 0.22, 0.15), turbidity * 0.55 * (1.0 - smoothstep(0.4, 2.0, wDepth)));
 
     float absorb = 1.0 - exp(-wDepth * 2.6);
@@ -2204,8 +2443,10 @@ void main() {
   }
 
   float camDist = length(uCameraPos - vWorldPos);
-  float fog = 1.0 - exp(-max(0.0, camDist - span * 0.55) * 0.0009);
-  litColor = mix(litColor, vec3(0.045, 0.055, 0.070), clamp(fog, 0.0, 0.45));
+  if (uMaterialTheme != 7) {
+    float fog = 1.0 - exp(-max(0.0, camDist - span * 0.55) * 0.0009);
+    litColor = mix(litColor, vec3(0.045, 0.055, 0.070), clamp(fog, 0.0, 0.45));
+  }
 
   vec3 x = max(vec3(0.0), litColor);
   vec3 mapped = (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14);
@@ -2359,7 +2600,19 @@ ${GLSL_PRECISION_HEADER}
 in vec2 vUv;
 layout(location = 0) out vec4 outColor;
 
+uniform int uMaterialTheme;
+
 void main() {
+  if (uMaterialTheme == 7) {
+    // Airless Lunar vacuum sky: deep space black with subtle pinpoint starfield!
+    vec2 starCell = floor(vUv * vec2(320.0, 180.0));
+    vec2 starF = fract(vUv * vec2(320.0, 180.0)) - 0.5;
+    float h = fract(sin(dot(starCell, vec2(127.1, 311.7))) * 43758.5453);
+    float star = h > 0.991 ? exp(-dot(starF, starF) * 28.0) * (0.35 + 0.65 * fract(h * 97.3)) : 0.0;
+    vec3 spaceCol = vec3(0.007, 0.009, 0.014) + vec3(0.88, 0.92, 1.0) * star;
+    outColor = vec4(spaceCol, 1.0);
+    return;
+  }
   vec3 topCol = vec3(0.065, 0.082, 0.108);
   vec3 horCol = vec3(0.125, 0.145, 0.175);
   vec3 c = mix(horCol, topCol, pow(max(1e-5, clamp(vUv.y, 0.0, 1.0)), 0.75));
@@ -2442,18 +2695,23 @@ void main() {
   vec3 softCol;
   vec3 hardCol;
   vec3 mossCol = vec3(0.11, 0.16, 0.055);
-  if (uMaterialTheme == 1 || uMaterialTheme == 4) {
-    softCol = vec3(0.062, 0.064, 0.070);
-    hardCol = uMaterialTheme == 4 ? vec3(0.185, 0.125, 0.090) : vec3(0.175, 0.118, 0.086);
+  if (uMaterialTheme == 1 || uMaterialTheme == 4 || uMaterialTheme == 8) {
+    softCol = vec3(0.058, 0.060, 0.066);
+    hardCol = uMaterialTheme == 4 ? vec3(0.185, 0.125, 0.090) : vec3(0.165, 0.122, 0.092);
+    if (uMaterialTheme == 8) mossCol = vec3(0.115, 0.245, 0.048);
   } else if (uMaterialTheme == 2) {
     softCol = vec3(0.125, 0.120, 0.126);
     hardCol = vec3(0.310, 0.286, 0.274);
   } else if (uMaterialTheme == 3) {
     softCol = vec3(0.285, 0.115, 0.078);
     hardCol = vec3(0.455, 0.365, 0.258);
-  } else if (uMaterialTheme == 5 || uMaterialTheme == 6) {
+  } else if (uMaterialTheme == 5 || uMaterialTheme == 6 || uMaterialTheme == 9) {
     softCol = vec3(0.185, 0.120, 0.088);
     hardCol = vec3(0.410, 0.285, 0.178);
+  } else if (uMaterialTheme == 7) {
+    // Lunar ejecta & anorthosite breccia boulders!
+    softCol = vec3(0.125, 0.128, 0.136);
+    hardCol = vec3(0.310, 0.314, 0.324);
   } else {
     softCol = vec3(0.165, 0.095, 0.075);
     hardCol = vec3(0.375, 0.285, 0.198);
@@ -2477,9 +2735,9 @@ void main() {
   }
 
   // Icelandic moss on upward-facing settled boulders & damp outcrops
-  if ((uMaterialTheme == 1 || uMaterialTheme == 4) && N.y > 0.52) {
+  if ((uMaterialTheme == 1 || uMaterialTheme == 4 || uMaterialTheme == 8) && N.y > 0.45) {
     float elevFrac = clamp(vWorldPos.y / max(uStrataOrient.w, 1.0), 0.0, 1.2);
-    float moss = smoothstep(0.52, 0.88, N.y) * (1.0 - smoothstep(0.38, 0.70, elevFrac)) * 0.55;
+    float moss = smoothstep(0.45, 0.85, N.y) * (1.0 - smoothstep(0.44, 0.78, elevFrac)) * (uMaterialTheme == 8 ? 0.78 : 0.55);
     albedo = mix(albedo, mossCol, moss);
   }
 
@@ -2527,13 +2785,17 @@ void main() {
   vec3 H = safeNorm3(L + V, vec3(0.0, 1.0, 0.0));
   float spec = pow(max(1e-5, dot(N, H)), 28.0) * 0.08 * rockShadow * ndotl;
 
-  vec3 sunRad = vec3(2.35, 2.20, 1.98) * ndotl * rockShadow;
-  vec3 amb = mix(vec3(0.14, 0.13, 0.13), vec3(0.36, 0.44, 0.56), 0.5 + 0.5 * N.y) * ao;
+  vec3 sunRad = (uMaterialTheme == 7 ? vec3(2.65, 2.62, 2.58) : vec3(2.35, 2.20, 1.98)) * ndotl * rockShadow;
+  vec3 amb = uMaterialTheme == 7
+    ? mix(vec3(0.025, 0.026, 0.032), vec3(0.050, 0.056, 0.072), 0.5 + 0.5 * N.y) * ao
+    : mix(vec3(0.14, 0.13, 0.13), vec3(0.36, 0.44, 0.56), 0.5 + 0.5 * N.y) * ao;
   vec3 lit = albedo * (sunRad + amb) + vec3(spec);
 
   float camDist = length(uCameraPos - vWorldPos);
-  float fog = 1.0 - exp(-max(0.0, camDist - span * 0.55) * 0.0009);
-  lit = mix(lit, vec3(0.045, 0.055, 0.070), clamp(fog, 0.0, 0.45));
+  if (uMaterialTheme != 7) {
+    float fog = 1.0 - exp(-max(0.0, camDist - span * 0.55) * 0.0009);
+    lit = mix(lit, vec3(0.045, 0.055, 0.070), clamp(fog, 0.0, 0.45));
+  }
 
   vec3 x = max(vec3(0.0), lit);
   vec3 mapped = (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14);

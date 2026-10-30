@@ -646,7 +646,7 @@ export class GpuErosionEngine {
 
   _themeCode() {
     const theme = Number(this.params.materialTheme);
-    return Number.isFinite(theme) ? Math.max(0, Math.min(6, Math.round(theme))) : 0;
+    return Number.isFinite(theme) ? Math.max(0, Math.min(9, Math.round(theme))) : 0;
   }
 
   _fabricCode() {
@@ -683,11 +683,11 @@ export class GpuErosionEngine {
       rain = (p.dryAeolianMode || 0) > 0.35 ? 0.0 : 0.05;
       snow = 0.05 * snowPossible;
       wind = 1.05 + 0.45 * clamp01(p.windSpeed);
-      rock = (p.dryAeolianMode || 0) > 0.85 ? 0.0 : (0.05 + 0.16 * clamp01(p.rockfallRate));
+      rock = (p.rockfallRate || 0) > 0.28 ? (0.06 + 0.20 * clamp01(p.rockfallRate)) : 0.0;
     } else if (p.emitterMode === 'rockfall-avalanche') {
-      rain = 0.05;
+      rain = (p.dryAeolianMode || 0) > 0.5 ? 0.0 : 0.05;
       snow = 0.03 * snowPossible;
-      wind = 0.10;
+      wind = p.windSpeed > 0.02 ? 0.10 : 0.0;
       rock = 1.00 + 0.65 * clamp01(p.rockfallRate);
     } else if (p.emitterMode === 'storm-cell') {
       rain = 0.90;
@@ -719,19 +719,25 @@ export class GpuErosionEngine {
   }
 
   applyLandscapePreset(landscapeId) {
+    const prevWasLunar = this.params.landscape === 'lunar-mare-craters';
     const preset = EROSION_LANDSCAPES[landscapeId] || EROSION_LANDSCAPES['layered-plateau'];
     const keep = {
       seed: this.params.seed,
       particleCount: this.params.particleCount,
       substepsPerFrame: this.params.substepsPerFrame,
       showParticles: this.params.showParticles,
-      showWater: this.params.showWater,
+      showWater: prevWasLunar ? true : this.params.showWater,
       showOutcrops: this.params.showOutcrops,
       viewMode: this.params.viewMode,
       brushMode: this.params.brushMode,
       brushRadius: this.params.brushRadius,
     };
     Object.assign(this.params, DEFAULT_EROSION_PARAMS, preset.defaults, keep);
+    this.params.materialTheme = preset.defaults.materialTheme ?? preset.materialTheme ?? 0;
+    this.params.fabricMode = preset.defaults.fabricMode ?? preset.fabricMode ?? 0;
+    if (preset.defaults.showWater !== undefined) {
+      this.params.showWater = preset.defaults.showWater;
+    }
     this.params.landscape = preset.id;
     this.resetSimulation();
   }
@@ -985,7 +991,7 @@ export class GpuErosionEngine {
       gl.uniform4f(
         gl.getUniformLocation(this.progTerrainIntegrate, 'uHydrology'),
         p.iceMeltRate ?? 0.22,
-        p.headwaterFlow ?? 0.0,
+        p.oasisSpring ? -Math.max(0.05, p.headwaterFlow ?? 0.65) : (p.headwaterFlow ?? 0.0),
         p.lakeRetention ?? 0.40,
         p.dryAeolianMode ?? 0.0
       );
@@ -1162,6 +1168,7 @@ export class GpuErosionEngine {
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
     gl.useProgram(this.progSkyBg);
+    gl.uniform1i(gl.getUniformLocation(this.progSkyBg, 'uMaterialTheme'), this._themeCode());
     gl.bindVertexArray(this.emptyVao);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
@@ -1339,9 +1346,9 @@ export class GpuErosionEngine {
 
       if (this.playing) {
         this.stepSimulation(this.params.substepsPerFrame);
-        this.rockCalving.stepPhysics(0.032);
+        this.rockCalving.stepPhysics(frameDt);
       } else {
-        this.rockCalving.stepPhysics(0.025);
+        this.rockCalving.stepPhysics(frameDt);
         if (this.brushDown && this.params.brushMode !== 'orbit') {
           this.stepSimulation(1);
         }
