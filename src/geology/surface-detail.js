@@ -260,6 +260,12 @@ export function createGeologicalSdfEvaluator(macro, params, rng) {
     let bestBlock = dTalus < dBedrock ? bestTalusBlock : bestBedrockBlock;
     let bestSecPlane = bestBedrockSecondPlane;
 
+    if (crackNet && crackNet.evalMacroCracks && dBedrock < S * 0.06) {
+      const crackedBed = crackNet.evalMacroCracks(wx, wy, wz, dBedrock);
+      dMacro = dTalus < 1e8 ? smin(crackedBed, dTalus, talusBlendR) : crackedBed;
+      dBedrock = crackedBed;
+    }
+
     if (dBoulder < dMacro) {
       dMacro = dBoulder;
       bestBlock = bestBoulderBlock;
@@ -499,6 +505,9 @@ export function createGeologicalSdfEvaluator(macro, params, rng) {
     }
 
     let dFinal = dMacro + disp;
+    if (crackNet && crackNet.evalFineCracks) {
+      dFinal += crackNet.evalFineCracks(wx, wy, wz);
+    }
 
     if (groundY !== null && groundY !== undefined) {
       const dGround = groundY - wy;

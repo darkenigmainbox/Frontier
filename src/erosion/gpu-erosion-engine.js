@@ -12,6 +12,8 @@ import {
   PARTICLE_SCATTER_FRAG,
   PARTICLE_SCATTER_VERT,
   PARTICLE_STEP_FRAG,
+  ROCK_INSTANCE_FRAG,
+  ROCK_INSTANCE_VERT,
   SKY_BG_FRAG,
   SNOW_CRYO_FRAG,
   TERRAIN_INTEGRATE_FRAG,
@@ -20,6 +22,7 @@ import {
   THERMAL_TALUS_FRAG,
   WATER_FLUX_FRAG,
 } from './erosion-shaders.js';
+import { RockCalvingSystem } from './rock-calving.js';
 
 const PART_TEX_W = 256;
 const PART_TEX_H = 128; // 256 * 128 = 32,768 GPU particle slots
@@ -34,14 +37,10 @@ precision highp sampler2D;
 in vec2 vUv;
 layout(location = 0) out vec4 outStats;
 uniform sampler2D uTerrainTex;
-uniform sampler2D uInitialTex;
 uniform float uGridRes;
 void main() {
   ivec2 tc = clamp(ivec2(vUv * uGridRes), ivec2(0), ivec2(int(uGridRes) - 1));
-  vec4 cur = texelFetch(uTerrainTex, tc, 0);
-  vec4 ini = texelFetch(uInitialTex, tc, 0);
-  float eroded = max(0.0, ini.r - cur.r);
-  outStats = vec4(eroded, cur.g, cur.b, cur.a);
+  outStats = texelFetch(uTerrainTex, tc, 0);
 }
 `;
 
@@ -145,6 +144,8 @@ export class GpuErosionEngine {
       erodedVolumeM3: 0,
       coarseSedM3: 0,
       fineSedM3: 0,
+      waterVolumeM3: 0,
+      boulders: 0,
       fps: 60,
     };
 
@@ -162,9 +163,12 @@ export class GpuErosionEngine {
     this.pointerWorldXZ = [0, 0];
     this.brushDown = false;
 
+    this.rockCalving = new RockCalvingSystem();
+
     this._initPrograms();
     this._initBuffersAndTextures();
     this._initMeshVao();
+    this._initRockInstanceVao();
     this._bindEvents();
 
     this.resetSimulation();
@@ -181,6 +185,7 @@ export class GpuErosionEngine {
     this.progSnowCryo = createProgram(gl, FULLSCREEN_VERT, SNOW_CRYO_FRAG, 'SnowCryo');
     this.progThermalTalus = createProgram(gl, FULLSCREEN_VERT, THERMAL_TALUS_FRAG, 'ThermalTalus');
     this.progTerrainRender = createProgram(gl, TERRAIN_RENDER_VERT, TERRAIN_RENDER_FRAG, 'TerrainRender');
+    this.progRockInstance = createProgram(gl, ROCK_INSTANCE_VERT, ROCK_INSTANCE_FRAG, 'RockInstance');
     this.progParticleRender = createProgram(gl, PARTICLE_RENDER_VERT, PARTICLE_RENDER_FRAG, 'ParticleRender');
     this.progSkyBg = createProgram(gl, FULLSCREEN_VERT, SKY_BG_FRAG, 'SkyBg');
     this.progTelemetry = createProgram(gl, FULLSCREEN_VERT, TELEMETRY_FRAG, 'Telemetry');
@@ -275,6 +280,7 @@ export class GpuErosionEngine {
     this.telemetryTex = createDataTexture(gl, TELEMETRY_RES, TELEMETRY_RES, gl.RGBA32F, gl.RGBA, gl.FLOAT);
     this.fboTelemetry = createFbo(gl, [this.telemetryTex]);
     this.telemetryBuf = new Float32Array(TELEMETRY_RES * TELEMETRY_RES * 4);
+    this.initialSnap64 = new Float32Array(TELEMETRY_RES * TELEMETRY_RES * 4);
   }
 
   _initMeshVao() {
@@ -327,6 +333,56 @@ export class GpuErosionEngine {
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
 
     gl.bindVertexArray(null);
+  }
+
+  _initRockInstanceVao() {
+    const gl = this.gl;
+    const atlas = this.rockCalving.atlas;
+    this.rockVao = gl.createVertexArray();
+    gl.bindVertexArray(this.rockVao);
+
+    const posBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, atlas.positions, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+
+    const nrmBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, nrmBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, atlas.normals, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+
+    const mskBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, mskBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, atlas.masks, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 0, 0);
+
+    this.rockInstVbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.rockInstVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, 320 * 16 * 4, gl.DYNAMIC_DRAW);
+    const stride = 16 * 4;
+    for (let k = 0; k < 4; k++) {
+      const loc = 3 + k;
+      gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc, 4, gl.FLOAT, false, stride, k * 16);
+      gl.vertexAttribDivisor(loc, 1);
+    }
+
+    const idxBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, atlas.indices, gl.STATIC_DRAW);
+
+    gl.bindVertexArray(null);
+  }
+
+  triggerBoulderCalving(count = 24) {
+    const spawned = this.rockCalving.calveCliffBoulders(count);
+    this.rockCalving._rebuildInstanceBuckets();
+    this.telemetry.boulders = this.rockCalving.rocks.length;
+    if (this.onTelemetry) this.onTelemetry(this.telemetry);
+    return spawned;
   }
 
   _bindEvents() {
@@ -499,7 +555,12 @@ export class GpuErosionEngine {
 
   _themeCode() {
     const theme = Number(this.params.materialTheme);
-    return Number.isFinite(theme) ? Math.max(0, Math.min(2, Math.round(theme))) : 0;
+    return Number.isFinite(theme) ? Math.max(0, Math.min(6, Math.round(theme))) : 0;
+  }
+
+  _fabricCode() {
+    const fab = Number(this.params.fabricMode);
+    return Number.isFinite(fab) ? Math.max(0, Math.min(4, Math.round(fab))) : 0;
   }
 
   _getHardnessUniforms() {
@@ -528,10 +589,10 @@ export class GpuErosionEngine {
       wind = 0.22 + 0.30 * clamp01(p.windSpeed);
       rock = 0.05 + 0.14 * clamp01(p.rockfallRate);
     } else if (p.emitterMode === 'aeolian-wind') {
-      rain = 0.05;
+      rain = (p.dryAeolianMode || 0) > 0.35 ? 0.0 : 0.05;
       snow = 0.05 * snowPossible;
       wind = 1.05 + 0.45 * clamp01(p.windSpeed);
-      rock = 0.05 + 0.16 * clamp01(p.rockfallRate);
+      rock = (p.dryAeolianMode || 0) > 0.85 ? 0.0 : (0.05 + 0.16 * clamp01(p.rockfallRate));
     } else if (p.emitterMode === 'rockfall-avalanche') {
       rain = 0.05;
       snow = 0.03 * snowPossible;
@@ -568,8 +629,19 @@ export class GpuErosionEngine {
 
   applyLandscapePreset(landscapeId) {
     const preset = EROSION_LANDSCAPES[landscapeId] || EROSION_LANDSCAPES['layered-plateau'];
+    const keep = {
+      seed: this.params.seed,
+      particleCount: this.params.particleCount,
+      substepsPerFrame: this.params.substepsPerFrame,
+      showParticles: this.params.showParticles,
+      showWater: this.params.showWater,
+      showOutcrops: this.params.showOutcrops,
+      viewMode: this.params.viewMode,
+      brushMode: this.params.brushMode,
+      brushRadius: this.params.brushRadius,
+    };
+    Object.assign(this.params, DEFAULT_EROSION_PARAMS, preset.defaults, keep);
     this.params.landscape = preset.id;
-    Object.assign(this.params, preset.defaults);
     this.resetSimulation();
   }
 
@@ -636,14 +708,34 @@ export class GpuErosionEngine {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     this.partIdx = 0;
 
+    // 4. Capture 64x64 initial terrain snapshot & seed 3D cliff outcrops + fallen boulders!
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboTelemetry);
+    gl.viewport(0, 0, TELEMETRY_RES, TELEMETRY_RES);
+    gl.useProgram(this.progTelemetry);
+    this._bindTex(this.progTelemetry, 'uTerrainTex', this.terrainTex[0], 0);
+    gl.uniform1f(gl.getUniformLocation(this.progTelemetry, 'uGridRes'), this.gridRes);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.readPixels(0, 0, TELEMETRY_RES, TELEMETRY_RES, gl.RGBA, gl.FLOAT, this.initialSnap64);
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindVertexArray(null);
+
+    this.rockCalving.updateTerrainSnapshot(this.initialSnap64, TELEMETRY_RES, p.worldSpan);
+    this.rockCalving.seedForLandscape(p);
+
+    let initWaterSum = 0;
+    for (let i = 0; i < this.initialSnap64.length; i += 4) {
+      initWaterSum += this.initialSnap64[i + 3];
+    }
+    const cellAreaSample = (p.worldSpan * p.worldSpan) / (TELEMETRY_RES * TELEMETRY_RES);
 
     this.stepCount = 0;
     this.telemetry.steps = 0;
     this.telemetry.erodedVolumeM3 = 0;
     this.telemetry.coarseSedM3 = 0;
     this.telemetry.fineSedM3 = 0;
+    this.telemetry.waterVolumeM3 = Math.round(initWaterSum * cellAreaSample);
+    this.telemetry.boulders = this.rockCalving.rocks.length;
     this.telemetry.particles = p.particleCount;
     if (this.onTelemetry) this.onTelemetry(this.telemetry);
   }
@@ -720,6 +812,7 @@ export class GpuErosionEngine {
       gl.uniform4fv(gl.getUniformLocation(this.progParticleStep, 'uSpeciesMix'), climate.speciesVec);
       gl.uniform4fv(gl.getUniformLocation(this.progParticleStep, 'uSnowParams'), climate.snowVec);
       gl.uniform4fv(gl.getUniformLocation(this.progParticleStep, 'uWindParams'), climate.windVec);
+      gl.uniform1f(gl.getUniformLocation(this.progParticleStep, 'uDryAeolian'), p.dryAeolianMode || 0.0);
       gl.uniform1f(gl.getUniformLocation(this.progParticleStep, 'uSeed'), p.seed);
 
       gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -785,6 +878,13 @@ export class GpuErosionEngine {
       gl.uniform4fv(gl.getUniformLocation(this.progTerrainIntegrate, 'uHardnessParams'), hardnessVec);
       gl.uniform4fv(gl.getUniformLocation(this.progTerrainIntegrate, 'uStrataOrient'), strataVec);
       gl.uniform4fv(gl.getUniformLocation(this.progTerrainIntegrate, 'uClimate'), climate.snowVec);
+      gl.uniform4f(
+        gl.getUniformLocation(this.progTerrainIntegrate, 'uHydrology'),
+        p.iceMeltRate ?? 0.22,
+        p.headwaterFlow ?? 0.0,
+        p.lakeRetention ?? 0.40,
+        p.dryAeolianMode ?? 0.0
+      );
 
       let brushCode = 0;
       if (this.brushDown) {
@@ -823,6 +923,7 @@ export class GpuErosionEngine {
       );
       gl.uniform4fv(gl.getUniformLocation(this.progThermalTalus, 'uHardnessParams'), hardnessVec);
       gl.uniform4fv(gl.getUniformLocation(this.progThermalTalus, 'uStrataOrient'), strataVec);
+      gl.uniform1f(gl.getUniformLocation(this.progThermalTalus, 'uDryAeolian'), p.dryAeolianMode || 0.0);
       gl.uniform1f(gl.getUniformLocation(this.progThermalTalus, 'uSeed'), p.seed);
 
       gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -842,6 +943,7 @@ export class GpuErosionEngine {
       gl.uniform4f(gl.getUniformLocation(this.progSnowCryo, 'uCryoParams'), R, cellSize, dt, p.worldSpan);
       gl.uniform4fv(gl.getUniformLocation(this.progSnowCryo, 'uClimate'), climate.snowVec);
       gl.uniform4fv(gl.getUniformLocation(this.progSnowCryo, 'uStrataOrient'), strataVec);
+      gl.uniform1f(gl.getUniformLocation(this.progSnowCryo, 'uIceMeltRate'), p.iceMeltRate ?? 0.22);
       gl.uniform1f(gl.getUniformLocation(this.progSnowCryo, 'uSeed'), p.seed);
 
       gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -871,7 +973,6 @@ export class GpuErosionEngine {
     gl.bindVertexArray(this.emptyVao);
 
     this._bindTex(this.progTelemetry, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
-    this._bindTex(this.progTelemetry, 'uInitialTex', this.initialTerrainTex, 1);
     gl.uniform1f(gl.getUniformLocation(this.progTelemetry, 'uGridRes'), this.gridRes);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
@@ -881,18 +982,32 @@ export class GpuErosionEngine {
     let sumEroded = 0;
     let sumCoarse = 0;
     let sumFine = 0;
+    let sumWater = 0;
     const buf = this.telemetryBuf;
+    const ini = this.initialSnap64;
     for (let i = 0; i < buf.length; i += 4) {
-      sumEroded += buf[i];
-      sumCoarse += buf[i + 1];
-      sumFine += buf[i + 2];
+      sumEroded += Math.max(0, ini[i] - buf[i]);
+      sumCoarse += Math.max(0, buf[i + 1] - ini[i + 1]);
+      sumFine += Math.max(0, buf[i + 2] - ini[i + 2]);
+      sumWater += buf[i + 3];
     }
+
+    // Feed live 64x64 terrain heightfield to 3D rock calving & undercut-boulder wake-up!
+    this.rockCalving.updateTerrainSnapshot(buf, TELEMETRY_RES, this.params.worldSpan);
+    if (this.playing && (this.params.rockfallRate || 0) > 0.25 && (this.params.boulderDensity ?? 0.65) > 0.05) {
+      if (this.stepCount % 144 === 0) {
+        this.rockCalving.calveCliffBoulders(Math.max(1, Math.round(this.params.rockfallRate * 3)));
+      }
+    }
+
     const cellAreaSample = (this.params.worldSpan * this.params.worldSpan) / (TELEMETRY_RES * TELEMETRY_RES);
     this.telemetry.steps = this.stepCount;
     this.telemetry.particles = this.params.particleCount;
     this.telemetry.erodedVolumeM3 = Math.round(sumEroded * cellAreaSample);
     this.telemetry.coarseSedM3 = Math.round(sumCoarse * cellAreaSample);
     this.telemetry.fineSedM3 = Math.round(sumFine * cellAreaSample);
+    this.telemetry.waterVolumeM3 = Math.round(sumWater * cellAreaSample);
+    this.telemetry.boulders = this.rockCalving.rocks.length;
     this.telemetry.fps = this.fps;
     if (this.onTelemetry) this.onTelemetry(this.telemetry);
   }
@@ -946,7 +1061,8 @@ export class GpuErosionEngine {
       p.viewMode === 'hardness' ? 2 :
       p.viewMode === 'flow'     ? 3 :
       p.viewMode === 'clay'     ? 4 :
-      p.viewMode === 'cryo'     ? 5 : 0;
+      p.viewMode === 'cryo'     ? 5 :
+      p.viewMode === 'hydro'    ? 6 : 0;
 
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
@@ -990,10 +1106,61 @@ export class GpuErosionEngine {
     );
     gl.uniform1i(gl.getUniformLocation(this.progTerrainRender, 'uViewMode'), viewCode);
     gl.uniform1i(gl.getUniformLocation(this.progTerrainRender, 'uMaterialTheme'), this._themeCode());
+    gl.uniform1i(gl.getUniformLocation(this.progTerrainRender, 'uFabricMode'), this._fabricCode());
     gl.uniform4fv(gl.getUniformLocation(this.progTerrainRender, 'uClimate'), climate.snowVec);
+    gl.uniform4f(
+      gl.getUniformLocation(this.progTerrainRender, 'uWindRender'),
+      climate.windVec[0],
+      climate.windVec[1],
+      p.windSpeed || 0.0,
+      p.dryAeolianMode || 0.0
+    );
     gl.uniform1f(gl.getUniformLocation(this.progTerrainRender, 'uSeed'), p.seed);
 
     gl.drawElements(gl.TRIANGLES, this.terrainIndexCount, gl.UNSIGNED_INT, 0);
+
+    // 2B. 3D Bedrock Outcrops & Gravity-Settled Cliff-Calved Boulders!
+    if (p.showOutcrops !== false && this.rockCalving.rocks.length > 0) {
+      gl.useProgram(this.progRockInstance);
+      gl.bindVertexArray(this.rockVao);
+
+      this._bindTex(this.progRockInstance, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
+      this._bindTex(this.progRockInstance, 'uSnowTex', this.snowTex[this.snowIdx], 1);
+
+      gl.uniformMatrix4fv(gl.getUniformLocation(this.progRockInstance, 'uViewProj'), false, viewProj);
+      gl.uniform3fv(gl.getUniformLocation(this.progRockInstance, 'uCameraPos'), eye);
+      gl.uniform3fv(gl.getUniformLocation(this.progRockInstance, 'uSunDir'), sunDir);
+      gl.uniform4f(
+        gl.getUniformLocation(this.progRockInstance, 'uRenderDomain'),
+        p.worldSpan,
+        this.gridRes,
+        p.showWater ? 1.0 : 0.0,
+        timeSec
+      );
+      gl.uniform4fv(gl.getUniformLocation(this.progRockInstance, 'uHardnessParams'), hardnessVec);
+      gl.uniform4fv(gl.getUniformLocation(this.progRockInstance, 'uStrataOrient'), strataVec);
+      gl.uniform4fv(gl.getUniformLocation(this.progRockInstance, 'uClimate'), climate.snowVec);
+      gl.uniform1i(gl.getUniformLocation(this.progRockInstance, 'uViewMode'), viewCode);
+      gl.uniform1i(gl.getUniformLocation(this.progRockInstance, 'uMaterialTheme'), this._themeCode());
+      gl.uniform1i(gl.getUniformLocation(this.progRockInstance, 'uFabricMode'), this._fabricCode());
+      gl.uniform1f(gl.getUniformLocation(this.progRockInstance, 'uSeed'), p.seed);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.rockInstVbo);
+      const subs = this.rockCalving.atlas.submeshes;
+      for (let b = 0; b < subs.length; b++) {
+        const count = this.rockCalving.bucketCounts[b];
+        if (count <= 0) continue;
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.rockCalving.bucketData[b].subarray(0, count * 16));
+        gl.drawElementsInstanced(
+          gl.TRIANGLES,
+          subs[b].indexCount,
+          gl.UNSIGNED_SHORT,
+          subs[b].firstIndex * 2,
+          count
+        );
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    }
 
     // 3. 3D Falling Sky Raindrops & Sediment-Colored Surface Runoff Particles!
     if (p.showParticles && p.particleOpacity > 0.01) {
@@ -1050,8 +1217,12 @@ export class GpuErosionEngine {
 
       if (this.playing) {
         this.stepSimulation(this.params.substepsPerFrame);
-      } else if (this.brushDown && this.params.brushMode !== 'orbit') {
-        this.stepSimulation(1);
+        this.rockCalving.stepPhysics(0.032);
+      } else {
+        this.rockCalving.stepPhysics(0.025);
+        if (this.brushDown && this.params.brushMode !== 'orbit') {
+          this.stepSimulation(1);
+        }
       }
 
       this.renderFrame();

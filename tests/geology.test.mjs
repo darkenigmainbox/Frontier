@@ -65,9 +65,9 @@ test('Curve-based arches sweep analytical 3D Bézier ribs with ZERO hole-punchin
   }
 });
 
-test('All 20 geological archetypes synthesize grounded, valid, watertight-grade AAA 3D meshes & isolate cracks to cracked-monolith', () => {
+test('All 25 geological archetypes synthesize grounded, valid, watertight-grade AAA 3D meshes & isolate cracks to cracked-monolith', () => {
   const keys = Object.keys(FORMATION_PRESETS);
-  assert.equal(keys.length, 20);
+  assert.equal(keys.length, 25);
   const expectedNew = [
     'desert-arch',
     'double-arch',
@@ -80,6 +80,11 @@ test('All 20 geological archetypes synthesize grounded, valid, watertight-grade 
     'exfoliation-dome',
     'cracked-monolith',
     'arch-encampment',
+    'grand-canyon-temple',
+    'studlagil-colonnade',
+    'icelandic-tuya-crag',
+    'saharan-yardang-fin',
+    'calved-cliff-boulders',
   ];
   for (const k of expectedNew) {
     assert.ok(keys.includes(k), `missing formation preset ${k}`);
@@ -93,7 +98,9 @@ test('All 20 geological archetypes synthesize grounded, valid, watertight-grade 
     const macro = buildMacroFormation(mParams, mTec, mRng);
     if (key === 'cracked-monolith') {
       assert.ok(macro.crackNetwork, 'cracked-monolith must define isolated crackNetwork');
-      assert.ok(macro.cuts.length >= 20, 'cracked-monolith must construct articulated 3D V-wedge crack segments');
+      assert.equal(macro.cuts.length, 0, 'cracked-monolith must use splinter-free polyhedral fracture splitting (zero void cuts)');
+      assert.ok(macro.blocks.length >= 25, 'cracked-monolith must produce >= 25 substantial cleaved blocks & chockstones');
+      assert.ok(macro.crackNetwork.throughSplitCount >= 7, 'cracked-monolith must register >= 7 through-split fracture planes');
     } else {
       assert.equal(macro.crackNetwork, undefined, `${key}: must NOT have crackNetwork (cracks isolated to cracked-monolith)`);
     }

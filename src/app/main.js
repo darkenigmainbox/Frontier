@@ -52,16 +52,20 @@ const EROSION_SLIDER_SCHEMA = {
     { key: 'snowline',        label: 'Snowline Elevation',        min: 0.15, max: 1.0,  step: 0.01, fmt: (v) => `${Math.round(v * 100)}%` },
     { key: 'snowfallRate',    label: 'Snowfall / Blizzard Rate',  min: 0.0,  max: 1.4,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
     { key: 'glacierStrength', label: 'Glacier Ice Flow & Pluck',  min: 0.0,  max: 1.0,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+    { key: 'iceMeltRate',     label: 'Ice Melt -> Rivers/Lakes',  min: 0.0,  max: 1.0,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
     { key: 'windSpeed',       label: 'Aeolian Wind & Drift',      min: 0.0,  max: 1.0,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
     { key: 'windAzimuth',     label: 'Prevailing Wind Azimuth',   min: -180, max: 180,  step: 1,    fmt: (v) => `${v}°` },
     { key: 'rockfallRate',    label: 'Cliff Rockfall Intensity',  min: 0.0,  max: 1.0,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+    { key: 'boulderDensity',  label: '3D Outcrops & Boulders',    min: 0.0,  max: 1.0,  step: 0.05, fmt: (v) => `${Math.round(v * 100)}%` },
   ],
   hydraulics: [
     { key: 'erosionStrength',  label: 'Hydraulic Cutting Power',  min: 0.10, max: 1.40,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
     { key: 'sedimentCapacity', label: 'Sediment Carry Capacity',  min: 0.10, max: 1.50,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
     { key: 'depositionRate',   label: 'Alluvial Deposition Rate', min: 0.08, max: 1.20,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
     { key: 'talusAngle',       label: 'Cliff Spall & Talus Angle',min: 0.10, max: 1.0,   step: 0.02, fmt: (v) => `${Math.round(24 + v * 16)}°` },
-    { key: 'pipeFlowBlend',    label: 'River Channel Convergence',min: 0.0,  max: 1.0,   step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+    { key: 'pipeFlowBlend',    label: '2.5D River Convergence',   min: 0.0,  max: 1.0,   step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+    { key: 'headwaterFlow',    label: 'River Spring Inflow',      min: 0.0,  max: 1.0,   step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+    { key: 'lakeRetention',    label: '2.5D Lake Basin Pooling',  min: 0.0,  max: 1.0,   step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
   ],
 };
 
@@ -119,6 +123,8 @@ function updateErosionHud(tel) {
   document.getElementById('er-stat-cut').textContent = `${tel.erodedVolumeM3.toLocaleString()} m³`;
   const totalSed = tel.coarseSedM3 + tel.fineSedM3;
   document.getElementById('er-stat-sed').textContent = `${totalSed.toLocaleString()} m³`;
+  const waterEl = document.getElementById('er-stat-water');
+  if (waterEl) waterEl.textContent = `${(tel.waterVolumeM3 || 0).toLocaleString()} m³`;
   document.getElementById('er-stat-fps').textContent = `${tel.fps}`;
 }
 
@@ -334,6 +340,11 @@ function buildErosionSliders(groupKey, mountId) {
         document.getElementById('er-stat-parts').textContent = num.toLocaleString();
       }
     });
+    if (spec.key === 'boulderDensity') {
+      input.addEventListener('change', () => {
+        erosionEngine.rockCalving.seedForLandscape(erosionEngine.params);
+      });
+    }
 
     erosionSliderRefs.set(spec.key, { input, out, spec });
     mount.appendChild(wrap);
@@ -348,6 +359,23 @@ function syncErosionSliders() {
     ref.out.textContent = ref.spec.fmt(val);
   }
   document.getElementById('er-stat-parts').textContent = erosionEngine.params.particleCount.toLocaleString();
+
+  const emSel = document.getElementById('select-emitter-mode');
+  if (emSel) emSel.value = erosionEngine.params.emitterMode;
+  const matSel = document.getElementById('select-erosion-material');
+  if (matSel) matSel.value = String(erosionEngine.params.materialTheme ?? 0);
+  const fabSel = document.getElementById('select-erosion-fabric');
+  if (fabSel) fabSel.value = String(erosionEngine.params.fabricMode ?? 0);
+  const erAz = document.getElementById('slider-erosion-sun-az');
+  const erEl = document.getElementById('slider-erosion-sun-el');
+  if (erAz) {
+    erAz.value = String(erosionEngine.params.sunAzimuth);
+    document.getElementById('out-erosion-sun-az').textContent = `${erosionEngine.params.sunAzimuth}°`;
+  }
+  if (erEl) {
+    erEl.value = String(erosionEngine.params.sunElevation);
+    document.getElementById('out-erosion-sun-el').textContent = `${erosionEngine.params.sunElevation}°`;
+  }
 }
 
 // ============================================================================
@@ -502,6 +530,14 @@ function initErosionControls() {
     });
   }
 
+  const fabricSelect = document.getElementById('select-erosion-fabric');
+  if (fabricSelect) {
+    fabricSelect.value = String(erosionEngine.params.fabricMode ?? 0);
+    fabricSelect.addEventListener('change', (e) => {
+      erosionEngine.params.fabricMode = Number(e.target.value) || 0;
+    });
+  }
+
   const erAz = document.getElementById('slider-erosion-sun-az');
   const erEl = document.getElementById('slider-erosion-sun-el');
   erAz.addEventListener('input', () => {
@@ -519,6 +555,24 @@ function initErosionControls() {
   document.getElementById('chk-erosion-water').addEventListener('change', (e) => {
     erosionEngine.params.showWater = e.target.checked;
   });
+  const chkOutcrops = document.getElementById('chk-erosion-outcrops');
+  if (chkOutcrops) {
+    chkOutcrops.addEventListener('change', (e) => {
+      erosionEngine.params.showOutcrops = e.target.checked;
+    });
+  }
+  const btnCalve = document.getElementById('btn-er-calve-boulders');
+  if (btnCalve) {
+    btnCalve.addEventListener('click', () => {
+      if ((erosionEngine.params.boulderDensity ?? 0) < 0.15) {
+        erosionEngine.params.boulderDensity = 0.65;
+        syncErosionSliders();
+      }
+      erosionEngine.params.showOutcrops = true;
+      if (chkOutcrops) chkOutcrops.checked = true;
+      erosionEngine.triggerBoulderCalving(26);
+    });
+  }
 
   // Transport Bar Buttons
   const playBtn = document.getElementById('btn-er-play');
@@ -734,6 +788,13 @@ function initShadingControls() {
   lithSelect.addEventListener('change', () => {
     viewport.setLithologyOverride(lithSelect.value);
   });
+
+  const rockFabricSelect = document.getElementById('select-rock-fabric');
+  if (rockFabricSelect) {
+    rockFabricSelect.addEventListener('change', () => {
+      viewport.setFabricMode(Number(rockFabricSelect.value) || 0);
+    });
+  }
 
   const sunAz = document.getElementById('slider-sun-az');
   const sunEl = document.getElementById('slider-sun-el');

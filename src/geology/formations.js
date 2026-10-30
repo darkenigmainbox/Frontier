@@ -44,6 +44,13 @@ import {
   buildExfoliationDome,
 } from './sedimentary-formations.js';
 import { buildCrackedMonolith } from './cracks-demo.js';
+import {
+  buildGrandCanyonTemple,
+  buildStudlagilColonnade,
+  buildIcelandicTuyaCrag,
+  buildSaharanYardangFin,
+  buildCalvedCliffBoulders,
+} from './frontier-formations.js';
 import { buildCustomUserSplineArch } from './custom-arch-spline.js';
 import { buildArchEncampment } from './encampment.js';
 
@@ -1743,6 +1750,16 @@ export function buildMacroFormation(params, tectonics, rng) {
       return buildHeroBoulder(params, tectonics, rng);
     case "cracked-monolith":
       return buildCrackedMonolith(params, tectonics, rng);
+    case "grand-canyon-temple":
+      return buildGrandCanyonTemple(params, tectonics, rng, addTalusAndFallenBoulders);
+    case "studlagil-colonnade":
+      return buildStudlagilColonnade(params, tectonics, rng);
+    case "icelandic-tuya-crag":
+      return buildIcelandicTuyaCrag(params, tectonics, rng);
+    case "saharan-yardang-fin":
+      return buildSaharanYardangFin(params, tectonics, rng);
+    case "calved-cliff-boulders":
+      return buildCalvedCliffBoulders(params, tectonics, rng);
     case "cliff-wall":
     default:
       return buildCliffWall(params, tectonics, rng);

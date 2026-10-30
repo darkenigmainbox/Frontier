@@ -59,6 +59,7 @@ export class RockStudioViewport {
       uAoStrength: { value: 0.92 },
       uUseVertexAlbedo: { value: 0.0 },
       uDebugMode: { value: 0 },
+      uFabricType: { value: 0 },
     };
     this.hasCustomAlbedo = false;
     this.manualLithologyOverride = false;
@@ -300,6 +301,7 @@ export class RockStudioViewport {
       shader.uniforms.uAoStrength = this.shaderUniforms.uAoStrength;
       shader.uniforms.uUseVertexAlbedo = this.shaderUniforms.uUseVertexAlbedo;
       shader.uniforms.uDebugMode = this.shaderUniforms.uDebugMode;
+      shader.uniforms.uFabricType = this.shaderUniforms.uFabricType;
 
       shader.vertexShader = shader.vertexShader
         .replace(
@@ -309,14 +311,16 @@ export class RockStudioViewport {
            attribute vec3 aRockAlbedo;
            varying vec4 vRockMask;
            varying vec3 vRockAlbedo;
-           varying vec3 vWorldNormalViz;`
+           varying vec3 vWorldNormalViz;
+           varying vec3 vRockWorldPos;`
         )
         .replace(
           '#include <begin_vertex>',
           `#include <begin_vertex>
            vRockMask = aRockMask;
            vRockAlbedo = aRockAlbedo;
-           vWorldNormalViz = normalize(mat3(modelMatrix) * objectNormal);`
+           vWorldNormalViz = normalize(mat3(modelMatrix) * objectNormal);
+           vRockWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`
         );
 
       shader.fragmentShader = shader.fragmentShader
@@ -326,16 +330,75 @@ export class RockStudioViewport {
            varying vec4 vRockMask;
            varying vec3 vRockAlbedo;
            varying vec3 vWorldNormalViz;
+           varying vec3 vRockWorldPos;
            uniform float uCurvatureStrength;
            uniform float uAoStrength;
            uniform float uUseVertexAlbedo;
-           uniform int uDebugMode;`
+           uniform int uDebugMode;
+           uniform int uFabricType;
+
+           float rsHash(vec3 p) {
+             p = fract(p * 0.3183099 + vec3(0.11, 0.17, 0.23));
+             p *= 17.0;
+             return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+           }
+           float rsNoise(vec3 x) {
+             vec3 i = floor(x);
+             vec3 f = fract(x);
+             f = f * f * (3.0 - 2.0 * f);
+             return mix(
+               mix(mix(rsHash(i), rsHash(i + vec3(1,0,0)), f.x),
+                   mix(rsHash(i + vec3(0,1,0)), rsHash(i + vec3(1,1,0)), f.x), f.y),
+               mix(mix(rsHash(i + vec3(0,0,1)), rsHash(i + vec3(1,0,1)), f.x),
+                   mix(rsHash(i + vec3(0,1,1)), rsHash(i + vec3(1,1,1)), f.x), f.y), f.z);
+           }`
         )
         .replace(
           '#include <color_fragment>',
           `#include <color_fragment>
            if (uUseVertexAlbedo > 0.5) {
              diffuseColor.rgb = vRockAlbedo;
+           }
+           if (uFabricType > 0) {
+             vec3 wp = vRockWorldPos;
+             vec3 wn = normalize(vWorldNormalViz);
+             if (uFabricType == 1) {
+               // Hexagonal columnar basalt colonnade seams + chisel cross-joints
+               vec2 q = wp.xz * 1.35;
+               vec2 r = vec2(1.0, 1.7320508);
+               vec2 h = r * 0.5;
+               vec2 a = mod(q, r) - h;
+               vec2 b = mod(q - h, r) - h;
+               vec2 gv = dot(a, a) < dot(b, b) ? a : b;
+               float hexEdge = 0.5 - max(abs(gv.x), abs(gv.x) * 0.5 + abs(gv.y) * 0.8660254);
+               float seam = 1.0 - smoothstep(0.015, 0.085, hexEdge);
+               float crossJ = 1.0 - smoothstep(0.02, 0.09, abs(fract(wp.y * 0.85 + rsNoise(wp * 0.4) * 0.35) - 0.5));
+               diffuseColor.rgb *= (1.0 - 0.34 * seam - 0.16 * crossJ * (1.0 - abs(wn.y)));
+               diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.18, 0.94, 0.76), seam * 0.35);
+             } else if (uFabricType == 2) {
+               // Aeolian trough cross-bedding laminations + desert varnish sheen
+               float setId = floor((wp.y + rsNoise(wp * 0.22) * 1.4) * 0.45);
+               float foreset = sin(wp.y * 11.0 + wp.x * (2.6 + mod(setId, 3.0) * 1.2) + rsNoise(wp * 0.65) * 2.4);
+               float lam = smoothstep(-0.6, 0.8, foreset);
+               diffuseColor.rgb *= mix(0.84, 1.12, lam);
+               float varnish = smoothstep(0.2, 0.8, 1.0 - abs(wn.y)) * rsNoise(wp * 0.35);
+               diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.68, 0.56, 0.52), varnish * 0.32);
+             } else if (uFabricType == 3) {
+               // Tafoni salt-weathering honeycomb alveoli on steep cliff faces
+               float steep = smoothstep(0.25, 0.78, 1.0 - abs(wn.y));
+               float cell1 = abs(rsNoise(wp * 2.3) - 0.5) * 2.0;
+               float cell2 = abs(rsNoise(wp * 5.1 + 4.3) - 0.5) * 2.0;
+               float pit = (1.0 - smoothstep(0.08, 0.42, cell1 * 0.7 + cell2 * 0.3)) * steep;
+               diffuseColor.rgb *= (1.0 - 0.42 * pit);
+               diffuseColor.rgb += vec3(0.05, 0.04, 0.03) * smoothstep(0.55, 0.88, cell1) * steep;
+             } else if (uFabricType == 4) {
+               // Folded metamorphic gneissic leucosome/melanosome banding + quartz veins
+               float fold = wp.y * 2.2 + sin(wp.x * 0.9 + rsNoise(wp * 0.45) * 3.8) * 1.3;
+               float band = sin(fold * 3.4);
+               diffuseColor.rgb = mix(diffuseColor.rgb * 0.76, diffuseColor.rgb * 1.24 + vec3(0.05), smoothstep(-0.5, 0.6, band));
+               float vein = 1.0 - smoothstep(0.015, 0.055, abs(rsNoise(wp * 1.15 + 9.2) - 0.52));
+               diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.72, 0.70, 0.66), vein * 0.45);
+             }
            }
            float edgeCatch = vRockMask.z * 0.065 * uCurvatureStrength;
            float cavityDark = 1.0 - vRockMask.y * 0.16 * uCurvatureStrength;
@@ -428,6 +491,10 @@ export class RockStudioViewport {
   setShadingMode(mode) {
     this.shadingMode = mode;
     this._applyShadingUniforms();
+  }
+
+  setFabricMode(code) {
+    this.shaderUniforms.uFabricType.value = Math.max(0, Math.min(4, Number(code) || 0));
   }
 
   setLithologyOverride(lithKey) {

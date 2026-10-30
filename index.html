@@ -89,6 +89,7 @@
             <span>Layer Map</span>
             <select id="select-erosion-view">
               <option value="natural">Natural Strata &amp; Sediment</option>
+              <option value="hydro">2.5D Rivers, Lakes &amp; Meltwater</option>
               <option value="sediment">Cut vs Sedimentation Map</option>
               <option value="hardness">3D Rock Hardness &amp; Faults</option>
               <option value="flow">Hydraulic Discharge &amp; Shear</option>
@@ -103,6 +104,21 @@
               <option value="0">Utah Desert Sandstone</option>
               <option value="1">Icelandic Volcanic Basalt &amp; Moss</option>
               <option value="2">Himalayan Gneiss &amp; Glacier</option>
+              <option value="3">Grand Canyon Redwall &amp; Supai</option>
+              <option value="4">Stuðlagil Basalt &amp; Turquoise</option>
+              <option value="5">Saharan Varnished Yardang</option>
+              <option value="6">Namib &amp; Sahara Golden Erg</option>
+            </select>
+          </label>
+
+          <label class="field-row">
+            <span>Stone Fabric</span>
+            <select id="select-erosion-fabric">
+              <option value="0">Classic Stratigraphic (Default)</option>
+              <option value="1">Hexagonal Columnar Basalt</option>
+              <option value="2">Aeolian Ripples &amp; Cross-Bed</option>
+              <option value="3">Tafoni Honeycomb &amp; Palagonite</option>
+              <option value="4">Foliated Gneiss &amp; Joints</option>
             </select>
           </label>
 
@@ -129,9 +145,16 @@
             </label>
             <label class="check-pill">
               <input id="chk-erosion-water" type="checkbox" checked />
-              <span>Water Channels</span>
+              <span>2.5D Lakes &amp; Rivers</span>
+            </label>
+            <label class="check-pill">
+              <input id="chk-erosion-outcrops" type="checkbox" checked />
+              <span>3D Outcrops &amp; Boulders</span>
             </label>
           </div>
+          <button id="btn-er-calve-boulders" class="btn-secondary" style="width:100%;margin-top:8px;">
+            🪨 Calve Cliff Boulders (Gravity Roll)
+          </button>
         </section>
       </div>
 
@@ -207,6 +230,17 @@
             <select id="select-lithology"></select>
           </label>
 
+          <label class="field-row">
+            <span>Stone Fabric</span>
+            <select id="select-rock-fabric">
+              <option value="0">Clean Studio Stone (Default)</option>
+              <option value="1">Hexagonal Columnar Basalt</option>
+              <option value="2">Aeolian Cross-Bedding</option>
+              <option value="3">Tafoni Honeycomb Pitting</option>
+              <option value="4">Foliated Gneiss &amp; Veins</option>
+            </select>
+          </label>
+
           <div class="slider-group">
             <div class="slider-label">
               <span>Sun Azimuth</span>
@@ -256,7 +290,7 @@
           GPU Particle Erosion &amp; Sedimentation
         </button>
         <button id="mode-btn-rock" class="mode-tab">
-          3D Rock &amp; Cliff Studio (19 Presets)
+          3D Rock &amp; Cliff Studio (25 Presets)
         </button>
       </div>
 
@@ -281,6 +315,10 @@
         <div class="hud-stat">
           <span class="hud-k">SEDIMENT</span>
           <span class="hud-v" id="er-stat-sed">0 m³</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-k">2.5D WATER</span>
+          <span class="hud-v" id="er-stat-water">0 m³</span>
         </div>
         <div class="hud-stat">
           <span class="hud-k">GPU FPS</span>

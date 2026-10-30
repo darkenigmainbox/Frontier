@@ -6,7 +6,10 @@ import {
   DEFAULT_EROSION_PARAMS,
   EMITTER_MODES,
   EROSION_LANDSCAPES,
+  MATERIAL_THEMES,
+  ROCK_FABRIC_MODES,
 } from '../src/erosion/erosion-presets.js';
+import { RockCalvingSystem, buildRockArchetypeAtlas } from '../src/erosion/rock-calving.js';
 import * as Shaders from '../src/erosion/erosion-shaders.js';
 
 const ALL_SHADER_EXPORTS = [
@@ -25,11 +28,13 @@ const ALL_SHADER_EXPORTS = [
   'PARTICLE_RENDER_VERT',
   'PARTICLE_RENDER_FRAG',
   'SKY_BG_FRAG',
+  'ROCK_INSTANCE_VERT',
+  'ROCK_INSTANCE_FRAG',
 ];
 
-test('GPU Erosion presets define 8 distinct geological landscapes and 6 multi-agent emitter modes', () => {
+test('GPU Erosion presets preserve all 8 baseline landscapes untouched and add 6 new canyon/Icelandic/dune/lake landscapes', () => {
   const landKeys = Object.keys(EROSION_LANDSCAPES);
-  assert.equal(landKeys.length, 8);
+  assert.equal(landKeys.length, 14);
   const seenTypes = new Set();
   for (const k of landKeys) {
     const p = EROSION_LANDSCAPES[k];
@@ -38,14 +43,33 @@ test('GPU Erosion presets define 8 distinct geological landscapes and 6 multi-ag
     assert.ok(p.defaults.rockHardness > 0 && p.defaults.rockHardness < 1);
     seenTypes.add(p.terrainType);
   }
-  assert.equal(seenTypes.size, 8, 'Each landscape preset should map to a unique GPU terrain generator mode');
+  assert.equal(seenTypes.size, 14, 'Each landscape preset should map to a unique GPU terrain generator mode');
+
+  // Verify all 8 original baseline terrainTypes (0..7) and default boot preset remain intact!
+  assert.equal(DEFAULT_EROSION_PARAMS.landscape, 'icelandic-highlands');
+  assert.equal(EROSION_LANDSCAPES['alpine-divide'].terrainType, 0);
+  assert.equal(EROSION_LANDSCAPES['layered-plateau'].terrainType, 1);
+  assert.equal(EROSION_LANDSCAPES['fault-escarpment'].terrainType, 2);
+  assert.equal(EROSION_LANDSCAPES['volcanic-caldera'].terrainType, 3);
+  assert.equal(EROSION_LANDSCAPES['badlands-domes'].terrainType, 4);
+  assert.equal(EROSION_LANDSCAPES['coastal-massif'].terrainType, 5);
+  assert.equal(EROSION_LANDSCAPES['icelandic-highlands'].terrainType, 6);
+  assert.equal(EROSION_LANDSCAPES['himalayan-karakoram'].terrainType, 7);
+
+  // Verify the 6 new researched landscapes (8..13), 7 rock themes, and 5 stone fabric modes
+  assert.equal(EROSION_LANDSCAPES['grand-canyon'].terrainType, 8);
+  assert.equal(EROSION_LANDSCAPES['studlagil-basalt'].terrainType, 9);
+  assert.equal(EROSION_LANDSCAPES['fjadrargljufur-palagonite'].terrainType, 10);
+  assert.equal(EROSION_LANDSCAPES['namib-erg-dunes'].terrainType, 11);
+  assert.equal(EROSION_LANDSCAPES['yardang-wind-corridor'].terrainType, 12);
+  assert.equal(EROSION_LANDSCAPES['glacial-lake-watershed'].terrainType, 13);
+  assert.equal(Object.keys(MATERIAL_THEMES).length, 7);
+  assert.equal(Object.keys(ROCK_FABRIC_MODES).length, 5);
 
   // Glacial mountain archetypes must exist and be genuinely cryospheric
   const iceland = EROSION_LANDSCAPES['icelandic-highlands'];
   const himalaya = EROSION_LANDSCAPES['himalayan-karakoram'];
   assert.ok(iceland && himalaya, 'Icelandic & Himalayan glacial mountain presets must exist');
-  assert.equal(iceland.terrainType, 6);
-  assert.equal(himalaya.terrainType, 7);
   assert.ok(iceland.defaults.snowfallRate > 0.5 && himalaya.defaults.snowfallRate > 0.5);
   assert.ok(himalaya.defaults.glacierStrength > iceland.defaults.glacierStrength * 0.9);
 
@@ -60,7 +84,7 @@ test('GPU Erosion presets define 8 distinct geological landscapes and 6 multi-ag
   assert.ok(DEFAULT_EROSION_PARAMS.particleCount >= 8192 && DEFAULT_EROSION_PARAMS.particleCount <= 32768);
 });
 
-test('All 15 WebGL2 GLSL ES 3.00 shaders satisfy strict ANGLE precision, brace, and interface invariants', () => {
+test('All 17 WebGL2 GLSL ES 3.00 shaders satisfy strict ANGLE precision, brace, and interface invariants', () => {
   for (const name of ALL_SHADER_EXPORTS) {
     const src = Shaders[name];
     assert.equal(typeof src, 'string', `Missing shader export ${name}`);
@@ -109,6 +133,7 @@ test('All 15 WebGL2 GLSL ES 3.00 shaders satisfy strict ANGLE precision, brace, 
     progThermalTalus: [Shaders.FULLSCREEN_VERT, Shaders.THERMAL_TALUS_FRAG],
     progSnowCryo: [Shaders.FULLSCREEN_VERT, Shaders.SNOW_CRYO_FRAG],
     progTerrainRender: [Shaders.TERRAIN_RENDER_VERT, Shaders.TERRAIN_RENDER_FRAG],
+    progRockInstance: [Shaders.ROCK_INSTANCE_VERT, Shaders.ROCK_INSTANCE_FRAG],
     progParticleRender: [Shaders.PARTICLE_RENDER_VERT, Shaders.PARTICLE_RENDER_FRAG],
   };
 
@@ -256,3 +281,70 @@ test('Multi-agent GPU particle species (snow, aeolian wind, rockfall) and glacie
   const windGain = surfaceSpeed('wind', 0.6) - surfaceSpeed('wind', 0.05);
   assert.ok(rockGain > 0 && windGain > 0, 'Both species must accelerate down steepening slopes');
 });
+
+test('3D RockCalvingSystem synthesizes cleaved polyhedral outcrops & settles calved boulders down cliff slopes', () => {
+  const atlas = buildRockArchetypeAtlas(7331);
+  assert.equal(atlas.submeshes.length, 6, 'Atlas must contain 6 cleaved polyhedral rock archetypes');
+  assert.ok(atlas.indices.length > 600, 'Polyhedral rock atlas must contain rich faceted triangles');
+
+  const sys = new RockCalvingSystem();
+  const N = 64;
+  const grid = new Float32Array(N * N * 4);
+  // Build a steep cliff escarpment at x < 0 dropping onto a gentle talus apron at x > 0
+  for (let iz = 0; iz < N; iz++) {
+    for (let ix = 0; ix < N; ix++) {
+      const u = ix / (N - 1) - 0.5;
+      const scarp = 1 / (1 + Math.exp(u * 22.0));
+      const idx = (iz * N + ix) * 4;
+      grid[idx + 0] = 14.0 + 95.0 * scarp;
+      grid[idx + 1] = 0.4 * (1 - scarp);
+      grid[idx + 2] = 0.0;
+      grid[idx + 3] = 0.0;
+    }
+  }
+
+  sys.updateTerrainSnapshot(grid, N, 512.0);
+  sys.seedForLandscape({ seed: 4029, worldSpan: 512.0, boulderDensity: 0.75, strataStrike: 10, strataDip: 12 });
+
+  const outcrops = sys.rocks.filter((r) => r.isOutcrop);
+  const boulders = sys.rocks.filter((r) => !r.isOutcrop);
+  assert.ok(outcrops.length >= 20, `Expected >= 20 cliff outcrops, got ${outcrops.length}`);
+  assert.ok(boulders.length >= 50, `Expected >= 50 calved boulders, got ${boulders.length}`);
+
+  // Step boulder gravity rolling until boulders settle at the cliff toe / apron
+  for (let s = 0; s < 120; s++) sys.stepPhysics(0.05);
+  const settled = sys.rocks.filter((r) => !r.isOutcrop && r.settled);
+  assert.ok(settled.length >= boulders.length * 0.75, 'Calved boulders must naturally decelerate and settle on gentler terrain');
+
+  // Verify hydraulic undercutting wakes settled boulders up to roll further!
+  const target = settled[0];
+  for (let i = 0; i < grid.length; i += 4) grid[i] = Math.max(2.0, grid[i] - 2.5);
+  sys.updateTerrainSnapshot(grid, N, 512.0);
+  assert.equal(target.settled, false, 'Erosion undercutting (>0.24m drop) must wake settled boulder to roll');
+});
+
+test('Asymmetric Namib/Sahara sand dune profile joins windward stoss & 33.8-deg planar slipface along a razor-sharp brink', () => {
+  const evalDune = (dM, hCrestM = 72.0, stossSpanM = 185.0) => {
+    if (dM >= 0.0) {
+      const rawLee = hCrestM - dM * 0.670;
+      if (rawLee <= -2.5) return 0.0;
+      const k = 2.2;
+      const h = Math.max(0, Math.min(1, 0.5 + 0.5 * rawLee / k));
+      return Math.max(0, rawLee * h + k * h * (1 - h));
+    }
+    const t = Math.max(0, Math.min(1, -dM / stossSpanM));
+    return hCrestM * (1 - t) * (1 - t) * (1 + 1.25 * t);
+  };
+
+  // 1. Exact C0 crest height continuity at brink (dM = 0)
+  assert.ok(Math.abs(evalDune(-1e-6) - evalDune(1e-6)) < 1e-3, 'Stoss and slipface meet cleanly at the brink');
+  // 2. Sharp slope discontinuity at brink: gentle positive windward stoss slope vs steep -0.670 (33.8 deg) leeward slipface!
+  const stossSlope = (evalDune(0) - evalDune(-2.0)) / 2.0;
+  const leeSlope = (evalDune(2.0) - evalDune(0)) / 2.0;
+  assert.ok(stossSlope > 0.15 && stossSlope < 0.38, `Expected gentle windward stoss slope, got ${stossSlope}`);
+  assert.ok(Math.abs(leeSlope - (-0.670)) < 1e-3, `Expected planar 33.8-deg (-0.670) slipface, got ${leeSlope}`);
+  // 3. Clean flat interdune desert floor beyond slipface & upwind toe
+  assert.equal(evalDune(140.0), 0, 'Interdune floor beyond slipface toe must be clean exposed desert pan');
+  assert.equal(evalDune(-190.0), 0, 'Upwind stoss toe merges smoothly onto flat desert pan');
+});
+
