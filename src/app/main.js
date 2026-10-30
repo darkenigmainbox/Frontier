@@ -1,15 +1,14 @@
-import { EROSION_LANDSCAPES } from '../erosion/erosion-presets.js';
 import { GpuErosionEngine } from '../erosion/gpu-erosion-engine.js';
 import { ErosionLayerStackUI } from '../erosion/layer-stack-ui.js';
+import { DEFAULT_CUSTOM_ARCH_CURVES } from '../geology/custom-arch-spline.js';
 import { FORMATION_PRESETS, LITHOLOGY_PALETTES, resolveParams } from '../geology/presets.js';
 import { exportFormationToGLB } from '../io/glb-exporter.js';
 import { exportFormationToOBJ } from '../io/obj-exporter.js';
-import { RockStudioViewport } from './viewport.js';
 import { ArchCurveGizmoOverlay } from './arch-curve-gizmo.js';
-import { DEFAULT_CUSTOM_ARCH_CURVES } from '../geology/custom-arch-spline.js';
+import { RockStudioViewport } from './viewport.js';
 
 // ============================================================================
-// SCHEMA DEFINITIONS: 3D ROCK STUDIO & GPU PARTICLE EROSION LAB
+// SCHEMA DEFINITIONS: 3D ROCK & CLIFF STUDIO
 // ============================================================================
 
 const SLIDER_SCHEMA = {
@@ -27,46 +26,10 @@ const SLIDER_SCHEMA = {
     { key: 'talusAmount',      label: 'Talus & Fallen Slabs',   min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
   ],
   detail: [
-    { key: 'cleavageSharpness', label: 'Cleavage Planarity',    min: 0.15, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'facetAmplitude',    label: 'Stepped Scarplet Depth',min: 0.0,  max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'edgeWear',          label: 'Chisel Chamfer & Wear', min: 0.0,  max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'creaseAngle',       label: 'Crease Split Angle',    min: 22,   max: 85,  step: 1,    fmt: (v) => `${v}°` },
-  ],
-};
-
-const EROSION_SLIDER_SCHEMA = {
-  particles: [
-    { key: 'particleCount',    label: 'Active GPU Particles',     min: 2048, max: 32768, step: 1024, fmt: (v) => Number(v).toLocaleString() },
-    { key: 'substepsPerFrame', label: 'GPU Substeps / Frame',     min: 1,    max: 8,     step: 1,    fmt: (v) => `${v}×` },
-    { key: 'rainIntensity',    label: 'Sky Drop Water Mass',      min: 0.15, max: 1.50,  step: 0.05, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'particleInertia',  label: 'Flow Momentum & Meander',  min: 0.04, max: 0.85,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'evaporation',      label: 'Runoff Evaporation',       min: 0.02, max: 0.80,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-  ],
-  hardness: [
-    { key: 'rockHardness',     label: 'Base Bedrock Hardness',    min: 0.06, max: 0.96,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'strataStrength',   label: 'Hard/Soft Strata Contrast',min: 0.0,  max: 1.0,   step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'strataFreq',       label: 'Stratigraphic Layers',     min: 2.0,  max: 18.0,  step: 0.5,  fmt: (v) => `${Number(v).toFixed(1)}` },
-    { key: 'strataDip',        label: 'Bedding Dip Angle',        min: 0,    max: 42,    step: 1,    fmt: (v) => `${v}°` },
-    { key: 'faultWeakness',    label: 'Fault Zone Erodibility',   min: 0.0,  max: 1.0,   step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-  ],
-  climate: [
-    { key: 'snowline',        label: 'Snowline Elevation',        min: 0.15, max: 1.0,  step: 0.01, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'snowfallRate',    label: 'Snowfall / Blizzard Rate',  min: 0.0,  max: 1.4,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'glacierStrength', label: 'Glacier Ice Flow & Pluck',  min: 0.0,  max: 1.0,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'iceMeltRate',     label: 'Ice Melt -> Rivers/Lakes',  min: 0.0,  max: 1.0,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'windSpeed',       label: 'Aeolian Wind & Drift',      min: 0.0,  max: 1.0,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'windAzimuth',     label: 'Prevailing Wind Azimuth',   min: -180, max: 180,  step: 1,    fmt: (v) => `${v}°` },
-    { key: 'rockfallRate',    label: 'Cliff Rockfall Intensity',  min: 0.0,  max: 1.0,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'boulderDensity',  label: '3D Outcrops & Boulders',    min: 0.0,  max: 1.0,  step: 0.05, fmt: (v) => `${Math.round(v * 100)}%` },
-  ],
-  hydraulics: [
-    { key: 'erosionStrength',  label: 'Hydraulic Cutting Power',  min: 0.10, max: 1.40,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'sedimentCapacity', label: 'Sediment Carry Capacity',  min: 0.10, max: 1.50,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'depositionRate',   label: 'Alluvial Deposition Rate', min: 0.08, max: 1.20,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'talusAngle',       label: 'Cliff Spall & Talus Angle',min: 0.10, max: 1.0,   step: 0.02, fmt: (v) => `${Math.round(24 + v * 16)}°` },
-    { key: 'pipeFlowBlend',    label: '2.5D River Convergence',   min: 0.0,  max: 1.0,   step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'headwaterFlow',    label: 'River Spring Inflow',      min: 0.0,  max: 1.0,   step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-    { key: 'lakeRetention',    label: '2.5D Lake Basin Pooling',  min: 0.0,  max: 1.0,   step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+    { key: 'cleavageSharpness', label: 'Cleavage Planarity',     min: 0.15, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+    { key: 'facetAmplitude',    label: 'Stepped Scarplet Depth', min: 0.0,  max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+    { key: 'edgeWear',          label: 'Chisel Chamfer & Wear',  min: 0.0,  max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+    { key: 'creaseAngle',       label: 'Crease Split Angle',     min: 22,   max: 85,  step: 1,    fmt: (v) => `${v}°` },
   ],
 };
 
@@ -102,7 +65,6 @@ try {
     onCurveCommitted: (curves) => {
       state.customCurveActive = true;
       updateCurveReadout();
-      // Rebuild the boulder arch along the exact user-drawn spline
       state.params.customArchCurves = curves;
       requestSynthesis(false);
     },
@@ -113,29 +75,36 @@ try {
 
 const erosionCanvas = document.getElementById('erosion-canvas');
 let erosionEngine = null;
+let erosionLayerStackUI = null;
 
 const progressBar = document.getElementById('progress-bar');
 const progressFill = document.getElementById('progress-fill');
 const statusToast = document.getElementById('status-toast');
 
 function updateErosionHud(tel) {
-  document.getElementById('er-stat-parts').textContent = tel.particles.toLocaleString();
-  document.getElementById('er-stat-steps').textContent = tel.steps.toLocaleString();
-  document.getElementById('er-stat-cut').textContent = `${tel.erodedVolumeM3.toLocaleString()} m³`;
-  const totalSed = tel.coarseSedM3 + tel.fineSedM3;
-  document.getElementById('er-stat-sed').textContent = `${totalSed.toLocaleString()} m³`;
-  const waterEl = document.getElementById('er-stat-water');
-  if (waterEl) waterEl.textContent = `${(tel.waterVolumeM3 || 0).toLocaleString()} m³`;
-  document.getElementById('er-stat-fps').textContent = `${tel.fps}`;
+  const elSteps = document.getElementById('er-stat-steps');
+  const elEval = document.getElementById('er-stat-eval');
+  const elCaves = document.getElementById('er-stat-caves');
+  const elCut = document.getElementById('er-stat-cut');
+  const elSed = document.getElementById('er-stat-sed');
+  const elWater = document.getElementById('er-stat-water');
+  const elFps = document.getElementById('er-stat-fps');
+
+  if (elSteps) elSteps.textContent = String(tel.layerCount ?? tel.steps ?? 0);
+  if (elEval) elEval.textContent = `${(tel.evalMs ?? 0).toFixed(1)} ms`;
+  if (elCaves) elCaves.textContent = `${(tel.caveTris ?? 0).toLocaleString()} tris`;
+  if (elCut) elCut.textContent = `${(tel.coarseSedM3 ?? 0).toLocaleString()} m³`;
+  if (elSed) elSed.textContent = `${(tel.fineSedM3 ?? 0).toLocaleString()} m³`;
+  if (elWater) elWater.textContent = `${(tel.waterVolumeM3 ?? 0).toLocaleString()} m³`;
+  if (elFps) elFps.textContent = `${tel.fps ?? 60} FPS`;
 }
 
 try {
   erosionEngine = new GpuErosionEngine(erosionCanvas, updateErosionHud);
-  erosionEngine.params.substepsPerFrame = 3;
 } catch (err) {
-  console.error('GPU Erosion initialization error:', err);
+  console.error('GPU Terrain Pipeline initialization error:', err);
   statusToast.classList.remove('hidden');
-  statusToast.textContent = `GPU Erosion Error: ${err.message}`;
+  statusToast.textContent = `GPU Pipeline Error: ${err.message}`;
 }
 
 const worker = new Worker(new URL('../worker/gen-worker.js', import.meta.url), { type: 'module' });
@@ -218,44 +187,45 @@ worker.onmessage = (e) => {
 
 function updateRockHud(stats) {
   const [dx, dy, dz] = stats.dimensions;
-  document.getElementById('stat-dims').textContent = `${dx} × ${dy} × ${dz}m`;
+  document.getElementById('stat-dims').textContent = `${dx}×${dy}×${dz}m`;
   document.getElementById('stat-tris').textContent = stats.triangles.toLocaleString();
   document.getElementById('stat-verts').textContent = stats.vertices.toLocaleString();
-  document.getElementById('stat-blocks').textContent = `${stats.blockCount} (${stats.faultCount}F)`;
-  document.getElementById('stat-time').textContent = `${stats.elapsedMs} ms`;
+  document.getElementById('stat-blocks').textContent = `${stats.blockCount}`;
+  document.getElementById('stat-time').textContent = `${stats.elapsedMs}ms`;
 }
 
 // ============================================================================
-// STUDIO MODE SWITCHING (GPU PARTICLE EROSION <-> 3D ROCK & CLIFF STUDIO)
+// WORKSPACE SWITCHING (TERRAIN STUDIO <-> 3D ROCK & CLIFF STUDIO)
 // ============================================================================
 
 function setStudioMode(mode) {
   state.studioMode = mode === 'rock' ? 'rock' : 'erosion';
-  const isErosion = state.studioMode === 'erosion';
+  const isTerrain = state.studioMode === 'erosion';
 
-  document.getElementById('mode-btn-erosion').classList.toggle('active', isErosion);
-  document.getElementById('mode-btn-rock').classList.toggle('active', !isErosion);
+  document.getElementById('mode-btn-erosion').classList.toggle('active', isTerrain);
+  document.getElementById('mode-btn-rock').classList.toggle('active', !isTerrain);
 
-  document.getElementById('left-erosion-panels').classList.toggle('hidden-panel', !isErosion);
-  document.getElementById('right-erosion-panels').classList.toggle('hidden-panel', !isErosion);
-  document.getElementById('hud-erosion').classList.toggle('hidden-panel', !isErosion);
-  document.getElementById('erosion-canvas').classList.toggle('hidden-panel', !isErosion);
-  document.getElementById('erosion-transport-bar').classList.toggle('hidden-panel', !isErosion);
+  document.getElementById('left-erosion-panels').classList.toggle('hidden-panel', !isTerrain);
+  document.getElementById('right-erosion-panels').classList.toggle('hidden-panel', !isTerrain);
+  document.getElementById('tp-terrain-bars').classList.toggle('hidden-panel', !isTerrain);
+  document.getElementById('tp-terrain-header-actions').classList.toggle('hidden-panel', !isTerrain);
+  document.getElementById('hud-erosion').classList.toggle('hidden-panel', !isTerrain);
+  document.getElementById('cb-shelf-root').classList.toggle('hidden-panel', !isTerrain);
+  document.getElementById('erosion-canvas').classList.toggle('hidden-panel', !isTerrain);
+  document.getElementById('spline-gizmo-svg').classList.toggle('hidden-panel', !isTerrain);
+  document.getElementById('tp-scene-nav').classList.toggle('hidden-panel', !isTerrain);
+  document.getElementById('tp-scene-caption').classList.toggle('hidden-panel', !isTerrain);
 
-  document.getElementById('left-rock-panels').classList.toggle('hidden-panel', isErosion);
-  document.getElementById('right-rock-panels').classList.toggle('hidden-panel', isErosion);
-  document.getElementById('hud-rock').classList.toggle('hidden-panel', isErosion);
-  document.getElementById('viewport-canvas').classList.toggle('hidden-panel', isErosion);
-  document.getElementById('rock-camera-bar').classList.toggle('hidden-panel', isErosion);
+  document.getElementById('left-rock-panels').classList.toggle('hidden-panel', isTerrain);
+  document.getElementById('right-rock-panels').classList.toggle('hidden-panel', isTerrain);
+  document.getElementById('hud-rock').classList.toggle('hidden-panel', isTerrain);
+  document.getElementById('viewport-canvas').classList.toggle('hidden-panel', isTerrain);
+  document.getElementById('rock-camera-bar').classList.toggle('hidden-panel', isTerrain);
 
-  document.getElementById('brand-subtitle').textContent = isErosion
-    ? 'GPU Particle Erosion & Sedimentation'
-    : '3D Structural Rock & Cliff Studio';
-  document.getElementById('brand-badge-pill').textContent = isErosion
-    ? 'WebGL2 GPGPU'
-    : '19 Presets';
+  const leftTabLabel = document.getElementById('tp-left-tab-label');
+  if (leftTabLabel) leftTabLabel.textContent = isTerrain ? 'Layer stack' : 'Rock archetypes';
 
-  if (isErosion) {
+  if (isTerrain) {
     progressBar.classList.add('hidden');
     statusToast.classList.add('hidden');
     if (curveOverlay && state.curveMode) setCurveMode(false);
@@ -264,7 +234,7 @@ function setStudioMode(mode) {
       erosionEngine.resizeIfNeeded();
       erosionEngine.start();
     }
-    window.history.replaceState(null, '', '#erosion');
+    window.history.replaceState(null, '', '#terrain');
   } else {
     if (erosionEngine) erosionEngine.stop();
     viewport.setActive(true);
@@ -282,114 +252,92 @@ document.getElementById('mode-btn-erosion').addEventListener('click', () => setS
 document.getElementById('mode-btn-rock').addEventListener('click', () => setStudioMode('rock'));
 
 // ============================================================================
-// GPU PARTICLE EROSION & SEDIMENTATION UI WIRING
+// FRONTIER TERRAIN STUDIO PIPELINE CONTROLS
 // ============================================================================
 
-const erosionSliderRefs = new Map();
-let erosionLayerStackUI = null;
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
-function buildErosionLandscapeCards() {
-  const mount = document.getElementById('erosion-landscape-list');
-  mount.innerHTML = '';
+function initTerrainStudio() {
   if (!erosionEngine) return;
 
-  for (const preset of Object.values(EROSION_LANDSCAPES)) {
-    const btn = document.createElement('button');
-    btn.className = `arch-card ${preset.id === erosionEngine.params.landscape ? 'active' : ''}`;
-    btn.dataset.id = preset.id;
-    btn.innerHTML = `
-      <div class="arch-card-top">
-        <span class="arch-title">${preset.name}</span>
-        <span class="arch-cat">500m</span>
-      </div>
-      <span class="arch-sub">${preset.subtitle}</span>
-    `;
-    btn.addEventListener('click', () => {
-      erosionEngine.applyLandscapePreset(preset.id);
-      mount.querySelectorAll('.arch-card').forEach((el) => {
-        el.classList.toggle('active', el.dataset.id === preset.id);
-      });
-      syncErosionSliders();
+  erosionLayerStackUI = new ErosionLayerStackUI(erosionEngine);
+
+  const playBtn = document.getElementById('btn-er-play');
+  const syncPlayBtn = () => {
+    const running = Boolean(erosionEngine.pipeline.liveSimRunning);
+    playBtn.textContent = running ? '⏸ Pause Sim' : '▶ Live Sim';
+    playBtn.classList.toggle('active-play', running);
+  };
+  playBtn.addEventListener('click', () => {
+    erosionEngine.pipeline.liveSimRunning = !erosionEngine.pipeline.liveSimRunning;
+    syncPlayBtn();
+  });
+
+  document.getElementById('btn-er-reset').addEventListener('click', () => {
+    erosionEngine.pipeline.evaluateStack({ reseedPlacements: true, fastPreview: false });
+    erosionLayerStackUI.renderAll();
+  });
+
+  // Camera Presets in Viewport Scene Nav
+  document.getElementById('btn-er-frame').addEventListener('click', () => {
+    erosionEngine.resetCamera();
+  });
+
+  document.getElementById('btn-cam-cliff').addEventListener('click', () => {
+    erosionEngine.camera.yaw = 0.62;
+    erosionEngine.camera.pitch = 0.19;
+    erosionEngine.camera.distance = 310;
+    erosionEngine.camera.target = [12, 48, -14];
+  });
+
+  document.getElementById('btn-cam-top').addEventListener('click', () => {
+    erosionEngine.camera.yaw = 0.0;
+    erosionEngine.camera.pitch = 1.38;
+    erosionEngine.camera.distance = 680;
+    erosionEngine.camera.target = [0, 40, 0];
+  });
+
+  // Export Constructed Terrain Mesh (.GLB / .OBJ)
+  document.getElementById('btn-er-export-glb').addEventListener('click', () => {
+    const mesh = erosionEngine.extractMeshForExport(2);
+    const slug = erosionEngine.pipeline.activePresetId || 'terrain';
+    const glb = exportFormationToGLB({
+      mesh,
+      lithology: 'canyonSand',
+      params: { archetype: slug, seed: 4029 },
     });
-    mount.appendChild(btn);
-  }
-}
+    downloadBlob(
+      new Blob([glb], { type: 'model/gltf-binary' }),
+      `frontier_${slug}_${erosionEngine.pipeline.layers.length}layers.glb`
+    );
+  });
 
-function buildErosionSliders(groupKey, mountId) {
-  const mount = document.getElementById(mountId);
-  mount.innerHTML = '';
-  if (!erosionEngine) return;
-
-  for (const spec of EROSION_SLIDER_SCHEMA[groupKey]) {
-    const wrap = document.createElement('div');
-    wrap.className = 'slider-group';
-    const val = erosionEngine.params[spec.key];
-    wrap.innerHTML = `
-      <div class="slider-label">
-        <span>${spec.label}</span>
-        <output>${spec.fmt(val)}</output>
-      </div>
-      <input type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${val}" />
-    `;
-    const input = wrap.querySelector('input');
-    const out = wrap.querySelector('output');
-
-    input.addEventListener('input', () => {
-      const num = Number(input.value);
-      erosionEngine.params[spec.key] = num;
-      out.textContent = spec.fmt(num);
-      if (spec.key === 'particleCount') {
-        document.getElementById('er-stat-parts').textContent = num.toLocaleString();
-      }
+  document.getElementById('btn-er-export-obj').addEventListener('click', () => {
+    const mesh = erosionEngine.extractMeshForExport(2);
+    const slug = erosionEngine.pipeline.activePresetId || 'terrain';
+    const objText = exportFormationToOBJ({
+      mesh,
+      params: { archetype: slug, seed: 4029 },
     });
-    if (spec.key === 'boulderDensity') {
-      input.addEventListener('change', () => {
-        erosionEngine.rockCalving.seedForLandscape(erosionEngine.params);
-      });
-    }
-
-    erosionSliderRefs.set(spec.key, { input, out, spec });
-    mount.appendChild(wrap);
-  }
-}
-
-function syncErosionSliders() {
-  if (!erosionEngine) return;
-  for (const [key, ref] of erosionSliderRefs.entries()) {
-    const val = erosionEngine.params[key];
-    ref.input.value = val;
-    ref.out.textContent = ref.spec.fmt(val);
-  }
-  document.getElementById('er-stat-parts').textContent = erosionEngine.params.particleCount.toLocaleString();
-
-  const emSel = document.getElementById('select-emitter-mode');
-  if (emSel) emSel.value = erosionEngine.params.emitterMode;
-  const matSel = document.getElementById('select-erosion-material');
-  if (matSel) matSel.value = String(erosionEngine.params.materialTheme ?? 0);
-  const fabSel = document.getElementById('select-erosion-fabric');
-  if (fabSel) fabSel.value = String(erosionEngine.params.fabricMode ?? 0);
-  const erAz = document.getElementById('slider-erosion-sun-az');
-  const erEl = document.getElementById('slider-erosion-sun-el');
-  if (erAz) {
-    erAz.value = String(erosionEngine.params.sunAzimuth);
-    document.getElementById('out-erosion-sun-az').textContent = `${erosionEngine.params.sunAzimuth}°`;
-  }
-  if (erEl) {
-    erEl.value = String(erosionEngine.params.sunElevation);
-    document.getElementById('out-erosion-sun-el').textContent = `${erosionEngine.params.sunElevation}°`;
-  }
-  const chkWater = document.getElementById('chk-erosion-water');
-  if (chkWater) chkWater.checked = Boolean(erosionEngine.params.showWater);
-  const chkOut = document.getElementById('chk-erosion-outcrops');
-  if (chkOut) chkOut.checked = erosionEngine.params.showOutcrops !== false;
-  const seedIn = document.getElementById('input-erosion-seed');
-  if (seedIn) seedIn.value = String(erosionEngine.params.seed);
-  if (erosionLayerStackUI) erosionLayerStackUI.refreshAll();
+    downloadBlob(
+      new Blob([objText], { type: 'text/plain' }),
+      `frontier_${slug}_${erosionEngine.pipeline.layers.length}layers.obj`
+    );
+  });
 }
 
 // ============================================================================
-// CUSTOM CURVE-DRAWN ARCH TOOL (GIZMO UI WIRING)
+// 3D ROCK & CLIFF STUDIO CONTROLS
 // ============================================================================
+
+const sliderRefs = new Map();
 
 function updateCurveReadout() {
   const readout = document.getElementById('curve-point-readout');
@@ -400,17 +348,15 @@ function updateCurveReadout() {
 
   const pt = curveOverlay.getSelectedPoint();
   if (pill) {
-    pill.textContent = !state.curveMode ? 'Off' : curveOverlay.placeMode ? 'Placing Points' : 'Gizmo Active';
-    pill.classList.toggle('accent', state.curveMode);
+    pill.textContent = !state.curveMode ? 'Off' : curveOverlay.placeMode ? 'Placing' : 'Gizmo';
   }
   if (!readout) return;
   if (!pt) {
     const total = curveOverlay.getCurves().reduce((n, c) => n + c.length, 0);
-    readout.textContent = `${total} control points · click the viewport to place a point`;
+    readout.textContent = `${total} control points`;
     return;
   }
-  readout.textContent =
-    `P${curveOverlay.selectedPointIdx + 1} · x ${pt.x.toFixed(2)} · y ${pt.y.toFixed(2)} · z ${pt.z.toFixed(2)} · r ${(pt.r ?? 1).toFixed(2)}×`;
+  readout.textContent = `P${curveOverlay.selectedPointIdx + 1} · r ${(pt.r ?? 1).toFixed(2)}×`;
   if (radSlider) radSlider.value = String(pt.r ?? 1.0);
   if (radOut) radOut.textContent = `${(pt.r ?? 1.0).toFixed(2)}×`;
 }
@@ -425,12 +371,10 @@ function setCurveMode(flag) {
 
 function initCurveTool() {
   if (!curveOverlay) return;
-
   document.getElementById('btn-curve-draw').addEventListener('click', () => {
     if (state.studioMode !== 'rock') setStudioMode('rock');
     state.curveMode = !state.curveMode;
     if (state.curveMode) {
-      // Start a fresh multi-segment arch: click to place piers and a hanging crown
       curveOverlay.clearForClickDraw(0);
       state.params.customArchCurves = curveOverlay.getCurves();
       setCurveMode(true);
@@ -470,7 +414,6 @@ function initCurveTool() {
     curveOverlay.setSelectedPointRadius(Number(radSlider.value), true);
   });
 
-  // Clicking a formation card (or the seed row) clears the custom curve override so presets rule
   document.getElementById('archetype-list').addEventListener('pointerdown', () => {
     if (state.customCurveActive) {
       state.customCurveActive = false;
@@ -478,241 +421,19 @@ function initCurveTool() {
       setCurveMode(false);
     }
   }, true);
-
-  updateCurveReadout();
 }
-
-function initErosionControls() {
-  if (!erosionEngine) return;
-
-  buildErosionLandscapeCards();
-  buildErosionSliders('particles', 'er-sliders-particles');
-  buildErosionSliders('hardness', 'er-sliders-hardness');
-  buildErosionSliders('hydraulics', 'er-sliders-hydraulics');
-  buildErosionSliders('climate', 'er-sliders-climate');
-
-  document.getElementById('select-emitter-mode').addEventListener('change', (e) => {
-    erosionEngine.params.emitterMode = e.target.value;
-  });
-
-  document.querySelectorAll('#erosion-brush-buttons button').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#erosion-brush-buttons button').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      erosionEngine.params.brushMode = btn.dataset.brush;
-    });
-  });
-
-  const radSlider = document.getElementById('slider-brush-radius');
-  const radOut = document.getElementById('out-brush-radius');
-  radSlider.addEventListener('input', () => {
-    const r = Number(radSlider.value);
-    erosionEngine.params.brushRadius = r;
-    radOut.textContent = `${r}m`;
-  });
-
-  const applyErosionSeed = (s) => {
-    erosionEngine.params.seed = Math.max(1, Math.floor(Number(s) || 1));
-    document.getElementById('input-erosion-seed').value = erosionEngine.params.seed;
-    erosionEngine.resetSimulation();
-  };
-
-  document.getElementById('btn-erosion-random-seed').addEventListener('click', () => {
-    applyErosionSeed(Math.floor(1000 + Math.random() * 9000));
-  });
-  document.getElementById('btn-erosion-apply-seed').addEventListener('click', () => {
-    applyErosionSeed(document.getElementById('input-erosion-seed').value);
-  });
-  document.getElementById('input-erosion-seed').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') applyErosionSeed(e.target.value);
-  });
-
-  document.getElementById('select-erosion-view').addEventListener('change', (e) => {
-    erosionEngine.params.viewMode = e.target.value;
-  });
-
-  const materialSelect = document.getElementById('select-erosion-material');
-  if (materialSelect) {
-    materialSelect.value = String(erosionEngine.params.materialTheme ?? 0);
-    materialSelect.addEventListener('change', (e) => {
-      erosionEngine.params.materialTheme = Number(e.target.value) || 0;
-    });
-  }
-
-  const fabricSelect = document.getElementById('select-erosion-fabric');
-  if (fabricSelect) {
-    fabricSelect.value = String(erosionEngine.params.fabricMode ?? 0);
-    fabricSelect.addEventListener('change', (e) => {
-      erosionEngine.params.fabricMode = Number(e.target.value) || 0;
-    });
-  }
-
-  const erAz = document.getElementById('slider-erosion-sun-az');
-  const erEl = document.getElementById('slider-erosion-sun-el');
-  erAz.addEventListener('input', () => {
-    erosionEngine.params.sunAzimuth = Number(erAz.value);
-    document.getElementById('out-erosion-sun-az').textContent = `${erAz.value}°`;
-  });
-  erEl.addEventListener('input', () => {
-    erosionEngine.params.sunElevation = Number(erEl.value);
-    document.getElementById('out-erosion-sun-el').textContent = `${erEl.value}°`;
-  });
-
-  document.getElementById('chk-erosion-particles').addEventListener('change', (e) => {
-    erosionEngine.params.showParticles = e.target.checked;
-  });
-  document.getElementById('chk-erosion-water').addEventListener('change', (e) => {
-    erosionEngine.params.showWater = e.target.checked;
-  });
-  const chkOutcrops = document.getElementById('chk-erosion-outcrops');
-  if (chkOutcrops) {
-    chkOutcrops.addEventListener('change', (e) => {
-      erosionEngine.params.showOutcrops = e.target.checked;
-    });
-  }
-  const btnCalve = document.getElementById('btn-er-calve-boulders');
-  if (btnCalve) {
-    btnCalve.addEventListener('click', () => {
-      if ((erosionEngine.params.boulderDensity ?? 0) < 0.15) {
-        erosionEngine.params.boulderDensity = 0.65;
-        syncErosionSliders();
-      }
-      erosionEngine.params.showOutcrops = true;
-      if (chkOutcrops) chkOutcrops.checked = true;
-      erosionEngine.triggerBoulderCalving(26);
-    });
-  }
-
-  // Transport Bar Buttons
-  const playBtn = document.getElementById('btn-er-play');
-  const syncPlayBtn = () => {
-    playBtn.textContent = erosionEngine.playing ? '⏸ Pause [Space]' : '▶ Resume [Space]';
-    playBtn.classList.toggle('active-play', erosionEngine.playing);
-  };
-
-  playBtn.addEventListener('click', () => {
-    erosionEngine.playing = !erosionEngine.playing;
-    syncPlayBtn();
-  });
-
-  document.getElementById('btn-er-burst100').addEventListener('click', () => {
-    erosionEngine.stepSimulation(100);
-    erosionEngine._sampleTelemetry();
-    erosionEngine.renderFrame();
-  });
-
-  document.getElementById('btn-er-burst400').addEventListener('click', () => {
-    erosionEngine.stepSimulation(400);
-    erosionEngine._sampleTelemetry();
-    erosionEngine.renderFrame();
-  });
-
-  document.getElementById('btn-er-reset').addEventListener('click', () => {
-    erosionEngine.resetSimulation();
-    erosionEngine.renderFrame();
-  });
-
-  document.getElementById('btn-er-frame').addEventListener('click', () => {
-    erosionEngine.resetCamera();
-  });
-
-  document.getElementById('btn-erosion-reset-params').addEventListener('click', () => {
-    erosionEngine.applyLandscapePreset(erosionEngine.params.landscape);
-    syncErosionSliders();
-  });
-
-  // Initialize c7egoist/Frontier Alloy Layer Stack Inspector!
-  erosionLayerStackUI = new ErosionLayerStackUI(erosionEngine, {
-    onTransportSync: () => syncPlayBtn(),
-    onExternalSync: () => syncErosionSliders(),
-    onPresetChanged: (presetId) => {
-      document.querySelectorAll('#erosion-landscape-list .arch-card').forEach((el) => {
-        el.classList.toggle('active', el.dataset.id === presetId);
-      });
-      syncErosionSliders();
-    },
-  });
-
-  // Populate Right-Dock Brush Tab (`#er-brush-inspector-mount`)
-  const brushMount = document.getElementById('er-brush-inspector-mount');
-  if (brushMount && erosionLayerStackUI) {
-    brushMount.appendChild(erosionLayerStackUI._makeSelect({
-      label: 'Pointer Tool Mode',
-      options: [
-        { value: 'orbit', label: 'Orbit Camera (Default)' },
-        { value: 'cloudburst', label: 'Storm Cloudburst Rain' },
-        { value: 'raise', label: 'Tectonic Uplift Sculpt' },
-        { value: 'carve', label: 'Canyon Carve Sculpt' },
-      ],
-      get: () => erosionEngine.params.brushMode,
-      set: (mode) => {
-        erosionEngine.params.brushMode = mode;
-        document.querySelectorAll('#erosion-brush-buttons button').forEach((b) => {
-          b.classList.toggle('active', b.dataset.brush === mode);
-        });
-      },
-    }));
-    brushMount.appendChild(erosionLayerStackUI._makePillSlider({
-      label: 'Brush Radius', min: 10, max: 110, step: 2, unit: 'm',
-      get: () => erosionEngine.params.brushRadius,
-      set: (v) => {
-        erosionEngine.params.brushRadius = v;
-        radSlider.value = String(v);
-        radOut.textContent = `${v}m`;
-      },
-    }));
-    brushMount.appendChild(erosionLayerStackUI._makePillSlider({
-      label: 'Sculpt / Storm Strength', min: 0.15, max: 2.2, step: 0.05, unit: '×',
-      get: () => erosionEngine.params.brushStrength,
-      set: (v) => { erosionEngine.params.brushStrength = v; },
-    }));
-  }
-
-  // Export Eroded Terrain Mesh (.GLB / .OBJ)
-  document.getElementById('btn-er-export-glb').addEventListener('click', () => {
-    const mesh = erosionEngine.extractMeshForExport(2);
-    const glb = exportFormationToGLB({
-      mesh,
-      lithology: 'canyonSand',
-      params: { archetype: erosionEngine.params.landscape, seed: erosionEngine.params.seed },
-    });
-    downloadBlob(
-      new Blob([glb], { type: 'model/gltf-binary' }),
-      `frontier_eroded_${erosionEngine.params.landscape}_${erosionEngine.stepCount}steps.glb`
-    );
-  });
-
-  document.getElementById('btn-er-export-obj').addEventListener('click', () => {
-    const mesh = erosionEngine.extractMeshForExport(2);
-    const objText = exportFormationToOBJ({
-      mesh,
-      params: { archetype: erosionEngine.params.landscape, seed: erosionEngine.params.seed },
-    });
-    downloadBlob(
-      new Blob([objText], { type: 'text/plain' }),
-      `frontier_eroded_${erosionEngine.params.landscape}_${erosionEngine.stepCount}steps.obj`
-    );
-  });
-}
-
-// ============================================================================
-// 3D ROCK & CLIFF STUDIO UI WIRING
-// ============================================================================
-
-const sliderRefs = new Map();
 
 function buildCategoryFilterBar() {
   const bar = document.getElementById('cat-filter-bar');
   bar.innerHTML = '';
   for (const cat of CATEGORIES) {
     const btn = document.createElement('button');
-    btn.className = `cat-pill ${state.categoryFilter === cat ? 'active' : ''}`;
+    btn.type = 'button';
+    btn.className = `cat-chip ${state.categoryFilter === cat ? 'active' : ''}`;
     btn.textContent = cat === 'Fracture Demo' ? 'Cracks' : cat;
     btn.addEventListener('click', () => {
       state.categoryFilter = cat;
-      bar.querySelectorAll('.cat-pill').forEach((el) => {
-        el.classList.toggle('active', el === btn);
-      });
+      bar.querySelectorAll('.cat-chip').forEach((el) => el.classList.toggle('active', el === btn));
       buildArchetypeCards();
     });
     bar.appendChild(btn);
@@ -725,14 +446,12 @@ function buildArchetypeCards() {
   for (const preset of Object.values(FORMATION_PRESETS)) {
     if (state.categoryFilter !== 'All' && preset.category !== state.categoryFilter) continue;
     const btn = document.createElement('button');
-    btn.className = `arch-card ${preset.id === state.params.archetype ? 'active' : ''}`;
+    btn.type = 'button';
+    btn.className = `archetype-card ${preset.id === state.params.archetype ? 'active' : ''}`;
     btn.dataset.id = preset.id;
     btn.innerHTML = `
-      <div class="arch-card-top">
-        <span class="arch-title">${preset.name}</span>
-        <span class="arch-cat">${preset.category}</span>
-      </div>
-      <span class="arch-sub">${preset.subtitle}</span>
+      <div class="arch-name">${preset.name}</div>
+      <div class="arch-sub">${preset.category}</div>
     `;
     btn.addEventListener('click', () => selectArchetype(preset.id));
     container.appendChild(btn);
@@ -748,12 +467,10 @@ function selectArchetype(archId) {
     quality: state.params.quality,
     decimation: state.params.decimation,
   });
-
   document.getElementById('active-category').textContent = preset.category;
-  document.querySelectorAll('#archetype-list .arch-card').forEach((el) => {
+  document.querySelectorAll('#archetype-list .archetype-card').forEach((el) => {
     el.classList.toggle('active', el.dataset.id === archId);
   });
-
   syncSlidersFromState();
   requestSynthesis(true);
 }
@@ -774,14 +491,12 @@ function buildSliders(groupKey, mountId) {
     `;
     const input = wrap.querySelector('input');
     const out = wrap.querySelector('output');
-
     input.addEventListener('input', () => {
       const num = Number(input.value);
       state.params[spec.key] = num;
       out.textContent = spec.fmt(num);
       requestSynthesis(false);
     });
-
     sliderRefs.set(spec.key, { input, out, spec });
     mount.appendChild(wrap);
   }
@@ -800,6 +515,7 @@ function buildSeedStrip() {
   strip.innerHTML = '';
   for (const s of QUICK_SEEDS) {
     const b = document.createElement('button');
+    b.type = 'button';
     b.className = `seed-chip ${Number(state.params.seed) === s ? 'active' : ''}`;
     b.textContent = `#${s}`;
     b.addEventListener('click', () => setSeed(s));
@@ -814,11 +530,6 @@ function setSeed(newSeed) {
     chip.classList.toggle('active', chip.textContent === `#${state.params.seed}`);
   });
   requestSynthesis(false);
-}
-
-function randomizeSeed() {
-  const next = Math.floor(1000 + Math.random() * 9000);
-  setSeed(next);
 }
 
 function initShadingControls() {
@@ -841,60 +552,31 @@ function initShadingControls() {
     viewport.setShadingMode(mode);
   });
 
-  lithSelect.addEventListener('change', () => {
-    viewport.setLithologyOverride(lithSelect.value);
+  lithSelect.addEventListener('change', () => viewport.setLithologyOverride(lithSelect.value));
+  document.getElementById('select-rock-fabric').addEventListener('change', (e) => {
+    viewport.setFabricMode(Number(e.target.value) || 0);
   });
-
-  const rockFabricSelect = document.getElementById('select-rock-fabric');
-  if (rockFabricSelect) {
-    rockFabricSelect.addEventListener('change', () => {
-      viewport.setFabricMode(Number(rockFabricSelect.value) || 0);
-    });
-  }
 
   const sunAz = document.getElementById('slider-sun-az');
   const sunEl = document.getElementById('slider-sun-el');
-  const outAz = document.getElementById('out-sun-az');
-  const outEl = document.getElementById('out-sun-el');
-
   const updateSun = () => {
     const az = Number(sunAz.value);
     const el = Number(sunEl.value);
-    outAz.textContent = `${az}°`;
-    outEl.textContent = `${el}°`;
+    document.getElementById('out-sun-az').textContent = `${az}°`;
+    document.getElementById('out-sun-el').textContent = `${el}°`;
     viewport.setSunAngles(az, el);
   };
   sunAz.addEventListener('input', updateSun);
   sunEl.addEventListener('input', updateSun);
 
-  document.getElementById('chk-human').addEventListener('change', (e) => {
-    viewport.setScaleHumanVisible(e.target.checked);
-  });
-  document.getElementById('chk-wireframe').addEventListener('change', (e) => {
-    viewport.setWireframe(e.target.checked);
-  });
-  document.getElementById('chk-turntable').addEventListener('change', (e) => {
-    viewport.setTurntable(e.target.checked);
-  });
+  document.getElementById('chk-human').addEventListener('change', (e) => viewport.setScaleHumanVisible(e.target.checked));
+  document.getElementById('chk-wireframe').addEventListener('change', (e) => viewport.setWireframe(e.target.checked));
+  document.getElementById('chk-turntable').addEventListener('change', (e) => viewport.setTurntable(e.target.checked));
 }
 
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function initActionButtons() {
-  document.getElementById('btn-random-seed').addEventListener('click', randomizeSeed);
-  document.getElementById('btn-apply-seed').addEventListener('click', () => {
-    setSeed(Number(document.getElementById('input-seed').value));
-  });
-  document.getElementById('input-seed').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') setSeed(Number(e.target.value));
-  });
+function initRockActionButtons() {
+  document.getElementById('btn-random-seed').addEventListener('click', () => setSeed(Math.floor(1000 + Math.random() * 9000)));
+  document.getElementById('btn-apply-seed').addEventListener('click', () => setSeed(Number(document.getElementById('input-seed').value)));
 
   document.querySelectorAll('#quality-buttons button').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -910,9 +592,7 @@ function initActionButtons() {
     requestSynthesis(false);
   });
 
-  document.getElementById('btn-reset-params').addEventListener('click', () => {
-    selectArchetype(state.params.archetype);
-  });
+  document.getElementById('btn-reset-params').addEventListener('click', () => selectArchetype(state.params.archetype));
 
   document.querySelectorAll('#rock-camera-bar .cam-btn').forEach((btn) => {
     btn.addEventListener('click', () => viewport.frameCamera(btn.dataset.cam));
@@ -921,26 +601,19 @@ function initActionButtons() {
   document.getElementById('btn-export-glb').addEventListener('click', () => {
     if (!state.latestResult) return;
     const glb = exportFormationToGLB(state.latestResult);
-    const fname = `frontier_${state.params.archetype}_${state.params.seed}.glb`;
-    downloadBlob(new Blob([glb], { type: 'model/gltf-binary' }), fname);
+    downloadBlob(new Blob([glb], { type: 'model/gltf-binary' }), `frontier_${state.params.archetype}_${state.params.seed}.glb`);
   });
 
   document.getElementById('btn-export-obj').addEventListener('click', () => {
     if (!state.latestResult) return;
     const objText = exportFormationToOBJ(state.latestResult);
-    const fname = `frontier_${state.params.archetype}_${state.params.seed}.obj`;
-    downloadBlob(new Blob([objText], { type: 'text/plain' }), fname);
+    downloadBlob(new Blob([objText], { type: 'text/plain' }), `frontier_${state.params.archetype}_${state.params.seed}.obj`);
   });
 
   window.addEventListener('keydown', (e) => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
     if (state.studioMode === 'erosion' && erosionEngine) {
-      if (e.key === 'r' || e.key === 'R') {
-        erosionEngine.params.seed = Math.floor(1000 + Math.random() * 9000);
-        document.getElementById('input-erosion-seed').value = erosionEngine.params.seed;
-        erosionEngine.resetSimulation();
-      } else if (e.key === 'f' || e.key === 'F') {
+      if (e.key === 'f' || e.key === 'F') {
         erosionEngine.resetCamera();
       } else if (e.code === 'Space') {
         e.preventDefault();
@@ -948,26 +621,12 @@ function initActionButtons() {
       }
       return;
     }
-
-    if (e.key === 'r' || e.key === 'R') {
-      randomizeSeed();
-    } else if (e.key === 'z' || e.key === 'Z') {
-      const chk = document.getElementById('chk-wireframe');
-      chk.checked = !chk.checked;
-      viewport.setWireframe(chk.checked);
-    } else if (e.key === 'f' || e.key === 'F') {
-      viewport.frameCamera('hero');
-    } else if (e.code === 'Space') {
-      e.preventDefault();
-      const chk = document.getElementById('chk-turntable');
-      chk.checked = !chk.checked;
-      viewport.setTurntable(chk.checked);
-    }
+    if (e.key === 'f' || e.key === 'F') viewport.frameCamera('hero');
   });
 }
 
-// Boot both UIs cleanly and activate initial studio mode!
-initErosionControls();
+// Boot Frontier Terrain Studio + Rock Studio
+initTerrainStudio();
 buildCategoryFilterBar();
 buildArchetypeCards();
 buildSliders('tectonics', 'sliders-tectonics');
@@ -976,10 +635,8 @@ buildSliders('detail', 'sliders-detail');
 buildSeedStrip();
 initShadingControls();
 initCurveTool();
-initActionButtons();
+initRockActionButtons();
 
-// Pre-warm initial Rock Studio mesh in background worker so switching tabs is instantaneous!
 state.rockInitializedOnce = true;
 requestSynthesis(true);
-
 setStudioMode(state.studioMode);

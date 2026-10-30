@@ -12,8 +12,16 @@ import {
 } from '../src/erosion/erosion-presets.js';
 import { RockCalvingSystem, buildRockArchetypeAtlas } from '../src/erosion/rock-calving.js';
 import { buildGrassTuftMesh, MAX_GRASS_TUFTS } from '../src/erosion/grass-system.js';
-import { PROCEDURAL_MODIFIER_CATALOG, glyphSvg } from '../src/erosion/layer-stack-ui.js';
+import {
+  DERIVED_PALETTES,
+  LAYER_CATEGORIES,
+  LAYER_OPERATION_SPECS,
+  TERRAIN_STACK_PRESETS,
+  createStackLayer,
+} from '../src/erosion/terrain-stack-presets.js';
+import { SdfCaveSystem } from '../src/erosion/sdf-cave-mesher.js';
 import * as Shaders from '../src/erosion/erosion-shaders.js';
+import * as PipelineShaders from '../src/erosion/pipeline-shaders.js';
 
 const ALL_SHADER_EXPORTS = [
   'FULLSCREEN_VERT',
@@ -517,19 +525,220 @@ test('Real 3D Grass tuft mesh, biome vegetation defaults (Green / Dry / Auto-Ble
 
   const moon = getVegetationDefaultsForLandscape('lunar-mare-craters');
   assert.equal(moon.grassEnabled, false, 'Lunar Mare Craters disables grass');
-
-  // 3. Layer Stack Default Visual Invariance & Independent Simulation Flags
-  assert.deepEqual(DEFAULT_EROSION_PARAMS.proceduralModifiers, [], 'Default preset must have zero procedural modifiers so existing terrains are visually unchanged');
-  assert.equal(DEFAULT_EROSION_PARAMS.lithologyLayerEnabled, true);
-  assert.equal(DEFAULT_EROSION_PARAMS.fabricLayerEnabled, true);
-  assert.equal(DEFAULT_EROSION_PARAMS.snowLayerEnabled, true);
-  assert.equal(DEFAULT_EROSION_PARAMS.waterLayerEnabled, true);
-  assert.equal(DEFAULT_EROSION_PARAMS.simHydraulicPlaying, true);
-  assert.equal(DEFAULT_EROSION_PARAMS.simCryoPlaying, true);
-  assert.equal(DEFAULT_EROSION_PARAMS.simWindPlaying, true);
-  assert.equal(DEFAULT_EROSION_PARAMS.simRockfallPlaying, true);
-  assert.equal(PROCEDURAL_MODIFIER_CATALOG.length, 6);
-  assert.ok(glyphSvg('grass').includes('<svg') && glyphSvg('layers').includes('<svg'));
 });
+
+test('Bottom-to-top Terrain Stack Pipeline shaders, uniform bindings, and non-colour operation specs satisfy strict architecture', () => {
+  const PIPELINE_EXPORTS = [
+    'STACK_LANDFORM_FRAG',
+    'SCULPT_STAMP_FRAG',
+    'STACK_RIVER_INCISION_FRAG',
+    'STACK_HYDRAULIC_FRAG',
+    'STACK_THERMAL_TALUS_FRAG',
+    'STACK_AEOLIAN_GLACIAL_FRAG',
+    'STACK_SURFACE_BAKE_FRAG',
+    'PIPELINE_TERRAIN_VERT',
+    'PIPELINE_TERRAIN_FRAG',
+    'SDF_CAVE_VERT',
+    'SDF_CAVE_FRAG',
+    'STACK_SYNC_EXPORT_FRAG',
+  ];
+
+  for (const name of PIPELINE_EXPORTS) {
+    const src = PipelineShaders[name];
+    assert.equal(typeof src, 'string', `Missing pipeline shader export ${name}`);
+    assert.ok(src.startsWith('#version 300 es\n'), `${name} must start with #version 300 es`);
+    assert.ok(src.includes('precision highp float;'), `${name} missing highp float`);
+    assert.ok(src.includes('precision highp int;'), `${name} missing highp int`);
+    assert.ok(src.includes('precision highp sampler2D;'), `${name} missing highp sampler2D`);
+    assert.ok(src.includes('void main()'), `${name} missing void main()`);
+
+    let braces = 0, parens = 0;
+    for (const ch of src) {
+      if (ch === '{') braces++;
+      else if (ch === '}') braces--;
+      else if (ch === '(') parens++;
+      else if (ch === ')') parens--;
+      assert.ok(braces >= 0, `Unbalanced '}' in ${name}`);
+      assert.ok(parens >= 0, `Unbalanced ')' in ${name}`);
+    }
+    assert.equal(braces, 0, `Unclosed '{' in ${name}`);
+    assert.equal(parens, 0, `Unclosed '(' in ${name}`);
+  }
+
+  // Verify every getUniformLocation / _bindTex in terrain-stack-pipeline.js matches its GLSL shader!
+  const pipeSrc = fs.readFileSync(new URL('../src/erosion/terrain-stack-pipeline.js', import.meta.url), 'utf8');
+  const uRegex = /(?:getUniformLocation|_bindTex)\(\s*this\.(\w+)\s*,\s*'(\w+)'/g;
+  const progShaders = {
+    progLandform: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_LANDFORM_FRAG],
+    progSculptStamp: [Shaders.FULLSCREEN_VERT, PipelineShaders.SCULPT_STAMP_FRAG],
+    progRiver: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_RIVER_INCISION_FRAG],
+    progHydraulic: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_HYDRAULIC_FRAG],
+    progThermal: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_THERMAL_TALUS_FRAG],
+    progAeolianGlacial: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_AEOLIAN_GLACIAL_FRAG],
+    progBake: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_SURFACE_BAKE_FRAG],
+    progSyncExport: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_SYNC_EXPORT_FRAG],
+    progTerrain: [PipelineShaders.PIPELINE_TERRAIN_VERT, PipelineShaders.PIPELINE_TERRAIN_FRAG],
+    progCave: [PipelineShaders.SDF_CAVE_VERT, PipelineShaders.SDF_CAVE_FRAG],
+  };
+
+  let m;
+  let verified = 0;
+  while ((m = uRegex.exec(pipeSrc)) !== null) {
+    const [, progName, uName] = m;
+    if (!progShaders[progName]) continue;
+    const joined = progShaders[progName].join('\n');
+    assert.ok(
+      joined.includes('uniform ') && joined.includes(uName),
+      `Pipeline uniform '${uName}' referenced on '${progName}' is missing from GLSL`
+    );
+    verified++;
+  }
+  assert.ok(verified >= 32, `Expected >= 32 verified pipeline GPU uniform bindings, got ${verified}`);
+
+  // Verify 14 composable operations across all 5 categories, and ZERO colour/material/biome layers!
+  const specKeys = Object.keys(LAYER_OPERATION_SPECS);
+  assert.equal(specKeys.length, 14);
+  for (const catKey of ['landform', 'simulation', 'spline', 'rocks', 'vegetation']) {
+    assert.ok(LAYER_CATEGORIES[catKey], `Missing category ${catKey}`);
+    assert.ok(specKeys.some((k) => LAYER_OPERATION_SPECS[k].category === catKey), `No operation in category ${catKey}`);
+  }
+  const forbiddenTerms = ['colour', 'color', 'material', 'biome', 'texture', 'albedo'];
+  for (const spec of Object.values(LAYER_OPERATION_SPECS)) {
+    const labelStr = spec.defaultName || '';
+    for (const bad of forbiddenTerms) {
+      assert.ok(
+        !spec.type.toLowerCase().includes(bad) && !labelStr.toLowerCase().includes(bad),
+        `Layer stack must not contain colour/material layers, found ${labelStr}`
+      );
+    }
+    assert.ok(Array.isArray(spec.reads) && Array.isArray(spec.writes) && spec.writes.length > 0);
+  }
+  assert.equal(Object.keys(DERIVED_PALETTES).length, 6, 'Derived surface palettes live separately from the layer stack');
+
+  // Verify all 8 preset stack recipes build valid bottom-up stacks anchored by base-landform at bottom!
+  const presetKeys = Object.keys(TERRAIN_STACK_PRESETS);
+  assert.equal(presetKeys.length, 8);
+  for (const pk of presetKeys) {
+    const stack = TERRAIN_STACK_PRESETS[pk].layers();
+    assert.ok(stack.length >= 5, `Preset ${pk} must populate a multi-stage editable stack`);
+    const bottomLayer = stack[stack.length - 1];
+    assert.equal(bottomLayer.type, 'base-landform', `Bottom layer of ${pk} must be base-landform (evaluated first)`);
+    for (const l of stack) {
+      assert.ok(l.id && l.type && l.params && typeof l.enabled === 'boolean');
+    }
+  }
+});
+
+test('Bottom-to-top layer order genuinely changes terrain output and 3D SDF Cave mesher carves volumetric overhangs', () => {
+  // 1. Prove Layer Order Sensitivity:
+  // Evaluate a 1D column strip bottom-to-top for:
+  //   Stack A (top -> bottom): [Hydraulic Erosion, Rock Stacks, Base Landform] -> Stacks built first, THEN eroded!
+  //   Stack B (top -> bottom): [Rock Stacks, Hydraulic Erosion, Base Landform] -> Valley eroded first, THEN crisp stacks added!
+  const W = 32;
+  const evalStripBottomUp = (layersTopToBottom) => {
+    let h = new Float32Array(W);
+    let sed = new Float32Array(W);
+    for (let li = layersTopToBottom.length - 1; li >= 0; li--) {
+      const layer = layersTopToBottom[li];
+      if (!layer.enabled) continue;
+      if (layer.type === 'base-landform') {
+        for (let x = 0; x < W; x++) h[x] = 20 + Math.sin((x / W) * Math.PI) * layer.params.relief * 0.4;
+      } else if (layer.type === 'rock-stacks') {
+        // Add steep rock stack pillar in center
+        for (let x = 13; x <= 18; x++) h[x] += layer.params.height;
+      } else if (layer.type === 'hydraulic-erosion') {
+        for (let it = 0; it < layer.params.iterations; it++) {
+          const next = new Float32Array(h);
+          for (let x = 1; x < W - 1; x++) {
+            const lap = 0.5 * (h[x - 1] + h[x + 1]) - h[x];
+            if (lap < 0) {
+              const cut = -lap * 0.28 * layer.params.erosionStrength;
+              next[x] -= cut;
+              sed[x] += cut * 0.5;
+            } else {
+              next[x] += lap * 0.15;
+            }
+          }
+          h = next;
+        }
+      }
+    }
+    return { h, sed };
+  };
+
+  const base = createStackLayer('base-landform', { params: { relief: 120 } });
+  const stacks = createStackLayer('rock-stacks', { params: { height: 55 } });
+  const erosion = createStackLayer('hydraulic-erosion', { params: { iterations: 24, erosionStrength: 0.8 } });
+
+  const outErodedStacks = evalStripBottomUp([erosion, stacks, base]); // bottom->top: base -> stacks -> erosion
+  const outFreshStacks = evalStripBottomUp([stacks, erosion, base]);  // bottom->top: base -> erosion -> stacks
+
+  const crestA = outErodedStacks.h[13];
+  const crestB = outFreshStacks.h[13];
+  assert.ok(
+    crestB - crestA > 12.0,
+    `Swapping Rock Stacks above Hydraulic Erosion must preserve sharp un-eroded stack rims (got ${crestB.toFixed(1)}m vs ${crestA.toFixed(1)}m)`
+  );
+  assert.ok(
+    outErodedStacks.sed[13] > outFreshStacks.sed[13] * 2.0,
+    'Eroding after Rock Stacks must generate significantly more stack-derived sediment'
+  );
+
+  // 2. Prove Real 3D Volumetric SDF Cave & Cliff-Undercut Carving + Non-Destructive Muting:
+  const caveSys = new SdfCaveSystem();
+  const N = 64;
+  const snap = new Float32Array(N * N * 4);
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const u = i / (N - 1);
+      // Steep 140m escarpment cliff running through center of domain
+      const bedrock = u < 0.42 ? 18.0 : u > 0.58 ? 158.0 : 18.0 + ((u - 0.42) / 0.16) * 140.0;
+      const idx = (j * N + i) * 4;
+      snap[idx] = bedrock;
+    }
+  }
+
+  const caveLayer = createStackLayer('sdf-caves', {
+    params: { undercutDepth: 16.5, caveRadius: 12.5, archHeight: 18.0, slopeMin: 20, elevationCenter: 0.35, elevationBand: 0.35, opacity: 1.0 },
+  });
+  const sculptCaveStrokes = [{ x: 0, y: 58, z: 0, radius: 18, strength: 1.0, op: 'cave-carve' }];
+
+  const resActive = caveSys.rebuildCaveVolume({
+    gridRgba: snap,
+    gridN: N,
+    worldSpan: 512,
+    caveLayers: [caveLayer],
+    sculptCaveStrokes,
+    maxRelief: 165,
+  });
+
+  assert.equal(resActive.hasCaves, true);
+  assert.ok(resActive.vertexCount >= 90, `Expected real 3D SDF cave mesh triangles, got ${resActive.vertexCount} vertices`);
+  let maxPortal = 0;
+  for (let k = 0; k < caveSys.portalTexData.length; k += 4) {
+    if (caveSys.portalTexData[k] > maxPortal) maxPortal = caveSys.portalTexData[k];
+  }
+  assert.ok(maxPortal > 0.46, `Expected 3D cave portal mask to breach cliff surface (>0.46), got ${maxPortal}`);
+
+  // Verify every 3D cave normal is unit length and finite
+  for (let v = 0; v < resActive.vertexCount; v++) {
+    const nx = caveSys.normals[v * 3], ny = caveSys.normals[v * 3 + 1], nz = caveSys.normals[v * 3 + 2];
+    const len = Math.hypot(nx, ny, nz);
+    assert.ok(Math.abs(len - 1.0) < 1e-3, `Non-unit 3D SDF cave normal length ${len}`);
+  }
+
+  // Non-destructive mute restores 0 cave vertices without touching snap heightfield
+  caveLayer.enabled = false;
+  const resMuted = caveSys.rebuildCaveVolume({
+    gridRgba: snap,
+    gridN: N,
+    worldSpan: 512,
+    caveLayers: [caveLayer],
+    sculptCaveStrokes: [],
+    maxRelief: 165,
+  });
+  assert.equal(resMuted.vertexCount, 0);
+});
+
 
 

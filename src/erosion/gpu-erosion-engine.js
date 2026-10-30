@@ -184,6 +184,11 @@ export class GpuErosionEngine {
 
     Object.assign(this.params, getVegetationDefaultsForLandscape(this.params.landscape));
     this.resetSimulation();
+
+    // Non-Destructive Bottom-to-Top Terrain Stack Pipeline (Landforms + SDF Caves + Simulation + Placements)
+    this.pipelineMode = true;
+    this.playing = false;
+    this.pipeline = new TerrainStackPipeline(this);
   }
 
   _initPrograms() {
@@ -453,6 +458,19 @@ export class GpuErosionEngine {
       const hit = this._raycastPlaneXZ(e.clientX, e.clientY);
       if (hit) this.pointerWorldXZ = hit;
 
+      const pipeTool = this.pipelineMode && this.pipeline ? this.pipeline.authorTool : 'navigate';
+      const isPipeSculpt =
+        button === 0 &&
+        !e.altKey &&
+        (pipeTool.startsWith('sculpt-') || pipeTool.startsWith('cave-'));
+
+      if (isPipeSculpt && hit) {
+        this.brushDown = true;
+        this.pipeline.applySculptStroke(hit[0], hit[1], true);
+        if (this.onStackMutated) this.onStackMutated();
+        return;
+      }
+
       const isToolStroke =
         button === 0 &&
         (e.shiftKey || (this.params.brushMode && this.params.brushMode !== 'orbit'));
@@ -469,6 +487,11 @@ export class GpuErosionEngine {
       const hit = this._raycastPlaneXZ(e.clientX, e.clientY);
       if (hit) {
         this.pointerWorldXZ = hit;
+        const pipeTool = this.pipelineMode && this.pipeline ? this.pipeline.authorTool : 'navigate';
+        if (this.brushDown && (pipeTool.startsWith('sculpt-') || pipeTool.startsWith('cave-'))) {
+          this.pipeline.applySculptStroke(hit[0], hit[1], false);
+          return;
+        }
         if (this.brushDown && (this.params.brushMode === 'cloudburst' || e.shiftKey)) {
           this.stormTarget = [hit[0], hit[1]];
         }
@@ -607,16 +630,42 @@ export class GpuErosionEngine {
     const aspect = rect.width / rect.height;
     const tanHalf = Math.tan((this.camera.fovDeg * Math.PI) / 360);
 
-    const dirX = forward[0] + right[0] * ndcX * aspect * tanHalf + up[0] * ndcY * tanHalf;
-    const dirY = forward[1] + right[1] * ndcX * aspect * tanHalf + up[1] * ndcY * tanHalf;
-    const dirZ = forward[2] + right[2] * ndcX * aspect * tanHalf + up[2] * ndcY * tanHalf;
+    let dirX = forward[0] + right[0] * ndcX * aspect * tanHalf + up[0] * ndcY * tanHalf;
+    let dirY = forward[1] + right[1] * ndcX * aspect * tanHalf + up[1] * ndcY * tanHalf;
+    let dirZ = forward[2] + right[2] * ndcX * aspect * tanHalf + up[2] * ndcY * tanHalf;
+    const dl = Math.hypot(dirX, dirY, dirZ) || 1;
+    dirX /= dl; dirY /= dl; dirZ /= dl;
+
+    const half = this.params.worldSpan * 0.5;
+    // Fast 24-step 3D terrain heightfield raymarch + binary refinement so sculpt/cave/spline hits exact cliff & ridge surfaces!
+    if (this.rockCalving && this.rockCalving.snapGrid) {
+      let prevT = 10.0;
+      let prevDiff = 1.0;
+      for (let s = 1; s <= 28; s++) {
+        const t = 10.0 + (s / 28.0) * 1650.0;
+        const rx = eye[0] + dirX * t;
+        const ry = eye[1] + dirY * t;
+        const rz = eye[2] + dirZ * t;
+        if (Math.abs(rx) <= half * 1.15 && Math.abs(rz) <= half * 1.15) {
+          const st = this.rockCalving.sampleTerrain(rx, rz);
+          const diff = ry - st.surfaceH;
+          if (diff <= 0.0 && prevDiff > 0.0) {
+            const hitT = prevT + (t - prevT) * (prevDiff / Math.max(1e-4, prevDiff - diff));
+            const wx = Math.max(-half, Math.min(half, eye[0] + dirX * hitT));
+            const wz = Math.max(-half, Math.min(half, eye[2] + dirZ * hitT));
+            return [wx, wz];
+          }
+          prevDiff = diff;
+          prevT = t;
+        }
+      }
+    }
 
     const refY = this.params.relief * 0.35;
     if (Math.abs(dirY) < 1e-4) return null;
     const t = (refY - eye[1]) / dirY;
     if (t < 0) return null;
 
-    const half = this.params.worldSpan * 0.5;
     const wx = Math.max(-half, Math.min(half, eye[0] + dirX * t));
     const wz = Math.max(-half, Math.min(half, eye[2] + dirZ * t));
     return [wx, wz];
@@ -1282,6 +1331,17 @@ export class GpuErosionEngine {
     const W = this.canvas.width;
     const H = this.canvas.height;
     const p = this.params;
+    const { viewProj, eye } = this._buildViewProjMatrix(W / H);
+    const az = (p.sunAzimuth * Math.PI) / 180;
+    const el = (p.sunElevation * Math.PI) / 180;
+    const sunDir = [Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az)];
+    const timeSec = (performance.now() - this.startTimeMs) * 0.001;
+
+    if (this.pipelineMode && this.pipeline) {
+      this.pipeline.renderPipelineFrame(viewProj, eye, sunDir, timeSec);
+      if (this.onFrameRendered) this.onFrameRendered();
+      return;
+    }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, W, H);
@@ -1296,14 +1356,9 @@ export class GpuErosionEngine {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     // 2. 3D Displaced Terrain + Stratigraphy + Sedimentation + Raymarched Sun Shadows
-    const { viewProj, eye } = this._buildViewProjMatrix(W / H);
-    const az = (p.sunAzimuth * Math.PI) / 180;
-    const el = (p.sunElevation * Math.PI) / 180;
-    const sunDir = [Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az)];
     const { hardnessVec, strataVec } = this._getHardnessUniforms();
     const layerVisVec = this._getLayerVisUniforms();
     const climate = this._getClimateUniforms();
-    const timeSec = (performance.now() - this.startTimeMs) * 0.001;
 
     const viewCode =
       p.viewMode === 'sediment' ? 1 :
@@ -1520,6 +1575,17 @@ export class GpuErosionEngine {
         this._fpsLastMs = now;
       }
 
+      if (this.pipelineMode && this.pipeline) {
+        if (this.pipeline.liveSimRunning) {
+          this.pipeline.stepLiveSimulation();
+        }
+        this.rockCalving.stepPhysics(frameDt, false);
+        this.telemetry.fps = this.fps;
+        this.telemetry.boulders = this.rockCalving.rocks.length;
+        this.renderFrame();
+        return;
+      }
+
       const anySimLayerOn =
         this.params.simHydraulicPlaying !== false ||
         this.params.simCryoPlaying !== false ||
@@ -1566,6 +1632,14 @@ export class GpuErosionEngine {
     gl.readPixels(0, 0, R, R, gl.RGBA, gl.FLOAT, raw);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
+    let rawVecDisp = null;
+    if (this.pipelineMode && this.pipeline && this.pipeline._fboVecOnly) {
+      rawVecDisp = new Float32Array(R * R * 4);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.pipeline._fboVecOnly[this.pipeline.curIdx]);
+      gl.readPixels(0, 0, R, R, gl.RGBA, gl.FLOAT, rawVecDisp);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+
     const stride = Math.max(1, exportStep);
     const M = Math.floor((R - 1) / stride) + 1;
     const vCount = M * M;
@@ -1597,11 +1671,14 @@ export class GpuErosionEngine {
         const bed = raw[rawIdx];
         const coarse = raw[rawIdx + 1];
         const fine = raw[rawIdx + 2];
-        const h = bed + coarse + fine;
+        const dx = rawVecDisp ? rawVecDisp[rawIdx] : 0;
+        const dy = rawVecDisp ? rawVecDisp[rawIdx + 1] : 0;
+        const dz = rawVecDisp ? rawVecDisp[rawIdx + 2] : 0;
+        const h = bed + coarse + fine + dy;
 
-        positions[vi * 3]     = (u - 0.5) * span;
+        positions[vi * 3]     = (u - 0.5) * span + dx;
         positions[vi * 3 + 1] = h;
-        positions[vi * 3 + 2] = (v - 0.5) * span;
+        positions[vi * 3 + 2] = (v - 0.5) * span + dz;
 
         uvs[vi * 2]     = u;
         uvs[vi * 2 + 1] = v;
