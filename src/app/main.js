@@ -55,6 +55,7 @@ const EROSION_SLIDER_SCHEMA = {
     { key: 'windSpeed',       label: 'Aeolian Wind & Drift',      min: 0.0,  max: 1.0,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
     { key: 'windAzimuth',     label: 'Prevailing Wind Azimuth',   min: -180, max: 180,  step: 1,    fmt: (v) => `${v}°` },
     { key: 'rockfallRate',    label: 'Cliff Rockfall Intensity',  min: 0.0,  max: 1.0,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+    { key: 'boulderDensity',  label: 'Settled Boulder & Outcrop Density', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
   ],
   hydraulics: [
     { key: 'erosionStrength',  label: 'Hydraulic Cutting Power',  min: 0.10, max: 1.40,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
@@ -301,6 +302,12 @@ function buildErosionLandscapeCards() {
       mount.querySelectorAll('.arch-card').forEach((el) => {
         el.classList.toggle('active', el.dataset.id === preset.id);
       });
+      document.getElementById('select-emitter-mode').value = erosionEngine.params.emitterMode;
+      document.getElementById('select-erosion-material').value = String(erosionEngine.params.materialTheme);
+      document.getElementById('input-erosion-seed').value = erosionEngine.params.seed;
+      document.getElementById('select-erosion-view').value = erosionEngine.params.viewMode;
+      document.getElementById('chk-erosion-water').checked = erosionEngine.params.showWater;
+      document.getElementById('chk-erosion-boulders').checked = erosionEngine.params.showBoulders;
       syncErosionSliders();
     });
     mount.appendChild(btn);
@@ -518,6 +525,9 @@ function initErosionControls() {
   });
   document.getElementById('chk-erosion-water').addEventListener('change', (e) => {
     erosionEngine.params.showWater = e.target.checked;
+  });
+  document.getElementById('chk-erosion-boulders').addEventListener('change', (e) => {
+    erosionEngine.params.showBoulders = e.target.checked;
   });
 
   // Transport Bar Buttons

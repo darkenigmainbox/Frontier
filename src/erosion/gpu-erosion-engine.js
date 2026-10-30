@@ -4,6 +4,8 @@ import {
   EROSION_LANDSCAPES,
 } from './erosion-presets.js';
 import {
+  BOULDER_RENDER_FRAG,
+  BOULDER_RENDER_VERT,
   FULLSCREEN_VERT,
   INIT_PARTICLES_FRAG,
   INIT_TERRAIN_FRAG,
@@ -17,9 +19,16 @@ import {
   TERRAIN_INTEGRATE_FRAG,
   TERRAIN_RENDER_FRAG,
   TERRAIN_RENDER_VERT,
+  WATER_RENDER_FRAG,
+  WATER_RENDER_VERT,
   THERMAL_TALUS_FRAG,
   WATER_FLUX_FRAG,
 } from './erosion-shaders.js';
+import {
+  createRockfallGeometry,
+  createRockfallInstances,
+  MAX_SETTLED_BOULDERS,
+} from './rockfall.js';
 
 const PART_TEX_W = 256;
 const PART_TEX_H = 128; // 256 * 128 = 32,768 GPU particle slots
@@ -165,6 +174,7 @@ export class GpuErosionEngine {
     this._initPrograms();
     this._initBuffersAndTextures();
     this._initMeshVao();
+    this._initRockfallVao();
     this._bindEvents();
 
     this.resetSimulation();
@@ -181,6 +191,8 @@ export class GpuErosionEngine {
     this.progSnowCryo = createProgram(gl, FULLSCREEN_VERT, SNOW_CRYO_FRAG, 'SnowCryo');
     this.progThermalTalus = createProgram(gl, FULLSCREEN_VERT, THERMAL_TALUS_FRAG, 'ThermalTalus');
     this.progTerrainRender = createProgram(gl, TERRAIN_RENDER_VERT, TERRAIN_RENDER_FRAG, 'TerrainRender');
+    this.progWaterRender = createProgram(gl, WATER_RENDER_VERT, WATER_RENDER_FRAG, 'WaterSurface2.5D');
+    this.progBoulderRender = createProgram(gl, BOULDER_RENDER_VERT, BOULDER_RENDER_FRAG, 'SettledRockfall');
     this.progParticleRender = createProgram(gl, PARTICLE_RENDER_VERT, PARTICLE_RENDER_FRAG, 'ParticleRender');
     this.progSkyBg = createProgram(gl, FULLSCREEN_VERT, SKY_BG_FRAG, 'SkyBg');
     this.progTelemetry = createProgram(gl, FULLSCREEN_VERT, TELEMETRY_FRAG, 'Telemetry');
@@ -327,6 +339,48 @@ export class GpuErosionEngine {
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
 
     gl.bindVertexArray(null);
+  }
+
+  _initRockfallVao() {
+    const gl = this.gl;
+    this.boulderVao = gl.createVertexArray();
+    gl.bindVertexArray(this.boulderVao);
+
+    this.boulderPositionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.boulderPositionBuffer);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+
+    this.boulderNormalBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.boulderNormalBuffer);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+
+    this.boulderInstanceBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.boulderInstanceBuffer);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 8 * Float32Array.BYTES_PER_ELEMENT, 0);
+    gl.vertexAttribDivisor(2, 1);
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribPointer(3, 4, gl.FLOAT, false, 8 * Float32Array.BYTES_PER_ELEMENT, 4 * Float32Array.BYTES_PER_ELEMENT);
+    gl.vertexAttribDivisor(3, 1);
+    gl.bindVertexArray(null);
+  }
+
+  _uploadRockfallField(seed, worldSpan) {
+    const gl = this.gl;
+    const geometry = createRockfallGeometry(seed);
+    this.boulderVertexCount = geometry.positions.length / 3;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.boulderPositionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, geometry.positions, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.boulderNormalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, geometry.normals, gl.STATIC_DRAW);
+
+    const instances = createRockfallInstances(seed, worldSpan, MAX_SETTLED_BOULDERS);
+    this.boulderInstanceCount = instances.length / 8;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.boulderInstanceBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, instances, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
   }
 
   _bindEvents() {
@@ -499,7 +553,7 @@ export class GpuErosionEngine {
 
   _themeCode() {
     const theme = Number(this.params.materialTheme);
-    return Number.isFinite(theme) ? Math.max(0, Math.min(2, Math.round(theme))) : 0;
+    return Number.isFinite(theme) ? Math.max(0, Math.min(6, Math.round(theme))) : 0;
   }
 
   _getHardnessUniforms() {
@@ -569,6 +623,7 @@ export class GpuErosionEngine {
   applyLandscapePreset(landscapeId) {
     const preset = EROSION_LANDSCAPES[landscapeId] || EROSION_LANDSCAPES['layered-plateau'];
     this.params.landscape = preset.id;
+    this.params.materialTheme = preset.materialTheme ?? this.params.materialTheme;
     Object.assign(this.params, preset.defaults);
     this.resetSimulation();
   }
@@ -585,6 +640,7 @@ export class GpuErosionEngine {
     const R = this.gridRes;
     const p = this.params;
     const preset = EROSION_LANDSCAPES[p.landscape] || EROSION_LANDSCAPES['layered-plateau'];
+    this._uploadRockfallField(p.seed, p.worldSpan);
 
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
@@ -600,6 +656,8 @@ export class GpuErosionEngine {
       p.seed
     );
     gl.uniform1f(gl.getUniformLocation(this.progInitTerrain, 'uWorldSpan'), p.worldSpan);
+    const windAz = (p.windAzimuth * Math.PI) / 180;
+    gl.uniform2f(gl.getUniformLocation(this.progInitTerrain, 'uInitWindDir'), Math.cos(windAz), Math.sin(windAz));
 
     gl.viewport(0, 0, R, R);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboTerrainSingle[0]);
@@ -861,6 +919,70 @@ export class GpuErosionEngine {
     }
   }
 
+  _drawSettledBoulders(viewProj, eye, sunDir) {
+    const p = this.params;
+    if (!p.showBoulders || p.boulderDensity <= 0.001) return;
+    const count = Math.min(this.boulderInstanceCount, Math.max(0, Math.round(MAX_SETTLED_BOULDERS * p.boulderDensity)));
+    if (count < 1) return;
+
+    const gl = this.gl;
+    gl.disable(gl.BLEND);
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthMask(true);
+    gl.useProgram(this.progBoulderRender);
+    gl.bindVertexArray(this.boulderVao);
+    this._bindTex(this.progBoulderRender, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
+    gl.uniformMatrix4fv(gl.getUniformLocation(this.progBoulderRender, 'uViewProj'), false, viewProj);
+    gl.uniform3fv(gl.getUniformLocation(this.progBoulderRender, 'uCameraPos'), eye);
+    gl.uniform3fv(gl.getUniformLocation(this.progBoulderRender, 'uSunDir'), sunDir);
+    gl.uniform4f(
+      gl.getUniformLocation(this.progBoulderRender, 'uBoulderDomain'),
+      p.worldSpan,
+      this.gridRes,
+      this._themeCode(),
+      0.0
+    );
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, this.boulderVertexCount, count);
+    gl.bindVertexArray(null);
+  }
+
+  _drawWaterSurface(viewProj, eye, sunDir, timeSec) {
+    const p = this.params;
+    if (!p.showWater || (p.viewMode !== 'natural' && p.viewMode !== 'water')) return;
+
+    const gl = this.gl;
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+    gl.depthMask(false);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.useProgram(this.progWaterRender);
+    gl.bindVertexArray(this.terrainVao);
+    this._bindTex(this.progWaterRender, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
+    this._bindTex(this.progWaterRender, 'uVelocityFieldTex', this.velocityFieldTex, 1);
+    gl.uniformMatrix4fv(gl.getUniformLocation(this.progWaterRender, 'uViewProj'), false, viewProj);
+    gl.uniform3fv(gl.getUniformLocation(this.progWaterRender, 'uCameraPos'), eye);
+    gl.uniform3fv(gl.getUniformLocation(this.progWaterRender, 'uSunDir'), sunDir);
+    gl.uniform4f(
+      gl.getUniformLocation(this.progWaterRender, 'uRenderDomain'),
+      p.worldSpan,
+      this.gridRes,
+      1.0,
+      timeSec
+    );
+    gl.uniform4f(
+      gl.getUniformLocation(this.progWaterRender, 'uWaterStyle'),
+      this._themeCode(),
+      p.viewMode === 'water' ? 1.0 : 0.0,
+      0.0,
+      0.0
+    );
+    gl.drawElements(gl.TRIANGLES, this.terrainIndexCount, gl.UNSIGNED_INT, 0);
+    gl.bindVertexArray(null);
+    gl.depthMask(true);
+    gl.disable(gl.BLEND);
+  }
+
   _sampleTelemetry() {
     const gl = this.gl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboTelemetry);
@@ -946,7 +1068,8 @@ export class GpuErosionEngine {
       p.viewMode === 'hardness' ? 2 :
       p.viewMode === 'flow'     ? 3 :
       p.viewMode === 'clay'     ? 4 :
-      p.viewMode === 'cryo'     ? 5 : 0;
+      p.viewMode === 'cryo'     ? 5 :
+      p.viewMode === 'water'    ? 6 : 0;
 
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
@@ -969,7 +1092,7 @@ export class GpuErosionEngine {
       gl.getUniformLocation(this.progTerrainRender, 'uRenderDomain'),
       p.worldSpan,
       this.gridRes,
-      p.showWater ? 1.0 : 0.0,
+      0.0,
       timeSec
     );
     gl.uniform4fv(gl.getUniformLocation(this.progTerrainRender, 'uHardnessParams'), hardnessVec);
@@ -994,6 +1117,11 @@ export class GpuErosionEngine {
     gl.uniform1f(gl.getUniformLocation(this.progTerrainRender, 'uSeed'), p.seed);
 
     gl.drawElements(gl.TRIANGLES, this.terrainIndexCount, gl.UNSIGNED_INT, 0);
+
+    // Persistent angular rockfall deposits settle into the current heightfield; water is a separate
+    // transparent height-surface pass with no volumetric voxels (2.5D shallow-water preview).
+    this._drawSettledBoulders(viewProj, eye, sunDir);
+    this._drawWaterSurface(viewProj, eye, sunDir, timeSec);
 
     // 3. 3D Falling Sky Raindrops & Sediment-Colored Surface Runoff Particles!
     if (p.showParticles && p.particleOpacity > 0.01) {

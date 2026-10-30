@@ -10,7 +10,7 @@
    - Natural arches (`desert-arch`, `double-arch`, `sea-arch`) are sculpted directly along **true 3D cubic Bézier curves** with parallel-transported Frenet frames, slender crown taper, polygonal sandstone fin cross-sections, and stepped bedding pedestals — **zero hole-punching boolean cuts**.
 2. **Real 3D Sedimentary Stratigraphy & Differential Weathering (`src/geology/sedimentary-formations.js`)**
    - `sedimentary-cliff` builds 17 continuous dipping stratigraphic horizons alternating between massive overhanging caprock cornices, rhythmically interbedded flagstone wafer packets, deeply undercut fissile shale recesses, lenticular paleochannel pinch-outs, oblique fault throws, and angular fallen caprock slabs.
-3. **18 Distinct Procedural Formation Archetypes (`src/geology/presets.js`, `src/geology/formations.js`)**
+3. **20 Distinct Procedural Formation Archetypes (`src/geology/presets.js`, `src/geology/formations.js`)**
    - **Arch**: *Utah Sandstone Arch*, *Double Sandstone Arch*, *Coastal Sea Arch*
    - **Sedimentary**: *Sedimentary Cliff*
    - **Desert**: *Utah Canyon Wall*, *Utah Slot Canyon*, *Desert Spires*, *Hoodoo Columns*, *Sandstone Butte*, *Balanced Pedestal Rock*
@@ -24,12 +24,18 @@
 
 ---
 
+## GPU Erosion & Living Landscapes
+
+The WebGL2 erosion viewport includes **13 procedural landscape presets**, from Icelandic basalt highlands and the Canyonlands river gorge to a moraine-dammed lake, Sahara dune sea, and limestone karst springs. The GPU simulation couples rainfall, snow and glacier melt, wind-driven saltation, hardness-aware erosion, and coarse/fine sediment transport. A separate **2.5D shallow-water surface** visualizes river channels and lakes in natural or flow-inspection mode. Rockfall fragments roll downhill and deposit talus; instanced, faceted boulders settle against the live heightfield.
+
+---
+
 ## Quick Start
 
 ```bash
 npm install
 npm run dev      # Launch interactive WebGL2 studio on 0.0.0.0:5173
-npm test         # Run unit & integration suite across all 18 archetypes
+npm test         # Run geology, erosion-shader, landscape, rockfall and export tests
 npm run build    # Production Vite bundle
 ```
 

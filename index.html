@@ -94,6 +94,7 @@
               <option value="flow">Hydraulic Discharge &amp; Shear</option>
               <option value="clay">Pure Sculptor Matte Clay</option>
               <option value="cryo">Cryosphere (Snowpack &amp; Glacier Ice)</option>
+              <option value="water">2.5D Water Surface / Flow Inspection</option>
             </select>
           </label>
 
@@ -101,8 +102,12 @@
             <span>Rock Palette</span>
             <select id="select-erosion-material">
               <option value="0">Utah Desert Sandstone</option>
-              <option value="1">Icelandic Volcanic Basalt &amp; Moss</option>
-              <option value="2">Himalayan Gneiss &amp; Glacier</option>
+              <option value="1">Icelandic Basalt, Rhyolite &amp; Moss</option>
+              <option value="2">Himalayan Banded Gneiss &amp; Moraine</option>
+              <option value="3">Canyonlands Layered Sandstone</option>
+              <option value="4">Sahara Quartz Sand &amp; Dune Rock</option>
+              <option value="5">Karst Limestone &amp; Dolomite</option>
+              <option value="6">North Atlantic Fjord Granite</option>
             </select>
           </label>
 
@@ -129,7 +134,11 @@
             </label>
             <label class="check-pill">
               <input id="chk-erosion-water" type="checkbox" checked />
-              <span>Water Channels</span>
+              <span>2.5D Rivers &amp; Lakes</span>
+            </label>
+            <label class="check-pill">
+              <input id="chk-erosion-boulders" type="checkbox" checked />
+              <span>Settled Rockfall Blocks</span>
             </label>
           </div>
         </section>
@@ -369,8 +378,8 @@
 
         <section class="panel-section">
           <div class="section-header">
-            <span>GLACIAL &amp; CLIMATE PARTICLES</span>
-            <span class="tag-pill">Snow / Ice / Wind</span>
+            <span>CLIMATE, WIND &amp; ROCKFALL</span>
+            <span class="tag-pill">Snow / Ice / Dunes / Boulder</span>
           </div>
           <div id="er-sliders-climate"></div>
         </section>

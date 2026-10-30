@@ -155,6 +155,7 @@ layout(location = 0) out vec4 outTerrain;
 
 uniform vec4 uInitParams; // (relief, roughness, terrainType, seed)
 uniform float uWorldSpan;
+uniform vec2 uInitWindDir; // normalized prevailing wind for wind-oriented dune fields
 
 ${COMMON_GEOLOGY_GLSL}
 
@@ -175,6 +176,7 @@ void main() {
   vec2 wp = p + warp;
 
   float baseElev = 0.0;
+  float initialWater = 0.0;
 
   if (kind == 1) {
     // 1. Stratified Canyon Plateau & Piedmont Basin:
@@ -285,6 +287,100 @@ void main() {
     baseElev = 0.05 + massif * (1.0 - 0.90 * max(trunk, hanging * 0.6))
              + valleyFloor * max(trunk, hanging * 0.6)
              + fineRock * (0.35 + 0.65 * clamp(massif, 0.0, 1.0));
+  } else if (kind == 8) {
+    // 8. CANYONLANDS RIVER GORGE:
+    // A high sedimentary plateau is cut by a sinuous trunk canyon, stair-step benches,
+    // resistant rim shelves and two small tributary slots. A shallow starter river lets the
+    // separate 2.5D water solver visibly evolve the channel immediately.
+    float meanderX = 0.13 * sin(wp.y * 2.55 + seedVec.x * 0.06)
+                   + 0.052 * sin(wp.y * 6.1 + seedVec.y * 0.05);
+    float riverDist = abs(wp.x - meanderX);
+    float canyonExtent = 1.0 - smoothstep(0.66, 0.98, abs(wp.y));
+    float innerSlot = 1.0 - smoothstep(0.016, 0.105, riverDist);
+    float middleBench = 1.0 - smoothstep(0.105, 0.285, riverDist);
+    float outerShelf = 1.0 - smoothstep(0.285, 0.52, riverDist);
+    float plateauNoise = ridgedFbm2D(wp * 2.0 + seedVec, 6, rough);
+    float plateau = 0.49 + 0.12 * plateauNoise + 0.045 * fbm2D(wp * 4.1 + seedVec, 4, 0.52);
+
+    float tribA = abs(wp.y - (0.42 * (wp.x + 0.55) + 0.10 * sin(wp.x * 5.0)));
+    float tribB = abs(wp.y - (-0.52 * (wp.x - 0.44) + 0.08 * sin(wp.x * 4.2 + 1.3)));
+    float tributaries = (1.0 - smoothstep(0.012, 0.042, tribA)) * (1.0 - smoothstep(0.10, 0.46, abs(wp.x + 0.28)))
+                      + (1.0 - smoothstep(0.012, 0.038, tribB)) * (1.0 - smoothstep(0.10, 0.42, abs(wp.x - 0.22)));
+    float canyonCut = canyonExtent * (0.20 * innerSlot + 0.20 * middleBench + 0.13 * outerShelf);
+    baseElev = 0.075 + plateau - canyonCut - tributaries * 0.065;
+    baseElev += (fbm2D(wp * 10.0 + seedVec, 3, 0.48) - 0.5) * 0.018;
+    float riverMask = 1.0 - smoothstep(0.009, 0.030, riverDist);
+    initialWater = riverMask * (1.35 + 0.22 * fbm2D(wp * 14.0 + seedVec, 3, 0.5));
+  } else if (kind == 9) {
+    // 9. MORAINE-DAMMED ALPINE LAKE:
+    // An ice-scoured U-valley ends in a closed basin behind a terminal moraine. The lake is
+    // initialized at a level surface; subsequent pipe flux, melt and runoff alter its stage.
+    vec2 basinP = wp - vec2(-0.045, 0.075);
+    float basinR = length(basinP * vec2(0.92, 1.10));
+    float floorNoise = fbm2D(wp * 4.4 + seedVec, 4, 0.52);
+    float bowl = 0.105 + 0.115 * smoothstep(0.02, 0.48, basinR) + 0.018 * floorNoise;
+    float moraineRim = exp(-sq((basinR - 0.49) * 8.5)) * (0.28 + 0.05 * ridgedFbm2D(basinP * 5.0 + seedVec, 3, 0.5));
+    float headwall = smoothstep(0.36, 0.92, basinR) * (0.14 + 0.18 * ridgedFbm2D(wp * 2.8 + seedVec, 5, rough));
+    float hangingValley = (1.0 - smoothstep(0.035, 0.105, abs(wp.x + 0.34 + 0.13 * sin(wp.y * 3.0))))
+                        * (1.0 - smoothstep(0.10, 0.72, abs(wp.y - 0.04)));
+    float outlet = (1.0 - smoothstep(0.012, 0.038, abs(wp.x - 0.16 - 0.08 * sin(wp.y * 4.0))))
+                 * (1.0 - smoothstep(0.14, 0.92, abs(wp.y + 0.72)));
+    baseElev = bowl + moraineRim + headwall * (1.0 - smoothstep(0.10, 0.48, basinR))
+             + 0.17 * hangingValley - 0.075 * outlet;
+    float lakeMask = 1.0 - smoothstep(0.38, 0.52, basinR);
+    float lakeStage = relief * 0.245;
+    initialWater = max(0.0, lakeStage - baseElev * relief) * lakeMask;
+    initialWater += outlet * (0.48 + 0.12 * floorNoise);
+  } else if (kind == 10) {
+    // 10. ICELANDIC RIFT, GLACIAL OUTWASH & BLACK-SAND COAST:
+    // Shield volcanoes and fissure ridges frame a braided south-draining sandur; asymmetric
+    // lava terraces, young basalt mesas and small meltwater threads break up the broad plain.
+    float shieldA = exp(-dot(wp - vec2(-0.34, 0.18), wp - vec2(-0.34, 0.18)) * 4.4) * 0.78;
+    float shieldB = exp(-dot(wp - vec2(0.30, 0.36), wp - vec2(0.30, 0.36)) * 5.1) * 0.68;
+    float riftTrace = abs(wp.x + 0.10 * sin(wp.y * 4.4 + seedVec.x));
+    float fissureRidge = (1.0 - smoothstep(0.025, 0.11, riftTrace)) * (0.18 + 0.10 * ridgedFbm2D(wp * 5.0 + seedVec, 4, 0.48));
+    float plateau = 0.10 + 0.13 * ridgedFbm2D(wp * 2.4 + seedVec, 6, rough);
+    float sandur = 1.0 - smoothstep(-0.78, 0.32, wp.y);
+    float glacierTrough = 1.0 - smoothstep(0.08, 0.26, abs(wp.x - 0.12 * sin(wp.y * 2.5)));
+    baseElev = 0.055 + plateau + shieldA + shieldB + fissureRidge
+             - 0.075 * glacierTrough + sandur * (0.025 + 0.02 * fbm2D(wp * 7.0 + seedVec, 4, 0.5));
+    float meltRiver = (1.0 - smoothstep(0.008, 0.026, abs(wp.x - 0.12 * sin(wp.y * 2.5)))) * sandur;
+    initialWater = meltRiver * 0.85;
+  } else if (kind == 11) {
+    // 11. SAHARA ERG:
+    // Wind-aligned transverse and crescent dune trains with sheltered interdune corridors and
+    // scattered exposed rock. Dune crests follow the user-selected prevailing wind azimuth.
+    vec2 windDir = normalize(uInitWindDir);
+    vec2 windCross = vec2(-windDir.y, windDir.x);
+    float along = dot(wp, windDir);
+    float across = dot(wp, windCross);
+    float duneWarp = fbm2D(wp * 2.3 + seedVec, 5, 0.54) - 0.5;
+    float dunePhase = across * 10.5 + 1.15 * sin(along * 2.2 + seedVec.x * 0.08) + duneWarp * 2.1;
+    float crest = 0.5 + 0.5 * cos(dunePhase);
+    float sharpCrest = pow(max(0.0, crest), 3.3);
+    float duneField = 1.0 - smoothstep(0.72, 1.02, length(wp * vec2(0.92, 1.08)));
+    float bedrockIslands = ridgedFbm2D(wp * 2.7 + seedVec + vec2(9.1, 18.3), 5, 0.50);
+    baseElev = 0.052 + 0.27 * sharpCrest * duneField + 0.10 * duneWarp
+             + 0.12 * smoothstep(0.76, 0.94, bedrockIslands);
+    baseElev += 0.018 * (fbm2D(vec2(along * 3.0, across * 22.0) + seedVec, 3, 0.5) - 0.5);
+  } else if (kind == 12) {
+    // 12. LIMESTONE KARST & SPRINGS:
+    // A weathered carbonate plateau with irregular dolines, sinking valleys, pale pavements and
+    // clear spring pools occupying the lowest closed depressions.
+    float dolineA = length((wp - vec2(-0.31, 0.10)) * vec2(1.12, 0.90));
+    float dolineB = length((wp - vec2(0.29, -0.24)) * vec2(0.86, 1.14));
+    float dolineC = length((wp - vec2(0.02, 0.42)) * vec2(1.20, 0.82));
+    float karstRough = ridgedFbm2D(wp * 3.4 + seedVec, 6, rough);
+    float upland = 0.28 + 0.17 * karstRough + 0.045 * fbm2D(wp * 7.2 + seedVec, 4, 0.5);
+    float sinkholes = 0.20 * exp(-dolineA * dolineA * 34.0)
+                    + 0.17 * exp(-dolineB * dolineB * 28.0)
+                    + 0.15 * exp(-dolineC * dolineC * 38.0);
+    float springA = 1.0 - smoothstep(0.035, 0.105, dolineA);
+    float springB = 1.0 - smoothstep(0.030, 0.092, dolineB);
+    float springC = 1.0 - smoothstep(0.028, 0.088, dolineC);
+    float sinkingStream = 1.0 - smoothstep(0.012, 0.036, abs(wp.y + 0.15 + 0.12 * sin(wp.x * 4.0)));
+    baseElev = upland - sinkholes - 0.035 * sinkingStream;
+    initialWater = max(max(springA, springB), springC) * 1.05 + sinkingStream * 0.38;
   } else {
     // 0. Tectonic Mountain Divide
     float spineDist = abs(wp.y * 0.85 + wp.x * 0.28 + 0.15 * sin(wp.x * 3.4));
@@ -295,7 +391,7 @@ void main() {
   }
 
   float bedrockH = max(2.0, baseElev * relief);
-  outTerrain = vec4(bedrockH, 0.0, 0.0, 0.0);
+  outTerrain = vec4(bedrockH, 0.0, 0.0, max(0.0, initialWater));
 }
 `;
 
@@ -397,12 +493,37 @@ void spawnNewDrop(
   else if (pick > wR + wS) species = SP_WIND;
   else if (pick > wR) species = SP_SNOW;
 
-  // Emission footprints: blizzards & storms concentrate in an overhead cell, wind seeds from the
-  // upwind edge of the domain, rockfall seeds directly on steep cliff faces.
+  // Emission footprints: rock chunks choose steep source faces, blizzards/storms use a cell,
+  // wind enters upwind, and rainfall may seek a high ridge for drainage cutting.
   vec2 xz;
+  vec2 rockLaunchDir = safeNorm2(r1.xy * 2.0 - 1.0, vec2(1.0, 0.0));
   float baseCloudY = uRainEmitter.x;
 
-  if (mode == 1) {
+  if (species == SP_ROCK) {
+    vec2 bestXZ = (r1.xy * 2.0 - 1.0) * halfSpan * 0.82;
+    float bestSlope = -1.0;
+    for (int k = 0; k < 4; k++) {
+      vec3 rk = hash32(rSeed + float(k + 1) * 27.9);
+      vec2 cand = (rk.xy * 2.0 - 1.0) * halfSpan * 0.82;
+      vec2 uv = worldToUv(cand, span);
+      vec4 tc = sampleGridBilinear(uTerrainTex, uv, res);
+      vec4 tr = sampleGridBilinear(uTerrainTex, uv + vec2(1.0 / res, 0.0), res);
+      vec4 tl = sampleGridBilinear(uTerrainTex, uv - vec2(1.0 / res, 0.0), res);
+      vec4 tu = sampleGridBilinear(uTerrainTex, uv + vec2(0.0, 1.0 / res), res);
+      vec4 td = sampleGridBilinear(uTerrainTex, uv - vec2(0.0, 1.0 / res), res);
+      float hR = tr.r + tr.g + tr.b;
+      float hL = tl.r + tl.g + tl.b;
+      float hU = tu.r + tu.g + tu.b;
+      float hD = td.r + td.g + td.b;
+      float slopeScore = length(vec2(hR - hL, hU - hD));
+      if (slopeScore > bestSlope) {
+        bestSlope = slopeScore;
+        bestXZ = cand;
+        rockLaunchDir = safeNorm2(vec2(hL - hR, hD - hU), rockLaunchDir);
+      }
+    }
+    xz = bestXZ;
+  } else if (mode == 1) {
     float ang = r1.x * 6.2831853;
     float rad = sqrt(max(0.0, r1.y)) * uStormTarget.z * 1.45;
     xz = clamp(uStormTarget.xy + vec2(cos(ang), sin(ang)) * rad, vec2(-halfSpan), vec2(halfSpan));
@@ -444,7 +565,7 @@ void spawnNewDrop(
   float payload = rainPayload;
   if (species == SP_SNOW) payload = 0.06 + 0.09 * uSnowParams.y;
   else if (species == SP_WIND) payload = 0.035 + 0.05 * uWindParams.z;
-  else if (species == SP_ROCK) payload = 0.16 + 0.22 * uWindParams.z;
+  else if (species == SP_ROCK) payload = 0.34 + 0.48 * uWindParams.z;
 
   vec3 initVel = vec3(uStormTarget.w * 1.8, -14.0 - 5.0 * r2.x, (r2.y - 0.5) * 1.2);
   if (species == SP_SNOW) {
@@ -453,7 +574,12 @@ void spawnNewDrop(
   } else if (species == SP_WIND) {
     initVel = vec3(uWindParams.x * (11.0 + 9.0 * r2.x), -1.2 - 1.6 * r2.y, uWindParams.y * (11.0 + 9.0 * r2.x));
   } else if (species == SP_ROCK) {
-    initVel = vec3((r2.x - 0.5) * 3.0, -2.0 - 3.0 * r2.y, (r2.y - 0.5) * 3.0);
+    float rollSpeed = 3.5 + 5.5 * r2.x + 1.2 * clamp(length(rockLaunchDir), 0.0, 1.0);
+    initVel = vec3(
+      rockLaunchDir.x * rollSpeed + (r2.x - 0.5) * 0.9,
+      -2.2 - 3.4 * r2.y,
+      rockLaunchDir.y * rollSpeed + (r2.y - 0.5) * 0.9
+    );
   }
 
   posAge = vec4(xz.x, startY, xz.y, -0.02);
@@ -1242,7 +1368,7 @@ layout(location = 0) in vec2 aGridUv;
 uniform sampler2D uTerrainTex;
 uniform sampler2D uSnowTex;
 uniform mat4 uViewProj;
-uniform vec4 uRenderDomain; // (worldSpan, gridRes, showWater, timeSec)
+uniform vec4 uRenderDomain; // (worldSpan, gridRes, reserved, reserved)
 
 out vec2 vUv;
 out vec3 vWorldPos;
@@ -1254,10 +1380,10 @@ void main() {
   vec4 terr = texelFetch(uTerrainTex, tc, 0);
   vec4 cryo = texelFetch(uSnowTex, tc, 0);
 
-  float waterLift = uRenderDomain.z > 0.5 ? terr.a : 0.0;
-  // Snowpack & glacier ice physically raise the visible surface (capped so drifts never balloon)
+  // Water is rendered as its own displaced 2.5D surface pass over the bedrock heightfield.
+  // Snowpack & glacier ice physically raise the visible terrain (capped so drifts never balloon).
   float cryoLift = min(3.4, cryo.r * 0.85 + cryo.g * 0.62);
-  float hSurf = terr.r + terr.g + terr.b + waterLift + cryoLift;
+  float hSurf = terr.r + terr.g + terr.b + cryoLift;
 
   vec2 xz = (clampedUv - 0.5) * uRenderDomain.x;
   bool isSkirt = aGridUv.x < -0.0001 || aGridUv.x > 1.0001 || aGridUv.y < -0.0001 || aGridUv.y > 1.0001;
@@ -1288,13 +1414,13 @@ uniform sampler2D uSnowTex;
 
 uniform vec3 uCameraPos;
 uniform vec3 uSunDir;
-uniform vec4 uRenderDomain;   // (worldSpan, gridRes, showWater, timeSec)
+uniform vec4 uRenderDomain;   // (worldSpan, gridRes, reserved, reserved)
 uniform vec4 uHardnessParams; // (rockHardness, strataStrength, strataFreq, faultWeakness)
 uniform vec4 uStrataOrient;   // (sinStrike, cosStrike, tanDip, reliefScale)
 uniform vec4 uBrush;          // (brushX, brushZ, brushRadius, brushMode)
 uniform vec4 uClimate;        // (snowlineNorm, snowfallRate, glacierStrength, meltRate)
 uniform int uViewMode;
-uniform int uMaterialTheme;   // 0 = Utah Desert, 1 = Icelandic Volcanic, 2 = Himalayan Gneiss
+uniform int uMaterialTheme;   // 0 Utah, 1 Iceland, 2 Himalaya, 3 Canyonlands, 4 Erg, 5 Karst, 6 Fjord
 uniform float uSeed;
 
 ${COMMON_GEOLOGY_GLSL}
@@ -1380,24 +1506,60 @@ void main() {
   vec3 mossCol = vec3(0.0);
 
   if (uMaterialTheme == 1) {
-    // ICELANDIC VOLCANIC: black basalt columns, oxidised orange rhyolite, subarctic moss, black sand
+    // ICELANDIC VOLCANIC: black basalt, oxidised rhyolite, subarctic moss and black sand
     softRockCol    = vec3(0.048, 0.047, 0.050);
-    midRockCol     = vec3(0.120, 0.064, 0.044); // Rhyolite / palagonite ridge bands
-    hardRockCol    = vec3(0.198, 0.122, 0.082); // Weathered olivine basalt ledge
+    midRockCol     = vec3(0.120, 0.064, 0.044);
+    hardRockCol    = vec3(0.198, 0.122, 0.082);
     summitCol      = vec3(0.270, 0.272, 0.288);
     basinFloorCol  = vec3(0.034, 0.034, 0.037);
-    coarseGravelCol = vec3(0.092, 0.090, 0.094); // Basalt scree
-    fineAlluvialCol = vec3(0.062, 0.058, 0.056); // Volcanic black-sand sandur
-    mossCol         = vec3(0.098, 0.140, 0.052); // Woolly fringed moss & arctic thyme
+    coarseGravelCol = vec3(0.092, 0.090, 0.094);
+    fineAlluvialCol = vec3(0.062, 0.058, 0.056);
+    mossCol         = vec3(0.098, 0.140, 0.052);
   } else if (uMaterialTheme == 2) {
-    // HIMALAYAN GNEISS: dark banded gneiss, leucogranite sills, moraine till, blue glacier ice
-    softRockCol    = vec3(0.098, 0.094, 0.100); // Biotite gneiss
-    midRockCol     = vec3(0.188, 0.180, 0.180); // Banded paragneiss
-    hardRockCol    = vec3(0.330, 0.300, 0.290); // Leucogranite sill
+    // HIMALAYAN GNEISS: banded biotite gneiss, leucogranite sills and moraine till
+    softRockCol    = vec3(0.098, 0.094, 0.100);
+    midRockCol     = vec3(0.188, 0.180, 0.180);
+    hardRockCol    = vec3(0.330, 0.300, 0.290);
     summitCol      = vec3(0.385, 0.380, 0.390);
     basinFloorCol  = vec3(0.112, 0.104, 0.098);
-    coarseGravelCol = vec3(0.232, 0.212, 0.190); // Moraine till
-    fineAlluvialCol = vec3(0.300, 0.262, 0.208); // Glaciofluvial outwash silt
+    coarseGravelCol = vec3(0.232, 0.212, 0.190);
+    fineAlluvialCol = vec3(0.300, 0.262, 0.208);
+  } else if (uMaterialTheme == 3) {
+    // CANYONLANDS LAYER CAKE: dark Moenkopi shale, russet sandstone, cream caprock and talus
+    softRockCol    = vec3(0.115, 0.060, 0.045);
+    midRockCol     = vec3(0.285, 0.125, 0.070);
+    hardRockCol    = vec3(0.490, 0.325, 0.190);
+    summitCol      = vec3(0.585, 0.455, 0.315);
+    basinFloorCol  = vec3(0.085, 0.063, 0.047);
+    coarseGravelCol = vec3(0.300, 0.205, 0.135);
+    fineAlluvialCol = vec3(0.455, 0.285, 0.145);
+  } else if (uMaterialTheme == 4) {
+    // SAHARA ERG: warm quartz sand, sun-bleached dune crests, iron-rich exposed ribs
+    softRockCol    = vec3(0.235, 0.135, 0.055);
+    midRockCol     = vec3(0.425, 0.275, 0.125);
+    hardRockCol    = vec3(0.620, 0.435, 0.230);
+    summitCol      = vec3(0.720, 0.580, 0.360);
+    basinFloorCol  = vec3(0.155, 0.102, 0.050);
+    coarseGravelCol = vec3(0.500, 0.345, 0.180);
+    fineAlluvialCol = vec3(0.665, 0.485, 0.270);
+  } else if (uMaterialTheme == 5) {
+    // KARST CARBONATE: cool grey limestone, ivory dolomite, moss-darkened spring sink basins
+    softRockCol    = vec3(0.205, 0.208, 0.195);
+    midRockCol     = vec3(0.355, 0.360, 0.335);
+    hardRockCol    = vec3(0.535, 0.520, 0.470);
+    summitCol      = vec3(0.625, 0.610, 0.550);
+    basinFloorCol  = vec3(0.100, 0.135, 0.120);
+    coarseGravelCol = vec3(0.360, 0.345, 0.305);
+    fineAlluvialCol = vec3(0.505, 0.485, 0.425);
+  } else if (uMaterialTheme == 6) {
+    // NORTH ATLANTIC FJORD: blue-grey gneiss, wet granite, glacial moraine
+    softRockCol    = vec3(0.105, 0.125, 0.145);
+    midRockCol     = vec3(0.205, 0.230, 0.250);
+    hardRockCol    = vec3(0.365, 0.385, 0.390);
+    summitCol      = vec3(0.490, 0.505, 0.510);
+    basinFloorCol  = vec3(0.070, 0.090, 0.105);
+    coarseGravelCol = vec3(0.230, 0.250, 0.260);
+    fineAlluvialCol = vec3(0.340, 0.360, 0.360);
   } else {
     // UTAH DESERT: Moenkopi shale, Wingate sandstone, Navajo caprock, ochre alluvial fans
     softRockCol    = vec3(0.115, 0.068, 0.062);
@@ -1417,6 +1579,24 @@ void main() {
   rockAlbedo = mix(rockAlbedo, summitCol, smoothstep(0.76, 1.08, elevFrac) * 0.48);
   rockAlbedo = mix(basinFloorCol, rockAlbedo, smoothstep(0.03, 0.20, elevFrac));
   rockAlbedo *= (1.0 + 0.12 * grain + 0.10 * patchN + 0.12 * ridgeConvex);
+
+  // Multi-frequency procedural surface families: warped bedding, dune grain and karst pitting.
+  float acrossStrike = vWorldPos.x * uStrataOrient.x + vWorldPos.z * uStrataOrient.y;
+  float stratCoord = vWorldPos.y + acrossStrike * uStrataOrient.z;
+  float bedPhase = stratCoord * (0.045 * max(2.0, uHardnessParams.z)) + patchN * 0.75;
+  float bedWave = 0.5 + 0.5 * sin(bedPhase);
+  float bedLamina = pow(max(0.0, bedWave), 9.0);
+  float bedStrength = (uMaterialTheme == 0 || uMaterialTheme == 3 || uMaterialTheme == 5)
+    ? 0.15 * uHardnessParams.y : 0.07 * uHardnessParams.y;
+  rockAlbedo = mix(rockAlbedo * (0.92 + 0.16 * bedWave), hardRockCol * (0.92 + 0.12 * grain), bedLamina * bedStrength);
+
+  if (uMaterialTheme == 4) {
+    float windGrain = 0.5 + 0.5 * sin(dot(vWorldPos.xz, vec2(0.83, 0.56)) * 2.2 + patchN * 4.0);
+    rockAlbedo *= 0.94 + 0.12 * windGrain;
+  } else if (uMaterialTheme == 5) {
+    float solutionPits = ridgedFbm2D(vWorldPos.xz * 0.18 + patchN * 3.2, 4, 0.52);
+    rockAlbedo *= 0.91 + 0.15 * solutionPits;
+  }
 
   // Icelandic subarctic vegetation belt: moss & lichen colonise gentle low & mid slopes
   if (uMaterialTheme == 1) {
@@ -1488,6 +1668,9 @@ void main() {
     // Cryosphere diagnostic: snowpack (white), glacier ice (cyan), exposed bedrock (charcoal)
     surfaceAlbedo = mix(vec3(0.10, 0.105, 0.115), vec3(0.88, 0.92, 0.985), smoothstep(0.01, 0.30, snowDepth));
     surfaceAlbedo = mix(surfaceAlbedo, vec3(0.12, 0.62, 0.90), smoothstep(0.02, 0.70, iceDepth) * 0.92);
+  } else if (uViewMode == 6) {
+    // Water inspection mode keeps dry terrain neutral so the independent 2.5D water surface reads clearly.
+    surfaceAlbedo = vec3(0.16, 0.18, 0.20) * (0.86 + 0.18 * ridgeConvex);
   }
 
   vec3 L = safeNorm3(uSunDir, vec3(0.4, 0.8, 0.4));
@@ -1497,9 +1680,9 @@ void main() {
 
   vec3 sunRadiance = vec3(2.35, 2.20, 1.98) * ndotl * shadow;
   float skyHemi = 0.5 + 0.5 * bedNormal.y;
-  vec3 groundBounce = uMaterialTheme == 1
-    ? vec3(0.085, 0.090, 0.105)   // Cold North-Atlantic skylight over black basalt
-    : (uMaterialTheme == 2 ? vec3(0.130, 0.150, 0.185) : vec3(0.18, 0.15, 0.13));
+  vec3 groundBounce = (uMaterialTheme == 1 || uMaterialTheme == 2 || uMaterialTheme == 6)
+    ? vec3(0.100, 0.125, 0.160)
+    : (uMaterialTheme == 5 ? vec3(0.16, 0.17, 0.16) : vec3(0.18, 0.15, 0.13));
   vec3 ambient = mix(groundBounce, vec3(0.36, 0.44, 0.56), skyHemi) * ao;
   // Snow & ice scatter light: they pick up stronger, cooler skylight than bare rock
   ambient = mix(ambient, vec3(0.42, 0.52, 0.68) * ao, max(snowCover * 0.72, iceCover * 0.55));
@@ -1511,39 +1694,6 @@ void main() {
     vec3 Hs = safeNorm3(L + V, vec3(0.0, 1.0, 0.0));
     float specCryo = pow(max(1e-5, dot(bedNormal, Hs)), 42.0) * shadow;
     litColor += vec3(0.42, 0.58, 0.72) * specCryo * (iceCover * 0.55 + snowCover * 0.16);
-  }
-
-  if (!isSideSkirt && uRenderDomain.z > 0.5 && uViewMode == 0 && tC.a > 0.004) {
-    float wDepth = tC.a;
-    vec4 flowD = sampleGridBilinear(uVelocityFieldTex, vUv, res);
-    float tSec = uRenderDomain.w;
-
-    vec2 wUv = vWorldPos.xz * 0.42 - flowD.xy * tSec * 0.35;
-    float ripX = noise2D(wUv * 2.1 + vec2(tSec * 0.6, 0.0)) - noise2D(wUv * 2.1 - vec2(tSec * 0.6, 0.0));
-    float ripZ = noise2D(wUv * 2.3 + vec2(0.0, tSec * 0.5)) - noise2D(wUv * 2.3 - vec2(0.0, tSec * 0.5));
-
-    float wH_R = hR + (tR.a > 0.003 ? tR.a : 0.0);
-    float wH_L = hL + (tL.a > 0.003 ? tL.a : 0.0);
-    float wH_U = hU + (tU.a > 0.003 ? tU.a : 0.0);
-    float wH_D = hD + (tD.a > 0.003 ? tD.a : 0.0);
-    vec3 waterN = safeNorm3(vec3(wH_L - wH_R + ripX * 0.08, 2.0 * cellSize, wH_D - wH_U + ripZ * 0.08), vec3(0.0, 1.0, 0.0));
-
-    float turbidity = clamp(flowD.z * 0.35 + fineMask * 0.45, 0.0, 1.0);
-    vec3 waterTint = mix(vec3(0.04, 0.24, 0.32), vec3(0.24, 0.22, 0.15), turbidity * 0.65);
-
-    float absorb = 1.0 - exp(-wDepth * 2.6);
-    float waterAlpha = smoothstep(0.004, 0.045, wDepth);
-    float oneMinusNdotV = max(0.0, 1.0 - clamp(dot(waterN, V), 0.0, 1.0));
-    float fresnel = 0.04 + 0.62 * sq(sq(oneMinusNdotV));
-    vec3 skyReflect = mix(vec3(0.22, 0.30, 0.40), vec3(0.55, 0.66, 0.80), clamp(waterN.y, 0.0, 1.0));
-
-    vec3 H = safeNorm3(L + V, vec3(0.0, 1.0, 0.0));
-    float spec = pow(max(1e-5, dot(waterN, H)), 96.0) * 1.35 * shadow;
-    float foam = smoothstep(0.55, 1.8, flowD.z) * (0.35 + 0.35 * noise2D(wUv * 4.5 + tSec));
-
-    vec3 submerged = mix(litColor, waterTint * (sunRadiance * 0.55 + ambient * 1.15), clamp(absorb * 0.85 + 0.18, 0.0, 0.94));
-    vec3 waterCol = mix(submerged, skyReflect, fresnel * 0.68) + vec3(spec) + vec3(0.55, 0.58, 0.60) * foam * 0.35;
-    litColor = mix(litColor, waterCol, waterAlpha);
   }
 
   if (!isSideSkirt && uBrush.z > 0.5 && abs(uBrush.w) > 0.1) {
@@ -1559,6 +1709,242 @@ void main() {
 
   vec3 x = max(vec3(0.0), litColor);
   vec3 mapped = (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14);
+  outColor = vec4(pow(max(vec3(1e-6), clamp(mapped, 0.0, 1.0)), vec3(1.0 / 2.2)), 1.0);
+}
+`;
+
+export const WATER_RENDER_VERT = `#version 300 es
+${GLSL_PRECISION_HEADER}
+layout(location = 0) in vec2 aGridUv;
+
+uniform sampler2D uTerrainTex;
+uniform mat4 uViewProj;
+uniform vec4 uRenderDomain; // (worldSpan, gridRes, enabled, timeSec)
+
+out vec2 vUv;
+out vec3 vWorldPos;
+
+void main() {
+  vec2 clampedUv = clamp(aGridUv, vec2(0.0), vec2(1.0));
+  ivec2 tc = clamp(ivec2(clampedUv * (uRenderDomain.y - 1.0) + 0.5), ivec2(0), ivec2(int(uRenderDomain.y) - 1));
+  vec4 terr = texelFetch(uTerrainTex, tc, 0);
+  vec2 xz = (clampedUv - 0.5) * uRenderDomain.x;
+  vUv = aGridUv;
+  vWorldPos = vec3(xz.x, terr.r + terr.g + terr.b + terr.a, xz.y);
+  gl_Position = uViewProj * vec4(vWorldPos, 1.0);
+}
+`;
+
+export const WATER_RENDER_FRAG = `#version 300 es
+${GLSL_PRECISION_HEADER}
+in vec2 vUv;
+in vec3 vWorldPos;
+layout(location = 0) out vec4 outColor;
+
+uniform sampler2D uTerrainTex;
+uniform sampler2D uVelocityFieldTex;
+uniform vec3 uCameraPos;
+uniform vec3 uSunDir;
+uniform vec4 uRenderDomain; // (worldSpan, gridRes, enabled, timeSec)
+uniform vec4 uWaterStyle;   // (materialTheme, waterInspectionMode, reserved, reserved)
+
+${COMMON_GEOLOGY_GLSL}
+
+void main() {
+  if (any(lessThan(vUv, vec2(0.0))) || any(greaterThan(vUv, vec2(1.0))) || uRenderDomain.z < 0.5) discard;
+  float span = uRenderDomain.x;
+  float res = uRenderDomain.y;
+  float cellSize = span / res;
+  int maxI = int(res) - 1;
+  ivec2 tc = clamp(ivec2(vUv * (res - 1.0) + 0.5), ivec2(0), ivec2(maxI));
+  vec4 tC = texelFetch(uTerrainTex, tc, 0);
+  if (tC.a < 0.006) discard;
+
+  vec4 tR = texelFetch(uTerrainTex, ivec2(min(maxI, tc.x + 1), tc.y), 0);
+  vec4 tL = texelFetch(uTerrainTex, ivec2(max(0, tc.x - 1), tc.y), 0);
+  vec4 tU = texelFetch(uTerrainTex, ivec2(tc.x, min(maxI, tc.y + 1)), 0);
+  vec4 tD = texelFetch(uTerrainTex, ivec2(tc.x, max(0, tc.y - 1)), 0);
+  float hR = tR.r + tR.g + tR.b + tR.a;
+  float hL = tL.r + tL.g + tL.b + tL.a;
+  float hU = tU.r + tU.g + tU.b + tU.a;
+  float hD = tD.r + tD.g + tD.b + tD.a;
+
+  vec4 flow = texelFetch(uVelocityFieldTex, tc, 0);
+  float timeSec = uRenderDomain.w;
+  vec2 flowUv = vWorldPos.xz * 0.075 - flow.xy * timeSec * 0.045;
+  float rippleA = sin(flowUv.x * 3.1 + sin(flowUv.y * 1.7 + timeSec * 0.6));
+  float rippleB = sin(flowUv.y * 2.4 - timeSec * 0.85 + flowUv.x * 0.8);
+  float waveAmp = 0.018 + 0.030 * clamp(flow.z, 0.0, 3.0);
+  vec3 N = safeNorm3(vec3(
+    hL - hR + (rippleA - rippleB) * waveAmp,
+    2.0 * cellSize,
+    hD - hU + (rippleB + rippleA) * waveAmp
+  ), vec3(0.0, 1.0, 0.0));
+  vec3 L = safeNorm3(uSunDir, vec3(0.3, 0.85, 0.4));
+  vec3 V = safeNorm3(uCameraPos - vWorldPos, vec3(0.0, 1.0, 0.0));
+  vec3 H = safeNorm3(L + V, vec3(0.0, 1.0, 0.0));
+
+  int theme = int(uWaterStyle.x + 0.5);
+  vec3 deepWater = vec3(0.018, 0.105, 0.155);
+  vec3 shallowWater = vec3(0.055, 0.34, 0.39);
+  if (theme == 1) {
+    deepWater = vec3(0.020, 0.115, 0.17);
+    shallowWater = vec3(0.075, 0.36, 0.42);
+  } else if (theme == 2 || theme == 6) {
+    deepWater = vec3(0.018, 0.11, 0.19);
+    shallowWater = vec3(0.10, 0.40, 0.47);
+  } else if (theme == 3) {
+    deepWater = vec3(0.020, 0.12, 0.16);
+    shallowWater = vec3(0.08, 0.39, 0.39);
+  } else if (theme == 4) {
+    deepWater = vec3(0.035, 0.15, 0.19);
+    shallowWater = vec3(0.22, 0.49, 0.45);
+  } else if (theme == 5) {
+    deepWater = vec3(0.025, 0.14, 0.18);
+    shallowWater = vec3(0.12, 0.46, 0.46);
+  }
+
+  float depth = tC.a;
+  float turbidity = clamp(flow.z * 0.22 + tC.b * 0.72, 0.0, 1.0);
+  vec3 waterTint = mix(deepWater, shallowWater, clamp(1.0 - exp(-depth * 0.32), 0.0, 1.0));
+  waterTint = mix(waterTint, vec3(0.24, 0.23, 0.18), turbidity * 0.55);
+
+  float ndv = clamp(dot(N, V), 0.0, 1.0);
+  float fresnel = 0.035 + 0.78 * pow(1.0 - ndv, 5.0);
+  vec3 sky = mix(vec3(0.20, 0.28, 0.38), vec3(0.55, 0.68, 0.82), clamp(N.y, 0.0, 1.0));
+  float spec = pow(max(1e-5, dot(N, H)), 72.0) * (0.25 + 1.35 * max(0.0, dot(N, L)));
+  float foamNoise = 0.55 + 0.45 * noise2D(flowUv * 5.2 + vec2(timeSec * 0.28, -timeSec * 0.16));
+  float shorelineFoam = 1.0 - smoothstep(0.018, 0.42, depth);
+  float fastWaterFoam = smoothstep(1.4, 5.8, flow.z) * foamNoise;
+  float foam = clamp(max(shorelineFoam * 0.40, fastWaterFoam * 0.68), 0.0, 0.82);
+
+  vec3 color = mix(waterTint, sky, fresnel * 0.72);
+  color += vec3(0.75, 0.84, 0.92) * spec;
+  color = mix(color, vec3(0.76, 0.84, 0.84), foam * 0.70);
+  float inspection = uWaterStyle.y;
+  if (inspection > 0.5) {
+    float flowBand = clamp(flow.z * 0.20 + depth * 0.04, 0.0, 1.0);
+    color = mix(vec3(0.025, 0.12, 0.24), vec3(0.14, 0.78, 0.92), flowBand);
+    color += vec3(0.2, 0.55, 0.60) * foam * 0.4;
+  }
+
+  float alpha = mix(0.68, 0.91, smoothstep(0.08, 4.5, depth));
+  if (inspection > 0.5) alpha = 0.94;
+  vec3 x = max(vec3(0.0), color);
+  vec3 mapped = (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14);
+  outColor = vec4(pow(max(vec3(1e-6), clamp(mapped, 0.0, 1.0)), vec3(1.0 / 2.2)), alpha);
+}
+`;
+
+export const BOULDER_RENDER_VERT = `#version 300 es
+${GLSL_PRECISION_HEADER}
+layout(location = 0) in vec3 aRockPosition;
+layout(location = 1) in vec3 aRockNormal;
+layout(location = 2) in vec4 aInstanceA; // (x, z, radiusX, radiusY)
+layout(location = 3) in vec4 aInstanceB; // (radiusZ, yaw, siteThreshold, albedoVariation)
+
+uniform sampler2D uTerrainTex;
+uniform mat4 uViewProj;
+uniform vec4 uBoulderDomain; // (worldSpan, gridRes, materialTheme, reserved)
+
+out vec3 vWorldPos;
+out vec3 vWorldNormal;
+out float vSiteVisibility;
+out float vRockTint;
+
+${COMMON_GEOLOGY_GLSL}
+
+void main() {
+  float span = uBoulderDomain.x;
+  float res = uBoulderDomain.y;
+  float cellSize = span / res;
+  vec2 anchor = vec2(aInstanceA.x, aInstanceA.y);
+  vec2 anchorUv = anchor / span + 0.5;
+  vec4 terrain = sampleGridBilinear(uTerrainTex, anchorUv, res);
+  float hC = terrain.r + terrain.g + terrain.b;
+  vec4 terrR = sampleGridBilinear(uTerrainTex, anchorUv + vec2(1.0 / res, 0.0), res);
+  vec4 terrL = sampleGridBilinear(uTerrainTex, anchorUv - vec2(1.0 / res, 0.0), res);
+  vec4 terrU = sampleGridBilinear(uTerrainTex, anchorUv + vec2(0.0, 1.0 / res), res);
+  vec4 terrD = sampleGridBilinear(uTerrainTex, anchorUv - vec2(0.0, 1.0 / res), res);
+  float hR = terrR.r + terrR.g + terrR.b;
+  float hL = terrL.r + terrL.g + terrL.b;
+  float hU = terrU.r + terrU.g + terrU.b;
+  float hD = terrD.r + terrD.g + terrD.b;
+  vec3 surfaceNormal = safeNorm3(vec3(hL - hR, 2.0 * cellSize, hD - hU), vec3(0.0, 1.0, 0.0));
+  float slope = clamp(1.0 - surfaceNormal.y, 0.0, 1.0);
+  float exposedSlope = smoothstep(0.055, 0.30, slope);
+  float erraticAllowance = aInstanceB.z < 0.14 ? 0.18 : 0.0;
+  float siteScore = max(exposedSlope, erraticAllowance);
+  vSiteVisibility = smoothstep(aInstanceB.z - 0.09, aInstanceB.z + 0.10, siteScore);
+
+  // A short gravity-biased roll from the source slope, then support the chunk on the live surface.
+  vec2 downSlope = safeNorm2(vec2(hL - hR, hD - hU), vec2(0.0, 0.0));
+  float roll = min(max(aInstanceA.z, aInstanceB.x) * 0.34, 5.5) * smoothstep(0.035, 0.24, slope);
+  vec2 settledXZ = anchor + downSlope * roll;
+  vec2 settledUv = settledXZ / span + 0.5;
+  vec4 settledTerrain = sampleGridBilinear(uTerrainTex, settledUv, res);
+  float settledHeight = settledTerrain.r + settledTerrain.g + settledTerrain.b;
+  float rx = aInstanceA.z;
+  float ry = aInstanceA.w;
+  float rz = aInstanceB.x;
+  vec3 center = vec3(settledXZ.x, settledHeight, settledXZ.y) + surfaceNormal * (ry * 1.04);
+
+  vec3 reference = abs(surfaceNormal.y) < 0.92 ? vec3(0.0, 1.0, 0.0) : vec3(0.0, 0.0, 1.0);
+  vec3 tangent = safeNorm3(cross(reference, surfaceNormal), vec3(1.0, 0.0, 0.0));
+  vec3 bitangent = safeNorm3(cross(surfaceNormal, tangent), vec3(0.0, 0.0, 1.0));
+  float c = cos(aInstanceB.y);
+  float s = sin(aInstanceB.y);
+  vec3 axisX = tangent * c + bitangent * s;
+  vec3 axisZ = bitangent * c - tangent * s;
+
+  vec3 scale = vec3(rx, ry, rz);
+  vec3 local = aRockPosition * scale;
+  vec3 world = center + axisX * local.x + surfaceNormal * local.y + axisZ * local.z;
+  vec3 localNormal = aRockNormal / max(scale, vec3(1e-3));
+  vWorldNormal = safeNorm3(axisX * localNormal.x + surfaceNormal * localNormal.y + axisZ * localNormal.z, surfaceNormal);
+  vWorldPos = world;
+  vRockTint = aInstanceB.w;
+  gl_Position = uViewProj * vec4(world, 1.0);
+}
+`;
+
+export const BOULDER_RENDER_FRAG = `#version 300 es
+${GLSL_PRECISION_HEADER}
+in vec3 vWorldPos;
+in vec3 vWorldNormal;
+in float vSiteVisibility;
+in float vRockTint;
+layout(location = 0) out vec4 outColor;
+
+uniform vec3 uSunDir;
+uniform vec3 uCameraPos;
+uniform vec4 uBoulderDomain; // (worldSpan, gridRes, materialTheme, reserved)
+
+${COMMON_GEOLOGY_GLSL}
+
+void main() {
+  if (vSiteVisibility < 0.16) discard;
+  vec3 N = safeNorm3(vWorldNormal, vec3(0.0, 1.0, 0.0));
+  vec3 L = safeNorm3(uSunDir, vec3(0.4, 0.8, 0.4));
+  vec3 V = safeNorm3(uCameraPos - vWorldPos, vec3(0.0, 1.0, 0.0));
+  vec3 H = safeNorm3(L + V, vec3(0.0, 1.0, 0.0));
+  int theme = int(uBoulderDomain.z + 0.5);
+  vec3 base = vec3(0.29, 0.20, 0.15);
+  if (theme == 1) base = vec3(0.075, 0.080, 0.084);
+  else if (theme == 2 || theme == 6) base = vec3(0.20, 0.20, 0.21);
+  else if (theme == 3) base = vec3(0.36, 0.19, 0.12);
+  else if (theme == 4) base = vec3(0.47, 0.32, 0.16);
+  else if (theme == 5) base = vec3(0.36, 0.36, 0.33);
+
+  float grain = noise2D(vWorldPos.xz * 0.44 + vWorldPos.y * 0.17) - 0.5;
+  float mineral = ridgedFbm2D(vWorldPos.xz * 0.12 + vWorldPos.y * 0.08, 3, 0.5);
+  vec3 albedo = base * (1.0 + grain * 0.22 + vRockTint) + vec3(mineral * 0.045);
+  float ndotl = max(0.0, dot(N, L));
+  float skyFill = 0.28 + 0.32 * clamp(N.y * 0.5 + 0.5, 0.0, 1.0);
+  float shadowlessLambert = 0.32 + 0.82 * ndotl;
+  float spec = pow(max(1e-5, dot(N, H)), 22.0) * 0.045;
+  vec3 color = albedo * (shadowlessLambert + skyFill) + vec3(spec);
+  vec3 mapped = (color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14);
   outColor = vec4(pow(max(vec3(1e-6), clamp(mapped, 0.0, 1.0)), vec3(1.0 / 2.2)), 1.0);
 }
 `;

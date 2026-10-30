@@ -85,7 +85,18 @@ function buildVWedgeCrackSegment(pA, pB, inDir, halfW0, halfW1, depth, outExtend
 
   const avgHalfW = 0.5 * (halfW0 + halfW1);
   const taperAlong = (halfW1 - halfW0) / segLen;
-  const vSlope = (avgHalfW * 0.85) / Math.max(0.05, depth);
+  const wallOffset = rng.signed() * avgHalfW * 0.13;
+  const vSlope = (avgHalfW * rng.range(0.72, 1.02)) / Math.max(0.05, depth);
+  const wallPos = [
+    mid[0] + lat[0] * (avgHalfW + wallOffset),
+    mid[1] + lat[1] * (avgHalfW + wallOffset),
+    mid[2] + lat[2] * (avgHalfW + wallOffset),
+  ];
+  const wallNeg = [
+    mid[0] - lat[0] * (avgHalfW - wallOffset),
+    mid[1] - lat[1] * (avgHalfW - wallOffset),
+    mid[2] - lat[2] * (avgHalfW - wallOffset),
+  ];
 
   const nWallPos = perturbNormal(
     vnorm([
@@ -94,12 +105,12 @@ function buildVWedgeCrackSegment(pA, pB, inDir, halfW0, halfW1, depth, outExtend
       lat[2] - tDir[2] * taperAlong + dDir[2] * vSlope,
     ]),
     rng,
-    0.04
+    0.085
   );
   poly = clipPolyByHalfSpace(
     poly,
     nWallPos,
-    vdot(nWallPos, [mid[0] + lat[0] * avgHalfW, mid[1] + lat[1] * avgHalfW, mid[2] + lat[2] * avgHalfW]),
+    vdot(nWallPos, wallPos),
     'crackWallL'
   ) || poly;
 
@@ -110,12 +121,12 @@ function buildVWedgeCrackSegment(pA, pB, inDir, halfW0, halfW1, depth, outExtend
       -lat[2] - tDir[2] * taperAlong + dDir[2] * vSlope,
     ]),
     rng,
-    0.04
+    0.085
   );
   poly = clipPolyByHalfSpace(
     poly,
     nWallNeg,
-    vdot(nWallNeg, [mid[0] - lat[0] * avgHalfW, mid[1] - lat[1] * avgHalfW, mid[2] - lat[2] * avgHalfW]),
+    vdot(nWallNeg, wallNeg),
     'crackWallR'
   ) || poly;
 
@@ -263,14 +274,18 @@ export function buildCrackedMonolith(params, tectonics, rng) {
 
   // 2. Primary Through-Going Zig-Zagging Master Chasm (`4` articulated kinked polyhedral chasm wedges!)
   const chasmWaypoints = [
-    [-0.018, 0.36, -0.48],
-    [ 0.024, 0.36, -0.20],
-    [-0.026, 0.36,  0.04],
-    [ 0.022, 0.36,  0.26],
-    [-0.015, 0.36,  0.48],
+    [-0.012, 0.36, -0.48],
+    [-0.004, 0.36, -0.36],
+    [ 0.006, 0.36, -0.24],
+    [ 0.013, 0.36, -0.12],
+    [ 0.010, 0.36,  0.01],
+    [ 0.001, 0.36,  0.14],
+    [-0.011, 0.36,  0.27],
+    [-0.014, 0.36,  0.39],
+    [-0.004, 0.36,  0.48],
   ];
-  const topW = S * (0.026 + 0.018 * aperture);
-  const botW = S * (0.009 + 0.006 * aperture);
+  const topW = S * (0.020 + 0.012 * aperture);
+  const botW = S * (0.0075 + 0.0045 * aperture);
   const outExt = S * 0.85;
   for (let s = 0; s < chasmWaypoints.length - 1; s++) {
     const a = chasmWaypoints[s];
@@ -455,8 +470,45 @@ export function buildCrackedMonolith(params, tectonics, rng) {
     if (compS) blocks.push(compS);
   }
 
-  const crackNetwork = { S, groundY, crackSalt };
+  const crackNetwork = { S, groundY, crackSalt, jointCellSize: S * 0.18 };
   return { blocks, cuts, groundY, crackNetwork };
+}
+
+function fractureHash2(ix, iz, salt) {
+  let h = Math.imul(ix | 0, 374761393) ^ Math.imul(iz | 0, 668265263) ^ Math.imul(salt | 0, 2246822519);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+}
+
+/** Irregular polygonal joint traces: stylized 2D Voronoi boundaries projected onto each face. */
+function evalSurfaceJointTrace(u, v, cellSize, salt) {
+  const px = u / cellSize;
+  const pv = v / cellSize;
+  const ix = Math.floor(px);
+  const iv = Math.floor(pv);
+  let nearest = Infinity;
+  let second = Infinity;
+
+  for (let dz = -1; dz <= 1; dz++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const cx = ix + dx;
+      const cz = iv + dz;
+      const fx = cx + 0.18 + fractureHash2(cx, cz, salt + 11) * 0.64;
+      const fz = cz + 0.18 + fractureHash2(cx, cz, salt + 29) * 0.64;
+      const distance = Math.hypot(px - fx, pv - fz);
+      if (distance < nearest) {
+        second = nearest;
+        nearest = distance;
+      } else if (distance < second) {
+        second = distance;
+      }
+    }
+  }
+
+  const gap = Math.max(0, second - nearest);
+  const t = clamp((gap - 0.024) / 0.105, 0, 1);
+  const seam = 1 - t * t * (3 - 2 * t);
+  return seam * (0.76 + 0.24 * fractureHash2(ix, iv, salt + 71));
 }
 
 /**
@@ -471,6 +523,26 @@ export function evalCrackedMonolithColor(crackNet, wx, wy, wz, nx, ny, nz, ao, c
   let sR = 0.48 + 0.038 * m1 + 0.018 * m2;
   let sG = 0.45 + 0.034 * m1 + 0.016 * m2;
   let sB = 0.42 + 0.030 * m1 + 0.015 * m2;
+
+  // Intersecting polygonal mineral joints add fine, stained fracture detail between the larger
+  // mechanically carved fissures. Choose the dominant face plane so the trace does not collapse
+  // into a flat-world grid on vertical walls.
+  let jointU = wx;
+  let jointV = wz;
+  if (Math.abs(ny) < Math.max(Math.abs(nx), Math.abs(nz))) {
+    if (Math.abs(nx) >= Math.abs(nz)) {
+      jointU = wy;
+      jointV = wz;
+    } else {
+      jointU = wx;
+      jointV = wy;
+    }
+  }
+  const jointTrace = evalSurfaceJointTrace(jointU, jointV, crackNet.jointCellSize || S * 0.18, crackNet.crackSalt + 911);
+  const jointStain = jointTrace * (0.34 + 0.12 * clamp(1.0 - m1, 0, 1));
+  sR = sR * (1 - jointStain) + 0.265 * jointStain;
+  sG = sG * (1 - jointStain) + 0.235 * jointStain;
+  sB = sB * (1 - jointStain) + 0.215 * jointStain;
 
   const ironPatch = clamp(m1 * 0.85 + 0.25, 0, 1) * clamp((1.0 - ao) * 1.1 + cav * 0.5, 0, 1);
   sR = sR * (1 - ironPatch * 0.42) + 0.47 * (ironPatch * 0.42);

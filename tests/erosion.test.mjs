@@ -22,23 +22,41 @@ const ALL_SHADER_EXPORTS = [
   'THERMAL_TALUS_FRAG',
   'TERRAIN_RENDER_VERT',
   'TERRAIN_RENDER_FRAG',
+  'WATER_RENDER_VERT',
+  'WATER_RENDER_FRAG',
+  'BOULDER_RENDER_VERT',
+  'BOULDER_RENDER_FRAG',
   'PARTICLE_RENDER_VERT',
   'PARTICLE_RENDER_FRAG',
   'SKY_BG_FRAG',
 ];
 
-test('GPU Erosion presets define 8 distinct geological landscapes and 6 multi-agent emitter modes', () => {
+test('GPU Erosion presets define 13 distinct geological landscapes and 6 multi-agent emitter modes', () => {
   const landKeys = Object.keys(EROSION_LANDSCAPES);
-  assert.equal(landKeys.length, 8);
+  assert.equal(landKeys.length, 13);
   const seenTypes = new Set();
   for (const k of landKeys) {
     const p = EROSION_LANDSCAPES[k];
     assert.equal(p.id, k);
     assert.ok(p.defaults.relief >= 80 && p.defaults.relief <= 220);
     assert.ok(p.defaults.rockHardness > 0 && p.defaults.rockHardness < 1);
+    assert.ok(p.defaults.boulderDensity >= 0 && p.defaults.boulderDensity <= 1);
     seenTypes.add(p.terrainType);
   }
-  assert.equal(seenTypes.size, 8, 'Each landscape preset should map to a unique GPU terrain generator mode');
+  assert.equal(seenTypes.size, 13, 'Each landscape preset should map to a unique GPU terrain generator mode');
+
+  const canyon = EROSION_LANDSCAPES['canyonlands-river-gorge'];
+  const lake = EROSION_LANDSCAPES['moraine-lake-basin'];
+  const icelandRift = EROSION_LANDSCAPES['icelandic-rift-coast'];
+  const dunes = EROSION_LANDSCAPES['sahara-erg-dunes'];
+  const karst = EROSION_LANDSCAPES['limestone-karst-springs'];
+  assert.equal(canyon.terrainType, 8);
+  assert.equal(lake.terrainType, 9);
+  assert.equal(icelandRift.terrainType, 10);
+  assert.equal(dunes.terrainType, 11);
+  assert.equal(karst.terrainType, 12);
+  assert.ok(canyon.defaults.pipeFlowBlend > 0.7 && canyon.defaults.boulderDensity > 0.6);
+  assert.ok(lake.defaults.glacierStrength > 0.5 && karst.materialTheme === 5);
 
   // Glacial mountain archetypes must exist and be genuinely cryospheric
   const iceland = EROSION_LANDSCAPES['icelandic-highlands'];
@@ -60,7 +78,7 @@ test('GPU Erosion presets define 8 distinct geological landscapes and 6 multi-ag
   assert.ok(DEFAULT_EROSION_PARAMS.particleCount >= 8192 && DEFAULT_EROSION_PARAMS.particleCount <= 32768);
 });
 
-test('All 15 WebGL2 GLSL ES 3.00 shaders satisfy strict ANGLE precision, brace, and interface invariants', () => {
+test('All 19 WebGL2 GLSL ES 3.00 shaders satisfy strict ANGLE precision, brace, and interface invariants', () => {
   for (const name of ALL_SHADER_EXPORTS) {
     const src = Shaders[name];
     assert.equal(typeof src, 'string', `Missing shader export ${name}`);
@@ -96,6 +114,17 @@ test('All 15 WebGL2 GLSL ES 3.00 shaders satisfy strict ANGLE precision, brace, 
     );
   }
 
+  // New terrain types initialize water independently from bedrock; the wind and render systems are wired.
+  for (let kind = 8; kind <= 12; kind++) {
+    assert.ok(Shaders.INIT_TERRAIN_FRAG.includes(`kind == ${kind}`), `Missing terrain generator ${kind}`);
+  }
+  assert.ok(Shaders.INIT_TERRAIN_FRAG.includes('uInitWindDir'));
+  assert.ok(Shaders.INIT_TERRAIN_FRAG.includes('outTerrain = vec4(bedrockH, 0.0, 0.0, max(0.0, initialWater))'));
+  assert.ok(Shaders.WATER_RENDER_FRAG.includes('tC.a < 0.006'), 'Water pass must skip dry terrain');
+  for (let theme = 3; theme <= 6; theme++) {
+    assert.ok(Shaders.TERRAIN_RENDER_FRAG.includes(`uMaterialTheme == ${theme}`), `Missing terrain material theme ${theme}`);
+  }
+
   // Verify every getUniformLocation / _bindTex name in gpu-erosion-engine.js exists in the target shader!
   const engineSrc = fs.readFileSync(new URL('../src/erosion/gpu-erosion-engine.js', import.meta.url), 'utf8');
   const uniformRegex = /(?:getUniformLocation|_bindTex)\(\s*this\.(\w+)\s*,\s*'(\w+)'/g;
@@ -109,6 +138,8 @@ test('All 15 WebGL2 GLSL ES 3.00 shaders satisfy strict ANGLE precision, brace, 
     progThermalTalus: [Shaders.FULLSCREEN_VERT, Shaders.THERMAL_TALUS_FRAG],
     progSnowCryo: [Shaders.FULLSCREEN_VERT, Shaders.SNOW_CRYO_FRAG],
     progTerrainRender: [Shaders.TERRAIN_RENDER_VERT, Shaders.TERRAIN_RENDER_FRAG],
+    progWaterRender: [Shaders.WATER_RENDER_VERT, Shaders.WATER_RENDER_FRAG],
+    progBoulderRender: [Shaders.BOULDER_RENDER_VERT, Shaders.BOULDER_RENDER_FRAG],
     progParticleRender: [Shaders.PARTICLE_RENDER_VERT, Shaders.PARTICLE_RENDER_FRAG],
   };
 
@@ -124,7 +155,9 @@ test('All 15 WebGL2 GLSL ES 3.00 shaders satisfy strict ANGLE precision, brace, 
     );
     checkedCount++;
   }
-  assert.ok(checkedCount >= 35, `Expected >= 35 verified GPU uniform bindings, got ${checkedCount}`);
+  assert.ok(checkedCount >= 45, `Expected >= 45 verified GPU uniform bindings, got ${checkedCount}`);
+  assert.ok(engineSrc.includes('gl.drawArraysInstanced'), 'Settled boulders must render as GPU instances');
+  assert.ok(engineSrc.includes('_drawWaterSurface(viewProj'), '2.5D water preview must be wired into the terrain pass');
 });
 
 test('Top-drop particle physics, 3D rock hardness resistance, and two-species sedimentation obey physical conservation', () => {
