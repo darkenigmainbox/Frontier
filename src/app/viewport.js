@@ -42,9 +42,20 @@ export class RockStudioViewport {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.065;
     this.controls.maxPolarAngle = Math.PI * 0.495;
-    this.controls.minDistance = 1.2;
-    this.controls.maxDistance = 180;
+    this.controls.minDistance = 0.8;
+    this.controls.maxDistance = 240;
     this.controls.target.set(0, 3.5, 0);
+    // Reserve Right Mouse Button for Unreal Engine Free-Look Mouselook (MMB / Shift+LMB still pans)
+    this.controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.PAN,
+      RIGHT: null,
+    };
+
+    this._keysDown = new Set();
+    this._rmbDown = false;
+    this.flySpeed = 14.0;
+    this._bindUnrealFlyControls();
 
     this.turntable = false;
     this.sunAzimuthDeg = 42;
@@ -614,11 +625,118 @@ export class RockStudioViewport {
     this.renderer.setSize(w, h);
   }
 
+  _bindUnrealFlyControls() {
+    const dom = this.renderer.domElement;
+    let rmbDragging = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    dom.addEventListener('contextmenu', (e) => e.preventDefault());
+    dom.addEventListener('pointerdown', (e) => {
+      if (!this.active || e.button !== 2) return;
+      rmbDragging = true;
+      this._rmbDown = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      dom.setPointerCapture(e.pointerId);
+    });
+    dom.addEventListener('pointermove', (e) => {
+      if (!this.active || !rmbDragging) return;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX;
+      lastY = e.clientY;
+
+      // Rotate look target around camera eye (Unreal RMB Free-Look!)
+      const lookVec = this.controls.target.clone().sub(this.camera.position);
+      const dist = Math.max(0.5, lookVec.length());
+      const sph = new THREE.Spherical().setFromVector3(lookVec);
+      sph.theta -= dx * 0.0046;
+      sph.phi = Math.max(0.08, Math.min(Math.PI - 0.08, sph.phi + dy * 0.0044));
+      lookVec.setFromSpherical(sph).setLength(dist);
+      this.controls.target.copy(this.camera.position).add(lookVec);
+    });
+    const endRmb = (e) => {
+      if (!e || e.button === 2) {
+        rmbDragging = false;
+        this._rmbDown = false;
+      }
+    };
+    dom.addEventListener('pointerup', endRmb);
+    dom.addEventListener('pointercancel', endRmb);
+    dom.addEventListener(
+      'wheel',
+      (e) => {
+        if (!this.active || !this._rmbDown) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        this.flySpeed = Math.max(2.5, Math.min(90.0, this.flySpeed * Math.exp(-e.deltaY * 0.0012)));
+      },
+      { passive: false, capture: true }
+    );
+
+    const flyCodes = new Set([
+      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE',
+      'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+      'ShiftLeft', 'ShiftRight',
+    ]);
+    window.addEventListener('keydown', (e) => {
+      if (!this.active || e.metaKey || e.ctrlKey) return;
+      const tag = document.activeElement ? document.activeElement.tagName : '';
+      const type = document.activeElement ? (document.activeElement.type || '') : '';
+      if (tag === 'TEXTAREA' || (tag === 'INPUT' && type !== 'range' && type !== 'checkbox')) return;
+      if (tag === 'SELECT' && e.code.startsWith('Arrow')) return;
+      if (flyCodes.has(e.code)) {
+        if (tag === 'INPUT' && type === 'range' && e.code.startsWith('Key')) {
+          document.activeElement.blur();
+        }
+        this._keysDown.add(e.code);
+        if (e.code.startsWith('Arrow')) e.preventDefault();
+      }
+    });
+    window.addEventListener('keyup', (e) => this._keysDown.delete(e.code));
+    window.addEventListener('blur', () => {
+      this._keysDown.clear();
+      this._rmbDown = false;
+    });
+  }
+
+  _stepWasdCamera(dt) {
+    if (this._keysDown.size === 0) return;
+    const k = this._keysDown;
+    const moveFwd = (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0);
+    const moveRight = (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
+    const moveUp = (k.has('KeyE') ? 1 : 0) - (k.has('KeyQ') ? 1 : 0);
+    if (moveFwd === 0 && moveRight === 0 && moveUp === 0) return;
+
+    const turbo = (k.has('ShiftLeft') || k.has('ShiftRight')) ? 3.0 : 1.0;
+    const step = this.flySpeed * turbo * Math.min(0.08, Math.max(0.001, dt));
+
+    const fwd = new THREE.Vector3();
+    this.camera.getWorldDirection(fwd);
+    const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
+    const delta = new THREE.Vector3()
+      .addScaledVector(fwd, moveFwd)
+      .addScaledVector(right, moveRight);
+    delta.y += moveUp;
+    if (delta.lengthSq() > 1.0) delta.normalize();
+    delta.multiplyScalar(step);
+
+    this.camera.position.add(delta);
+    this.controls.target.add(delta);
+    if (this.camera.position.y < 0.25) {
+      const lift = 0.25 - this.camera.position.y;
+      this.camera.position.y += lift;
+      this.controls.target.y += lift;
+    }
+  }
+
   _animate() {
     this._raf = requestAnimationFrame(this._animate);
     if (!this.active) return;
     const dt = this._clock.getDelta();
-    if (this.turntable) {
+    this._stepWasdCamera(dt);
+    if (this.turntable && this._keysDown.size === 0) {
       const offset = this.camera.position.clone().sub(this.controls.target);
       offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), dt * 0.35);
       this.camera.position.copy(this.controls.target).add(offset);

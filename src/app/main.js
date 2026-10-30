@@ -895,7 +895,7 @@ function initActionButtons() {
 
     if (e.key === 'r' || e.key === 'R') {
       randomizeSeed();
-    } else if (e.key === 'w' || e.key === 'W') {
+    } else if (e.key === 'z' || e.key === 'Z') {
       const chk = document.getElementById('chk-wireframe');
       chk.checked = !chk.checked;
       viewport.setWireframe(chk.checked);

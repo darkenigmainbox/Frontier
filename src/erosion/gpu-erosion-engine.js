@@ -6,6 +6,7 @@ import {
 import {
   FULLSCREEN_VERT,
   INIT_PARTICLES_FRAG,
+  INIT_SNOW_FRAG,
   INIT_TERRAIN_FRAG,
   PARTICLE_RENDER_FRAG,
   PARTICLE_RENDER_VERT,
@@ -149,14 +150,18 @@ export class GpuErosionEngine {
       fps: 60,
     };
 
-    // Camera state (3D Orbit + Pan)
+    // Camera state (Unreal WASD + Q/E Free-Fly + RMB Free-Look + LMB Orbit)
     this.camera = {
       yaw: 0.42,
       pitch: 0.46,
       distance: 740.0,
       target: [0, 54, 0],
       fovDeg: 44,
+      flySpeed: 175.0,
     };
+    this._keysDown = new Set();
+    this._rmbDown = false;
+    this._lastFrameMs = performance.now();
 
     // Storm & Interactive Brush state in world XZ coordinates
     this.stormTarget = [0, 0];
@@ -177,6 +182,7 @@ export class GpuErosionEngine {
   _initPrograms() {
     const gl = this.gl;
     this.progInitTerrain = createProgram(gl, FULLSCREEN_VERT, INIT_TERRAIN_FRAG, 'InitTerrain');
+    this.progInitSnow = createProgram(gl, FULLSCREEN_VERT, INIT_SNOW_FRAG, 'InitSnow');
     this.progInitParticles = createProgram(gl, FULLSCREEN_VERT, INIT_PARTICLES_FRAG, 'InitParticles');
     this.progParticleStep = createProgram(gl, FULLSCREEN_VERT, PARTICLE_STEP_FRAG, 'ParticleStep');
     this.progParticleScatter = createProgram(gl, PARTICLE_SCATTER_VERT, PARTICLE_SCATTER_FRAG, 'ParticleScatter');
@@ -398,6 +404,7 @@ export class GpuErosionEngine {
       if (!this.active) return;
       dragging = true;
       button = e.button;
+      if (button === 2) this._rmbDown = true;
       lastX = e.clientX;
       lastY = e.clientY;
       el.setPointerCapture(e.pointerId);
@@ -434,20 +441,36 @@ export class GpuErosionEngine {
 
       if (this.brushDown) return;
 
-      if (button === 2 || button === 1 || (button === 0 && e.altKey)) {
-        const panScale = this.camera.distance * 0.0014;
+      if (button === 2) {
+        // Unreal Engine RMB Free-Look Mouselook: rotate yaw & pitch around current eye!
+        const { eye } = this._getCameraBasis();
+        this.camera.yaw -= dx * 0.0046;
+        this.camera.pitch = Math.max(-1.42, Math.min(1.48, this.camera.pitch + dy * 0.0044));
+        const cp = Math.cos(this.camera.pitch);
+        const sp = Math.sin(this.camera.pitch);
         const cy = Math.cos(this.camera.yaw);
         const sy = Math.sin(this.camera.yaw);
-        this.camera.target[0] -= (cy * dx - sy * dy * 0.7) * panScale;
-        this.camera.target[2] -= (-sy * dx - cy * dy * 0.7) * panScale;
+        const fx = -cp * sy;
+        const fy = -sp;
+        const fz = -cp * cy;
+        this.camera.target[0] = eye[0] + fx * this.camera.distance;
+        this.camera.target[1] = eye[1] + fy * this.camera.distance;
+        this.camera.target[2] = eye[2] + fz * this.camera.distance;
+      } else if (button === 1 || (button === 0 && e.altKey)) {
+        const panScale = Math.max(40, this.camera.distance) * 0.0014;
+        const { right, up } = this._getCameraBasis();
+        this.camera.target[0] -= (right[0] * dx - up[0] * dy) * panScale;
+        this.camera.target[1] -= (right[1] * dx - up[1] * dy) * panScale;
+        this.camera.target[2] -= (right[2] * dx - up[2] * dy) * panScale;
       } else if (button === 0) {
         this.camera.yaw -= dx * 0.0065;
-        this.camera.pitch = Math.max(0.12, Math.min(1.46, this.camera.pitch + dy * 0.006));
+        this.camera.pitch = Math.max(-0.35, Math.min(1.48, this.camera.pitch + dy * 0.006));
       }
     });
 
-    const endDrag = () => {
+    const endDrag = (e) => {
       dragging = false;
+      if (!e || e.button === 2) this._rmbDown = false;
       this.brushDown = false;
     };
     el.addEventListener('pointerup', endDrag);
@@ -458,11 +481,79 @@ export class GpuErosionEngine {
       (e) => {
         if (!this.active) return;
         e.preventDefault();
+        if (this._rmbDown) {
+          // Unreal Engine RMB + Scroll adjusts WASD fly speed!
+          const speedMul = Math.exp(-e.deltaY * 0.0012);
+          this.camera.flySpeed = Math.max(30, Math.min(900, this.camera.flySpeed * speedMul));
+          return;
+        }
         const factor = Math.exp(e.deltaY * 0.0011);
-        this.camera.distance = Math.max(85, Math.min(1150, this.camera.distance * factor));
+        this.camera.distance = Math.max(14, Math.min(1450, this.camera.distance * factor));
       },
       { passive: false }
     );
+
+    // Unreal Engine WASD + Q/E + Shift Free-Fly Keyboard Navigation
+    const flyCodes = new Set([
+      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE',
+      'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+      'ShiftLeft', 'ShiftRight',
+    ]);
+    window.addEventListener('keydown', (e) => {
+      if (!this.active) return;
+      if (e.metaKey || e.ctrlKey) return;
+      const activeTag = document.activeElement ? document.activeElement.tagName : '';
+      const activeType = document.activeElement ? (document.activeElement.type || '') : '';
+      if (activeTag === 'TEXTAREA' || (activeTag === 'INPUT' && activeType !== 'range' && activeType !== 'checkbox')) {
+        return;
+      }
+      if (activeTag === 'SELECT' && e.code.startsWith('Arrow')) return;
+      if (flyCodes.has(e.code)) {
+        if (activeTag === 'INPUT' && activeType === 'range' && e.code.startsWith('Key')) {
+          document.activeElement.blur();
+        }
+        this._keysDown.add(e.code);
+        if (e.code.startsWith('Arrow')) e.preventDefault();
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      this._keysDown.delete(e.code);
+    });
+    window.addEventListener('blur', () => {
+      this._keysDown.clear();
+      this._rmbDown = false;
+    });
+  }
+
+  _stepWasdCamera(dtSec) {
+    if (this._keysDown.size === 0) return;
+    const k = this._keysDown;
+    let moveFwd = (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0);
+    let moveRight = (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
+    let moveUp = (k.has('KeyE') ? 1 : 0) - (k.has('KeyQ') ? 1 : 0);
+    if (moveFwd === 0 && moveRight === 0 && moveUp === 0) return;
+
+    const turbo = (k.has('ShiftLeft') || k.has('ShiftRight')) ? 3.2 : 1.0;
+    const speed = (this.camera.flySpeed || 175.0) * turbo * Math.min(0.08, Math.max(0.001, dtSec));
+    const { forward, right } = this._getCameraBasis();
+
+    let dx = forward[0] * moveFwd + right[0] * moveRight;
+    let dy = forward[1] * moveFwd + right[1] * moveRight + moveUp;
+    let dz = forward[2] * moveFwd + right[2] * moveRight;
+    const mag = Math.hypot(dx, dy, dz);
+    if (mag > 1.0) {
+      dx /= mag; dy /= mag; dz /= mag;
+    }
+
+    this.camera.target[0] += dx * speed;
+    this.camera.target[1] += dy * speed;
+    this.camera.target[2] += dz * speed;
+
+    // Prevent eye from dipping below y = 4m plinth base while allowing low-altitude canyon flight!
+    const { eye } = this._getCameraBasis();
+    if (eye[1] < 4.0) {
+      this.camera.target[1] += (4.0 - eye[1]);
+    }
   }
 
   _raycastPlaneXZ(clientX, clientY) {
@@ -681,16 +772,29 @@ export class GpuErosionEngine {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     this.terrainIdx = 0;
 
-    // 2. Clear shallow-water flux, velocity & cryosphere (snowpack / glacier ice) textures
+    // 2. Clear shallow-water flux & seed initial mountain snowpack + valley glaciers (`progInitSnow`)
     for (let i = 0; i < 2; i++) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboFlux[i]);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSnowClear[i]);
-      gl.clearColor(0, 0, 0, 0);
-      gl.clear(gl.COLOR_BUFFER_BIT);
     }
     this.fluxIdx = 0;
+
+    const { strataVec } = this._getHardnessUniforms();
+    const climate = this._getClimateUniforms();
+    const cellSize = p.worldSpan / R;
+    gl.viewport(0, 0, R, R);
+    gl.useProgram(this.progInitSnow);
+    this._bindTex(this.progInitSnow, 'uTerrainTex', this.terrainTex[0], 0);
+    gl.uniform4f(gl.getUniformLocation(this.progInitSnow, 'uCryoParams'), R, cellSize, 0.085, p.worldSpan);
+    gl.uniform4fv(gl.getUniformLocation(this.progInitSnow, 'uClimate'), climate.snowVec);
+    gl.uniform4fv(gl.getUniformLocation(this.progInitSnow, 'uStrataOrient'), strataVec);
+    gl.uniform1f(gl.getUniformLocation(this.progInitSnow, 'uSeed'), p.seed);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSnowClear[0]);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSnowClear[1]);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
     this.snowIdx = 0;
 
     // 3. Spawn staggered sky raindrops across all 32,768 GPU particle slots
@@ -885,6 +989,13 @@ export class GpuErosionEngine {
         p.lakeRetention ?? 0.40,
         p.dryAeolianMode ?? 0.0
       );
+      gl.uniform4f(
+        gl.getUniformLocation(this.progTerrainIntegrate, 'uWindField'),
+        climate.windVec[0],
+        climate.windVec[1],
+        p.windSpeed ?? 0.0,
+        p.erosionStrength ?? 0.70
+      );
 
       let brushCode = 0;
       if (this.brushDown) {
@@ -943,6 +1054,13 @@ export class GpuErosionEngine {
       gl.uniform4f(gl.getUniformLocation(this.progSnowCryo, 'uCryoParams'), R, cellSize, dt, p.worldSpan);
       gl.uniform4fv(gl.getUniformLocation(this.progSnowCryo, 'uClimate'), climate.snowVec);
       gl.uniform4fv(gl.getUniformLocation(this.progSnowCryo, 'uStrataOrient'), strataVec);
+      gl.uniform4f(
+        gl.getUniformLocation(this.progSnowCryo, 'uWindCryo'),
+        climate.windVec[0],
+        climate.windVec[1],
+        p.windSpeed ?? 0.0,
+        this.stepCount * dt
+      );
       gl.uniform1f(gl.getUniformLocation(this.progSnowCryo, 'uIceMeltRate'), p.iceMeltRate ?? 0.22);
       gl.uniform1f(gl.getUniformLocation(this.progSnowCryo, 'uSeed'), p.seed);
 
@@ -1208,6 +1326,10 @@ export class GpuErosionEngine {
       this._rafId = requestAnimationFrame(tick);
 
       const now = performance.now();
+      const frameDt = Math.min(0.08, Math.max(0.001, (now - this._lastFrameMs) * 0.001));
+      this._lastFrameMs = now;
+      this._stepWasdCamera(frameDt);
+
       this._fpsFrames++;
       if (now - this._fpsLastMs >= 500) {
         this.fps = Math.round((this._fpsFrames * 1000) / (now - this._fpsLastMs));

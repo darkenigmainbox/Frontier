@@ -59,11 +59,23 @@ export function buildRockArchetypeAtlas(seed = 7331) {
 
     const firstIndex = indices.length;
     if (poly && poly.faces) {
+      // Compute polyhedron interior centroid so every face normal is guaranteed to point OUTWARD!
+      let pcx = 0, pcy = 0, pcz = 0, pCount = 0;
+      for (let f = 0; f < poly.faces.length; f++) {
+        const fv = poly.faces[f].verts;
+        if (!fv) continue;
+        for (let k = 0; k < fv.length; k++) {
+          pcx += fv[k][0]; pcy += fv[k][1]; pcz += fv[k][2];
+          pCount++;
+        }
+      }
+      if (pCount > 0) { pcx /= pCount; pcy /= pCount; pcz /= pCount; }
+
       for (let f = 0; f < poly.faces.length; f++) {
         const face = poly.faces[f];
         const fv = face.verts;
         if (!fv || fv.length < 3) continue;
-        const fn = vnorm(face.normal);
+        let fn = vnorm(face.normal);
 
         // Compute face centroid to accentuate crisp rock arris edges (`edgeMask`)
         let cx = 0, cy = 0, cz = 0;
@@ -71,6 +83,11 @@ export function buildRockArchetypeAtlas(seed = 7331) {
           cx += fv[k][0]; cy += fv[k][1]; cz += fv[k][2];
         }
         cx /= fv.length; cy /= fv.length; cz /= fv.length;
+
+        // Enforce strictly OUTWARD face normal relative to polyhedron interior centroid!
+        if ((cx - pcx) * fn[0] + (cy - pcy) * fn[1] + (cz - pcz) * fn[2] < 0) {
+          fn = [-fn[0], -fn[1], -fn[2]];
+        }
 
         const baseVertex = positions.length / 3;
         // Center vertex + perimeter vertices so edge distance is exact on every facet!
@@ -89,7 +106,19 @@ export function buildRockArchetypeAtlas(seed = 7331) {
 
         for (let k = 0; k < fv.length; k++) {
           const kNext = (k + 1) % fv.length;
-          indices.push(baseVertex, baseVertex + 1 + k, baseVertex + 1 + kNext);
+          const v0 = fv[k];
+          const v1 = fv[kNext];
+          // Guarantee outward CCW winding `(v0 - c) x (v1 - c) . fn > 0` for gl.cullFace(gl.BACK)!
+          const e0x = v0[0] - cx, e0y = v0[1] - cy, e0z = v0[2] - cz;
+          const e1x = v1[0] - cx, e1y = v1[1] - cy, e1z = v1[2] - cz;
+          const nx = e0y * e1z - e0z * e1y;
+          const ny = e0z * e1x - e0x * e1z;
+          const nz = e0x * e1y - e0y * e1x;
+          if (nx * fn[0] + ny * fn[1] + nz * fn[2] >= 0) {
+            indices.push(baseVertex, baseVertex + 1 + k, baseVertex + 1 + kNext);
+          } else {
+            indices.push(baseVertex, baseVertex + 1 + kNext, baseVertex + 1 + k);
+          }
         }
       }
     }
@@ -498,18 +527,27 @@ export class RockCalvingSystem {
       if (slot >= MAX_INSTANCES) continue;
       this.bucketCounts[bIdx] = slot + 1;
 
-      // Orthonormal basis with Y aligned to `r.up` and yaw around `r.up`
+      // Right-handed orthonormal basis (det = +1.0!): b = t x u (NOT u x t!)
+      // With det = -1 previously, cofactor(M) = -M^{-T} inverted every normal & flipped CCW winding!
       const ux = r.upX, uy = r.upY, uz = r.upZ;
       const cy = Math.cos(r.yaw), sy = Math.sin(r.yaw);
       let tx = cy, ty = 0, tz = sy;
       const dotTU = tx * ux + ty * uy + tz * uz;
       tx -= ux * dotTU; ty -= uy * dotTU; tz -= uz * dotTU;
-      const tl = Math.hypot(tx, ty, tz) || 1;
+      let tl = Math.hypot(tx, ty, tz);
+      if (tl < 1e-5) {
+        tx = Math.abs(uy) < 0.9 ? 0 : 1;
+        ty = Math.abs(uy) < 0.9 ? 1 : 0;
+        tz = 0;
+        const d2 = tx * ux + ty * uy + tz * uz;
+        tx -= ux * d2; ty -= uy * d2; tz -= uz * d2;
+        tl = Math.hypot(tx, ty, tz) || 1;
+      }
       tx /= tl; ty /= tl; tz /= tl;
 
-      const bx = uy * tz - uz * ty;
-      const by = uz * tx - ux * tz;
-      const bz = ux * ty - uy * tx;
+      const bx = ty * uz - tz * uy;
+      const by = tz * ux - tx * uz;
+      const bz = tx * uy - ty * ux;
 
       const arr = this.bucketData[bIdx];
       const o = slot * FLOATS_PER_INSTANCE;

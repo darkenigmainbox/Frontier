@@ -15,6 +15,7 @@ import * as Shaders from '../src/erosion/erosion-shaders.js';
 const ALL_SHADER_EXPORTS = [
   'FULLSCREEN_VERT',
   'INIT_TERRAIN_FRAG',
+  'INIT_SNOW_FRAG',
   'INIT_PARTICLES_FRAG',
   'PARTICLE_STEP_FRAG',
   'PARTICLE_SCATTER_VERT',
@@ -32,9 +33,9 @@ const ALL_SHADER_EXPORTS = [
   'ROCK_INSTANCE_FRAG',
 ];
 
-test('GPU Erosion presets preserve all 8 baseline landscapes untouched and add 6 new canyon/Icelandic/dune/lake landscapes', () => {
+test('GPU Erosion presets cover all 15 landscapes including Himalayan Snow Mountains & Namib/Sahara wind deserts', () => {
   const landKeys = Object.keys(EROSION_LANDSCAPES);
-  assert.equal(landKeys.length, 14);
+  assert.equal(landKeys.length, 15);
   const seenTypes = new Set();
   for (const k of landKeys) {
     const p = EROSION_LANDSCAPES[k];
@@ -43,9 +44,9 @@ test('GPU Erosion presets preserve all 8 baseline landscapes untouched and add 6
     assert.ok(p.defaults.rockHardness > 0 && p.defaults.rockHardness < 1);
     seenTypes.add(p.terrainType);
   }
-  assert.equal(seenTypes.size, 14, 'Each landscape preset should map to a unique GPU terrain generator mode');
+  assert.equal(seenTypes.size, 15, 'Each landscape preset should map to a unique GPU terrain generator mode');
 
-  // Verify all 8 original baseline terrainTypes (0..7) and default boot preset remain intact!
+  // Verify all 8 baseline terrainTypes (0..7) and default boot preset remain intact!
   assert.equal(DEFAULT_EROSION_PARAMS.landscape, 'icelandic-highlands');
   assert.equal(EROSION_LANDSCAPES['alpine-divide'].terrainType, 0);
   assert.equal(EROSION_LANDSCAPES['layered-plateau'].terrainType, 1);
@@ -55,22 +56,25 @@ test('GPU Erosion presets preserve all 8 baseline landscapes untouched and add 6
   assert.equal(EROSION_LANDSCAPES['coastal-massif'].terrainType, 5);
   assert.equal(EROSION_LANDSCAPES['icelandic-highlands'].terrainType, 6);
   assert.equal(EROSION_LANDSCAPES['himalayan-karakoram'].terrainType, 7);
+  assert.equal(EROSION_LANDSCAPES['himalayan-karakoram'].name, 'Himalayan Snow Mountains');
 
-  // Verify the 6 new researched landscapes (8..13), 7 rock themes, and 5 stone fabric modes
+  // Verify the 7 researched landscapes (8..14), 7 rock themes, and 5 stone fabric modes
   assert.equal(EROSION_LANDSCAPES['grand-canyon'].terrainType, 8);
   assert.equal(EROSION_LANDSCAPES['studlagil-basalt'].terrainType, 9);
   assert.equal(EROSION_LANDSCAPES['fjadrargljufur-palagonite'].terrainType, 10);
   assert.equal(EROSION_LANDSCAPES['namib-erg-dunes'].terrainType, 11);
   assert.equal(EROSION_LANDSCAPES['yardang-wind-corridor'].terrainType, 12);
   assert.equal(EROSION_LANDSCAPES['glacial-lake-watershed'].terrainType, 13);
+  assert.equal(EROSION_LANDSCAPES['sahara-tassili-erg'].terrainType, 14);
   assert.equal(Object.keys(MATERIAL_THEMES).length, 7);
   assert.equal(Object.keys(ROCK_FABRIC_MODES).length, 5);
 
-  // Glacial mountain archetypes must exist and be genuinely cryospheric
+  // Glacial mountain archetypes must exist and snow across broad mountain elevation ranges
   const iceland = EROSION_LANDSCAPES['icelandic-highlands'];
   const himalaya = EROSION_LANDSCAPES['himalayan-karakoram'];
   assert.ok(iceland && himalaya, 'Icelandic & Himalayan glacial mountain presets must exist');
-  assert.ok(iceland.defaults.snowfallRate > 0.5 && himalaya.defaults.snowfallRate > 0.5);
+  assert.ok(iceland.defaults.snowfallRate > 0.5 && himalaya.defaults.snowfallRate > 0.85);
+  assert.ok(himalaya.defaults.snowline <= 0.30, 'Himalayan Snow Mountains must have low snowline for broad snow cover');
   assert.ok(himalaya.defaults.glacierStrength > iceland.defaults.glacierStrength * 0.9);
 
   const emitterKeys = Object.keys(EMITTER_MODES);
@@ -84,7 +88,7 @@ test('GPU Erosion presets preserve all 8 baseline landscapes untouched and add 6
   assert.ok(DEFAULT_EROSION_PARAMS.particleCount >= 8192 && DEFAULT_EROSION_PARAMS.particleCount <= 32768);
 });
 
-test('All 17 WebGL2 GLSL ES 3.00 shaders satisfy strict ANGLE precision, brace, and interface invariants', () => {
+test('All 18 WebGL2 GLSL ES 3.00 shaders satisfy strict ANGLE precision, brace, and interface invariants', () => {
   for (const name of ALL_SHADER_EXPORTS) {
     const src = Shaders[name];
     assert.equal(typeof src, 'string', `Missing shader export ${name}`);
@@ -125,6 +129,7 @@ test('All 17 WebGL2 GLSL ES 3.00 shaders satisfy strict ANGLE precision, brace, 
   const uniformRegex = /(?:getUniformLocation|_bindTex)\(\s*this\.(\w+)\s*,\s*'(\w+)'/g;
   const progMap = {
     progInitTerrain: [Shaders.FULLSCREEN_VERT, Shaders.INIT_TERRAIN_FRAG],
+    progInitSnow: [Shaders.FULLSCREEN_VERT, Shaders.INIT_SNOW_FRAG],
     progInitParticles: [Shaders.FULLSCREEN_VERT, Shaders.INIT_PARTICLES_FRAG],
     progParticleStep: [Shaders.FULLSCREEN_VERT, Shaders.PARTICLE_STEP_FRAG],
     progParticleScatter: [Shaders.PARTICLE_SCATTER_VERT, Shaders.PARTICLE_SCATTER_FRAG],
@@ -150,6 +155,11 @@ test('All 17 WebGL2 GLSL ES 3.00 shaders satisfy strict ANGLE precision, brace, 
     checkedCount++;
   }
   assert.ok(checkedCount >= 35, `Expected >= 35 verified GPU uniform bindings, got ${checkedCount}`);
+  // Verify glacial-blizzard (code 1) is NOT trapped inside storm-cell disc (only mode == 5 is storm-cell!)
+  assert.ok(
+    Shaders.PARTICLE_STEP_FRAG.includes('if (mode == 5)') && !Shaders.PARTICLE_STEP_FRAG.includes('if (mode == 1) {\n    float ang'),
+    'Full-domain blizzard snowfall must not be restricted to storm-cell radius'
+  );
 });
 
 test('Top-drop particle physics, 3D rock hardness resistance, and two-species sedimentation obey physical conservation', () => {
@@ -282,10 +292,27 @@ test('Multi-agent GPU particle species (snow, aeolian wind, rockfall) and glacie
   assert.ok(rockGain > 0 && windGain > 0, 'Both species must accelerate down steepening slopes');
 });
 
-test('3D RockCalvingSystem synthesizes cleaved polyhedral outcrops & settles calved boulders down cliff slopes', () => {
+test('3D RockCalvingSystem synthesizes outward-normal CCW polyhedral outcrops & settles calved boulders down cliff slopes', () => {
   const atlas = buildRockArchetypeAtlas(7331);
   assert.equal(atlas.submeshes.length, 6, 'Atlas must contain 6 cleaved polyhedral rock archetypes');
   assert.ok(atlas.indices.length > 600, 'Polyhedral rock atlas must contain rich faceted triangles');
+
+  // Verify EVERY triangle in the rock atlas has outward-pointing normals and CCW front-face winding!
+  const pos = atlas.positions;
+  const nrm = atlas.normals;
+  const idxArr = atlas.indices;
+  for (const sub of atlas.submeshes) {
+    for (let t = sub.firstIndex; t < sub.firstIndex + sub.indexCount; t += 3) {
+      const i0 = idxArr[t] * 3, i1 = idxArr[t + 1] * 3, i2 = idxArr[t + 2] * 3;
+      const e1x = pos[i1] - pos[i0], e1y = pos[i1 + 1] - pos[i0 + 1], e1z = pos[i1 + 2] - pos[i0 + 2];
+      const e2x = pos[i2] - pos[i0], e2y = pos[i2 + 1] - pos[i0 + 1], e2z = pos[i2 + 2] - pos[i0 + 2];
+      const cx = e1y * e2z - e1z * e2y;
+      const cy = e1z * e2x - e1x * e2z;
+      const cz = e1x * e2y - e1y * e2x;
+      const dotN = cx * nrm[i0] + cy * nrm[i0 + 1] + cz * nrm[i0 + 2];
+      assert.ok(dotN > 0, 'Every rock facet triangle must have strictly outward CCW winding');
+    }
+  }
 
   const sys = new RockCalvingSystem();
   const N = 64;
@@ -305,6 +332,22 @@ test('3D RockCalvingSystem synthesizes cleaved polyhedral outcrops & settles cal
 
   sys.updateTerrainSnapshot(grid, N, 512.0);
   sys.seedForLandscape({ seed: 4029, worldSpan: 512.0, boulderDensity: 0.75, strataStrike: 10, strataDip: 12 });
+
+  // Verify EVERY rock instance 3x3 basis matrix has det(M) > 0 (right-handed, NEVER inverted normals!)
+  for (let b = 0; b < sys.bucketCounts.length; b++) {
+    const cnt = sys.bucketCounts[b];
+    const data = sys.bucketData[b];
+    for (let s = 0; s < cnt; s++) {
+      const o = s * 16;
+      const m00 = data[o + 0], m01 = data[o + 1], m02 = data[o + 2];
+      const m10 = data[o + 4], m11 = data[o + 5], m12 = data[o + 6];
+      const m20 = data[o + 8], m21 = data[o + 9], m22 = data[o + 10];
+      const det = m00 * (m11 * m22 - m12 * m21)
+                - m01 * (m10 * m22 - m12 * m20)
+                + m02 * (m10 * m21 - m11 * m20);
+      assert.ok(det > 0.05, `Instance matrix must be strictly right-handed (det > 0), got ${det}`);
+    }
+  }
 
   const outcrops = sys.rocks.filter((r) => r.isOutcrop);
   const boulders = sys.rocks.filter((r) => !r.isOutcrop);
