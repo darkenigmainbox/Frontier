@@ -51,35 +51,44 @@ const state = {
 // VIEWPORTS & WORKER INITIALIZATION
 // ============================================================================
 
-const viewportEl = document.getElementById('viewport-canvas');
-const viewport = new RockStudioViewport(viewportEl);
-viewport.setActive(false);
-
-const stageEl = document.querySelector('.viewport-stage');
-
-let curveOverlay = null;
-try {
-  curveOverlay = new ArchCurveGizmoOverlay(stageEl, {
-    getCameraAdapter: () => (state.studioMode === 'rock' ? viewport.getCameraAdapter() : null),
-    onCurveChanged: () => updateCurveReadout(),
-    onCurveCommitted: (curves) => {
-      state.customCurveActive = true;
-      updateCurveReadout();
-      state.params.customArchCurves = curves;
-      requestSynthesis(false);
-    },
-  });
-} catch (err) {
-  console.warn('Curve gizmo unavailable:', err);
-}
-
-const erosionCanvas = document.getElementById('erosion-canvas');
-let erosionEngine = null;
-let erosionLayerStackUI = null;
-
 const progressBar = document.getElementById('progress-bar');
 const progressFill = document.getElementById('progress-fill');
 const statusToast = document.getElementById('status-toast');
+const viewportEl = document.getElementById('viewport-canvas');
+const stageEl = document.querySelector('.viewport-stage');
+const erosionCanvas = document.getElementById('erosion-canvas');
+
+let erosionEngine = null;
+let erosionLayerStackUI = null;
+let fatalGpuError = null;
+let viewport = null;
+let curveOverlay = null;
+let curveToolBound = false;
+
+function ensureRockViewport() {
+  if (viewport) return viewport;
+  try {
+    viewport = new RockStudioViewport(viewportEl);
+    viewport.setActive(false);
+    curveOverlay = new ArchCurveGizmoOverlay(stageEl, {
+      getCameraAdapter: () => (state.studioMode === 'rock' && viewport ? viewport.getCameraAdapter() : null),
+      onCurveChanged: () => updateCurveReadout(),
+      onCurveCommitted: (curves) => {
+        state.customCurveActive = true;
+        updateCurveReadout();
+        state.params.customArchCurves = curves;
+        requestSynthesis(false);
+      },
+    });
+    if (!curveToolBound) {
+      curveToolBound = true;
+      initCurveTool();
+    }
+  } catch (err) {
+    console.error('Rock Studio viewport error:', err);
+  }
+  return viewport;
+}
 
 function updateErosionHud(tel) {
   const elSteps = document.getElementById('er-stat-steps');
@@ -102,9 +111,10 @@ function updateErosionHud(tel) {
 try {
   erosionEngine = new GpuErosionEngine(erosionCanvas, updateErosionHud);
 } catch (err) {
+  fatalGpuError = err.message || String(err);
   console.error('GPU Terrain Pipeline initialization error:', err);
   statusToast.classList.remove('hidden');
-  statusToast.textContent = `GPU Pipeline Error: ${err.message}`;
+  statusToast.textContent = `GPU Pipeline Error: ${fatalGpuError}`;
 }
 
 const worker = new Worker(new URL('../worker/gen-worker.js', import.meta.url), { type: 'module' });
@@ -113,6 +123,7 @@ let busy = false;
 let pendingRequest = null;
 
 function requestSynthesis(autoFrame = false) {
+  ensureRockViewport();
   if (autoFrame) state.autoFrameNext = true;
   const payload = { params: { ...state.params } };
   if (busy) {
@@ -161,12 +172,14 @@ worker.onmessage = (e) => {
     const selectLith = document.getElementById('select-lithology');
     if (selectLith && msg.lithology) selectLith.value = msg.lithology;
 
-    viewport.setFormationMesh(
-      msg.mesh,
-      msg.lithology,
-      msg.stats.dimensions,
-      state.autoFrameNext
-    );
+    if (viewport) {
+      viewport.setFormationMesh(
+        msg.mesh,
+        msg.lithology,
+        msg.stats.dimensions,
+        state.autoFrameNext
+      );
+    }
     state.autoFrameNext = false;
     updateRockHud(msg.stats);
   } else if (msg.type === 'error') {
@@ -181,7 +194,9 @@ worker.onmessage = (e) => {
     dispatchToWorker(next);
   } else {
     progressBar.classList.add('hidden');
-    statusToast.classList.add('hidden');
+    if (!fatalGpuError) {
+      statusToast.classList.add('hidden');
+    }
   }
 };
 
@@ -227,9 +242,11 @@ function setStudioMode(mode) {
 
   if (isTerrain) {
     progressBar.classList.add('hidden');
-    statusToast.classList.add('hidden');
+    if (!fatalGpuError) {
+      statusToast.classList.add('hidden');
+    }
     if (curveOverlay && state.curveMode) setCurveMode(false);
-    viewport.setActive(false);
+    if (viewport) viewport.setActive(false);
     if (erosionEngine) {
       erosionEngine.resizeIfNeeded();
       erosionEngine.start();
@@ -237,12 +254,13 @@ function setStudioMode(mode) {
     window.history.replaceState(null, '', '#terrain');
   } else {
     if (erosionEngine) erosionEngine.stop();
-    viewport.setActive(true);
+    const vp = ensureRockViewport();
+    if (vp) vp.setActive(true);
     if (!state.rockInitializedOnce) {
       state.rockInitializedOnce = true;
       requestSynthesis(true);
-    } else if (state.latestResult) {
-      viewport.frameCamera('hero');
+    } else if (state.latestResult && vp) {
+      vp.frameCamera('hero');
     }
     window.history.replaceState(null, '', '#rock');
   }
@@ -549,12 +567,12 @@ function initShadingControls() {
   shadingSelect.addEventListener('change', () => {
     const mode = shadingSelect.value;
     rowLith.style.display = mode === 'lithology' ? 'flex' : 'none';
-    viewport.setShadingMode(mode);
+    ensureRockViewport()?.setShadingMode(mode);
   });
 
-  lithSelect.addEventListener('change', () => viewport.setLithologyOverride(lithSelect.value));
+  lithSelect.addEventListener('change', () => ensureRockViewport()?.setLithologyOverride(lithSelect.value));
   document.getElementById('select-rock-fabric').addEventListener('change', (e) => {
-    viewport.setFabricMode(Number(e.target.value) || 0);
+    ensureRockViewport()?.setFabricMode(Number(e.target.value) || 0);
   });
 
   const sunAz = document.getElementById('slider-sun-az');
@@ -564,14 +582,14 @@ function initShadingControls() {
     const el = Number(sunEl.value);
     document.getElementById('out-sun-az').textContent = `${az}°`;
     document.getElementById('out-sun-el').textContent = `${el}°`;
-    viewport.setSunAngles(az, el);
+    ensureRockViewport()?.setSunAngles(az, el);
   };
   sunAz.addEventListener('input', updateSun);
   sunEl.addEventListener('input', updateSun);
 
-  document.getElementById('chk-human').addEventListener('change', (e) => viewport.setScaleHumanVisible(e.target.checked));
-  document.getElementById('chk-wireframe').addEventListener('change', (e) => viewport.setWireframe(e.target.checked));
-  document.getElementById('chk-turntable').addEventListener('change', (e) => viewport.setTurntable(e.target.checked));
+  document.getElementById('chk-human').addEventListener('change', (e) => ensureRockViewport()?.setScaleHumanVisible(e.target.checked));
+  document.getElementById('chk-wireframe').addEventListener('change', (e) => ensureRockViewport()?.setWireframe(e.target.checked));
+  document.getElementById('chk-turntable').addEventListener('change', (e) => ensureRockViewport()?.setTurntable(e.target.checked));
 }
 
 function initRockActionButtons() {
@@ -595,7 +613,7 @@ function initRockActionButtons() {
   document.getElementById('btn-reset-params').addEventListener('click', () => selectArchetype(state.params.archetype));
 
   document.querySelectorAll('#rock-camera-bar .cam-btn').forEach((btn) => {
-    btn.addEventListener('click', () => viewport.frameCamera(btn.dataset.cam));
+    btn.addEventListener('click', () => ensureRockViewport()?.frameCamera(btn.dataset.cam));
   });
 
   document.getElementById('btn-export-glb').addEventListener('click', () => {
@@ -621,11 +639,11 @@ function initRockActionButtons() {
       }
       return;
     }
-    if (e.key === 'f' || e.key === 'F') viewport.frameCamera('hero');
+    if (e.key === 'f' || e.key === 'F') ensureRockViewport()?.frameCamera('hero');
   });
 }
 
-// Boot Frontier Terrain Studio + Rock Studio
+// Boot Frontier Terrain Studio + Rock Studio Controls
 initTerrainStudio();
 buildCategoryFilterBar();
 buildArchetypeCards();
@@ -634,9 +652,5 @@ buildSliders('macro', 'sliders-macro');
 buildSliders('detail', 'sliders-detail');
 buildSeedStrip();
 initShadingControls();
-initCurveTool();
 initRockActionButtons();
-
-state.rockInitializedOnce = true;
-requestSynthesis(true);
 setStudioMode(state.studioMode);

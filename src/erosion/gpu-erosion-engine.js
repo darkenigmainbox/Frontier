@@ -29,6 +29,7 @@ import {
 } from './erosion-shaders.js';
 import { MAX_GRASS_TUFTS, buildGrassTuftMesh } from './grass-system.js';
 import { RockCalvingSystem } from './rock-calving.js';
+import { TerrainStackPipeline } from './terrain-stack-pipeline.js';
 
 const PART_TEX_W = 256;
 const PART_TEX_H = 128; // 256 * 128 = 32,768 GPU particle slots
@@ -1633,9 +1634,9 @@ export class GpuErosionEngine {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     let rawVecDisp = null;
-    if (this.pipelineMode && this.pipeline && this.pipeline._fboVecOnly) {
+    if (this.pipelineMode && this.pipeline && this.pipeline.fboVecOnly) {
       rawVecDisp = new Float32Array(R * R * 4);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.pipeline._fboVecOnly[this.pipeline.curIdx]);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.pipeline.fboVecOnly[this.pipeline.vecIdx]);
       gl.readPixels(0, 0, R, R, gl.RGBA, gl.FLOAT, rawVecDisp);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }

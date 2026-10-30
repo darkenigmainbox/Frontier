@@ -20,6 +20,8 @@ import {
   createStackLayer,
 } from '../src/erosion/terrain-stack-presets.js';
 import { SdfCaveSystem } from '../src/erosion/sdf-cave-mesher.js';
+import { GpuErosionEngine } from '../src/erosion/gpu-erosion-engine.js';
+import { ErosionLayerStackUI } from '../src/erosion/layer-stack-ui.js';
 import * as Shaders from '../src/erosion/erosion-shaders.js';
 import * as PipelineShaders from '../src/erosion/pipeline-shaders.js';
 
@@ -739,6 +741,324 @@ test('Bottom-to-top layer order genuinely changes terrain output and 3D SDF Cave
   });
   assert.equal(resMuted.vertexCount, 0);
 });
+
+test('All Pipeline Shaders satisfy strict Windows Chrome ANGLE D3D11 HLSL rules (no inverted smoothstep, no divergent texture(), matching varyings)', () => {
+  for (const [name, src] of Object.entries(PipelineShaders)) {
+    if (typeof src !== 'string') continue;
+
+    // 1. Every fragment shader must declare explicit layout(location = 0) out
+    if (name.endsWith('_FRAG')) {
+      assert.ok(
+        /layout\s*\(\s*location\s*=\s*0\s*\)\s*out\s+vec4/.test(src),
+        `${name} must declare explicit layout(location = 0) out vec4`
+      );
+    }
+
+    // 2. Zero texture() calls (must use derivative-free texelFetch so D3D11 never rejects divergent Sample() gradients!)
+    const stripped = src.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    assert.ok(
+      !/\btexture\s*\(/.test(stripped),
+      `${name} must use derivative-free texelFetch rather than texture() for ANGLE D3D11 RGBA32F compatibility`
+    );
+
+    // 3. Zero literal inverted smoothstep(a, b, x) where a >= b (D3D11 error X4010!)
+    const smRe = /smoothstep\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*,/g;
+    let m;
+    while ((m = smRe.exec(stripped)) !== null) {
+      const e0 = Number(m[1]);
+      const e1 = Number(m[2]);
+      assert.ok(
+        e0 < e1,
+        `${name} contains inverted literal smoothstep(${e0}, ${e1}, ...) which fails ANGLE D3D11 with error X4010`
+      );
+    }
+
+    // 4. Zero pow((... - ...), ...) where base can be negative (D3D11 error X3571!)
+    assert.ok(
+      !/\bpow\s*\(\s*\([^)]*-[^)]*\)\s*,/.test(stripped),
+      `${name} contains unguarded pow((a - b), e) which fails ANGLE D3D11 with error X3571`
+    );
+  }
+
+  // 5. Verify exact vertex out -> fragment in varying signatures for all linked pairs
+  const extractVaryings = (glsl, dir) => {
+    const out = [];
+    const re = new RegExp(`^\\s*${dir}\\s+((?:highp|mediump|lowp)\\s+)?(vec[234]|float|int)\\s+(\\w+)\\s*;`, 'gm');
+    let m;
+    while ((m = re.exec(glsl)) !== null) {
+      out.push(`${m[2]} ${m[3]}`);
+    }
+    return out.sort();
+  };
+
+  assert.deepEqual(
+    extractVaryings(PipelineShaders.PIPELINE_TERRAIN_VERT, 'out'),
+    extractVaryings(PipelineShaders.PIPELINE_TERRAIN_FRAG, 'in'),
+    'PIPELINE_TERRAIN_VERT/FRAG varyings must match identically'
+  );
+  assert.deepEqual(
+    extractVaryings(PipelineShaders.SDF_CAVE_VERT, 'out'),
+    extractVaryings(PipelineShaders.SDF_CAVE_FRAG, 'in'),
+    'SDF_CAVE_VERT/FRAG varyings must match identically'
+  );
+});
+
+test('End-to-end stateful Mock-WebGL2 + DOM boot of GpuErosionEngine, TerrainStackPipeline, and ErosionLayerStackUI succeeds with zero FBO feedback loops', () => {
+  // Minimal DOM environment covering all Frontier Studio IDs
+  const elements = new Map();
+  const makeEl = (id = '') => {
+    const listeners = {};
+    const el = {
+      id,
+      value: '0',
+      checked: true,
+      hidden: false,
+      textContent: '',
+      _innerHTML: '',
+      dataset: {},
+      clientWidth: 960,
+      clientHeight: 600,
+      width: 960,
+      height: 600,
+      style: { setProperty() {} },
+      parentElement: { style: { setProperty() {} } },
+      classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
+      setAttribute() {},
+      addEventListener(ev, fn) { (listeners[ev] ||= []).push(fn); },
+      querySelectorAll() { return []; },
+      querySelector() { return null; },
+      contains() { return false; },
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 600 }),
+    };
+    Object.defineProperty(el, 'innerHTML', {
+      get() { return el._innerHTML; },
+      set(v) { el._innerHTML = String(v); },
+    });
+    return el;
+  };
+
+  const domIds = [
+    'tp-layer-list', 'tp-layer-count', 'tp-stat-visible', 'tp-stat-hidden',
+    'tp-layer-search-input', 'tp-btn-add-layer', 'tp-add-layer-menu',
+    'tp-inspector-content', 'cb-preset-grid', 'cb-shelf-drawer', 'cb-btn-toggle',
+    'tp-doc-title', 'tp-scene-caption', 'tp-select-shading', 'tp-select-palette',
+    'tp-author-tools', 'spline-gizmo-svg',
+  ];
+  for (const id of domIds) elements.set(id, makeEl(id));
+
+  const prevDoc = globalThis.document;
+  const prevWin = globalThis.window;
+  globalThis.document = {
+    getElementById: (id) => elements.get(id) || makeEl(id),
+    addEventListener() {},
+  };
+  globalThis.window = {
+    devicePixelRatio: 1,
+    addEventListener() {},
+  };
+
+  try {
+    // Stateful WebGL2 mock that tracks shader outputs, uniform samplers, texture units, and FBO attachments
+    // to catch ANY FBO-texture feedback loop or MRT drawBuffers mismatch!
+    let nextId = 1;
+    const shaders = new Map();
+    const programs = new Map();
+    const fbos = new Map();
+    const texUnits = new Array(16).fill(null);
+    let activeUnit = 0;
+    let currentProg = null;
+    let drawFbo = null;
+    let drawCount = 0;
+
+    const gl = {
+      VERTEX_SHADER: 0x8b31,
+      FRAGMENT_SHADER: 0x8b30,
+      COMPILE_STATUS: 0x8b81,
+      LINK_STATUS: 0x8b82,
+      TEXTURE_2D: 0x0de1,
+      TEXTURE0: 0x84c0,
+      RGBA32F: 0x8814,
+      RGBA16F: 0x881a,
+      RGBA: 0x1908,
+      FLOAT: 0x1406,
+      HALF_FLOAT: 0x140b,
+      NEAREST: 0x2600,
+      LINEAR: 0x2601,
+      CLAMP_TO_EDGE: 0x812f,
+      TEXTURE_MIN_FILTER: 0x2801,
+      TEXTURE_MAG_FILTER: 0x2800,
+      TEXTURE_WRAP_S: 0x2802,
+      TEXTURE_WRAP_T: 0x2803,
+      FRAMEBUFFER: 0x8d40,
+      READ_FRAMEBUFFER: 0x8ca8,
+      DRAW_FRAMEBUFFER: 0x8ca9,
+      FRAMEBUFFER_COMPLETE: 0x8cd5,
+      COLOR_ATTACHMENT0: 0x8ce0,
+      COLOR_BUFFER_BIT: 0x4000,
+      DEPTH_BUFFER_BIT: 0x0100,
+      COLOR: 0x1800,
+      ARRAY_BUFFER: 0x8892,
+      ELEMENT_ARRAY_BUFFER: 0x8893,
+      STATIC_DRAW: 0x88e4,
+      DYNAMIC_DRAW: 0x88e8,
+      TRIANGLES: 0x0004,
+      UNSIGNED_INT: 0x1405,
+      UNSIGNED_SHORT: 0x1403,
+      DEPTH_TEST: 0x0b71,
+      BLEND: 0x0be2,
+      CULL_FACE: 0x0b44,
+      BACK: 0x0405,
+      LEQUAL: 0x0203,
+      ONE: 1,
+      SRC_ALPHA: 0x0302,
+      ONE_MINUS_SRC_ALPHA: 0x0303,
+
+      getExtension: (ext) => (ext === 'EXT_color_buffer_float' || ext === 'EXT_float_blend' || ext === 'OES_texture_float_linear' ? {} : null),
+      createShader: (type) => { const s = { id: nextId++, type, src: '' }; shaders.set(s, s); return s; },
+      shaderSource: (s, src) => { s.src = src; },
+      compileShader: () => {},
+      getShaderParameter: () => true,
+      getShaderInfoLog: () => '',
+      deleteShader: () => {},
+      createProgram: () => { const p = { id: nextId++, vs: null, fs: null, samplers: new Map(), fragOutCount: 1 }; programs.set(p, p); return p; },
+      attachShader: (p, s) => { if (s.type === 0x8b31) p.vs = s.src; else p.fs = s.src; },
+      linkProgram: (p) => {
+        const fs = p.fs || '';
+        const outs = fs.match(/layout\s*\(\s*location\s*=\s*\d+\s*\)\s*out\s+vec4/g);
+        p.fragOutCount = outs ? outs.length : 1;
+        const combined = `${p.vs || ''}\n${fs}`;
+        const sRe = /uniform\s+sampler2D\s+(\w+)\s*;/g;
+        let m;
+        while ((m = sRe.exec(combined)) !== null) {
+          p.samplers.set(m[1], 0);
+        }
+      },
+      getProgramParameter: () => true,
+      getProgramInfoLog: () => '',
+      deleteProgram: () => {},
+      useProgram: (p) => { currentProg = p; },
+      getUniformLocation: (p, name) => ({ prog: p, name }),
+      uniform1i: (loc, v) => {
+        if (loc && loc.prog && loc.prog.samplers.has(loc.name)) {
+          loc.prog.samplers.set(loc.name, v);
+        }
+      },
+      uniform1f() {},
+      uniform2i() {},
+      uniform3fv() {},
+      uniform4f() {},
+      uniform4fv() {},
+      uniformMatrix4fv() {},
+      createTexture: () => ({ texId: nextId++ }),
+      deleteTexture() {},
+      activeTexture: (u) => { activeUnit = u - 0x84c0; },
+      bindTexture: (_target, tex) => { texUnits[activeUnit] = tex; },
+      texParameteri() {},
+      texImage2D() {},
+      createFramebuffer: () => { const f = { fboId: nextId++, attachments: new Map(), drawBufCount: 1 }; fbos.set(f, f); return f; },
+      deleteFramebuffer() {},
+      bindFramebuffer: (target, f) => {
+        if (target === 0x8d40 || target === 0x8ca9) drawFbo = f;
+      },
+      framebufferTexture2D: (_target, att, _texTarget, tex) => {
+        if (drawFbo) drawFbo.attachments.set(att, tex);
+      },
+      drawBuffers: (bufs) => { if (drawFbo) drawFbo.drawBufCount = bufs.length; },
+      checkFramebufferStatus: () => 0x8cd5,
+      createVertexArray: () => ({ vaoId: nextId++ }),
+      bindVertexArray() {},
+      createBuffer: () => ({ bufId: nextId++ }),
+      bindBuffer() {},
+      bufferData() {},
+      bufferSubData() {},
+      enableVertexAttribArray() {},
+      vertexAttribPointer() {},
+      vertexAttribDivisor() {},
+      viewport() {},
+      blitFramebuffer() {},
+      clearColor() {},
+      clear() {},
+      clearBufferfv() {},
+      enable() {},
+      disable() {},
+      depthFunc() {},
+      depthMask() {},
+      cullFace() {},
+      blendFunc() {},
+      readPixels(_x, _y, w, h, _fmt, _type, dst) {
+        for (let j = 0; j < h; j++) {
+          for (let i = 0; i < w; i++) {
+            const u = i / Math.max(1, w - 1);
+            const idx = (j * w + i) * 4;
+            dst[idx] = u < 0.45 ? 20 : u > 0.55 ? 150 : 20 + ((u - 0.45) / 0.10) * 130;
+            dst[idx + 1] = 0.2;
+            dst[idx + 2] = 0.4;
+            dst[idx + 3] = 0.3;
+          }
+        }
+      },
+      _verifyDrawState() {
+        drawCount++;
+        assert.ok(currentProg, 'Draw call issued with no active WebGL program');
+        if (drawFbo) {
+          assert.equal(
+            drawFbo.drawBufCount,
+            currentProg.fragOutCount,
+            `MRT drawBuffers (${drawFbo.drawBufCount}) must match fragment outputs (${currentProg.fragOutCount})`
+          );
+          const fboTexSet = new Set(drawFbo.attachments.values());
+          for (const [sName, unit] of currentProg.samplers.entries()) {
+            const boundTex = texUnits[unit];
+            assert.ok(
+              !fboTexSet.has(boundTex),
+              `WebGL2 Feedback Loop detected: sampler ${sName} (unit ${unit}) reads texture currently attached to draw FBO!`
+            );
+          }
+        }
+      },
+      drawArrays() { this._verifyDrawState(); },
+      drawElements() { this._verifyDrawState(); },
+      drawArraysInstanced() { this._verifyDrawState(); },
+      drawElementsInstanced() { this._verifyDrawState(); },
+    };
+
+    const canvas = makeEl('erosion-canvas');
+    canvas.getContext = (kind) => (kind === 'webgl2' ? gl : null);
+
+    let lastTel = null;
+    const engine = new GpuErosionEngine(canvas, (t) => { lastTel = t; });
+    const ui = new ErosionLayerStackUI(engine);
+
+    assert.ok(engine.pipeline, 'TerrainStackPipeline must initialize cleanly');
+    assert.ok(lastTel && lastTel.layerCount >= 7, 'Initial telemetry must publish evaluated stack');
+    assert.ok(elements.get('tp-select-palette').innerHTML.includes('<option'), 'Palette select must be populated');
+    assert.ok(elements.get('tp-layer-list').innerHTML.includes('tp-layer-row'), 'Layer stack list must render rows');
+    assert.ok(elements.get('tp-inspector-content').innerHTML.includes('tp-property-card'), 'Inspector must render property cards');
+    assert.ok(elements.get('cb-preset-grid').innerHTML.includes('cb-preset-card'), 'Preset shelf must render 8 recipes');
+
+    // Cycle through ALL 8 stack presets, add a sculpt stroke, step live sim, render 3D frame, and export mesh!
+    for (const presetId of Object.keys(TERRAIN_STACK_PRESETS)) {
+      engine.pipeline.loadPreset(presetId);
+      ui.renderAll();
+      engine.renderFrame();
+    }
+
+    engine.pipeline.authorTool = 'sculpt-add';
+    engine.pipeline.applySculptStroke(12, -18, true);
+    engine.pipeline.authorTool = 'cave-carve';
+    engine.pipeline.applySculptStroke(0, 0, true);
+    engine.pipeline.stepLiveSimulation();
+    engine.renderFrame();
+
+    const exported = engine.extractMeshForExport(4);
+    assert.ok(exported.positions.length > 0 && exported.indices.length > 0, 'Mesh export must succeed in pipelineMode');
+    assert.ok(drawCount > 250, `Expected >250 verified WebGL2 draw calls with zero feedback loops, got ${drawCount}`);
+  } finally {
+    globalThis.document = prevDoc;
+    globalThis.window = prevWin;
+  }
+});
+
 
 
 

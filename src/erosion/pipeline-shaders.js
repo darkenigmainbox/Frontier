@@ -13,6 +13,9 @@
  */
 
 const GLSL_NOISE_AND_MASK = `
+float sqf(float v) { return v * v; }
+float safePow(float x, float y) { return pow(max(x, 1e-5), y); }
+
 float hash12(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
@@ -51,7 +54,7 @@ float ridgedFbm(vec2 p, int oct, float sharp) {
   for (int i = 0; i < 7; i++) {
     if (i >= oct) break;
     float n = 1.0 - abs(vnoise(p) * 2.0 - 1.0);
-    n = pow(clamp(n, 0.0, 1.0), mix(1.15, 2.55, sharp));
+    n = safePow(clamp(n, 0.0, 1.0), mix(1.15, 2.55, sharp));
     n *= weight;
     weight = clamp(n * 1.75, 0.15, 1.0);
     sum += n * amp;
@@ -193,9 +196,9 @@ void main() {
       // Alpine Mountain Divide: branching arête spine + glacial cirque basins
       float mainSpine = ridgedFbm(pw * 0.95, 6, sharp);
       float spurs = ridgedFbm(pw * 2.15 + vec2(9.2, -4.7), 5, sharp * 0.85);
-      float massifEnv = smoothstep(0.62, 0.08, length((worldXZ / span) * vec2(0.95, 1.05)));
+      float massifEnv = 1.0 - smoothstep(0.08, 0.62, length((worldXZ / span) * vec2(0.95, 1.05)));
       hNorm = (mainSpine * 0.72 + spurs * 0.28 * rough) * (0.45 + 0.65 * massifEnv);
-      hNorm = pow(clamp(hNorm, 0.0, 1.2), mix(1.35, 0.85, 1.0 - valley));
+      hNorm = safePow(clamp(hNorm, 0.0, 1.2), mix(1.35, 0.85, 1.0 - valley));
     } else if (arch == 1) {
       // Tectonic Fault Escarpment: uplifted tilted block + steep fault wall + piedmont apron
       float strikeX = (worldXZ.x * 0.84 + worldXZ.y * 0.54) / span;
@@ -215,7 +218,7 @@ void main() {
       float basin = 0.14 + 0.24 * fbm(pw * 0.8, 4);
       float dCoord = (worldXZ.x * 0.88 + worldXZ.y * 0.47) / span * sc * 3.8 + fbm(pw * 1.2, 4) * 1.4;
       float ph = fract(dCoord);
-      float dune = ph < 0.72 ? pow(ph / 0.72, 1.35) : max(0.0, 1.0 - (ph - 0.72) / 0.28);
+      float dune = ph < 0.72 ? safePow(ph / 0.72, 1.35) : max(0.0, 1.0 - (ph - 0.72) / 0.28);
       hNorm = basin + dune * 0.34;
     } else if (arch == 4) {
       // Volcanic Caldera & Rim
@@ -233,7 +236,7 @@ void main() {
     } else {
       // Pediment & Inselberg Plain (ideal basement for Rock Stacks / Desert Mesas)
       float ped = 0.10 + 0.18 * fbm(pw * 0.95, 4);
-      float dome = pow(clamp(fbm(pw * 1.7 + 4.2, 5), 0.0, 1.0), 2.6) * 0.52;
+      float dome = safePow(clamp(fbm(pw * 1.7 + 4.2, 5), 0.0, 1.0), 2.6) * 0.52;
       hNorm = ped + dome * rough;
     }
 
@@ -282,17 +285,17 @@ void main() {
     } else if (gen == 1) {
       // Flat-Topped Mesa / Plateau
       float raw = fbm(pw * 0.85, 5);
-      float top = smoothstep(0.38, mix(0.68, 0.44, sharp), raw);
+      float top = smoothstep(0.38, max(0.41, mix(0.68, 0.44, clamp(sharp, 0.0, 1.0))), raw);
       deltaH = top * amp;
     } else if (gen == 2) {
       // Fault Escarpment Step
       float faultCoord = rotXZ.x / span + (fbm(pw * 1.4, 4) - 0.5) * 0.20;
-      float stepUp = smoothstep(-0.10, mix(0.18, 0.03, sharp), faultCoord);
+      float stepUp = smoothstep(-0.10, max(-0.04, mix(0.18, 0.03, clamp(sharp, 0.0, 1.0))), faultCoord);
       deltaH = stepUp * amp * (0.78 + 0.22 * fbm(pw * 2.2, 4));
     } else if (gen == 3) {
       // Asymmetric Aeolian Sand Dunes (sharp 33.8-deg leeward slipface!)
       float phase = fract(pw.x * 1.45 + (fbm(pw * 0.8, 3) - 0.5) * 0.95);
-      float stoss = pow(clamp(phase / 0.74, 0.0, 1.0), 1.35);
+      float stoss = safePow(clamp(phase / 0.74, 0.0, 1.0), 1.35);
       float lee = clamp(1.0 - (phase - 0.74) / 0.26, 0.0, 1.0);
       float dune = (phase < 0.74 ? stoss : lee) * (0.65 + 0.35 * fbm(pw * 0.7, 3));
       addSand = dune * amp * opac;
@@ -306,7 +309,8 @@ void main() {
       float rad = 0.55 + 0.35 * hash12(cid + 41.3);
       float rn = r / rad;
       float bowl = rn < 1.0 ? -(1.0 - rn * rn) * 0.82 : 0.0;
-      float rim = exp(-pow((rn - 1.03) * 4.5, 2.0)) * 0.34 * sharp;
+      float rimDist = (rn - 1.03) * 4.5;
+      float rim = exp(-sqf(rimDist)) * 0.34 * sharp;
       deltaH = (bowl + rim) * amp;
     }
 
@@ -355,7 +359,7 @@ void main() {
     // Pseudo-random per-bed thickness & hardness variation so beds look geological, not uniform stairs!
     float bedRand = hash12(vec2(bedIdx, seed * 0.07));
     float hardCapMask = smoothstep(0.52, 0.78, bedFrac) * (1.0 - smoothstep(0.92, 1.0, bedFrac) * 0.35);
-    float steppedFrac = mix(bedFrac, pow(bedFrac, mix(1.0, 0.34, 0.55 + 0.45 * bedRand)), terrStr);
+    float steppedFrac = mix(bedFrac, safePow(bedFrac, mix(1.0, 0.34, 0.55 + 0.45 * bedRand)), terrStr);
     float newBedrockH = (bedIdx + steppedFrac) * bedSpacingM - dipOffset - fold;
 
     // Apply stronger terrace benches on moderate-to-steep slopes while keeping flat valley floors clean
@@ -413,18 +417,20 @@ void main() {
         vec2 jit = (vec2(hash12(cid + 7.1), hash12(cid + 23.9)) - 0.5) * 0.62;
         vec2 centerXZ = (cid + 0.5 + jit) * spacing;
 
-        // Angular facetedrock-stack cross section
+        // Angular faceted rock-stack cross section
         vec2 rel = worldXZ - centerXZ;
-        float theta = atan(rel.y, rel.x);
+        float safeRelX = abs(rel.x) < 1e-5 ? (rel.x >= 0.0 ? 1e-5 : -1e-5) : rel.x;
+        float theta = atan(rel.y, safeRelX);
         float facet = 0.84 + 0.16 * cos(theta * 5.0 + spawnProb * 6.28) + 0.10 * (vnoise(worldXZ * 0.12 + cid) - 0.5);
         float localRad = baseRad * (0.68 + 0.58 * hash12(cid + 51.2)) * facet;
-        float dNorm = length(rel) / localRad;
+        float dNorm = length(rel) / max(1e-3, localRad);
         if (dNorm >= 1.18) continue;
 
         // Steep-sided stack profile with tiered horizontal bedding notches & caprock!
-        float colMask = smoothstep(1.08, mix(0.28, 0.72, 1.0 - taper), dNorm);
+        float innerEdge = mix(0.28, 0.72, clamp(1.0 - taper, 0.0, 1.0));
+        float colMask = 1.0 - smoothstep(innerEdge, 1.08, dNorm);
         float localMaxH = stackH * (0.58 + 0.55 * hash12(cid + 89.4));
-        float rawH = pow(colMask, 0.58) * localMaxH;
+        float rawH = safePow(colMask, 0.58) * localMaxH;
 
         float tierCoord = (rawH / max(8.0, localMaxH)) * tiers;
         float tierStep = (floor(tierCoord) + smoothstep(0.08, 0.78, fract(tierCoord))) / tiers;
@@ -437,7 +443,6 @@ void main() {
           // Caprock flares outward near top tier (true 3D mushroom/hoodoo overhang!)
           float capFlare = smoothstep(0.68, 0.94, hRatio) * capOver * 5.5;
           vec2 radOut = length(rel) > 1e-3 ? normalize(rel) : vec2(1.0, 0.0);
-          bestDisp = vec3(leanDir * (hRatio * lean * 9.5) + radOut * capFlare, capFlare * 0.25).xzy;
           bestDisp = vec3(leanDir.x * hRatio * lean * 9.5 + radOut.x * capFlare, capFlare * 0.35, leanDir.y * hRatio * lean * 9.5 + radOut.y * capFlare);
           bestHard = mix(0.76, 0.96, hRatio);
         }
@@ -469,7 +474,8 @@ void main() {
     float opac = uParam1.z * maskW;
     float seed = uParam1.w;
 
-    float steepMask = smoothstep(slopeMinTan * 0.72, slopeMinTan * 1.45, slope);
+    float sLo = slopeMinTan * 0.72;
+    float steepMask = smoothstep(sLo, max(sLo + 0.02, slopeMinTan * 1.45), slope);
     if (steepMask > 0.005) {
       vec2 outDir = slope > 1e-4 ? -vec2(dhdx, dhdz) / slope : vec2(0.0);
       vec2 alongCliff = vec2(-outDir.y, outDir.x);
@@ -549,7 +555,7 @@ void main() {
       float outerW = halfW * (1.35 + bankFall);
       if (minDist < outerW) {
         float u = clamp(minDist / outerW, 0.0, 1.0);
-        float wallProf = 1.0 - pow(u, mix(1.4, 4.2, steep));
+        float wallProf = 1.0 - safePow(u, mix(1.4, 4.2, steep));
         float cutM = wallProf * depth * opac;
         st.r = max(2.0, st.r - cutM);
         if (minDist < halfW * 0.62 && waterFill > 0.01) {
@@ -564,21 +570,23 @@ void main() {
         vec2 pEnd = getSplinePt(uSplineCount - 1);
         vec2 uv0 = clamp(pStart / span + 0.5, 0.02, 0.98);
         vec2 uv1 = clamp(pEnd / span + 0.5, 0.02, 0.98);
-        float h0 = texture(uStateTex, uv0).r;
-        float h1 = texture(uStateTex, uv1).r;
+        ivec2 ij0 = clamp(ivec2(round(uv0 * (R - 1.0))), ivec2(0), maxIJ);
+        ivec2 ij1 = clamp(ivec2(round(uv1 * (R - 1.0))), ivec2(0), maxIJ);
+        float h0 = texelFetch(uStateTex, ij0, 0).r;
+        float h1 = texelFetch(uStateTex, ij1, 0).r;
         float gradeH = mix(h0, h1, smoothstep(0.0, 1.0, bestT)) - depth * 0.15;
-        float blend = 1.0 - smoothstep(halfW * 0.85, embankmentW, minDist);
+        float blend = 1.0 - smoothstep(halfW * 0.85, max(halfW * 0.85 + 0.2, embankmentW), minDist);
         st.r = mix(st.r, gradeH, blend * opac);
         st.b *= (1.0 - blend * 0.85);
         st.a *= (1.0 - blend * 0.85);
-        geo.r = mix(geo.r, 0.88, smoothstep(halfW, halfW * 0.6, minDist) * opac);
+        geo.r = mix(geo.r, 0.88, (1.0 - smoothstep(halfW * 0.6, max(halfW * 0.6 + 0.2, halfW), minDist)) * opac);
       }
     } else {
       // Hydrostatic Lake Basin Boundary
       float basinR = halfW * 1.85;
       if (minDist < basinR) {
         float bowl = 1.0 - smoothstep(0.0, basinR, minDist);
-        float bowlShaped = pow(bowl, mix(0.75, 1.8, 1.0 - steep));
+        float bowlShaped = safePow(bowl, mix(0.75, 1.8, 1.0 - steep));
         float newFloor = st.r - bowlShaped * depth * opac;
         float waterSurface = st.r - depth * (1.0 - waterFill) * 0.55;
         st.r = max(2.0, newFloor);
@@ -604,7 +612,7 @@ precision highp int;
 precision highp sampler2D;
 
 in vec2 vUv;
-out vec4 oSculpt;
+layout(location = 0) out vec4 oSculpt;
 
 uniform sampler2D uSculptTex;
 uniform vec4 uBrushPosRad; // (worldX, worldZ, radiusM, worldSpan)
@@ -617,7 +625,8 @@ void main() {
   float d = length(worldXZ - uBrushPosRad.xy);
   float r = max(2.0, uBrushPosRad.z);
   if (d < r) {
-    float falloff = pow(1.0 - d / r, 2.0);
+    float tFall = 1.0 - d / r;
+    float falloff = tFall * tFall;
     int op = int(uBrushOpStr.x + 0.5);
     float str = uBrushOpStr.y;
     if (op == 0) {
@@ -689,7 +698,8 @@ void main() {
   float newFlow = clamp(mix(geo.g, inflow, 0.62), 0.0, 14.0);
   // Stream-power law I = K * A^m * S^n / rockResistance!
   float rockRes = mix(1.0, 0.30 + 2.8 * geo.r * geo.r, uSimExtra.y);
-  float streamPower = pow(max(0.0, newFlow - 0.04), 0.65) * maxDrop;
+  float effFlow = max(0.0, newFlow - 0.04);
+  float streamPower = (effFlow > 1e-4 ? pow(effFlow, 0.65) : 0.0) * maxDrop;
   float cut = min(st.r - 1.5, (streamPower * uSimParams.z * 0.34) / rockRes);
   cut = max(0.0, cut);
 
@@ -700,7 +710,8 @@ void main() {
   if (maxDrop < 0.015 && newFlow > 0.12) {
     st.g = clamp(st.g + newFlow * 0.045 * uSimExtra.x, 0.0, 18.0);
   } else {
-    st.g = clamp(mix(st.g, pow(newFlow, 0.75) * 0.38 * uSimExtra.x, 0.35), 0.0, 14.0);
+    float flowWater = newFlow > 1e-4 ? pow(newFlow, 0.75) : 0.0;
+    st.g = clamp(mix(st.g, flowWater * 0.38 * uSimExtra.x, 0.35), 0.0, 14.0);
   }
 
   // Drain domain boundary cleanly
@@ -971,7 +982,7 @@ precision highp int;
 precision highp sampler2D;
 
 in vec2 vUv;
-out vec4 oBaked;
+layout(location = 0) out vec4 oBaked;
 
 uniform sampler2D uStateTex;
 uniform sampler2D uGeoTex;
@@ -1081,24 +1092,39 @@ void main() {
   float span = uRenderDomain.x;
   float R = uRenderDomain.y;
   ivec2 maxIJ = ivec2(int(R) - 1);
-  ivec2 ij = clamp(ivec2(round(aGridUv * (R - 1.0))), ivec2(0), maxIJ);
+  vec2 clampedUv = clamp(aGridUv, 0.0, 1.0);
+  ivec2 ij = clamp(ivec2(round(clampedUv * (R - 1.0))), ivec2(0), maxIJ);
+  bool isSkirt = aGridUv.x < -0.0001 || aGridUv.x > 1.0001 || aGridUv.y < -0.0001 || aGridUv.y > 1.0001;
 
-  vUv = aGridUv;
-  vState = texelFetch(uStateTex, ij, 0);
+  vUv = clampedUv;
+  vec4 rawSt = texelFetch(uStateTex, ij, 0);
+  vState = isSkirt ? vec4(rawSt.r, 0.0, 0.0, 0.0) : rawSt;
   vGeo = texelFetch(uGeoTex, ij, 0);
 
   vec3 P = evalDisplacedPos(ij, maxIJ, span, R);
-  vec3 PL = evalDisplacedPos(ij + ivec2(-1, 0), maxIJ, span, R);
-  vec3 PR = evalDisplacedPos(ij + ivec2( 1, 0), maxIJ, span, R);
-  vec3 PD = evalDisplacedPos(ij + ivec2(0, -1), maxIJ, span, R);
-  vec3 PU = evalDisplacedPos(ij + ivec2(0,  1), maxIJ, span, R);
+  if (isSkirt) {
+    vec2 edgeXZ = (clampedUv - 0.5) * span;
+    P = vec3(edgeXZ.x, 0.0, edgeXZ.y);
+    vec3 skirtN = vec3(
+      aGridUv.x < -0.0001 ? -1.0 : (aGridUv.x > 1.0001 ? 1.0 : 0.0),
+      0.12,
+      aGridUv.y < -0.0001 ? -1.0 : (aGridUv.y > 1.0001 ? 1.0 : 0.0)
+    );
+    float snl = length(skirtN);
+    vNormal = snl > 1e-5 ? skirtN / snl : vec3(0.0, 1.0, 0.0);
+  } else {
+    vec3 PL = evalDisplacedPos(ij + ivec2(-1, 0), maxIJ, span, R);
+    vec3 PR = evalDisplacedPos(ij + ivec2( 1, 0), maxIJ, span, R);
+    vec3 PD = evalDisplacedPos(ij + ivec2(0, -1), maxIJ, span, R);
+    vec3 PU = evalDisplacedPos(ij + ivec2(0,  1), maxIJ, span, R);
 
-  // True 3D Jacobian surface normal (handles lateral cliff overhangs & leaning stacks accurately!)
-  vec3 dX = PR - PL;
-  vec3 dZ = PU - PD;
-  vec3 N = cross(dZ, dX);
-  float nl = length(N);
-  vNormal = nl > 1e-5 ? N / nl : vec3(0.0, 1.0, 0.0);
+    // True 3D Jacobian surface normal (handles lateral cliff overhangs & leaning stacks accurately!)
+    vec3 dX = PR - PL;
+    vec3 dZ = PU - PD;
+    vec3 N = cross(dZ, dX);
+    float nl = length(N);
+    vNormal = nl > 1e-5 ? N / nl : vec3(0.0, 1.0, 0.0);
+  }
   vWorldPos = P;
 
   gl_Position = uViewProj * vec4(P, 1.0);
@@ -1106,6 +1132,14 @@ void main() {
 `;
 
 const DERIVED_SURFACE_SHADING_FN = `
+vec3 safeNorm3(vec3 v, vec3 fb) {
+  float l2 = dot(v, v);
+  return l2 > 1e-8 ? v * inversesqrt(l2) : fb;
+}
+float safePowShade(float x, float y) {
+  return pow(max(x, 1e-5), y);
+}
+
 // Clean, physically derived surface shading from AO, protrusions, height, rock hardness,
 // coarse talus, fine sediment, drainage flow, and snow — ZERO noisy fake colour textures!
 vec3 shadeDerivedGeology(
@@ -1116,6 +1150,7 @@ vec3 shadeDerivedGeology(
   vec3 V,
   vec3 sunDir,
   float ao,
+  float sunShadow,
   float protrusion,
   float maskPreview,
   float hardness,
@@ -1164,7 +1199,7 @@ vec3 shadeDerivedGeology(
   if (shadingMode == 6) {
     // Pure Sculptor Clay (geometry + AO + protrusions only)
     vec3 clay = vec3(0.58, 0.56, 0.53) * (0.88 + 0.16 * protrusion);
-    float ndl = max(dot(N, sunDir), 0.0);
+    float ndl = max(dot(N, sunDir), 0.0) * sunShadow;
     return clay * (0.28 * ao + 0.78 * ndl);
   }
 
@@ -1227,8 +1262,8 @@ vec3 shadeDerivedGeology(
   float snowMask = clamp(snowDepth * 0.32, 0.0, 1.0) * (1.0 - smoothstep(0.62, 0.90, steep) * 0.80);
   albedo = mix(albedo, vec3(0.90, 0.93, 0.97), snowMask);
 
-  // 6. Physically-based sun + sky hemisphere + horizon AO lighting
-  float ndl = max(dot(N, sunDir), 0.0);
+  // 6. Physically-based sun + sky hemisphere + horizon AO + raymarched sun shadows
+  float ndl = max(dot(N, sunDir), 0.0) * sunShadow;
   vec3 skyCol = paletteId == 5 ? vec3(0.04) : vec3(0.42, 0.52, 0.66);
   vec3 sunCol = paletteId == 5 ? vec3(1.28, 1.26, 1.24) : vec3(1.18, 1.08, 0.95);
   vec3 hemi = skyCol * (0.35 + 0.65 * clamp(N.y * 0.5 + 0.5, 0.0, 1.0)) * ao;
@@ -1236,8 +1271,8 @@ vec3 shadeDerivedGeology(
   vec3 lit = albedo * (hemi * 0.68 + sunCol * ndl * (0.35 + 0.65 * ao)) + bounce;
 
   // Specular glint on wet channels & snow
-  vec3 H = normalize(sunDir + V);
-  float spec = pow(max(dot(N, H), 0.0), 42.0) * (damp * 0.22 + snowMask * 0.18);
+  vec3 H = safeNorm3(sunDir + V, vec3(0.0, 1.0, 0.0));
+  float spec = safePowShade(max(dot(N, H), 0.0), 42.0) * (damp * 0.22 + snowMask * 0.18) * sunShadow;
   lit += sunCol * spec;
 
   // 7. Shallow-to-deep 2.5D river & lake water transmission + Fresnel sky reflection
@@ -1246,10 +1281,10 @@ vec3 shadeDerivedGeology(
     vec3 shallowCol = vec3(0.14, 0.38, 0.42);
     vec3 deepCol = vec3(0.04, 0.14, 0.22);
     vec3 waterBody = mix(shallowCol, deepCol, clamp(waterDepth * 0.14, 0.0, 1.0));
-    vec3 wN = normalize(mix(N, vec3(0.0, 1.0, 0.0), 0.88));
-    float fres = 0.04 + 0.96 * pow(1.0 - max(dot(wN, V), 0.0), 4.2);
-    float wSpec = pow(max(dot(wN, H), 0.0), 140.0) * 0.95;
-    vec3 wLit = mix(lit * vec3(0.72, 0.86, 0.90), waterBody * (0.4 + 0.7 * max(dot(wN, sunDir), 0.0)), wAlpha);
+    vec3 wN = safeNorm3(mix(N, vec3(0.0, 1.0, 0.0), 0.88), vec3(0.0, 1.0, 0.0));
+    float fres = 0.04 + 0.96 * safePowShade(1.0 - max(dot(wN, V), 0.0), 4.2);
+    float wSpec = safePowShade(max(dot(wN, H), 0.0), 140.0) * 0.95 * sunShadow;
+    vec3 wLit = mix(lit * vec3(0.72, 0.86, 0.90), waterBody * (0.4 + 0.7 * max(dot(wN, sunDir), 0.0) * sunShadow), wAlpha);
     lit = mix(wLit, skyCol * 1.15, fres * 0.55 * wAlpha) + sunCol * wSpec * step(0.06, waterDepth);
   }
 
@@ -1268,8 +1303,9 @@ in vec3 vNormal;
 in vec4 vState;
 in vec4 vGeo;
 
-out vec4 oColor;
+layout(location = 0) out vec4 oColor;
 
+uniform sampler2D uStateTex;
 uniform sampler2D uBakedTex;
 uniform sampler2D uCavePortalTex;
 uniform vec3 uCameraPos;
@@ -1290,23 +1326,46 @@ vec4 sampleBilinearFloat(sampler2D tex, vec2 uv, float res) {
   return mix(mix(v00, v10, f.x), mix(v01, v11, f.x), f.y);
 }
 
+float marchSunShadow(vec2 startUv, float startH, vec3 sunDir, float span, float res) {
+  float horiz = length(sunDir.xz);
+  if (horiz < 1e-4 || sunDir.y <= 0.02) return 1.0;
+  float shadow = 1.0;
+  float t = (span / res) * 1.5;
+  vec2 marchDir = sunDir.xz / horiz;
+  for (int i = 0; i < 14; i++) {
+    vec2 suv = startUv + marchDir * (t / span);
+    if (suv.x <= 0.0 || suv.x >= 1.0 || suv.y <= 0.0 || suv.y >= 1.0) break;
+    vec4 st = sampleBilinearFloat(uStateTex, suv, res);
+    float sh = st.r + st.b + st.a;
+    float rayH = startH + (sunDir.y / horiz) * t;
+    float diff = rayH - sh;
+    if (diff < 0.0) return 0.22;
+    shadow = min(shadow, clamp(3.0 * diff / max(t * 0.18, 0.5), 0.22, 1.0));
+    t *= 1.28;
+  }
+  return shadow;
+}
+
 ${DERIVED_SURFACE_SHADING_FN}
 
 void main() {
   // Cut smooth organic portal opening into the heightfield skin wherever 3D SDF Caves breach the cliff face!
   vec4 portal = sampleBilinearFloat(uCavePortalTex, vUv, 128.0);
-  if (portal.r > 0.46 && vState.g < 0.15) {
+  if (portal.r > 0.46 && vState.g < 0.15 && vWorldPos.y > 0.5) {
     discard;
   }
 
-  vec3 N = normalize(vNormal);
-  vec3 V = normalize(uCameraPos - vWorldPos);
-  vec3 sunDir = normalize(uSunDir);
+  vec3 N = safeNorm3(vNormal, vec3(0.0, 1.0, 0.0));
+  vec3 V = safeNorm3(uCameraPos - vWorldPos, vec3(0.0, 1.0, 0.0));
+  vec3 sunDir = safeNorm3(uSunDir, vec3(0.5, 0.7, 0.5));
   vec4 baked = sampleBilinearFloat(uBakedTex, vUv, uRenderDomain.y);
 
   // Darken lip immediately surrounding a 3D SDF cave opening for seamless contact occlusion
   float portalRimAO = 1.0 - smoothstep(0.08, 0.46, portal.r) * 0.52;
   float ao = baked.r * portalRimAO;
+  float sunShadow = vWorldPos.y > 0.5
+    ? marchSunShadow(vUv, vWorldPos.y + 0.35, sunDir, uRenderDomain.x, uRenderDomain.y)
+    : 0.75;
 
   vec3 col = shadeDerivedGeology(
     uShadeConfig.x,
@@ -1316,6 +1375,7 @@ void main() {
     V,
     sunDir,
     ao,
+    sunShadow,
     baked.g,
     baked.b,
     vGeo.r,
@@ -1343,7 +1403,7 @@ void main() {
 
   // ACES filmic tone map + sRGB
   col = (col * (2.51 * col + 0.03)) / (col * (2.43 * col + 0.59) + 0.14);
-  col = pow(clamp(col, 0.0, 1.0), vec3(1.0 / 2.2));
+  col = pow(clamp(col, 1e-5, 1.0), vec3(1.0 / 2.2));
   oColor = vec4(col, 1.0);
 }
 `;
@@ -1383,7 +1443,7 @@ in vec3 vWorldPos;
 in vec3 vNormal;
 in vec4 vAttrib;
 
-out vec4 oColor;
+layout(location = 0) out vec4 oColor;
 
 uniform vec3 uCameraPos;
 uniform vec3 uSunDir;
@@ -1393,14 +1453,16 @@ uniform ivec2 uShadeConfig; // (paletteId, shadingMode)
 ${DERIVED_SURFACE_SHADING_FN}
 
 void main() {
-  vec3 N = normalize(gl_FrontFacing ? vNormal : -vNormal);
-  vec3 V = normalize(uCameraPos - vWorldPos);
-  vec3 sunDir = normalize(uSunDir);
+  vec3 rawN = gl_FrontFacing ? vNormal : -vNormal;
+  vec3 N = safeNorm3(rawN, vec3(0.0, 1.0, 0.0));
+  vec3 V = safeNorm3(uCameraPos - vWorldPos, vec3(0.0, 1.0, 0.0));
+  vec3 sunDir = safeNorm3(uSunDir, vec3(0.5, 0.7, 0.5));
 
   float caveAO = vAttrib.x;
   float hardness = vAttrib.y;
   float strataPhase = fract(vWorldPos.y * 0.065);
   float protrusion = clamp(-vAttrib.w * 0.08, -0.8, 0.2);
+  float caveShadow = clamp(1.0 - vAttrib.w * 0.14, 0.18, 0.92);
 
   vec3 col = shadeDerivedGeology(
     uShadeConfig.x,
@@ -1410,6 +1472,7 @@ void main() {
     V,
     sunDir,
     caveAO,
+    caveShadow,
     protrusion,
     1.0,
     hardness,
@@ -1427,8 +1490,27 @@ void main() {
   col = mix(col, vec3(0.56, 0.63, 0.72), fog);
 
   col = (col * (2.51 * col + 0.03)) / (col * (2.43 * col + 0.59) + 0.14);
-  col = pow(clamp(col, 0.0, 1.0), vec3(1.0 / 2.2));
+  col = pow(clamp(col, 1e-5, 1.0), vec3(1.0 / 2.2));
   oColor = vec4(col, 1.0);
+}
+`;
+
+/**
+ * Exact 1:1 RGBA32F texture copy shader (avoids ANGLE D3D11 float blitFramebuffer quirks).
+ */
+export const STACK_COPY_VEC_FRAG = `#version 300 es
+precision highp float;
+precision highp int;
+precision highp sampler2D;
+
+in vec2 vUv;
+layout(location = 0) out vec4 oCopy;
+
+uniform sampler2D uSrcTex;
+
+void main() {
+  ivec2 ij = ivec2(gl_FragCoord.xy);
+  oCopy = texelFetch(uSrcTex, ij, 0);
 }
 `;
 

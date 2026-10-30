@@ -14,6 +14,7 @@ import {
   SDF_CAVE_FRAG,
   SDF_CAVE_VERT,
   STACK_AEOLIAN_GLACIAL_FRAG,
+  STACK_COPY_VEC_FRAG,
   STACK_HYDRAULIC_FRAG,
   STACK_LANDFORM_FRAG,
   STACK_RIVER_INCISION_FRAG,
@@ -79,7 +80,11 @@ function makeFbo(gl, colorAttachments) {
     bufs.push(att);
   }
   gl.drawBuffers(bufs);
+  const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  if (status !== gl.FRAMEBUFFER_COMPLETE) {
+    throw new Error(`[Pipeline FBO] Incomplete framebuffer: 0x${status.toString(16)}`);
+  }
   return fbo;
 }
 
@@ -132,6 +137,7 @@ export class TerrainStackPipeline {
     this.progAeolianGlacial = link(gl, FULLSCREEN_VERT, STACK_AEOLIAN_GLACIAL_FRAG, 'StackAeolianGlacial');
     this.progBake = link(gl, FULLSCREEN_VERT, STACK_SURFACE_BAKE_FRAG, 'StackSurfaceBake');
     this.progSyncExport = link(gl, FULLSCREEN_VERT, STACK_SYNC_EXPORT_FRAG, 'StackSyncExport');
+    this.progCopyVec = link(gl, FULLSCREEN_VERT, STACK_COPY_VEC_FRAG, 'StackCopyVec');
     this.progTerrain = link(gl, PIPELINE_TERRAIN_VERT, PIPELINE_TERRAIN_FRAG, 'PipelineTerrain');
     this.progCave = link(gl, SDF_CAVE_VERT, SDF_CAVE_FRAG, 'SdfCave');
 
@@ -153,9 +159,11 @@ export class TerrainStackPipeline {
     ];
     this.fboStateRead = [makeFbo(gl, [this.stateTex[0]]), makeFbo(gl, [this.stateTex[1]])];
     this.fboGeoRead = [makeFbo(gl, [this.geoTex[0]]), makeFbo(gl, [this.geoTex[1]])];
+    this.fboVecOnly = [makeFbo(gl, [this.vecDispTex[0]]), makeFbo(gl, [this.vecDispTex[1]])];
     this.fboSyncEngine = makeFbo(gl, [this.engine.terrainTex[0], this.engine.snowTex[0]]);
     this.fboBaked = makeFbo(gl, [this.bakedTex]);
     this.curIdx = 0;
+    this.vecIdx = 0;
 
     // Downsampled 64x64 readback FBO for fast <0.5ms CPU snapshot (for SDF caves & rock placement)
     this.snapN = 64;
@@ -435,6 +443,7 @@ export class TerrainStackPipeline {
 
     // 1. Initialize empty working terrain state at bottom of stack
     this.curIdx = 0;
+    this.vecIdx = 0;
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboLandform[0]);
     gl.clearBufferfv(gl.COLOR, 0, new Float32Array([14.0, 0.0, 0.0, 0.0])); // bedrock=14m
     gl.clearBufferfv(gl.COLOR, 1, new Float32Array([0.52, 0.0, 0.0, 0.0])); // hardness=0.52
@@ -460,11 +469,15 @@ export class TerrainStackPipeline {
         layer.type === 'spline-feature'
       ) {
         const next = 1 - this.curIdx;
+        if (this.vecIdx === next) {
+          this._copyVecDisp(this.vecIdx, this.curIdx);
+          this.vecIdx = this.curIdx;
+        }
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboLandform[next]);
         gl.useProgram(this.progLandform);
         this._bindTex(this.progLandform, 'uStateTex', this.stateTex[this.curIdx], 0);
         this._bindTex(this.progLandform, 'uGeoTex', this.geoTex[this.curIdx], 1);
-        this._bindTex(this.progLandform, 'uVecDispTex', this.vecDispTex[this.curIdx], 2);
+        this._bindTex(this.progLandform, 'uVecDispTex', this.vecDispTex[this.vecIdx], 2);
 
         let sculptTex = this.emptySculptTex;
         if (layer.type === 'sculpt-layer') {
@@ -528,6 +541,7 @@ export class TerrainStackPipeline {
         gl.uniform4fv(gl.getUniformLocation(this.progLandform, 'uParam2'), u2);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         this.curIdx = next;
+        this.vecIdx = next;
       } else if (layer.type === 'sdf-caves') {
         activeCaveLayers.push(layer);
       } else if (layer.type === 'river-incision') {
@@ -547,7 +561,6 @@ export class TerrainStackPipeline {
             p.basinPooling ?? 0.42, p.hardnessRespect ?? 0.80, p.channelWidth ?? 0.45, it
           );
           gl.drawArrays(gl.TRIANGLES, 0, 3);
-          this._copyVecDisp(this.curIdx, next);
           this.curIdx = next;
         }
       } else if (layer.type === 'hydraulic-erosion') {
@@ -567,7 +580,6 @@ export class TerrainStackPipeline {
             p.depositionRate ?? 0.58, p.rainRate ?? 0.65, p.evaporation ?? 0.16, it
           );
           gl.drawArrays(gl.TRIANGLES, 0, 3);
-          this._copyVecDisp(this.curIdx, next);
           this.curIdx = next;
         }
       } else if (layer.type === 'thermal-talus') {
@@ -587,7 +599,6 @@ export class TerrainStackPipeline {
             p.talusSpread ?? 0.58, p.hardnessShield ?? 0.72, it, 0
           );
           gl.drawArrays(gl.TRIANGLES, 0, 3);
-          this._copyVecDisp(this.curIdx, next);
           this.curIdx = next;
         }
       } else if (layer.type === 'aeolian-glacial') {
@@ -607,7 +618,6 @@ export class TerrainStackPipeline {
           this._bindTex(this.progAeolianGlacial, 'uStateTex', this.stateTex[this.curIdx], 0);
           this._bindTex(this.progAeolianGlacial, 'uGeoTex', this.geoTex[this.curIdx], 1);
           gl.drawArrays(gl.TRIANGLES, 0, 3);
-          this._copyVecDisp(this.curIdx, next);
           this.curIdx = next;
         }
       }
@@ -702,17 +712,14 @@ export class TerrainStackPipeline {
   }
 
   _copyVecDisp(fromIdx, toIdx) {
-    // Keep 3D cliff overhang vector field aligned across ping-pong swaps
+    // Shader-based 1:1 RGBA32F copy (zero blitFramebuffer driver quirks on ANGLE D3D11)
+    if (fromIdx === toIdx) return;
     const gl = this.gl;
-    const R = this.R;
-    if (!this._fboVecOnly) {
-      this._fboVecOnly = [makeFbo(gl, [this.vecDispTex[0]]), makeFbo(gl, [this.vecDispTex[1]])];
-    }
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this._fboVecOnly[fromIdx]);
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this._fboVecOnly[toIdx]);
-    gl.blitFramebuffer(0, 0, R, R, 0, 0, R, R, gl.COLOR_BUFFER_BIT, gl.NEAREST);
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboVecOnly[toIdx]);
+    gl.viewport(0, 0, this.R, this.R);
+    gl.useProgram(this.progCopyVec);
+    this._bindTex(this.progCopyVec, 'uSrcTex', this.vecDispTex[fromIdx], 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
   /**
@@ -743,7 +750,6 @@ export class TerrainStackPipeline {
         gl.uniform4f(gl.getUniformLocation(this.progHydraulic, 'uHydParams'), R, span, p.erosionStrength ?? 0.74, p.sedimentCapacity ?? 0.82);
         gl.uniform4f(gl.getUniformLocation(this.progHydraulic, 'uHydExtra'), p.depositionRate ?? 0.58, p.rainRate ?? 0.65, p.evaporation ?? 0.16, 0);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
-        this._copyVecDisp(this.curIdx, next);
         this.curIdx = next;
         ranAny = true;
       } else if (l.type === 'thermal-talus') {
@@ -755,7 +761,6 @@ export class TerrainStackPipeline {
         gl.uniform4f(gl.getUniformLocation(this.progThermal, 'uTalusCfg'), R, span, p.reposeAngle ?? 33, p.spallingRate ?? 0.66);
         gl.uniform4f(gl.getUniformLocation(this.progThermal, 'uTalusExt'), p.talusSpread ?? 0.58, p.hardnessShield ?? 0.72, 0, 0);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
-        this._copyVecDisp(this.curIdx, next);
         this.curIdx = next;
         ranAny = true;
       }
@@ -853,7 +858,7 @@ export class TerrainStackPipeline {
     gl.bindVertexArray(this.engine.terrainVao);
     this._bindTex(this.progTerrain, 'uStateTex', this.stateTex[this.curIdx], 0);
     this._bindTex(this.progTerrain, 'uGeoTex', this.geoTex[this.curIdx], 1);
-    this._bindTex(this.progTerrain, 'uVecDispTex', this.vecDispTex[this.curIdx], 2);
+    this._bindTex(this.progTerrain, 'uVecDispTex', this.vecDispTex[this.vecIdx], 2);
     this._bindTex(this.progTerrain, 'uBakedTex', this.bakedTex, 3);
     this._bindTex(this.progTerrain, 'uCavePortalTex', this.cavePortalTex, 4);
 
