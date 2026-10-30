@@ -52,9 +52,17 @@ const EROSION_SLIDER_SCHEMA = {
     { key: 'snowline',        label: 'Snowline Elevation',        min: 0.15, max: 1.0,  step: 0.01, fmt: (v) => `${Math.round(v * 100)}%` },
     { key: 'snowfallRate',    label: 'Snowfall / Blizzard Rate',  min: 0.0,  max: 1.4,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
     { key: 'glacierStrength', label: 'Glacier Ice Flow & Pluck',  min: 0.0,  max: 1.0,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+    { key: 'meltRate',        label: 'Snow & Ice Meltwater',      min: 0.0,  max: 1.0,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
     { key: 'windSpeed',       label: 'Aeolian Wind & Drift',      min: 0.0,  max: 1.0,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
     { key: 'windAzimuth',     label: 'Prevailing Wind Azimuth',   min: -180, max: 180,  step: 1,    fmt: (v) => `${v}°` },
     { key: 'rockfallRate',    label: 'Cliff Rockfall Intensity',  min: 0.0,  max: 1.0,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+  ],
+  water: [
+    { key: 'lakeLevelRate',  label: 'Lake Leveling (2.5D Water)', min: 0.05, max: 0.9,  step: 0.01, fmt: (v) => `${Math.round(v * 100)}%` },
+    { key: 'rockScatterDensity', label: 'Boulder & Talus Scatter', min: 0.0, max: 1.6,  step: 0.05, fmt: (v) => `${Math.round(v * 100)}%` },
+    { key: 'rockScatterScale',   label: 'Boulder Size Multiplier', min: 0.4, max: 2.5,  step: 0.05, fmt: (v) => `${Number(v).toFixed(2)}x` },
+    { key: 'rockTilt',           label: 'Settle Onto Slope',       min: 0.0, max: 1.0,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+    { key: 'rockSink',           label: 'Burial / Ground Sink',    min: 0.0, max: 0.6,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
   ],
   hydraulics: [
     { key: 'erosionStrength',  label: 'Hydraulic Cutting Power',  min: 0.10, max: 1.40,  step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
@@ -160,6 +168,15 @@ function dispatchToWorker(payload) {
 
 worker.onmessage = (e) => {
   const msg = e.data;
+
+  if (msg.type === 'boulders') {
+    if (erosionEngine && msg.meshes?.length) {
+      const n = erosionEngine.setBoulderMeshes(msg.meshes);
+      updateRockScatterHud(n, erosionEngine.rockInstanceCount);
+    }
+    return;
+  }
+
   if (msg.type === 'progress') {
     if (state.studioMode === 'rock') {
       progressFill.style.width = `${Math.round(msg.progress * 100)}%`;
@@ -333,11 +350,21 @@ function buildErosionSliders(groupKey, mountId) {
       if (spec.key === 'particleCount') {
         document.getElementById('er-stat-parts').textContent = num.toLocaleString();
       }
+      if (spec.key.startsWith('rock')) scheduleRockResettle();
     });
 
     erosionSliderRefs.set(spec.key, { input, out, spec });
     mount.appendChild(wrap);
   }
+}
+
+let rockResettleTimer = 0;
+function scheduleRockResettle() {
+  clearTimeout(rockResettleTimer);
+  rockResettleTimer = setTimeout(() => {
+    if (!erosionEngine) return;
+    updateRockScatterHud(erosionEngine.rockVariants.length, erosionEngine.resettleRocks());
+  }, 160);
 }
 
 function syncErosionSliders() {
@@ -453,6 +480,7 @@ function initErosionControls() {
   buildErosionSliders('hardness', 'er-sliders-hardness');
   buildErosionSliders('hydraulics', 'er-sliders-hydraulics');
   buildErosionSliders('climate', 'er-sliders-climate');
+  buildErosionSliders('water', 'er-sliders-water');
 
   document.getElementById('select-emitter-mode').addEventListener('change', (e) => {
     erosionEngine.params.emitterMode = e.target.value;
@@ -512,6 +540,33 @@ function initErosionControls() {
     erosionEngine.params.sunElevation = Number(erEl.value);
     document.getElementById('out-erosion-sun-el').textContent = `${erEl.value}°`;
   });
+
+  const rockStyleSel = document.getElementById('select-rock-scatter');
+  if (rockStyleSel) {
+    rockStyleSel.value = erosionEngine.params.rockScatterStyle || 'mixed';
+    rockStyleSel.addEventListener('change', (e) => {
+      erosionEngine.params.rockScatterStyle = e.target.value;
+      updateRockScatterHud(erosionEngine.rockVariants.length, erosionEngine.resettleRocks());
+    });
+  }
+
+  const resettleBtn = document.getElementById('btn-er-resettle');
+  if (resettleBtn) {
+    resettleBtn.addEventListener('click', () => {
+      const n = erosionEngine.resettleRocks();
+      updateRockScatterHud(erosionEngine.rockVariants.length, n);
+      statusToast.classList.remove('hidden');
+      statusToast.textContent = `Settled ${n} boulders on the eroded terrain`;
+      setTimeout(() => statusToast.classList.add('hidden'), 1600);
+    });
+  }
+
+  const rocksToggle = document.getElementById('chk-erosion-rocks');
+  if (rocksToggle) {
+    rocksToggle.addEventListener('change', (e) => {
+      erosionEngine.params.showRocks = e.target.checked;
+    });
+  }
 
   document.getElementById('chk-erosion-particles').addEventListener('change', (e) => {
     erosionEngine.params.showParticles = e.target.checked;
@@ -861,8 +916,27 @@ initShadingControls();
 initCurveTool();
 initActionButtons();
 
+// Bake the volumetric SDF boulder library used to scatter fallen rock across the eroded terrain
+function requestScatterBoulders() {
+  worker.postMessage({
+    id: ++reqCounter,
+    boulders: [
+      { archetype: 'hero-boulder', seed: 4029, scale: 6.4, decimation: 0.052 },
+      { archetype: 'granite-tor', seed: 7714, scale: 6.0, decimation: 0.050 },
+      { archetype: 'metamorphic-outcrop', seed: 1984, scale: 6.8, decimation: 0.048 },
+      { archetype: 'hero-boulder', seed: 9301, scale: 5.2, decimation: 0.055 },
+    ],
+  });
+}
+
+function updateRockScatterHud(variants, instances) {
+  const el = document.getElementById('rock-scatter-count');
+  if (el) el.textContent = `${instances} rocks / ${variants} variants`;
+}
+
 // Pre-warm initial Rock Studio mesh in background worker so switching tabs is instantaneous!
 state.rockInitializedOnce = true;
 requestSynthesis(true);
+requestScatterBoulders();
 
 setStudioMode(state.studioMode);

@@ -12,6 +12,9 @@ import {
   PARTICLE_SCATTER_FRAG,
   PARTICLE_SCATTER_VERT,
   PARTICLE_STEP_FRAG,
+  DOWNSCALE_FRAG,
+  ROCK_RENDER_FRAG,
+  ROCK_RENDER_VERT,
   SKY_BG_FRAG,
   SNOW_CRYO_FRAG,
   TERRAIN_INTEGRATE_FRAG,
@@ -19,6 +22,7 @@ import {
   TERRAIN_RENDER_VERT,
   THERMAL_TALUS_FRAG,
   WATER_FLUX_FRAG,
+  WATER_SURFACE_FRAG,
 } from './erosion-shaders.js';
 
 const PART_TEX_W = 256;
@@ -72,6 +76,19 @@ function createProgram(gl, vsSrc, fsSrc, label) {
     throw new Error(`[GPU Erosion ${label}] Program link error:\n${log}`);
   }
   return prog;
+}
+
+/**
+ * Optional GPU passes (2.5D water, boulder scatter) must never take the whole studio down:
+ * a driver that rejects a stage simply disables that feature and the erosion sim keeps running.
+ */
+function createOptionalProgram(gl, vsSrc, fsSrc, label) {
+  try {
+    return createProgram(gl, vsSrc, fsSrc, label);
+  } catch (err) {
+    console.warn(`[GPU Erosion] Optional pass '${label}' disabled:`, err.message);
+    return null;
+  }
 }
 
 function createDataTexture(gl, w, h, internalFormat, format, type) {
@@ -134,6 +151,7 @@ export class GpuErosionEngine {
     this.active = false;   // Whether this viewport tab is visible
     this.playing = true;   // Whether simulation steps advance each frame
     this.stepCount = 0;
+    this.terrainReady = false;
     this.startTimeMs = performance.now();
     this.fps = 60;
     this._fpsFrames = 0;
@@ -179,6 +197,9 @@ export class GpuErosionEngine {
     this.progWaterFlux = createProgram(gl, FULLSCREEN_VERT, WATER_FLUX_FRAG, 'WaterFlux');
     this.progTerrainIntegrate = createProgram(gl, FULLSCREEN_VERT, TERRAIN_INTEGRATE_FRAG, 'TerrainIntegrate');
     this.progSnowCryo = createProgram(gl, FULLSCREEN_VERT, SNOW_CRYO_FRAG, 'SnowCryo');
+    this.progWaterSurface = createOptionalProgram(gl, FULLSCREEN_VERT, WATER_SURFACE_FRAG, 'WaterSurface');
+    this.progDownscale = createOptionalProgram(gl, FULLSCREEN_VERT, DOWNSCALE_FRAG, 'Downscale');
+    this.progRockRender = createOptionalProgram(gl, ROCK_RENDER_VERT, ROCK_RENDER_FRAG, 'RockRender');
     this.progThermalTalus = createProgram(gl, FULLSCREEN_VERT, THERMAL_TALUS_FRAG, 'ThermalTalus');
     this.progTerrainRender = createProgram(gl, TERRAIN_RENDER_VERT, TERRAIN_RENDER_FRAG, 'TerrainRender');
     this.progParticleRender = createProgram(gl, PARTICLE_RENDER_VERT, PARTICLE_RENDER_FRAG, 'ParticleRender');
@@ -270,6 +291,30 @@ export class GpuErosionEngine {
       createFbo(gl, [this.partPosAge[0], this.partVelWater[0], this.partSediment[0], this.partExchange, this.partExchange2]),
       createFbo(gl, [this.partPosAge[1], this.partVelWater[1], this.partSediment[1], this.partExchange, this.partExchange2]),
     ];
+
+    // 2.5D water: leveled lake-surface ping-pong (surfaceElev, depth, lakeFlag, discharge)
+    this.surfaceTex = [
+      createDataTexture(gl, R, R, gl.RGBA32F, gl.RGBA, gl.FLOAT),
+      createDataTexture(gl, R, R, gl.RGBA32F, gl.RGBA, gl.FLOAT),
+    ];
+    this.surfaceIdx = 0;
+    this.fboSurfaceClear = [
+      createFbo(gl, [this.surfaceTex[0]]),
+      createFbo(gl, [this.surfaceTex[1]]),
+    ];
+
+    // Boulder placement readback bridge (256x256 RGBA32F)
+    this.heightRes = 256;
+    this.heightTex = createDataTexture(gl, this.heightRes, this.heightRes, gl.RGBA32F, gl.RGBA, gl.FLOAT);
+    this.fboHeight = createFbo(gl, [this.heightTex]);
+    this.heightBuf = new Float32Array(this.heightRes * this.heightRes * 4);
+
+    // Instanced volumetric SDF boulder / outcrop scatter
+    this.rockVariants = [];   // { positions, normals, surf, indices, vao, ibo, instBuf, count }
+    this.rockVaoList = [];
+    this.rockInstanceCount = 0;
+    this.rockSettled = false;
+    this.lastRockSettleStep = -1;
 
     // Tiny 64x64 telemetry downsample FBO (sampled only once every 36 steps -> zero frame stall!)
     this.telemetryTex = createDataTexture(gl, TELEMETRY_RES, TELEMETRY_RES, gl.RGBA32F, gl.RGBA, gl.FLOAT);
@@ -560,7 +605,12 @@ export class GpuErosionEngine {
     const windMag = 0.35 + 0.65 * clamp01(p.windSpeed);
     return {
       speciesVec: [rain / sum, snow / sum, wind / sum, rock / sum],
-      snowVec: [p.snowline, clamp01(p.snowfallRate), clamp01(p.glacierStrength), 0.35 + 0.9 * clamp01(p.snowfallRate)],
+      snowVec: [
+        p.snowline,
+        clamp01(p.snowfallRate),
+        clamp01(p.glacierStrength),
+        0.25 + 1.60 * clamp01(p.meltRate ?? 0.55),
+      ],
       windVec: [Math.cos(azRad) * windMag, Math.sin(azRad) * windMag, 0.25 + 0.95 * clamp01(p.windSpeed), 0.35 + 0.65 * clamp01(p.windSpeed)],
       materialTheme: Number.isFinite(p.materialTheme) ? p.materialTheme : 0,
     };
@@ -617,9 +667,13 @@ export class GpuErosionEngine {
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSnowClear[i]);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSurfaceClear[i]);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
     }
     this.fluxIdx = 0;
     this.snowIdx = 0;
+    this.surfaceIdx = 0;
 
     // 3. Spawn staggered sky raindrops across all 32,768 GPU particle slots
     const emitter = EMITTER_MODES[p.emitterMode] || EMITTER_MODES['sky-rain'];
@@ -646,6 +700,11 @@ export class GpuErosionEngine {
     this.telemetry.fineSedM3 = 0;
     this.telemetry.particles = p.particleCount;
     if (this.onTelemetry) this.onTelemetry(this.telemetry);
+
+    this.terrainReady = true;
+
+    // Re-settle the boulder scatter on the freshly generated terrain
+    if (this.rockVariants.length) this.resettleRocks();
   }
 
   /**
@@ -846,10 +905,47 @@ export class GpuErosionEngine {
 
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       this.snowIdx = nextSnow;
+
+      // ---------------------------------------------------------------------
+      // PASS G: 2.5D Hydrostatic Lake Leveling & River Surface Resolution
+      // ---------------------------------------------------------------------
+      if (this.progWaterSurface) {
+      gl.viewport(0, 0, R, R);
+      gl.useProgram(this.progWaterSurface);
+      this._bindTex(this.progWaterSurface, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
+      this._bindTex(this.progWaterSurface, 'uVelocityFieldTex', this.velocityFieldTex, 2);
+      const lakeRate = Number.isFinite(p.lakeLevelRate) ? p.lakeLevelRate : 0.55;
+      gl.uniform4f(gl.getUniformLocation(this.progWaterSurface, 'uLakeParams'), R, cellSize, dt, lakeRate);
+
+      // Two sub-iterations per frame: even count keeps the two-texture ping-pong exact while
+      // halving the wall-clock time for a lake to settle onto its plane.
+      for (let sub = 0; sub < 2; sub++) {
+        const nextSurf = 1 - this.surfaceIdx;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSurfaceClear[nextSurf]);
+        this._bindTex(this.progWaterSurface, 'uSurfaceTex', this.surfaceTex[this.surfaceIdx], 1);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        this.surfaceIdx = nextSurf;
+      }
+      }
     }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindVertexArray(null);
+
+    // Boulders requested before the terrain existed settle on the first live heightfield
+    if (this.params.showRocks && this.rockVariants.length && !this.rockSettled) {
+      this.resettleRocks();
+    }
+
+    // Once the terrain has been carved substantially, the debris field must follow it downhill
+    if (
+      this.params.showRocks &&
+      this.rockVariants.length &&
+      this.rockSettled &&
+      this.stepCount - this.lastRockSettleStep > 900
+    ) {
+      this.resettleRocks();
+    }
 
     if (this.stepCount % 36 === 0) {
       this._sampleTelemetry();
@@ -859,6 +955,293 @@ export class GpuErosionEngine {
       this.telemetry.fps = this.fps;
       if (this.onTelemetry && this.stepCount % 8 === 0) this.onTelemetry(this.telemetry);
     }
+  }
+
+  // ==========================================================================
+  // VOLUMETRIC SDF BOULDER / OUTCROP SCATTER
+  // ==========================================================================
+
+  /**
+   * Installs baked SDF rock meshes (produced by the shared geology pipeline) as instanced
+   * `ROCK_RENDER_VERT` geometry. Each mesh becomes one variant with its own instance buffer.
+   */
+  setBoulderMeshes(meshes) {
+    const gl = this.gl;
+    if (!this.progRockRender) return 0;
+    for (const rv of this.rockVariants) {
+      if (rv.vao) gl.deleteVertexArray(rv.vao);
+      if (rv.vbo) gl.deleteBuffer(rv.vbo);
+      if (rv.nbo) gl.deleteBuffer(rv.nbo);
+      if (rv.cbo) gl.deleteBuffer(rv.cbo);
+      if (rv.ibo) gl.deleteBuffer(rv.ibo);
+      if (rv.instBuf) gl.deleteBuffer(rv.instBuf);
+    }
+    this.rockVariants = [];
+    this.rockInstanceCount = 0;
+
+    for (const mesh of meshes || []) {
+      if (!mesh || !mesh.positions || !mesh.indices) continue;
+      const vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+
+      const vbo = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.bufferData(gl.ARRAY_BUFFER, mesh.positions, gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+
+      const nbo = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, nbo);
+      gl.bufferData(gl.ARRAY_BUFFER, mesh.normals, gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(1);
+      gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+
+      // Surface attributes pack: (ao, cavity, edge, up-facing) from the SDF mesher
+      const surf = mesh.colors || new Float32Array((mesh.positions.length / 3) * 4);
+      const cbo = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, cbo);
+      gl.bufferData(gl.ARRAY_BUFFER, surf, gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(2);
+      gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 0, 0);
+
+      const ibo = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.indices, gl.STATIC_DRAW);
+
+      const instBuf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(8 * 512), gl.DYNAMIC_DRAW);
+      gl.enableVertexAttribArray(3);
+      gl.vertexAttribPointer(3, 4, gl.FLOAT, false, 32, 0);
+      gl.vertexAttribDivisor(3, 1);
+      gl.enableVertexAttribArray(4);
+      gl.vertexAttribPointer(4, 4, gl.FLOAT, false, 32, 16);
+      gl.vertexAttribDivisor(4, 1);
+
+      gl.bindVertexArray(null);
+
+      this.rockVariants.push({
+        vao, vbo, nbo, cbo, ibo, instBuf,
+        indexCount: mesh.indices.length,
+        instances: 0,
+      });
+    }
+
+    this.rockSettled = false;
+    this.resettleRocks();
+    return this.rockVariants.length;
+  }
+
+  /** Reads the live heightfield (bed + cryosphere) into a compact CPU buffer. */
+  readHeightfield() {
+    if (!this.progDownscale) return null;
+    const gl = this.gl;
+    const res = this.heightRes;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboHeight);
+    gl.viewport(0, 0, res, res);
+    gl.useProgram(this.progDownscale);
+    gl.bindVertexArray(this.emptyVao);
+    this._bindTex(this.progDownscale, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
+    this._bindTex(this.progDownscale, 'uSnowTex', this.snowTex[this.snowIdx], 1);
+    gl.uniform1f(gl.getUniformLocation(this.progDownscale, 'uGridRes'), this.gridRes);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+    gl.readPixels(0, 0, res, res, gl.RGBA, gl.FLOAT, this.heightBuf);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return this.heightBuf;
+  }
+
+  /**
+   * Solves where broken-off rock debris naturally settles: clustered below steep cliff faces
+   * (talus aprons), lone erratics on the plains, and a few oversized outcrops on structural breaks.
+   */
+  resettleRocks() {
+    if (!this.rockVariants.length) return 0;
+    if (!this.terrainReady) return 0;
+    const p = this.params;
+    const hf = this.readHeightfield();
+    if (!hf) return 0;
+
+    const res = this.heightRes;
+    const span = p.worldSpan;
+    const cell = span / (res - 1);
+    const hAt = (ix, iz) => hf[(Math.min(res - 1, Math.max(0, iz)) * res + Math.min(res - 1, Math.max(0, ix))) * 4];
+    const heightWorld = (wx, wz) => {
+      const fx = (wx / span + 0.5) * (res - 1);
+      const fz = (wz / span + 0.5) * (res - 1);
+      const x0 = Math.floor(fx), z0 = Math.floor(fz);
+      const tx = fx - x0, tz = fz - z0;
+      const a = hAt(x0, z0) * (1 - tx) + hAt(x0 + 1, z0) * tx;
+      const b = hAt(x0, z0 + 1) * (1 - tx) + hAt(x0 + 1, z0 + 1) * tx;
+      return a * (1 - tz) + b * tz;
+    };
+    const slopeWorld = (wx, wz) => {
+      const e = cell * 1.5;
+      const gx = (heightWorld(wx + e, wz) - heightWorld(wx - e, wz)) / (2 * e);
+      const gz = (heightWorld(wx, wz + e) - heightWorld(wx, wz - e)) / (2 * e);
+      return Math.hypot(gx, gz);
+    };
+
+    // Deterministic scatter RNG so every re-settle with the same seed is reproducible
+    let s = (Math.floor(p.seed) * 2654435761) >>> 0;
+    const rand = () => {
+      s ^= s << 13; s >>>= 0;
+      s ^= s >>> 17;
+      s ^= s << 5; s >>>= 0;
+      return s / 4294967296;
+    };
+
+    const density = Math.max(0, Math.min(1.6, Number(p.rockScatterDensity) || 0));
+    const style = p.rockScatterStyle || 'mixed';
+    const targetRocks = Math.round(150 * density);
+    const lists = this.rockVariants.map(() => []);
+    const pushRock = (x, z, scale, tilt, sink) => {
+      const v = Math.floor(rand() * this.rockVariants.length) % this.rockVariants.length;
+      lists[v].push(x, z, scale, rand() * Math.PI * 2, tilt, sink, 0, 0);
+    };
+    const half = span * 0.47;
+
+    const sampleSlope = () => {
+      let fallback = null;
+      for (let attempt = 0; attempt < 30; attempt++) {
+        const x = (rand() * 2 - 1) * half;
+        const z = (rand() * 2 - 1) * half;
+        const sl = slopeWorld(x, z);
+        if (sl > 0.34) return { x, z, sl };
+        if (!fallback || sl > fallback.sl) fallback = { x, z, sl };
+      }
+      // Gently rolling ground still receives debris: fall back to its steepest sample
+      return fallback;
+    };
+
+    const talusShare = style === 'talus' ? 1.0 : style === 'erratics' ? 0.0 : style === 'outcrops' ? 0.25 : 0.55;
+    let placed = 0;
+    let guard = 0;
+
+    // 1. Talus aprons & fallen slabs below steep cliff faces
+    while (placed < targetRocks * talusShare && guard++ < targetRocks * 24) {
+      const anchor = sampleSlope();
+      if (!anchor) break;
+      if (anchor.sl < 0.12 && rand() > 0.22) continue;
+      const clusterN = 2 + Math.floor(rand() * 5);
+      // Downhill direction from the local gradient
+      const e = cell * 1.5;
+      const gx = (heightWorld(anchor.x + e, anchor.z) - heightWorld(anchor.x - e, anchor.z)) / (2 * e);
+      const gz = (heightWorld(anchor.x, anchor.z + e) - heightWorld(anchor.x, anchor.z - e)) / (2 * e);
+      const gm = Math.hypot(gx, gz) || 1;
+      const dx = -gx / gm, dz = -gz / gm;
+      for (let k = 0; k < clusterN && placed < targetRocks * talusShare; k++) {
+        const runOut = span * (0.010 + rand() * 0.045) * (k + 1) * 0.55;
+        const jitterA = rand() * Math.PI * 2;
+        const jitterR = span * 0.006 * rand();
+        const x = anchor.x + dx * runOut + Math.cos(jitterA) * jitterR;
+        const z = anchor.z + dz * runOut + Math.sin(jitterA) * jitterR;
+        if (Math.abs(x) > half || Math.abs(z) > half) continue;
+        // Size falls off with run-out distance: the big blocks stop first
+        const scale = (0.28 + rand() * 0.55) * Math.max(0.35, 1.0 - k * 0.16);
+        pushRock(x, z, scale, 0.85 + rand() * 0.15, 0.16 + rand() * 0.22);
+        placed++;
+      }
+    }
+
+    // 2. Lone erratics & small debris scattered across the flats
+    const erraticTarget = placed + Math.round(targetRocks * (style === 'erratics' ? 1.0 : 0.35));
+    guard = 0;
+    while (placed < erraticTarget && guard++ < targetRocks * 20) {
+      const x = (rand() * 2 - 1) * half;
+      const z = (rand() * 2 - 1) * half;
+      const sl = slopeWorld(x, z);
+      if (sl > 0.55 && rand() > 0.25) continue;
+      const scale = 0.16 + rand() * 0.34;
+      pushRock(x, z, scale, 0.55 + rand() * 0.45, 0.20 + rand() * 0.28);
+      placed++;
+    }
+
+    // 3. Oversized outcrops breaking through the surface on structural benches
+    const outcropTarget = style === 'outcrops' ? Math.max(6, Math.round(targetRocks * 0.35)) : Math.round(targetRocks * 0.07);
+    guard = 0;
+    let outcrops = 0;
+    while (outcrops < outcropTarget && guard++ < 400) {
+      const x = (rand() * 2 - 1) * half * 0.86;
+      const z = (rand() * 2 - 1) * half * 0.86;
+      const sl = slopeWorld(x, z);
+      if (sl < 0.10 || sl > 0.85) continue;
+      const scale = 1.25 + rand() * 1.75;
+      pushRock(x, z, scale, 0.35 + rand() * 0.35, 0.30 + rand() * 0.20);
+      outcrops++;
+    }
+
+    // Upload per-variant instance streams
+    const gl = this.gl;
+    let total = 0;
+    this.rockVariants.forEach((rv, i) => {
+      const arr = lists[i];
+      const count = Math.min(512, arr.length / 8);
+      const data = new Float32Array(count * 8);
+      for (let k = 0; k < count * 8; k++) data[k] = arr[k];
+      gl.bindBuffer(gl.ARRAY_BUFFER, rv.instBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+      rv.instances = count;
+      total += count;
+    });
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+    this.rockInstanceCount = total;
+    this.rockSettled = true;
+    this.lastRockSettleStep = this.stepCount;
+    return total;
+  }
+
+  clearRocks() {
+    this.rockInstanceCount = 0;
+    for (const rv of this.rockVariants) rv.instances = 0;
+  }
+
+  _drawRocks(viewProj, eye, sunDir, climate) {
+    const gl = this.gl;
+    if (!this.progRockRender || !this.params.showRocks || this.rockInstanceCount <= 0) return;
+    const p = this.params;
+    const { hardnessVec, strataVec } = this._getHardnessUniforms();
+
+    gl.useProgram(this.progRockRender);
+    this._bindTex(this.progRockRender, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
+    this._bindTex(this.progRockRender, 'uSnowTex', this.snowTex[this.snowIdx], 1);
+
+    gl.uniformMatrix4fv(gl.getUniformLocation(this.progRockRender, 'uViewProj'), false, viewProj);
+    gl.uniform3fv(gl.getUniformLocation(this.progRockRender, 'uCameraPos'), eye);
+    gl.uniform3fv(gl.getUniformLocation(this.progRockRender, 'uSunDir'), sunDir);
+    gl.uniform4f(
+      gl.getUniformLocation(this.progRockRender, 'uRenderDomain'),
+      p.worldSpan,
+      this.gridRes,
+      p.showWater ? 1.0 : 0.0,
+      (performance.now() - this.startTimeMs) * 0.001
+    );
+    gl.uniform4f(
+      gl.getUniformLocation(this.progRockRender, 'uRockParams'),
+      Number(p.rockScatterScale) || 1.0,
+      Number.isFinite(p.rockTilt) ? p.rockTilt : 0.85,
+      Number.isFinite(p.rockSink) ? p.rockSink : 0.22,
+      p.snowline
+    );
+    gl.uniform4fv(gl.getUniformLocation(this.progRockRender, 'uHardnessParams'), hardnessVec);
+    gl.uniform4fv(gl.getUniformLocation(this.progRockRender, 'uStrataOrient'), strataVec);
+    gl.uniform4fv(gl.getUniformLocation(this.progRockRender, 'uClimate'), climate.snowVec);
+    gl.uniform1i(gl.getUniformLocation(this.progRockRender, 'uMaterialTheme'), this._themeCode());
+    gl.uniform1f(gl.getUniformLocation(this.progRockRender, 'uSeed'), p.seed);
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+    gl.depthMask(true);
+    gl.enable(gl.CULL_FACE);
+    gl.cullFace(gl.BACK);
+
+    for (const rv of this.rockVariants) {
+      if (rv.instances <= 0) continue;
+      gl.bindVertexArray(rv.vao);
+      gl.drawElementsInstanced(gl.TRIANGLES, rv.indexCount, gl.UNSIGNED_INT, 0, rv.instances);
+    }
+    gl.bindVertexArray(null);
   }
 
   _sampleTelemetry() {
@@ -946,7 +1329,8 @@ export class GpuErosionEngine {
       p.viewMode === 'hardness' ? 2 :
       p.viewMode === 'flow'     ? 3 :
       p.viewMode === 'clay'     ? 4 :
-      p.viewMode === 'cryo'     ? 5 : 0;
+      p.viewMode === 'cryo'     ? 5 :
+      p.viewMode === 'water'    ? 6 : 0;
 
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
@@ -961,6 +1345,7 @@ export class GpuErosionEngine {
     this._bindTex(this.progTerrainRender, 'uInitialTex', this.initialTerrainTex, 1);
     this._bindTex(this.progTerrainRender, 'uVelocityFieldTex', this.velocityFieldTex, 2);
     this._bindTex(this.progTerrainRender, 'uSnowTex', this.snowTex[this.snowIdx], 3);
+    this._bindTex(this.progTerrainRender, 'uSurfaceTex', this.surfaceTex[this.surfaceIdx], 4);
 
     gl.uniformMatrix4fv(gl.getUniformLocation(this.progTerrainRender, 'uViewProj'), false, viewProj);
     gl.uniform3fv(gl.getUniformLocation(this.progTerrainRender, 'uCameraPos'), eye);
@@ -995,7 +1380,10 @@ export class GpuErosionEngine {
 
     gl.drawElements(gl.TRIANGLES, this.terrainIndexCount, gl.UNSIGNED_INT, 0);
 
-    // 3. 3D Falling Sky Raindrops & Sediment-Colored Surface Runoff Particles!
+    // 3. Instanced Volumetric SDF Boulders, Fallen Slabs & Outcrops Settled On The Live Terrain
+    this._drawRocks(viewProj, eye, sunDir, climate);
+
+    // 4. 3D Falling Sky Raindrops & Sediment-Colored Surface Runoff Particles!
     if (p.showParticles && p.particleOpacity > 0.01) {
       const activeCount = Math.min(MAX_GPU_PARTICLES, Math.max(1024, Math.floor(p.particleCount)));
       gl.disable(gl.CULL_FACE);

@@ -58,6 +58,62 @@ export const EROSION_LANDSCAPES = {
       rockfallRate: 0.62,
     },
   },
+  'grand-canyon': {
+    id: 'grand-canyon',
+    name: 'Grand Canyon Superposition',
+    subtitle: 'Meandering trunk canyon incised through stepped redwall limestone & Tapeats sandstone',
+    terrainType: 8,
+    materialTheme: 5, // Vermilion redwall / Muav / Bright Angel / Tapeats banded strata
+    defaults: {
+      emitterMode: 'all-weather',
+      relief: 186,
+      roughness: 0.52,
+      rockHardness: 0.52,
+      strataStrength: 0.94,
+      strataFreq: 11.5,
+      strataDip: 2.0,
+      faultWeakness: 0.52,
+      erosionStrength: 0.72,
+      sedimentCapacity: 0.80,
+      depositionRate: 0.62,
+      talusAngle: 0.52,
+      snowline: 0.99,
+      snowfallRate: 0.0,
+      glacierStrength: 0.0,
+      windSpeed: 0.36,
+      windAzimuth: 55,
+      rockfallRate: 0.46,
+      rockScatterDensity: 0.85,
+    },
+  },
+  'icelandic-lava-shore': {
+    id: 'icelandic-lava-shore',
+    name: 'Icelandic Lava Field & Black-Sand Shore',
+    subtitle: 'Fissure-fed basalt shield with moss ridges, wave-cut cliffs and a braided outwash delta',
+    terrainType: 9,
+    materialTheme: 3, // Fresh black basalt, red scoria, olivine sand, arctic moss
+    defaults: {
+      emitterMode: 'all-weather',
+      relief: 118,
+      roughness: 0.66,
+      rockHardness: 0.60,
+      strataStrength: 0.48,
+      strataFreq: 7.5,
+      strataDip: 3.0,
+      faultWeakness: 0.82,
+      erosionStrength: 0.62,
+      sedimentCapacity: 0.70,
+      depositionRate: 0.72,
+      talusAngle: 0.50,
+      snowline: 0.80,
+      snowfallRate: 0.24,
+      glacierStrength: 0.20,
+      windSpeed: 0.86,
+      windAzimuth: -18,
+      rockfallRate: 0.30,
+      rockScatterDensity: 0.95,
+    },
+  },
   'layered-plateau': {
     id: 'layered-plateau',
     name: 'Stratified Canyon Plateau',
@@ -290,9 +346,21 @@ export const DEFAULT_EROSION_PARAMS = {
   snowline: 0.54,         // Normalized elevation of freezing snowline [0.15 .. 1.0]
   snowfallRate: 0.78,     // Blizzard snow accumulation intensity
   glacierStrength: 0.74,  // Glacial ice U-valley plucking & moraine bulldozing
+  meltRate: 0.55,         // Snowpack / ice ablation -> meltwater runoff & lake recharge
   windSpeed: 0.58,        // Aeolian saltation & snow-drift speed
   windAzimuth: 35,        // Wind direction (degrees)
   rockfallRate: 0.45,     // Ballistic cliff rockfall & scree intensity
+
+  // 2.5D Water: lakes pond in basins, rivers stay channelised
+  lakeLevelRate: 0.55,    // Hydrostatic lake-surface relaxation
+
+  // Volumetric SDF boulder / outcrop scatter across the terrain
+  showRocks: true,
+  rockScatterDensity: 1.05,
+  rockScatterStyle: 'mixed', // 'talus' | 'erratics' | 'outcrops' | 'mixed'
+  rockScatterScale: 1.0,
+  rockTilt: 0.85,
+  rockSink: 0.22,
 
   // Rock Hardness & 3D Stratigraphy Controls
   relief: 168.0,

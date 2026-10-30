@@ -94,6 +94,7 @@
               <option value="flow">Hydraulic Discharge &amp; Shear</option>
               <option value="clay">Pure Sculptor Matte Clay</option>
               <option value="cryo">Cryosphere (Snowpack &amp; Glacier Ice)</option>
+              <option value="water">Water Depth (Lakes &amp; Rivers)</option>
             </select>
           </label>
 
@@ -103,6 +104,9 @@
               <option value="0">Utah Desert Sandstone</option>
               <option value="1">Icelandic Volcanic Basalt &amp; Moss</option>
               <option value="2">Himalayan Gneiss &amp; Glacier</option>
+              <option value="3">Lava Field, Scoria &amp; Ash</option>
+              <option value="4">Alpine Granite &amp; Pine</option>
+              <option value="5">Vermilion Canyon Strata</option>
             </select>
           </label>
 
@@ -373,6 +377,32 @@
             <span class="tag-pill">Snow / Ice / Wind</span>
           </div>
           <div id="er-sliders-climate"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <span>ROCKS, TALUS &amp; 2.5D WATER</span>
+            <span class="tag-pill" id="rock-scatter-count">0 rocks</span>
+          </div>
+          <label class="field-row">
+            <span>Scatter Style</span>
+            <select id="select-rock-scatter">
+              <option value="mixed">Mixed (talus + erratics + outcrops)</option>
+              <option value="talus">Cliff Talus &amp; Fallen Slabs</option>
+              <option value="erratics">Lone Glacial Erratics</option>
+              <option value="outcrops">Bedrock Outcrops</option>
+            </select>
+          </label>
+          <div id="er-sliders-water"></div>
+          <div class="export-buttons" style="margin-top:4px;">
+            <button id="btn-er-resettle" class="btn-secondary">🪨 Re-settle Rocks</button>
+          </div>
+          <div class="toggle-grid">
+            <label class="check-pill">
+              <input id="chk-erosion-rocks" type="checkbox" checked />
+              <span>SDF Boulders</span>
+            </label>
+          </div>
         </section>
 
         <section class="panel-section">
