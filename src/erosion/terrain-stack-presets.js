@@ -1,14 +1,21 @@
 /**
  * Non-Destructive Geological & SDF Terrain Layer Stack Model and Preset Library.
  *
- * A preset is a SAVED CONFIGURATION OF THE WHOLE STACK (ordered bottom-to-top operations +
- * global lighting/mineral palette), NEVER a layer type or colour layer.
- *
- * UI displays newest/final operations at the TOP (index 0) and base landform at the BOTTOM
- * (index length - 1); evaluation runs strictly from BOTTOM -> TOP through shared terrain data:
- *   height, hardness, 3D vector overhang displacement, SDF cave volume, water, flow,
- *   coarse scree, fine sediment, snow/ice, ambient occlusion & protrusion curvature.
+ * Unifies the 19 battle-tested geological generators, parameters, and seeds (`seed: 4029`)
+ * from `erosion-presets.js` with a true bottom-to-top composable Layer Stack pipeline:
+ *   - Newest / final operations sit at the TOP of the UI (index 0) and evaluate LAST.
+ *   - Base landform sits at the BOTTOM of the UI (index length - 1) and evaluates FIRST.
+ *   - Surface palette, rock fabric, view modes, sun angles, and particle display stay
+ *     separate from the Layer Stack (zero fake colour/biome layers in the stack).
  */
+
+import {
+  DEFAULT_EROSION_PARAMS,
+  EROSION_LANDSCAPES,
+  MATERIAL_THEMES,
+  ROCK_FABRIC_MODES,
+  getVegetationDefaultsForLandscape,
+} from './erosion-presets.js';
 
 let layerUidCounter = 1;
 
@@ -61,6 +68,62 @@ export const DEFAULT_LAYER_MASK = {
 };
 
 /**
+ * All 19 proven `INIT_TERRAIN_FRAG` geological landform generators (`terrainType = 0..18`),
+ * keyed by `terrainType` so `base-landform` executes the exact `c5ae88b` / `2cc3d34` generator!
+ */
+export const BASE_ARCHETYPES = {};
+for (const preset of Object.values(EROSION_LANDSCAPES)) {
+  BASE_ARCHETYPES[preset.terrainType] = {
+    id: preset.terrainType,
+    presetId: preset.id,
+    label: preset.name,
+  };
+}
+
+export const COMBINE_MODES = {
+  0: { id: 0, label: 'Add (Uplift)' },
+  1: { id: 1, label: 'Subtract (Excavate)' },
+  2: { id: 2, label: 'Max (Union)' },
+  3: { id: 3, label: 'Min (Clip)' },
+  4: { id: 4, label: 'Blend (Lerp)' },
+};
+
+export const SPLINE_MODES = {
+  0: { id: 0, label: 'Canyon Gorge Cut' },
+  1: { id: 1, label: 'Graded Road / Terrace' },
+  2: { id: 2, label: 'Lake Basin Boundary' },
+};
+
+export const VEG_SPECIES = {
+  0: { id: 0, label: 'Alpine Green Grass' },
+  1: { id: 1, label: 'Dry Steppe / Desert Grass' },
+  2: { id: 2, label: 'Biome Moisture Auto-Blend' },
+};
+
+/**
+ * All 10 regional geological surface palettes from `MATERIAL_THEMES` (`0..9`),
+ * kept strictly separate from the Layer Stack.
+ */
+export const DERIVED_PALETTES = {};
+for (const [k, theme] of Object.entries(MATERIAL_THEMES)) {
+  const id = Number(k);
+  DERIVED_PALETTES[id] = {
+    id,
+    label: theme.name,
+    subtitle: theme.subtitle,
+  };
+}
+
+export const DERIVED_FABRICS = {};
+for (const [k, fab] of Object.entries(ROCK_FABRIC_MODES)) {
+  const id = Number(k);
+  DERIVED_FABRICS[id] = {
+    id,
+    label: fab.name,
+  };
+}
+
+/**
  * Complete registry of composable Terrain Stack Operations.
  * Each operation declares what terrain channels it READS and what it WRITES.
  */
@@ -71,19 +134,14 @@ export const LAYER_OPERATION_SPECS = {
     defaultName: 'Base landform',
     glyph: 'mountain',
     lockedPosition: false,
-    reads: ['Domain XZ'],
-    writes: ['Height', 'Hardness'],
-    summary: (p) => `${BASE_ARCHETYPES[p.archetype]?.label || 'Alpine Ridge'} · ${Math.round(p.relief)}m`,
+    reads: ['Domain XZ', 'Seed'],
+    writes: ['Height', 'Sediment', 'Water'],
+    summary: (p) => `${BASE_ARCHETYPES[p.archetype]?.label || 'Icelandic Highlands'} · ${Math.round(p.relief)}m · #${p.seed}`,
     defaults: {
-      archetype: 0, // 0=Alpine Ridge, 1=Plateau/Escarpment, 2=Canyon Uplift, 3=Dune Basin, 4=Volcanic Caldera, 5=Coastal Massif, 6=Arid Pediment
-      seed: 4029,
-      relief: 155,
-      scale: 1.85,
-      roughness: 0.62,
-      ridgeSharpness: 0.68,
-      warpStrength: 0.45,
-      valleyFloor: 0.22,
-      baseHardness: 0.54,
+      archetype: 6, // 0..18 -> exact `INIT_TERRAIN_FRAG` terrainType!
+      seed: DEFAULT_EROSION_PARAMS.seed, // 4029
+      relief: DEFAULT_EROSION_PARAMS.relief, // 168
+      roughness: DEFAULT_EROSION_PARAMS.roughness, // 0.68
     },
   },
 
@@ -93,18 +151,17 @@ export const LAYER_OPERATION_SPECS = {
     defaultName: 'Procedural landform',
     glyph: 'ridge',
     reads: ['Height', 'Mask'],
-    writes: ['Height', 'Hardness', 'FineSed'],
+    writes: ['Height', 'FineSed'],
     summary: (p) => `${COMBINE_MODES[p.combineMode]?.label || 'Add'} · ${Math.round(p.amplitude)}m`,
     defaults: {
       generator: 0, // 0=Arête Ridges, 1=Mesa/Plateau, 2=Fault Escarpment, 3=Aeolian Dunes, 4=Impact Craters
       combineMode: 0, // 0=Add, 1=Subtract, 2=Max, 3=Min, 4=Blend
-      amplitude: 62,
+      amplitude: 48,
       scale: 2.2,
-      sharpness: 0.64,
+      sharpness: 0.60,
       azimuth: 28,
       opacity: 1.0,
-      hardnessDelta: 0.15,
-      seed: 7104,
+      seed: DEFAULT_EROSION_PARAMS.seed,
     },
   },
 
@@ -113,19 +170,20 @@ export const LAYER_OPERATION_SPECS = {
     category: 'landform',
     defaultName: 'Stratigraphic beds',
     glyph: 'strata',
-    reads: ['Height', 'Hardness'],
-    writes: ['Height', 'Hardness', 'Overhang'],
-    summary: (p) => `${Math.round(p.bedCount)} beds · dip ${Math.round(p.dipAngle)}°`,
+    reads: ['Height', '3D Strata'],
+    writes: ['3D Hardness', 'Height', 'Overhang'],
+    summary: (p) => `${Number(p.strataFreq).toFixed(1)} beds · dip ${Math.round(p.strataDip)}° · hard ${Math.round(p.rockHardness * 100)}%`,
     defaults: {
-      bedCount: 9,
-      terraceStrength: 0.58,
-      hardSoftContrast: 0.78,
-      dipAngle: 11,
-      strikeAzimuth: 24,
-      bedFoldWarp: 0.28,
-      ledgeOverhang: 0.35,
+      rockHardness: DEFAULT_EROSION_PARAMS.rockHardness,
+      strataStrength: DEFAULT_EROSION_PARAMS.strataStrength,
+      strataFreq: DEFAULT_EROSION_PARAMS.strataFreq,
+      strataDip: DEFAULT_EROSION_PARAMS.strataDip,
+      strataStrike: DEFAULT_EROSION_PARAMS.strataStrike,
+      faultWeakness: DEFAULT_EROSION_PARAMS.faultWeakness,
+      terraceCarve: 0.0,
+      ledgeOverhang: 0.0,
       opacity: 1.0,
-      seed: 3190,
+      seed: DEFAULT_EROSION_PARAMS.seed,
     },
   },
 
@@ -135,19 +193,19 @@ export const LAYER_OPERATION_SPECS = {
     defaultName: 'Rock stacks & hoodoos',
     glyph: 'stacks',
     reads: ['Height', 'Slope', 'Mask'],
-    writes: ['Height', 'Hardness', 'Overhang'],
+    writes: ['Height', '3D Overhang'],
     summary: (p) => `${Math.round(p.height)}m · ${Math.round(p.tiers)} tiers`,
     defaults: {
-      height: 54,
+      height: 48,
       spacing: 68,
-      radius: 16,
+      radius: 15,
       taper: 0.42,
       tiers: 5,
-      lean: 0.30,
+      lean: 0.28,
       leanAzimuth: 35,
-      caprockOverhang: 0.48,
+      caprockOverhang: 0.45,
       opacity: 1.0,
-      seed: 8821,
+      seed: DEFAULT_EROSION_PARAMS.seed,
     },
   },
 
@@ -160,14 +218,14 @@ export const LAYER_OPERATION_SPECS = {
     writes: ['Height', '3D Overhang'],
     summary: (p) => `${Number(p.displacement).toFixed(1)}m · >${Math.round(p.slopeThreshold)}°`,
     defaults: {
-      displacement: 11.5,
+      displacement: 10.5,
       featureScale: 2.6,
       slopeThreshold: 28,
       ledgeStrength: 0.62,
-      overhangBias: 0.55,
+      overhangBias: 0.52,
       verticalCrease: 0.58,
       opacity: 1.0,
-      seed: 5512,
+      seed: DEFAULT_EROSION_PARAMS.seed,
     },
   },
 
@@ -207,7 +265,7 @@ export const LAYER_OPERATION_SPECS = {
       undercutStrength: 0.68,
       ribRoughness: 0.52,
       opacity: 1.0,
-      seed: 6419,
+      seed: DEFAULT_EROSION_PARAMS.seed,
     },
   },
 
@@ -217,7 +275,7 @@ export const LAYER_OPERATION_SPECS = {
     defaultName: 'Spline canyon / road',
     glyph: 'spline',
     reads: ['Height', 'Control Path'],
-    writes: ['Height', 'Water', 'Hardness'],
+    writes: ['Height', 'Water'],
     summary: (p) => `${SPLINE_MODES[p.mode]?.label || 'Canyon Cut'} · ${Math.round(p.width)}m`,
     defaults: {
       mode: 0, // 0=Canyon Cut, 1=Graded Mountain Road, 2=Hydrostatic Lake Basin
@@ -242,15 +300,14 @@ export const LAYER_OPERATION_SPECS = {
     category: 'simulation',
     defaultName: 'River incision & drainage',
     glyph: 'river',
-    reads: ['Height', 'Hardness'],
+    reads: ['Height', '3D Hardness'],
     writes: ['Height', 'Flow', 'Water'],
     summary: (p) => `${Math.round(p.iterations)} steps · cut ${Math.round(p.incisionStrength * 100)}%`,
     defaults: {
-      iterations: 28,
-      incisionStrength: 0.68,
-      channelWidth: 0.45,
-      headwaterRain: 0.58,
-      basinPooling: 0.42,
+      iterations: 20,
+      incisionStrength: 0.85,
+      headwaterRain: 0.68,
+      basinPooling: 0.45,
       hardnessRespect: 0.80,
     },
   },
@@ -260,17 +317,21 @@ export const LAYER_OPERATION_SPECS = {
     category: 'simulation',
     defaultName: 'Hydraulic erosion',
     glyph: 'droplet',
-    reads: ['Height', 'Hardness', 'Water'],
+    reads: ['Height', '3D Hardness', 'Water'],
     writes: ['Height', 'Sediment', 'Flow'],
-    summary: (p) => `${Math.round(p.iterations)} iters · cap ${Math.round(p.sedimentCapacity * 100)}%`,
+    summary: (p) =>
+      (p.bakeSteps > 0 ? `${Math.round(p.bakeSteps)} baked + live` : 'Live GPU sim') +
+      ` · rain ${Math.round((p.rainIntensity ?? 0.68) * 100)}% · erod ${Math.round((p.erosionStrength ?? 0.70) * 100)}%`,
     defaults: {
-      iterations: 52,
-      erosionStrength: 0.74,
-      sedimentCapacity: 0.82,
-      depositionRate: 0.58,
-      rainRate: 0.65,
-      evaporation: 0.16,
-      liveParticles: false,
+      bakeSteps: 0,
+      rainIntensity: DEFAULT_EROSION_PARAMS.rainIntensity,
+      erosionStrength: DEFAULT_EROSION_PARAMS.erosionStrength,
+      sedimentCapacity: DEFAULT_EROSION_PARAMS.sedimentCapacity,
+      depositionRate: DEFAULT_EROSION_PARAMS.depositionRate,
+      evaporation: DEFAULT_EROSION_PARAMS.evaporation,
+      headwaterFlow: DEFAULT_EROSION_PARAMS.headwaterFlow,
+      lakeRetention: DEFAULT_EROSION_PARAMS.lakeRetention,
+      oasisSpring: 0,
     },
   },
 
@@ -279,15 +340,16 @@ export const LAYER_OPERATION_SPECS = {
     category: 'simulation',
     defaultName: 'Thermal erosion & talus',
     glyph: 'talus',
-    reads: ['Height', 'Hardness'],
+    reads: ['Height', '3D Hardness'],
     writes: ['Height', 'Coarse Talus'],
-    summary: (p) => `${Math.round(p.iterations)} iters · ${Math.round(p.reposeAngle)}° repose`,
+    summary: (p) => {
+      const deg = Math.round((Math.atan(p.talusAngle ?? 0.58) * 180) / Math.PI);
+      return `${p.bakePasses > 0 ? `${Math.round(p.bakePasses)} baked · ` : ''}${deg}° repose · spall ${Math.round((p.rockfallRate ?? 0.45) * 100)}%`;
+    },
     defaults: {
-      iterations: 34,
-      reposeAngle: 33,
-      spallingRate: 0.66,
-      talusSpread: 0.58,
-      hardnessShield: 0.72,
+      bakePasses: 0,
+      talusAngle: DEFAULT_EROSION_PARAMS.talusAngle, // slope tangent (0.58 ≈ 30°)
+      rockfallRate: DEFAULT_EROSION_PARAMS.rockfallRate,
     },
   },
 
@@ -298,14 +360,19 @@ export const LAYER_OPERATION_SPECS = {
     glyph: 'wind',
     reads: ['Height', 'FineSed'],
     writes: ['Height', 'FineSed', 'SnowIce'],
-    summary: (p) => (p.processMode === 1 ? `Aeolian wind · ${Math.round(p.azimuth)}°` : `Glacial snowline ${Math.round(p.snowline * 100)}%`),
+    summary: (p) =>
+      (p.dryAeolianMode ?? 0) > 0.4
+        ? `Aeolian wind ${Math.round((p.windSpeed ?? 0.58) * 100)}% · ${Math.round(p.windAzimuth ?? 35)}°`
+        : `Snowline ${Math.round((p.snowline ?? 0.42) * 100)}% · ice ${Math.round((p.glacierStrength ?? 0.74) * 100)}%`,
     defaults: {
-      processMode: 0, // 0=Alpine Snow & Glacier Abrasion, 1=Aeolian Sand Saltation & Ripples
-      iterations: 22,
-      intensity: 0.68,
-      snowline: 0.54,
-      glacierCarve: 0.55,
-      azimuth: 32,
+      bakePasses: 0,
+      snowline: DEFAULT_EROSION_PARAMS.snowline,
+      snowfallRate: DEFAULT_EROSION_PARAMS.snowfallRate,
+      glacierStrength: DEFAULT_EROSION_PARAMS.glacierStrength,
+      iceMeltRate: DEFAULT_EROSION_PARAMS.iceMeltRate,
+      windSpeed: DEFAULT_EROSION_PARAMS.windSpeed,
+      windAzimuth: DEFAULT_EROSION_PARAMS.windAzimuth,
+      dryAeolianMode: DEFAULT_EROSION_PARAMS.dryAeolianMode,
     },
   },
 
@@ -316,18 +383,12 @@ export const LAYER_OPERATION_SPECS = {
     glyph: 'boulders',
     reads: ['Height', 'Slope', 'Coarse Talus', 'Water'],
     writes: ['3D Rock Instances'],
-    summary: (p) => `${Math.round(p.density * 100)}% density · ${p.talusAffinity > 0.5 ? 'Talus toes' : 'Scattered'}`,
+    summary: (p) => `${Math.round((p.density ?? 0.65) * 100)}% density · #${p.seed ?? 4029}`,
     defaults: {
-      density: 0.62,
-      scaleMin: 0.65,
-      scaleMax: 1.55,
-      slopeMin: 2,
-      slopeMax: 26,
-      talusAffinity: 0.72,
-      crownOutcrops: 0.55,
-      avoidWater: true,
-      settleSteps: 28,
-      seed: 4410,
+      density: DEFAULT_EROSION_PARAMS.boulderDensity,
+      talusAffinity: DEFAULT_EROSION_PARAMS.rockfallRate,
+      settleSteps: 0,
+      seed: DEFAULT_EROSION_PARAMS.seed,
     },
   },
 
@@ -338,59 +399,19 @@ export const LAYER_OPERATION_SPECS = {
     glyph: 'grass',
     reads: ['Height', 'Slope', 'Water', 'Sediment', 'SnowIce'],
     writes: ['3D Plant Instances'],
-    summary: (p) => `${VEG_SPECIES[p.species]?.label || 'Green Grass'} · ${Math.round(p.density * 100)}%`,
+    summary: (p) => `${VEG_SPECIES[p.species]?.label || 'Green Grass'} · ${Math.round((p.density ?? 0.55) * 100)}%`,
     defaults: {
-      species: 0, // 0=Alpine Green Grass, 1=Dry Savanna Grass, 2=Moisture-Driven Blend
-      density: 0.58,
-      bladeHeight: 1.18,
-      slopeMax: 32,
-      elevationMin: 0.02,
-      elevationMax: 0.62,
-      waterAffinity: 0.65,
-      patchiness: 0.56,
-      windSway: 0.65,
-      seed: 9012,
+      species: DEFAULT_EROSION_PARAMS.grassMode,
+      density: DEFAULT_EROSION_PARAMS.grassDensity,
+      bladeHeight: DEFAULT_EROSION_PARAMS.grassHeight,
+      slopeMax: DEFAULT_EROSION_PARAMS.grassSlopeMax, // slope tangent (0.62 ≈ 32°)
+      elevationMax: DEFAULT_EROSION_PARAMS.grassElevMax,
+      patchiness: DEFAULT_EROSION_PARAMS.grassPatchiness,
+      windSway: DEFAULT_EROSION_PARAMS.grassWindSway,
+      dryBlend: DEFAULT_EROSION_PARAMS.grassDryBlend,
+      seed: DEFAULT_EROSION_PARAMS.seed,
     },
   },
-};
-
-export const BASE_ARCHETYPES = {
-  0: { id: 0, label: 'Alpine Mountain Divide' },
-  1: { id: 1, label: 'Tectonic Fault Escarpment' },
-  2: { id: 2, label: 'Dissected Canyon Plateau' },
-  3: { id: 3, label: 'Arid Erg & Basin Floor' },
-  4: { id: 4, label: 'Volcanic Caldera & Rim' },
-  5: { id: 5, label: 'Coastal Headland Massif' },
-  6: { id: 6, label: 'Pediment & Inselberg Plain' },
-};
-
-export const COMBINE_MODES = {
-  0: { id: 0, label: 'Add (Uplift)' },
-  1: { id: 1, label: 'Subtract (Excavate)' },
-  2: { id: 2, label: 'Max (Union)' },
-  3: { id: 3, label: 'Min (Clip)' },
-  4: { id: 4, label: 'Blend (Lerp)' },
-};
-
-export const SPLINE_MODES = {
-  0: { id: 0, label: 'Canyon Gorge Cut' },
-  1: { id: 1, label: 'Graded Road / Terrace' },
-  2: { id: 2, label: 'Lake Basin Boundary' },
-};
-
-export const VEG_SPECIES = {
-  0: { id: 0, label: 'Alpine Green Grass' },
-  1: { id: 1, label: 'Dry Steppe / Desert Grass' },
-  2: { id: 2, label: 'Moisture-Driven Blend' },
-};
-
-export const DERIVED_PALETTES = {
-  0: { id: 0, label: 'Alpine Granite & Scree', sunAz: 42, sunEl: 34 },
-  1: { id: 1, label: 'Colorado Redrock Strata', sunAz: 52, sunEl: 30 },
-  2: { id: 2, label: 'Icelandic Basalt & Rhyolite', sunAz: 36, sunEl: 26 },
-  3: { id: 3, label: 'Arid Sandstone & Erg', sunAz: 58, sunEl: 28 },
-  4: { id: 4, label: 'Limestone Karst & Highland', sunAz: 40, sunEl: 36 },
-  5: { id: 5, label: 'Lunar Regolith & Basalt', sunAz: 64, sunEl: 19 },
 };
 
 export function createStackLayer(type, overrides = {}) {
@@ -413,362 +434,185 @@ export function createStackLayer(type, overrides = {}) {
 }
 
 /**
- * Saved Terrain Project Stack Presets.
- * Notice: Every preset is an ordered list of composable geological, SDF, simulation, spline,
- * rock-placement, and vegetation layers (index 0 = TOP / evaluated LAST, last index = BOTTOM / evaluated FIRST).
+ * Decomposes any of the 19 canonical `EROSION_LANDSCAPES` (`erosion-presets.js`) into its exact
+ * bottom-to-top editable Layer Stack (index 0 = TOP / evaluated LAST, last index = BOTTOM / evaluated FIRST)
+ * while preserving 100% identical generator parameters, seed (`4029`), and simulation behavior!
  */
-export const TERRAIN_STACK_PRESETS = {
-  'cliff-caves-undercuts': {
-    id: 'cliff-caves-undercuts',
-    name: 'Overhanging Cliff & Caves',
-    subtitle: 'Escarpment + dipping beds + 3D cliff push–pull + hydraulic/talus erosion + SDF caves',
-    category: 'Cliff & SDF',
-    palette: 4,
-    layers: () => [
-      createStackLayer('vegetation-placement', {
-        name: 'Highland crown turf',
-        species: 0, density: 0.56, bladeHeight: 1.15, slopeMax: 27, elevationMin: 0.14, elevationMax: 0.78,
-      }),
-      createStackLayer('rock-placement', {
-        name: 'Cave-mouth & talus boulders',
-        density: 0.68, talusAffinity: 0.82, crownOutcrops: 0.50,
-      }),
-      createStackLayer('sdf-caves', {
-        name: 'SDF caves & cliff undercuts',
-        carveDepth: 28, archHeight: 18, tunnelScale: 2.1, elevationCenter: 0.34, elevationBand: 0.26, slopeMin: 22, undercutStrength: 0.78,
-      }),
-      createStackLayer('thermal-talus', {
-        name: 'Thermal scree aprons',
-        iterations: 38, reposeAngle: 33, spallingRate: 0.72,
-      }),
-      createStackLayer('hydraulic-erosion', {
-        name: 'Gully & waterfall erosion',
-        iterations: 54, erosionStrength: 0.76, sedimentCapacity: 0.80, depositionRate: 0.62,
-      }),
-      createStackLayer('river-incision', {
-        name: 'Ravine drainage incision',
-        iterations: 24, incisionStrength: 0.62, basinPooling: 0.35,
-      }),
-      createStackLayer('cliff-push-pull', {
-        name: 'Rugged cliff push–pull',
-        displacement: 13.5, featureScale: 2.5, slopeThreshold: 25, ledgeStrength: 0.72, overhangBias: 0.68,
-      }),
-      createStackLayer('sculpt-layer', {
-        name: 'SDF sculpt edits',
-        opacity: 1.0,
-      }),
-      createStackLayer('stratigraphic-beds', {
-        name: 'Limestone bed packages',
-        bedCount: 8, terraceStrength: 0.64, hardSoftContrast: 0.84, dipAngle: 12, strikeAzimuth: 22, ledgeOverhang: 0.45,
-      }),
-      createStackLayer('base-landform', {
-        name: 'Base escarpment landform',
-        archetype: 1, seed: 4029, relief: 168, scale: 1.75, roughness: 0.60, ridgeSharpness: 0.70, baseHardness: 0.58,
-      }),
-    ],
-  },
+function buildStackRecipeFromLandscape(landscapeId) {
+  const preset = EROSION_LANDSCAPES[landscapeId];
+  const d = { ...DEFAULT_EROSION_PARAMS, ...(preset.defaults || {}) };
+  const veg = getVegetationDefaultsForLandscape(landscapeId);
+  const seed = d.seed ?? 4029;
 
-  'canyon-strata-incision': {
-    id: 'canyon-strata-incision',
-    name: 'Grand Canyon Strata',
-    subtitle: 'Kaibab plateau + 11 horizontal strata beds + spline gorge cut + hydraulic & talus passes',
-    category: 'Canyon',
-    palette: 1,
-    layers: () => [
-      createStackLayer('vegetation-placement', {
-        name: 'Rim dry scrub grass',
-        species: 1, density: 0.38, bladeHeight: 0.95, slopeMax: 24, elevationMin: 0.08, elevationMax: 0.86,
-      }),
-      createStackLayer('rock-placement', {
-        name: 'Bench & river boulders',
-        density: 0.64, talusAffinity: 0.85, crownOutcrops: 0.45,
-      }),
-      createStackLayer('thermal-talus', {
-        name: 'Shale slope talus cones',
-        iterations: 42, reposeAngle: 34, spallingRate: 0.74,
-      }),
-      createStackLayer('hydraulic-erosion', {
-        name: 'Side-canyon tributary cutting',
-        iterations: 64, erosionStrength: 0.82, sedimentCapacity: 0.88, depositionRate: 0.56,
-      }),
-      createStackLayer('river-incision', {
-        name: 'Trunk river drainage',
-        iterations: 32, incisionStrength: 0.74, basinPooling: 0.48,
-      }),
-      createStackLayer('cliff-push-pull', {
-        name: 'Redwall buttress push–pull',
-        displacement: 10.5, featureScale: 2.8, slopeThreshold: 27, ledgeStrength: 0.68, overhangBias: 0.52,
-      }),
-      createStackLayer('spline-feature', {
-        name: 'Colorado gorge spline cut',
-        mode: 0, width: 58, depth: 72, wallSteepness: 0.82, meanderAmp: 0.42, waterFill: 0.34,
-        points: [[-210, -120], [-75, 34], [64, -28], [212, 118]],
-      }),
-      createStackLayer('stratigraphic-beds', {
-        name: 'Horizontal cliff–bench beds',
-        bedCount: 11, terraceStrength: 0.82, hardSoftContrast: 0.92, dipAngle: 3, strikeAzimuth: 14, ledgeOverhang: 0.42,
-      }),
-      createStackLayer('base-landform', {
-        name: 'Uplifted canyon plateau',
-        archetype: 2, seed: 5180, relief: 176, scale: 1.55, roughness: 0.52, ridgeSharpness: 0.56, baseHardness: 0.62,
-      }),
-    ],
-  },
+  const layers = []; // Push TOP -> BOTTOM
 
-  'desert-rock-stacks': {
-    id: 'desert-rock-stacks',
-    name: 'Desert Rock Stacks',
-    subtitle: 'Pediment plain + tiered leaning sandstone stacks + thermal scree + wind-rippled sand apron',
-    category: 'Arid & Stacks',
-    palette: 3,
-    layers: () => [
+  // 1. Top: 3D Grass Vegetation Placement (enabled on biomes with grass)
+  if (veg.grassEnabled) {
+    layers.push(
       createStackLayer('vegetation-placement', {
-        name: 'Sparse desert bunchgrass',
-        species: 1, density: 0.34, bladeHeight: 0.92, slopeMax: 22, elevationMin: 0.02, elevationMax: 0.34,
-      }),
-      createStackLayer('rock-placement', {
-        name: 'Fallen caprock blocks',
-        density: 0.70, talusAffinity: 0.78, crownOutcrops: 0.62,
-      }),
+        name: veg.grassMode === 1 ? 'Dry desert / canyon grass' : veg.grassMode === 2 ? 'Biome-blended 3D turf' : 'Lush highland 3D turf',
+        species: veg.grassMode,
+        density: veg.grassDensity,
+        bladeHeight: veg.grassHeight,
+        slopeMax: veg.grassSlopeMax,
+        elevationMax: veg.grassElevMax,
+        patchiness: veg.grassPatchiness,
+        windSway: DEFAULT_EROSION_PARAMS.grassWindSway,
+        dryBlend: veg.grassDryBlend,
+        seed,
+      })
+    );
+  }
+
+  // 2. 3D Polyhedral Outcrops & Calved Cliff Boulders
+  layers.push(
+    createStackLayer('rock-placement', {
+      name: '3D outcrops & talus boulders',
+      enabled: d.showOutcrops !== false,
+      density: d.boulderDensity ?? DEFAULT_EROSION_PARAMS.boulderDensity,
+      talusAffinity: d.rockfallRate ?? DEFAULT_EROSION_PARAMS.rockfallRate,
+      settleSteps: 0,
+      seed,
+    })
+  );
+
+  // 3. Cryosphere Snow/Glaciers & Aeolian Wind Process (when active in preset)
+  const hasCryoOrWind =
+    (d.snowfallRate ?? 0) > 0.015 ||
+    (d.glacierStrength ?? 0) > 0.015 ||
+    (d.windSpeed ?? 0) > 0.04;
+  if (hasCryoOrWind) {
+    const isDryWind = (d.dryAeolianMode ?? 0) > 0.4;
+    layers.push(
       createStackLayer('aeolian-glacial', {
-        name: 'Aeolian sand dune drift',
-        processMode: 1, iterations: 28, intensity: 0.78, azimuth: 34,
-      }),
-      createStackLayer('thermal-talus', {
-        name: 'Pediment scree cones',
-        iterations: 36, reposeAngle: 32, spallingRate: 0.68,
-      }),
-      createStackLayer('sdf-caves', {
-        name: 'Sandstone base alcoves',
-        carveDepth: 18, archHeight: 13, tunnelScale: 2.6, elevationCenter: 0.24, elevationBand: 0.20, slopeMin: 28, undercutStrength: 0.62,
-      }),
-      createStackLayer('cliff-push-pull', {
-        name: 'Pillar ledge displacement',
-        displacement: 9.0, featureScale: 3.1, slopeThreshold: 26, ledgeStrength: 0.65, overhangBias: 0.60,
-      }),
-      createStackLayer('rock-stacks', {
-        name: 'Tiered sandstone stacks',
-        height: 68, spacing: 64, radius: 17, taper: 0.38, tiers: 6, lean: 0.34, leanAzimuth: 38, caprockOverhang: 0.58,
-      }),
-      createStackLayer('stratigraphic-beds', {
-        name: 'Cross-bedded sandstone',
-        bedCount: 9, terraceStrength: 0.54, hardSoftContrast: 0.80, dipAngle: 7, strikeAzimuth: -18,
-      }),
-      createStackLayer('base-landform', {
-        name: 'Arid pediment & basin',
-        archetype: 6, seed: 8821, relief: 112, scale: 1.65, roughness: 0.48, ridgeSharpness: 0.52, baseHardness: 0.50,
-      }),
-    ],
-  },
+        name: isDryWind ? 'Aeolian sand saltation & wind' : 'Snowpack, glaciers & mountain wind',
+        bakePasses: 0,
+        snowline: d.snowline,
+        snowfallRate: d.snowfallRate,
+        glacierStrength: d.glacierStrength,
+        iceMeltRate: d.iceMeltRate,
+        windSpeed: d.windSpeed,
+        windAzimuth: d.windAzimuth,
+        dryAeolianMode: d.dryAeolianMode,
+      })
+    );
+  }
 
-  'alpine-glacial-divide': {
-    id: 'alpine-glacial-divide',
-    name: 'Alpine Divide & Cirques',
-    subtitle: 'Arête horns + folded strata + glacial snow/cirque abrasion + river meltwater + alpine meadows',
-    category: 'Alpine',
-    palette: 0,
-    layers: () => [
-      createStackLayer('vegetation-placement', {
-        name: 'Subalpine valley meadows',
-        species: 0, density: 0.66, bladeHeight: 1.12, slopeMax: 30, elevationMin: 0.03, elevationMax: 0.46,
-      }),
-      createStackLayer('rock-placement', {
-        name: 'Moraine & scree boulders',
-        density: 0.65, talusAffinity: 0.76, crownOutcrops: 0.58,
-      }),
-      createStackLayer('aeolian-glacial', {
-        name: 'Snowpack & glacier abrasion',
-        processMode: 0, iterations: 26, intensity: 0.76, snowline: 0.48, glacierCarve: 0.66,
-      }),
+  // 4. Thermal Cliff Spalling & Talus Scree Repose (when active in preset)
+  if ((d.rockfallRate ?? 0) > 0.015) {
+    layers.push(
       createStackLayer('thermal-talus', {
-        name: 'Frost-shatter couloir scree',
-        iterations: 32, reposeAngle: 35, spallingRate: 0.64,
-      }),
+        name: 'Cliff spalling & talus repose',
+        bakePasses: 0,
+        talusAngle: d.talusAngle,
+        rockfallRate: d.rockfallRate,
+      })
+    );
+  }
+
+  // 5. Hydraulic Rain, Shallow-Water Pipe Flow & Alluvial Sedimentation (when active in preset)
+  const hasHydro =
+    (d.rainIntensity ?? 0) > 0.005 ||
+    (d.headwaterFlow ?? 0) > 0.005 ||
+    Boolean(d.oasisSpring);
+  if (hasHydro) {
+    layers.push(
       createStackLayer('hydraulic-erosion', {
-        name: 'Meltwater ravine cutting',
-        iterations: 48, erosionStrength: 0.72, sedimentCapacity: 0.78, depositionRate: 0.60,
-      }),
-      createStackLayer('river-incision', {
-        name: 'Glacial valley drainage',
-        iterations: 26, incisionStrength: 0.64, basinPooling: 0.52,
-      }),
-      createStackLayer('cliff-push-pull', {
-        name: 'Granite arête crags',
-        displacement: 10.0, featureScale: 2.4, slopeThreshold: 30, ledgeStrength: 0.52, overhangBias: 0.44,
-      }),
-      createStackLayer('mountain-ridges', {
-        name: 'Cross-cutting horn spurs',
-        generator: 0, combineMode: 0, amplitude: 54, scale: 2.3, sharpness: 0.76, azimuth: -34,
-        mask: { enabled: true, mode: 'height', min: 0.28, max: 1.0, feather: 0.18, invert: false },
-      }),
-      createStackLayer('stratigraphic-beds', {
-        name: 'Folded gneiss foliation',
-        bedCount: 7, terraceStrength: 0.36, hardSoftContrast: 0.68, dipAngle: 26, strikeAzimuth: 32, bedFoldWarp: 0.48,
-      }),
-      createStackLayer('base-landform', {
-        name: 'Alpine mountain range',
-        archetype: 0, seed: 4029, relief: 186, scale: 1.90, roughness: 0.68, ridgeSharpness: 0.78, baseHardness: 0.66,
-      }),
-    ],
-  },
+        name: d.oasisSpring ? 'Artesian oasis spring & hydrology' : (d.headwaterFlow ?? 0) > 0.25 ? 'River discharge & hydraulic erosion' : 'Hydraulic rain & alluvial runoff',
+        bakeSteps: 0,
+        rainIntensity: d.rainIntensity,
+        erosionStrength: d.erosionStrength,
+        sedimentCapacity: d.sedimentCapacity,
+        depositionRate: d.depositionRate,
+        evaporation: d.evaporation,
+        headwaterFlow: d.headwaterFlow ?? 0,
+        lakeRetention: d.lakeRetention ?? 0.4,
+        oasisSpring: d.oasisSpring ? 1 : 0,
+      })
+    );
+  }
 
-  'icelandic-basalt-gorge': {
-    id: 'icelandic-basalt-gorge',
-    name: 'Icelandic Highlands & Gorge',
-    subtitle: 'Basalt flood beds + braided glacial river canyon + emerald moss-grass highlands + snowcaps',
-    category: 'Highland',
-    palette: 2,
-    layers: () => [
-      createStackLayer('vegetation-placement', {
-        name: 'Emerald highland turf',
-        species: 0, density: 0.78, bladeHeight: 1.24, slopeMax: 34, elevationMin: 0.03, elevationMax: 0.58,
-      }),
-      createStackLayer('rock-placement', {
-        name: 'Columnar basalt blocks',
-        density: 0.62, talusAffinity: 0.74, crownOutcrops: 0.54,
-      }),
-      createStackLayer('aeolian-glacial', {
-        name: 'Highland snowfields',
-        processMode: 0, iterations: 20, intensity: 0.62, snowline: 0.58, glacierCarve: 0.48,
-      }),
-      createStackLayer('thermal-talus', {
-        name: 'Basalt talus slopes',
-        iterations: 30, reposeAngle: 34, spallingRate: 0.60,
-      }),
-      createStackLayer('hydraulic-erosion', {
-        name: 'Braided river & gully erosion',
-        iterations: 56, erosionStrength: 0.78, sedimentCapacity: 0.84, depositionRate: 0.64,
-      }),
-      createStackLayer('spline-feature', {
-        name: 'Stuðlagil basalt gorge',
-        mode: 0, width: 42, depth: 46, wallSteepness: 0.86, meanderAmp: 0.36, waterFill: 0.42,
-        points: [[-205, 88], [-62, 18], [72, -32], [206, -96]],
-      }),
-      createStackLayer('cliff-push-pull', {
-        name: 'Columnar wall steps',
-        displacement: 8.5, featureScale: 3.4, slopeThreshold: 27, ledgeStrength: 0.70, overhangBias: 0.48,
-      }),
-      createStackLayer('stratigraphic-beds', {
-        name: 'Flood-basalt trap tiers',
-        bedCount: 10, terraceStrength: 0.66, hardSoftContrast: 0.84, dipAngle: 6, strikeAzimuth: 18,
-      }),
-      createStackLayer('base-landform', {
-        name: 'Volcanic highland massif',
-        archetype: 0, seed: 7714, relief: 158, scale: 1.75, roughness: 0.60, ridgeSharpness: 0.64, baseHardness: 0.60,
-      }),
-    ],
-  },
+  // 6. 3D Stratigraphic Bedding & Differential Rock Hardness
+  layers.push(
+    createStackLayer('stratigraphic-beds', {
+      name: '3D stratigraphy & rock hardness',
+      rockHardness: d.rockHardness,
+      strataStrength: d.strataStrength,
+      strataFreq: d.strataFreq,
+      strataDip: d.strataDip,
+      strataStrike: d.strataStrike,
+      faultWeakness: d.faultWeakness,
+      terraceCarve: 0.0,
+      ledgeOverhang: 0.0,
+      opacity: 1.0,
+      seed,
+    })
+  );
 
-  'sahara-erg-oasis': {
-    id: 'sahara-erg-oasis',
-    name: 'Sahara Erg & Spring Oasis',
-    subtitle: 'Star/transverse sand dunes + spline spring oasis basin + sandstone tors + shoreline palms/grass',
-    category: 'Arid & Stacks',
-    palette: 3,
-    layers: () => [
-      createStackLayer('vegetation-placement', {
-        name: 'Oasis shoreline meadow',
-        species: 2, density: 0.76, bladeHeight: 1.38, slopeMax: 24, elevationMin: 0.0, elevationMax: 0.32, waterAffinity: 0.95,
-      }),
-      createStackLayer('rock-placement', {
-        name: 'Exhumed sandstone outcrops',
-        density: 0.42, talusAffinity: 0.65, crownOutcrops: 0.60,
-      }),
-      createStackLayer('aeolian-glacial', {
-        name: 'Wind saltation & ripples',
-        processMode: 1, iterations: 34, intensity: 0.86, azimuth: 28,
-      }),
-      createStackLayer('spline-feature', {
-        name: 'Interdune oasis lake basin',
-        mode: 2, width: 82, depth: 26, wallSteepness: 0.45, meanderAmp: 0.15, waterFill: 0.62,
-        points: [[-54, -36], [18, -48], [62, 16], [-18, 52]],
-      }),
-      createStackLayer('rock-stacks', {
-        name: 'Rim sandstone inselbergs',
-        height: 46, spacing: 92, radius: 18, taper: 0.44, tiers: 4, lean: 0.22, caprockOverhang: 0.42,
-        mask: { enabled: true, mode: 'radial', min: 0.48, max: 1.0, feather: 0.20, invert: false },
-      }),
-      createStackLayer('mountain-ridges', {
-        name: 'Transverse dune chains',
-        generator: 3, combineMode: 0, amplitude: 66, scale: 2.1, sharpness: 0.78, azimuth: 28,
-      }),
-      createStackLayer('base-landform', {
-        name: 'Desert erg basin',
-        archetype: 3, seed: 6204, relief: 118, scale: 1.50, roughness: 0.44, ridgeSharpness: 0.58, baseHardness: 0.42,
-      }),
-    ],
-  },
+  // 7. Bottom Foundation: Exact `INIT_TERRAIN_FRAG` Landform Generator (`terrainType` 0..18, `seed: 4029`)
+  layers.push(
+    createStackLayer('base-landform', {
+      name: `${preset.name} base`,
+      archetype: preset.terrainType,
+      seed,
+      relief: d.relief,
+      roughness: d.roughness,
+    })
+  );
 
-  'mountain-pass-road': {
-    id: 'mountain-pass-road',
-    name: 'Alpine Switchback & Lake',
-    subtitle: 'Mountain massif + eroded valleys + graded spline mountain road + glacial tarn basin',
-    category: 'Spline Demo',
-    palette: 0,
-    layers: () => [
-      createStackLayer('vegetation-placement', {
-        name: 'Valley & roadside grass',
-        species: 0, density: 0.64, bladeHeight: 1.08, slopeMax: 28, elevationMin: 0.02, elevationMax: 0.55,
-      }),
-      createStackLayer('rock-placement', {
-        name: 'Cut-slope boulders',
-        density: 0.54, talusAffinity: 0.72, crownOutcrops: 0.48,
-      }),
-      createStackLayer('spline-feature', {
-        name: 'Graded mountain pass road',
-        mode: 1, width: 22, depth: 14, wallSteepness: 0.68, meanderAmp: 0.22, waterFill: 0.0,
-        points: [[-205, -155], [-85, -42], [12, 48], [118, -18], [208, 136]],
-      }),
-      createStackLayer('thermal-talus', {
-        name: 'Talus stabilization',
-        iterations: 28, reposeAngle: 34, spallingRate: 0.62,
-      }),
-      createStackLayer('hydraulic-erosion', {
-        name: 'Watershed erosion',
-        iterations: 46, erosionStrength: 0.70, sedimentCapacity: 0.78, depositionRate: 0.60,
-      }),
-      createStackLayer('river-incision', {
-        name: 'Tarn & stream drainage',
-        iterations: 24, incisionStrength: 0.60, basinPooling: 0.58,
-      }),
-      createStackLayer('stratigraphic-beds', {
-        name: 'Tilted alpine strata',
-        bedCount: 8, terraceStrength: 0.48, hardSoftContrast: 0.74, dipAngle: 16, strikeAzimuth: -24,
-      }),
-      createStackLayer('base-landform', {
-        name: 'Base alpine massif',
-        archetype: 0, seed: 2607, relief: 166, scale: 1.80, roughness: 0.62, ridgeSharpness: 0.70, baseHardness: 0.60,
-      }),
-    ],
-  },
+  return {
+    id: preset.id,
+    name: preset.name,
+    subtitle: preset.subtitle,
+    category: preset.category,
+    terrainType: preset.terrainType,
+    palette: preset.materialTheme ?? 0,
+    fabricMode: d.fabricMode ?? 0,
+    emitterMode: d.emitterMode ?? DEFAULT_EROSION_PARAMS.emitterMode,
+    particleCount: d.particleCount ?? DEFAULT_EROSION_PARAMS.particleCount,
+    particleInertia: d.particleInertia ?? DEFAULT_EROSION_PARAMS.particleInertia,
+    pipeFlowBlend: d.pipeFlowBlend ?? DEFAULT_EROSION_PARAMS.pipeFlowBlend,
+    sunAzimuth: d.sunAzimuth ?? DEFAULT_EROSION_PARAMS.sunAzimuth,
+    sunElevation: d.sunElevation ?? DEFAULT_EROSION_PARAMS.sunElevation,
+    showWater: d.showWater ?? true,
+    showParticles: d.showParticles ?? true,
+    layers: () => structuredClone(layers).map((l) => ({ ...l, id: nextLayerId(l.type.slice(0, 4)) })),
+  };
+}
 
-  'lunar-impact-highlands': {
-    id: 'lunar-impact-highlands',
-    name: 'Lunar Impact Highlands',
-    subtitle: 'Basaltic mare + multi-ring crater excavations + thermal regolith slumping + ejecta boulders',
-    category: 'Planetary',
-    palette: 5,
-    layers: () => [
-      createStackLayer('rock-placement', {
-        name: 'Ejecta blanket boulders',
-        density: 0.72, talusAffinity: 0.70, crownOutcrops: 0.65,
-      }),
-      createStackLayer('thermal-talus', {
-        name: 'Crater wall regolith slump',
-        iterations: 26, reposeAngle: 31, spallingRate: 0.58,
-      }),
-      createStackLayer('mountain-ridges', {
-        name: 'Secondary crater cluster',
-        generator: 4, combineMode: 0, amplitude: 36, scale: 3.6, sharpness: 0.74, seed: 9912,
-      }),
-      createStackLayer('mountain-ridges', {
-        name: 'Primary impact basins',
-        generator: 4, combineMode: 0, amplitude: 68, scale: 1.55, sharpness: 0.82, seed: 3318,
-      }),
-      createStackLayer('base-landform', {
-        name: 'Highland regolith crust',
-        archetype: 4, seed: 1969, relief: 108, scale: 1.45, roughness: 0.52, ridgeSharpness: 0.48, baseHardness: 0.56,
-      }),
-    ],
-  },
-};
+/**
+ * Curated showcase order across all 19 original `EROSION_LANDSCAPES` (`icelandic-highlands` default first!).
+ */
+const PRESET_ORDER = [
+  'icelandic-highlands',
+  'himalayan-karakoram',
+  'grand-canyon',
+  'studlagil-basalt',
+  'fjadrargljufur-palagonite',
+  'icelandic-green-highlands',
+  'namib-erg-dunes',
+  'sahara-tassili-erg',
+  'desert-oasis-erg',
+  'rugged-desert-crags',
+  'yardang-wind-corridor',
+  'glacial-lake-watershed',
+  'lunar-mare-craters',
+  'layered-plateau',
+  'alpine-divide',
+  'fault-escarpment',
+  'volcanic-caldera',
+  'badlands-domes',
+  'coastal-massif',
+];
+
+export const TERRAIN_STACK_PRESETS = {};
+for (const id of PRESET_ORDER) {
+  if (EROSION_LANDSCAPES[id]) {
+    TERRAIN_STACK_PRESETS[id] = buildStackRecipeFromLandscape(id);
+  }
+}
+for (const id of Object.keys(EROSION_LANDSCAPES)) {
+  if (!TERRAIN_STACK_PRESETS[id]) {
+    TERRAIN_STACK_PRESETS[id] = buildStackRecipeFromLandscape(id);
+  }
+}

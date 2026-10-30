@@ -290,9 +290,11 @@ function initTerrainStudio() {
   const playBtn = document.getElementById('btn-er-play');
   const syncPlayBtn = () => {
     const running = Boolean(erosionEngine.pipeline.liveSimRunning);
+    erosionEngine.playing = running;
     playBtn.textContent = running ? '⏸ Pause Sim' : '▶ Live Sim';
     playBtn.classList.toggle('active-play', running);
   };
+  syncPlayBtn();
   playBtn.addEventListener('click', () => {
     erosionEngine.pipeline.liveSimRunning = !erosionEngine.pipeline.liveSimRunning;
     syncPlayBtn();

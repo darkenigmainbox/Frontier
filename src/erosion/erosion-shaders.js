@@ -1925,9 +1925,11 @@ layout(location = 0) in vec2 aGridUv;
 
 uniform sampler2D uTerrainTex;
 uniform sampler2D uSnowTex;
+uniform sampler2D uVecDispTex;
 uniform mat4 uViewProj;
 uniform vec4 uRenderDomain; // (worldSpan, gridRes, showWater, timeSec)
 uniform vec4 uLayerVis;     // (lithologyOpacity, fabricStrength, snowVisOpacity, waterVisOpacity)
+uniform float uUseVecDisp;
 
 out vec2 vUv;
 out vec3 vWorldPos;
@@ -1949,6 +1951,10 @@ void main() {
   float y = isSkirt ? 0.0 : hSurf;
 
   vec3 wp = vec3(xz.x, y, xz.y);
+  if (!isSkirt && uUseVecDisp > 0.5) {
+    vec4 vd = texelFetch(uVecDispTex, tc, 0);
+    wp += vd.xyz;
+  }
   vUv = clampedUv;
   vWorldPos = wp;
   vLayers = isSkirt ? vec4(wp.y, 0.0, 0.0, 0.0) : terr;
@@ -1970,6 +1976,8 @@ uniform sampler2D uInitialTex;
 uniform sampler2D uVelocityFieldTex;
 
 uniform sampler2D uSnowTex;
+uniform sampler2D uCavePortalTex;
+uniform sampler2D uMaskPreviewTex;
 
 uniform vec3 uCameraPos;
 uniform vec3 uSunDir;
@@ -1984,6 +1992,7 @@ uniform int uViewMode;
 uniform int uMaterialTheme;   // 0..2 = Baseline, 3 = Grand Canyon, 4 = Studlagil, 5 = Yardang, 6 = Namib Erg
 uniform int uFabricMode;      // 0 = Baseline, 1 = Columnar, 2 = Cross-Bed/Ripples, 3 = Tafoni, 4 = Gneiss
 uniform float uSeed;
+uniform float uHasCaves;
 
 ${COMMON_GEOLOGY_GLSL}
 
@@ -2027,6 +2036,10 @@ void main() {
   float hD = tD.r + tD.g + tD.b;
 
   bool isSideSkirt = vWorldPos.y < hC - 0.6;
+  if (!isSideSkirt && uHasCaves > 0.5) {
+    float portalCut = sampleGridBilinear(uCavePortalTex, vUv, 128.0).r;
+    if (portalCut > 0.52) discard;
+  }
   vec3 bedNormal;
   if (isSideSkirt) {
     vec2 edgeD = vUv - 0.5;
@@ -2360,6 +2373,15 @@ void main() {
     vec3 hydroCol = mix(shallowRiver, deepLake, smoothstep(0.12, 2.2, tC.a));
     hydroCol += vec3(0.35, 0.42, 0.45) * clamp(velData.z * 0.45, 0.0, 0.65);
     surfaceAlbedo = mix(meltZone, hydroCol, wMask);
+  } else if (uViewMode == 7) {
+    // Active Layer B&W Mask Diagnostic (0 = black unmasked, 1 = white active mask)
+    float maskVal = clamp(sampleGridBilinear(uMaskPreviewTex, vUv, res).r, 0.0, 1.0);
+    surfaceAlbedo = mix(vec3(0.030, 0.032, 0.036), vec3(0.95, 0.96, 0.98), maskVal);
+  } else if (uViewMode == 8) {
+    // Ambient Occlusion & Ridge Protrusion Diagnostic
+    vec3 cavityCol = vec3(0.055, 0.060, 0.070) * ao;
+    vec3 crestCol = vec3(0.86, 0.72, 0.46);
+    surfaceAlbedo = mix(cavityCol + vec3(0.24) * ao, crestCol, clamp(ridgeConvex * 1.15, 0.0, 1.0));
   }
 
   vec3 L = safeNorm3(uSunDir, vec3(0.4, 0.8, 0.4));

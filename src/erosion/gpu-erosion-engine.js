@@ -184,11 +184,10 @@ export class GpuErosionEngine {
     this._bindEvents();
 
     Object.assign(this.params, getVegetationDefaultsForLandscape(this.params.landscape));
-    this.resetSimulation();
 
     // Non-Destructive Bottom-to-Top Terrain Stack Pipeline (Landforms + SDF Caves + Simulation + Placements)
     this.pipelineMode = true;
-    this.playing = false;
+    this.playing = true;
     this.pipeline = new TerrainStackPipeline(this);
   }
 
@@ -1012,9 +1011,66 @@ export class GpuErosionEngine {
   }
 
   /**
+   * Seeds initial mountain snowpack & valley glaciers (`progInitSnow`) onto `snowTex[snowIdx]`.
+   */
+  seedInitialSnow() {
+    const gl = this.gl;
+    const R = this.gridRes;
+    const p = this.params;
+    const { strataVec } = this._getHardnessUniforms();
+    const cellSize = p.worldSpan / R;
+
+    gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.BLEND);
+    gl.viewport(0, 0, R, R);
+    gl.useProgram(this.progInitSnow);
+    gl.bindVertexArray(this.emptyVao);
+    this._bindTex(this.progInitSnow, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
+    gl.uniform4f(gl.getUniformLocation(this.progInitSnow, 'uCryoParams'), R, cellSize, 0.085, p.worldSpan);
+    gl.uniform4fv(
+      gl.getUniformLocation(this.progInitSnow, 'uClimate'),
+      [p.snowline, Math.max(0, Math.min(1, p.snowfallRate || 0)), Math.max(0, Math.min(1, p.glacierStrength || 0)), 0.8]
+    );
+    gl.uniform4fv(gl.getUniformLocation(this.progInitSnow, 'uStrataOrient'), strataVec);
+    gl.uniform1f(gl.getUniformLocation(this.progInitSnow, 'uSeed'), p.seed);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSnowClear[this.snowIdx]);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  /**
+   * Executes `passes` iterations of conservative `THERMAL_TALUS_FRAG` (`progThermalTalus`).
+   */
+  stepThermalTalusOnly(passes = 1) {
+    const gl = this.gl;
+    const R = this.gridRes;
+    const p = this.params;
+    const cellSize = p.worldSpan / R;
+    const { hardnessVec, strataVec } = this._getHardnessUniforms();
+
+    gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.BLEND);
+    gl.viewport(0, 0, R, R);
+    gl.useProgram(this.progThermalTalus);
+    gl.bindVertexArray(this.emptyVao);
+    gl.uniform4f(gl.getUniformLocation(this.progThermalTalus, 'uTalusParams'), R, cellSize, p.talusAngle, p.worldSpan);
+    gl.uniform4fv(gl.getUniformLocation(this.progThermalTalus, 'uHardnessParams'), hardnessVec);
+    gl.uniform4fv(gl.getUniformLocation(this.progThermalTalus, 'uStrataOrient'), strataVec);
+    gl.uniform1f(gl.getUniformLocation(this.progThermalTalus, 'uDryAeolian'), p.dryAeolianMode || 0.0);
+    gl.uniform1f(gl.getUniformLocation(this.progThermalTalus, 'uSeed'), p.seed);
+
+    for (let i = 0; i < passes; i++) {
+      const nextTalus = 1 - this.terrainIdx;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboTerrainSingle[nextTalus]);
+      this._bindTex(this.progThermalTalus, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      this.terrainIdx = nextTalus;
+    }
+  }
+
+  /**
    * Executes `count` full GPU erosion + shallow-water + sedimentation + thermal talus substeps!
    */
-  stepSimulation(count = 1) {
+  stepSimulation(count = 1, opts = {}) {
     const gl = this.gl;
     const R = this.gridRes;
     const p = this.params;
@@ -1250,12 +1306,19 @@ export class GpuErosionEngine {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindVertexArray(null);
 
+    if (opts.skipTelemetry) return;
+
     if (this.stepCount % 36 === 0) {
       this._sampleTelemetry();
     } else {
       this.telemetry.steps = this.stepCount;
       this.telemetry.particles = activeCount;
       this.telemetry.fps = this.fps;
+      if (this.pipeline) {
+        this.telemetry.layerCount = this.pipeline.layers.length;
+        this.telemetry.evalMs = Number(this.pipeline.lastEvalMs.toFixed(1));
+        this.telemetry.caveTris = Math.round(this.pipeline.caveSystem.vertexCount / 3);
+      }
       if (this.onTelemetry && this.stepCount % 8 === 0) this.onTelemetry(this.telemetry);
     }
   }
@@ -1306,6 +1369,11 @@ export class GpuErosionEngine {
     this.telemetry.waterVolumeM3 = Math.round(sumWater * cellAreaSample);
     this.telemetry.boulders = this.rockCalving.rocks.length;
     this.telemetry.fps = this.fps;
+    if (this.pipeline) {
+      this.telemetry.layerCount = this.pipeline.layers.length;
+      this.telemetry.evalMs = Number(this.pipeline.lastEvalMs.toFixed(1));
+      this.telemetry.caveTris = Math.round(this.pipeline.caveSystem.vertexCount / 3);
+    }
     if (this.onTelemetry) this.onTelemetry(this.telemetry);
   }
 
@@ -1577,12 +1645,21 @@ export class GpuErosionEngine {
       }
 
       if (this.pipelineMode && this.pipeline) {
-        if (this.pipeline.liveSimRunning) {
-          this.pipeline.stepLiveSimulation();
+        this.playing = Boolean(this.pipeline.liveSimRunning);
+        const anySimLayerOn =
+          this.params.simHydraulicPlaying !== false ||
+          this.params.simCryoPlaying !== false ||
+          this.params.simWindPlaying !== false ||
+          this.params.simRockfallPlaying !== false;
+        if (this.playing && anySimLayerOn) {
+          this.stepSimulation(this.params.substepsPerFrame);
         }
-        this.rockCalving.stepPhysics(frameDt, false);
+        if (this.params.simRockfallPlaying !== false && this.params.showOutcrops !== false) {
+          this.rockCalving.stepPhysics(frameDt, false);
+        }
         this.telemetry.fps = this.fps;
         this.telemetry.boulders = this.rockCalving.rocks.length;
+        this.telemetry.layerCount = this.pipeline.layers.length;
         this.renderFrame();
         return;
       }

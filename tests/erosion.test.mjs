@@ -531,18 +531,13 @@ test('Real 3D Grass tuft mesh, biome vegetation defaults (Green / Dry / Auto-Ble
 
 test('Bottom-to-top Terrain Stack Pipeline shaders, uniform bindings, and non-colour operation specs satisfy strict architecture', () => {
   const PIPELINE_EXPORTS = [
-    'STACK_LANDFORM_FRAG',
+    'STACK_OP_FRAG',
     'SCULPT_STAMP_FRAG',
-    'STACK_RIVER_INCISION_FRAG',
-    'STACK_HYDRAULIC_FRAG',
-    'STACK_THERMAL_TALUS_FRAG',
-    'STACK_AEOLIAN_GLACIAL_FRAG',
-    'STACK_SURFACE_BAKE_FRAG',
-    'PIPELINE_TERRAIN_VERT',
-    'PIPELINE_TERRAIN_FRAG',
+    'STACK_MASK_BAKE_FRAG',
+    'STACK_MASK_BLEND_FRAG',
+    'STACK_COPY_VEC_FRAG',
     'SDF_CAVE_VERT',
     'SDF_CAVE_FRAG',
-    'STACK_SYNC_EXPORT_FRAG',
   ];
 
   for (const name of PIPELINE_EXPORTS) {
@@ -569,18 +564,21 @@ test('Bottom-to-top Terrain Stack Pipeline shaders, uniform bindings, and non-co
 
   // Verify every getUniformLocation / _bindTex in terrain-stack-pipeline.js matches its GLSL shader!
   const pipeSrc = fs.readFileSync(new URL('../src/erosion/terrain-stack-pipeline.js', import.meta.url), 'utf8');
-  const uRegex = /(?:getUniformLocation|_bindTex)\(\s*this\.(\w+)\s*,\s*'(\w+)'/g;
+  const uRegex = /(?:getUniformLocation|_bindTex)\(\s*this\.(?:engine\.)?(\w+)\s*,\s*'(\w+)'/g;
   const progShaders = {
-    progLandform: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_LANDFORM_FRAG],
+    progStackOp: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_OP_FRAG],
     progSculptStamp: [Shaders.FULLSCREEN_VERT, PipelineShaders.SCULPT_STAMP_FRAG],
-    progRiver: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_RIVER_INCISION_FRAG],
-    progHydraulic: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_HYDRAULIC_FRAG],
-    progThermal: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_THERMAL_TALUS_FRAG],
-    progAeolianGlacial: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_AEOLIAN_GLACIAL_FRAG],
-    progBake: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_SURFACE_BAKE_FRAG],
-    progSyncExport: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_SYNC_EXPORT_FRAG],
-    progTerrain: [PipelineShaders.PIPELINE_TERRAIN_VERT, PipelineShaders.PIPELINE_TERRAIN_FRAG],
+    progMaskBake: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_MASK_BAKE_FRAG],
+    progMaskBlend: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_MASK_BLEND_FRAG],
+    progCopyVec: [Shaders.FULLSCREEN_VERT, PipelineShaders.STACK_COPY_VEC_FRAG],
     progCave: [PipelineShaders.SDF_CAVE_VERT, PipelineShaders.SDF_CAVE_FRAG],
+    progInitTerrain: [Shaders.FULLSCREEN_VERT, Shaders.INIT_TERRAIN_FRAG],
+    progInitParticles: [Shaders.FULLSCREEN_VERT, Shaders.INIT_PARTICLES_FRAG],
+    progSkyBg: [Shaders.FULLSCREEN_VERT, Shaders.SKY_BG_FRAG],
+    progTerrainRender: [Shaders.TERRAIN_RENDER_VERT, Shaders.TERRAIN_RENDER_FRAG],
+    progRockInstance: [Shaders.ROCK_INSTANCE_VERT, Shaders.ROCK_INSTANCE_FRAG],
+    progGrassInstance: [Shaders.GRASS_INSTANCE_VERT, Shaders.GRASS_INSTANCE_FRAG],
+    progParticleRender: [Shaders.PARTICLE_RENDER_VERT, Shaders.PARTICLE_RENDER_FRAG],
   };
 
   let m;
@@ -595,7 +593,7 @@ test('Bottom-to-top Terrain Stack Pipeline shaders, uniform bindings, and non-co
     );
     verified++;
   }
-  assert.ok(verified >= 32, `Expected >= 32 verified pipeline GPU uniform bindings, got ${verified}`);
+  assert.ok(verified >= 45, `Expected >= 45 verified pipeline GPU uniform bindings, got ${verified}`);
 
   // Verify 14 composable operations across all 5 categories, and ZERO colour/material/biome layers!
   const specKeys = Object.keys(LAYER_OPERATION_SPECS);
@@ -615,16 +613,21 @@ test('Bottom-to-top Terrain Stack Pipeline shaders, uniform bindings, and non-co
     }
     assert.ok(Array.isArray(spec.reads) && Array.isArray(spec.writes) && spec.writes.length > 0);
   }
-  assert.equal(Object.keys(DERIVED_PALETTES).length, 6, 'Derived surface palettes live separately from the layer stack');
+  assert.equal(Object.keys(DERIVED_PALETTES).length, 10, 'All 10 regional geological MATERIAL_THEMES live separately from the layer stack');
 
-  // Verify all 8 preset stack recipes build valid bottom-up stacks anchored by base-landform at bottom!
+  // Verify all 19 canonical EROSION_LANDSCAPES preset stack recipes build valid bottom-up stacks anchored by base-landform at bottom!
   const presetKeys = Object.keys(TERRAIN_STACK_PRESETS);
-  assert.equal(presetKeys.length, 8);
+  assert.equal(presetKeys.length, 19);
   for (const pk of presetKeys) {
+    const orig = EROSION_LANDSCAPES[pk];
+    assert.ok(orig, `Stack preset ${pk} must map 1:1 to canonical EROSION_LANDSCAPES`);
     const stack = TERRAIN_STACK_PRESETS[pk].layers();
-    assert.ok(stack.length >= 5, `Preset ${pk} must populate a multi-stage editable stack`);
+    assert.ok(stack.length >= 3, `Preset ${pk} must populate a multi-stage editable stack`);
     const bottomLayer = stack[stack.length - 1];
     assert.equal(bottomLayer.type, 'base-landform', `Bottom layer of ${pk} must be base-landform (evaluated first)`);
+    assert.equal(bottomLayer.params.archetype, orig.terrainType, `Preset ${pk} must use exact INIT_TERRAIN_FRAG terrainType ${orig.terrainType}`);
+    assert.equal(bottomLayer.params.seed, 4029, `Preset ${pk} must preserve default seed 4029`);
+    assert.equal(bottomLayer.params.relief, orig.defaults.relief ?? DEFAULT_EROSION_PARAMS.relief, `Preset ${pk} must preserve exact relief`);
     for (const l of stack) {
       assert.ok(l.id && l.type && l.params && typeof l.enabled === 'boolean');
     }
@@ -649,7 +652,8 @@ test('Bottom-to-top layer order genuinely changes terrain output and 3D SDF Cave
         // Add steep rock stack pillar in center
         for (let x = 13; x <= 18; x++) h[x] += layer.params.height;
       } else if (layer.type === 'hydraulic-erosion') {
-        for (let it = 0; it < layer.params.iterations; it++) {
+        const steps = layer.params.bakeSteps ?? layer.params.iterations ?? 24;
+        for (let it = 0; it < steps; it++) {
           const next = new Float32Array(h);
           for (let x = 1; x < W - 1; x++) {
             const lap = 0.5 * (h[x - 1] + h[x + 1]) - h[x];
@@ -670,7 +674,7 @@ test('Bottom-to-top layer order genuinely changes terrain output and 3D SDF Cave
 
   const base = createStackLayer('base-landform', { params: { relief: 120 } });
   const stacks = createStackLayer('rock-stacks', { params: { height: 55 } });
-  const erosion = createStackLayer('hydraulic-erosion', { params: { iterations: 24, erosionStrength: 0.8 } });
+  const erosion = createStackLayer('hydraulic-erosion', { params: { bakeSteps: 24, erosionStrength: 0.8 } });
 
   const outErodedStacks = evalStripBottomUp([erosion, stacks, base]); // bottom->top: base -> stacks -> erosion
   const outFreshStacks = evalStripBottomUp([stacks, erosion, base]);  // bottom->top: base -> erosion -> stacks
@@ -792,14 +796,24 @@ test('All Pipeline Shaders satisfy strict Windows Chrome ANGLE D3D11 HLSL rules 
   };
 
   assert.deepEqual(
-    extractVaryings(PipelineShaders.PIPELINE_TERRAIN_VERT, 'out'),
-    extractVaryings(PipelineShaders.PIPELINE_TERRAIN_FRAG, 'in'),
-    'PIPELINE_TERRAIN_VERT/FRAG varyings must match identically'
+    extractVaryings(Shaders.TERRAIN_RENDER_VERT, 'out'),
+    extractVaryings(Shaders.TERRAIN_RENDER_FRAG, 'in'),
+    'TERRAIN_RENDER_VERT/FRAG varyings must match identically'
   );
   assert.deepEqual(
     extractVaryings(PipelineShaders.SDF_CAVE_VERT, 'out'),
     extractVaryings(PipelineShaders.SDF_CAVE_FRAG, 'in'),
     'SDF_CAVE_VERT/FRAG varyings must match identically'
+  );
+  assert.equal(
+    PipelineShaders.STACK_HYDRAULIC_FRAG,
+    undefined,
+    'Non-conservative custom iterative hydraulic shader must be eliminated in favor of engine conservative passes'
+  );
+  assert.equal(
+    PipelineShaders.STACK_THERMAL_TALUS_FRAG,
+    undefined,
+    'Non-conservative custom iterative talus shader must be eliminated in favor of engine conservative passes'
   );
 });
 
@@ -901,6 +915,7 @@ test('End-to-end stateful Mock-WebGL2 + DOM boot of GpuErosionEngine, TerrainSta
       ELEMENT_ARRAY_BUFFER: 0x8893,
       STATIC_DRAW: 0x88e4,
       DYNAMIC_DRAW: 0x88e8,
+      POINTS: 0x0000,
       TRIANGLES: 0x0004,
       UNSIGNED_INT: 0x1405,
       UNSIGNED_SHORT: 0x1403,
@@ -944,6 +959,7 @@ test('End-to-end stateful Mock-WebGL2 + DOM boot of GpuErosionEngine, TerrainSta
         }
       },
       uniform1f() {},
+      uniform2f() {},
       uniform2i() {},
       uniform3fv() {},
       uniform4f() {},
@@ -1030,24 +1046,49 @@ test('End-to-end stateful Mock-WebGL2 + DOM boot of GpuErosionEngine, TerrainSta
     const ui = new ErosionLayerStackUI(engine);
 
     assert.ok(engine.pipeline, 'TerrainStackPipeline must initialize cleanly');
+    assert.equal(engine.pipeline.activePresetId, 'icelandic-highlands', 'Default preset must match c5ae88b/2cc3d34 icelandic-highlands');
+    assert.equal(engine.params.seed, 4029, 'Default seed must be 4029');
+    assert.equal(engine.pipeline.liveSimRunning, true, 'Live conservative GPU simulation must default to enabled');
     assert.ok(lastTel && lastTel.layerCount >= 7, 'Initial telemetry must publish evaluated stack');
     assert.ok(elements.get('tp-select-palette').innerHTML.includes('<option'), 'Palette select must be populated');
     assert.ok(elements.get('tp-layer-list').innerHTML.includes('tp-layer-row'), 'Layer stack list must render rows');
     assert.ok(elements.get('tp-inspector-content').innerHTML.includes('tp-property-card'), 'Inspector must render property cards');
-    assert.ok(elements.get('cb-preset-grid').innerHTML.includes('cb-preset-card'), 'Preset shelf must render 8 recipes');
+    assert.ok(elements.get('cb-preset-grid').innerHTML.includes('cb-preset-card'), 'Preset shelf must render all 19 recipes');
 
-    // Cycle through ALL 8 stack presets, add a sculpt stroke, step live sim, render 3D frame, and export mesh!
+    // Cycle through ALL 19 canonical stack presets, verifying exact generator/parameter/seed parity & zero feedback loops!
     for (const presetId of Object.keys(TERRAIN_STACK_PRESETS)) {
+      const orig = EROSION_LANDSCAPES[presetId];
+      const d = { ...DEFAULT_EROSION_PARAMS, ...(orig.defaults || {}) };
       engine.pipeline.loadPreset(presetId);
+      assert.equal(engine.params.relief, d.relief, `Preset ${presetId} relief parity`);
+      assert.equal(engine.params.roughness, d.roughness, `Preset ${presetId} roughness parity`);
+      assert.equal(engine.params.seed, 4029, `Preset ${presetId} seed parity`);
+      assert.equal(engine.params.materialTheme, orig.materialTheme ?? 0, `Preset ${presetId} materialTheme parity`);
+      assert.ok(engine.telemetry.fineSedM3 < 50_000_000, `Preset ${presetId} fineSedM3 must stay physically bounded`);
+      assert.ok(engine.telemetry.coarseSedM3 < 50_000_000, `Preset ${presetId} coarseSedM3 must stay physically bounded`);
       ui.renderAll();
       engine.renderFrame();
     }
+
+    // Exercise every composable stack operation (Ridges, Rock Stacks, Cliff Push-Pull, Spline, Caves, River, Baked Masked Sim, Sculpt)!
+    engine.pipeline.loadPreset('icelandic-highlands');
+    engine.pipeline.addLayer('mountain-ridges');
+    engine.pipeline.addLayer('rock-stacks');
+    engine.pipeline.addLayer('cliff-push-pull');
+    engine.pipeline.addLayer('spline-feature');
+    engine.pipeline.addLayer('sdf-caves');
+    const riverLyr = engine.pipeline.addLayer('river-incision', { iterations: 6 });
+    riverLyr.mask.enabled = true;
+    engine.pipeline.evaluateStack({ reseedPlacements: true });
 
     engine.pipeline.authorTool = 'sculpt-add';
     engine.pipeline.applySculptStroke(12, -18, true);
     engine.pipeline.authorTool = 'cave-carve';
     engine.pipeline.applySculptStroke(0, 0, true);
-    engine.pipeline.stepLiveSimulation();
+    engine.stepSimulation(2);
+    engine.pipeline.shadingMode = 5; // B&W Mask inspection mode
+    engine.renderFrame();
+    engine.pipeline.shadingMode = 0;
     engine.renderFrame();
 
     const exported = engine.extractMeshForExport(4);

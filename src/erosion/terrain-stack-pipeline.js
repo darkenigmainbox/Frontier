@@ -2,32 +2,34 @@
  * Non-Destructive Bottom-to-Top GPU Terrain Stack Evaluator & Renderer.
  *
  * Evaluates an ordered stack of Landform, SDF Geometry, Sculpt, Spline, Simulation,
- * Rock-Placement, and Vegetation-Placement layers from bottom (last index) to top (index 0).
+ * Rock-Placement, and Vegetation-Placement layers from bottom (last index) to top (index 0)
+ * directly on `GpuErosionEngine`'s native textures (`terrainTex`, `snowTex`, `fluxTex`,
+ * `velocityFieldTex`) using the exact `c5ae88b` / `2cc3d34` generators (`INIT_TERRAIN_FRAG`
+ * `terrainType` 0..18, `seed: 4029`), conservative simulation shaders, and `TERRAIN_RENDER`
+ * geological shading!
  */
 
+import { DEFAULT_EROSION_PARAMS, EMITTER_MODES } from './erosion-presets.js';
 import { FULLSCREEN_VERT } from './erosion-shaders.js';
 import { MAX_GRASS_TUFTS } from './grass-system.js';
 import {
-  PIPELINE_TERRAIN_FRAG,
-  PIPELINE_TERRAIN_VERT,
   SCULPT_STAMP_FRAG,
   SDF_CAVE_FRAG,
   SDF_CAVE_VERT,
-  STACK_AEOLIAN_GLACIAL_FRAG,
   STACK_COPY_VEC_FRAG,
-  STACK_HYDRAULIC_FRAG,
-  STACK_LANDFORM_FRAG,
-  STACK_RIVER_INCISION_FRAG,
-  STACK_SURFACE_BAKE_FRAG,
-  STACK_SYNC_EXPORT_FRAG,
-  STACK_THERMAL_TALUS_FRAG,
+  STACK_MASK_BAKE_FRAG,
+  STACK_MASK_BLEND_FRAG,
+  STACK_OP_FRAG,
 } from './pipeline-shaders.js';
 import { SdfCaveSystem } from './sdf-cave-mesher.js';
 import {
-  DERIVED_PALETTES,
   TERRAIN_STACK_PRESETS,
   createStackLayer,
 } from './terrain-stack-presets.js';
+
+const PART_TEX_W = 256;
+const PART_TEX_H = 128;
+const MAX_GPU_PARTICLES = PART_TEX_W * PART_TEX_H;
 
 function compile(gl, type, src, label) {
   const sh = gl.createShader(type);
@@ -103,17 +105,19 @@ export class TerrainStackPipeline {
     this.gl = engine.gl;
     this.R = engine.gridRes;
 
-    // Document state
-    this.activePresetId = 'cliff-caves-undercuts';
-    this.projectTitle = TERRAIN_STACK_PRESETS[this.activePresetId].name;
-    this.paletteId = TERRAIN_STACK_PRESETS[this.activePresetId].palette ?? 0;
-    this.shadingMode = 0; // 0=Derived Geology, 1=AO & Protrusions, 2=Hardness, 3=Drainage Flow, 4=Sedimentation, 5=Active Mask B&W, 6=Clay
+    // Document state — defaults to `icelandic-highlands` (`seed: 4029`), matching `c5ae88b` / `2cc3d34`!
+    this.activePresetId = 'icelandic-highlands';
+    const initPreset = TERRAIN_STACK_PRESETS[this.activePresetId];
+    this.projectTitle = initPreset.name;
+    this.paletteId = initPreset.palette ?? 1;
+    this.fabricMode = initPreset.fabricMode ?? 0;
+    this.shadingMode = 0; // 0=Derived Geology, 1=AO & Protrusions, 2=Hardness, 3=Flow, 4=Sedimentation, 5=Active Mask B&W, 6=Clay, 7=Cryosphere, 8=Hydrology
     this.authorTool = 'navigate'; // 'navigate' | 'sculpt-add' | 'sculpt-remove' | 'sculpt-smooth' | 'cave-carve' | 'cave-fill' | 'spline-edit'
     this.layers = [];
     this.selectedLayerId = null;
-    this.maskPreviewLayerId = null;
     this.lastEvalMs = 0;
-    this.liveSimRunning = false;
+    this.liveSimRunning = true; // Live conservative GPU simulation ON by default!
+    this.hasActiveVecDisp = false;
 
     // Per-sculpt-layer GPU delta textures: layerId -> { tex: [t0, t1], fbo: [f0, f1], idx: 0, caveStrokes: [] }
     this.sculptStore = new Map();
@@ -129,51 +133,43 @@ export class TerrainStackPipeline {
     const gl = this.gl;
     const R = this.R;
 
-    this.progLandform = link(gl, FULLSCREEN_VERT, STACK_LANDFORM_FRAG, 'StackLandform');
+    this.progStackOp = link(gl, FULLSCREEN_VERT, STACK_OP_FRAG, 'StackOp');
     this.progSculptStamp = link(gl, FULLSCREEN_VERT, SCULPT_STAMP_FRAG, 'SculptStamp');
-    this.progRiver = link(gl, FULLSCREEN_VERT, STACK_RIVER_INCISION_FRAG, 'StackRiver');
-    this.progHydraulic = link(gl, FULLSCREEN_VERT, STACK_HYDRAULIC_FRAG, 'StackHydraulic');
-    this.progThermal = link(gl, FULLSCREEN_VERT, STACK_THERMAL_TALUS_FRAG, 'StackThermal');
-    this.progAeolianGlacial = link(gl, FULLSCREEN_VERT, STACK_AEOLIAN_GLACIAL_FRAG, 'StackAeolianGlacial');
-    this.progBake = link(gl, FULLSCREEN_VERT, STACK_SURFACE_BAKE_FRAG, 'StackSurfaceBake');
-    this.progSyncExport = link(gl, FULLSCREEN_VERT, STACK_SYNC_EXPORT_FRAG, 'StackSyncExport');
+    this.progMaskBake = link(gl, FULLSCREEN_VERT, STACK_MASK_BAKE_FRAG, 'StackMaskBake');
+    this.progMaskBlend = link(gl, FULLSCREEN_VERT, STACK_MASK_BLEND_FRAG, 'StackMaskBlend');
     this.progCopyVec = link(gl, FULLSCREEN_VERT, STACK_COPY_VEC_FRAG, 'StackCopyVec');
-    this.progTerrain = link(gl, PIPELINE_TERRAIN_VERT, PIPELINE_TERRAIN_FRAG, 'PipelineTerrain');
     this.progCave = link(gl, SDF_CAVE_VERT, SDF_CAVE_FRAG, 'SdfCave');
 
-    // Working Terrain Data ping-pong textures
-    this.stateTex = [makeFloatTex(gl, R, R, false), makeFloatTex(gl, R, R, false)];
-    this.geoTex = [makeFloatTex(gl, R, R, false), makeFloatTex(gl, R, R, false)];
+    // 3D Lateral Overhang Vector Displacement ping-pong textures + scratch textures
     this.vecDispTex = [makeFloatTex(gl, R, R, false), makeFloatTex(gl, R, R, false)];
-    this.bakedTex = makeFloatTex(gl, R, R, false);
+    this.vecIdx = 0;
+    this.maskTex = makeFloatTex(gl, R, R, false);
+    this.prevTerrainScratchTex = makeFloatTex(gl, R, R, false);
     this.emptySculptTex = makeFloatTex(gl, R, R, false);
 
-    // 3-target MRT FBOs for Landform passes + 2-target MRT FBOs for Simulation passes
-    this.fboLandform = [
-      makeFbo(gl, [this.stateTex[0], this.geoTex[0], this.vecDispTex[0]]),
-      makeFbo(gl, [this.stateTex[1], this.geoTex[1], this.vecDispTex[1]]),
+    // 2-target MRT FBOs writing directly to `(engine.terrainTex[i], this.vecDispTex[i])`!
+    this.fboStackOp = [
+      makeFbo(gl, [this.engine.terrainTex[0], this.vecDispTex[0]]),
+      makeFbo(gl, [this.engine.terrainTex[1], this.vecDispTex[1]]),
     ];
-    this.fboSim = [
-      makeFbo(gl, [this.stateTex[0], this.geoTex[0]]),
-      makeFbo(gl, [this.stateTex[1], this.geoTex[1]]),
-    ];
-    this.fboStateRead = [makeFbo(gl, [this.stateTex[0]]), makeFbo(gl, [this.stateTex[1]])];
-    this.fboGeoRead = [makeFbo(gl, [this.geoTex[0]]), makeFbo(gl, [this.geoTex[1]])];
     this.fboVecOnly = [makeFbo(gl, [this.vecDispTex[0]]), makeFbo(gl, [this.vecDispTex[1]])];
-    this.fboSyncEngine = makeFbo(gl, [this.engine.terrainTex[0], this.engine.snowTex[0]]);
-    this.fboBaked = makeFbo(gl, [this.bakedTex]);
-    this.curIdx = 0;
-    this.vecIdx = 0;
+    this.fboMask = makeFbo(gl, [this.maskTex]);
+    this.fboPrevScratch = makeFbo(gl, [this.prevTerrainScratchTex]);
 
-    // Downsampled 64x64 readback FBO for fast <0.5ms CPU snapshot (for SDF caves & rock placement)
+    // Clear emptySculptTex & vecDispTex once
+    for (const f of [this.fboVecOnly[0], this.fboVecOnly[1], makeFbo(gl, [this.emptySculptTex])]) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    // Downsampled 64x64 readback buffer
     this.snapN = 64;
-    this.snapTex = makeFloatTex(gl, this.snapN, this.snapN, false);
-    this.fboSnap = makeFbo(gl, [this.snapTex]);
     this.snapBuf = new Float32Array(this.snapN * this.snapN * 4);
-    this.rockSnapBuf = new Float32Array(this.snapN * this.snapN * 4);
     this.lastViewProj = null;
 
-    // 128x128 Cave Portal Cutout Texture (OES_texture_float_linear if supported, else NEAREST)
+    // 128x128 Cave Portal Cutout Texture
     const P = this.caveSystem.portalMaskSize;
     this.cavePortalTex = makeFloatTex(gl, P, P, false);
 
@@ -202,6 +198,16 @@ export class TerrainStackPipeline {
     gl.activeTexture(gl.TEXTURE0 + unit);
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.uniform1i(gl.getUniformLocation(prog, name), unit);
+  }
+
+  _copyTex(srcTex, dstFbo, w = this.R, h = this.R) {
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dstFbo);
+    gl.viewport(0, 0, w, h);
+    gl.useProgram(this.progCopyVec);
+    gl.bindVertexArray(this.engine.emptyVao);
+    this._bindTex(this.progCopyVec, 'uSrcTex', srcTex, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
   _getOrCreateSculptEntry(layerId) {
@@ -241,14 +247,25 @@ export class TerrainStackPipeline {
   }
 
   loadPreset(presetId) {
-    const preset = TERRAIN_STACK_PRESETS[presetId] || TERRAIN_STACK_PRESETS['cliff-caves-undercuts'];
+    const preset = TERRAIN_STACK_PRESETS[presetId] || TERRAIN_STACK_PRESETS['icelandic-highlands'];
     this.activePresetId = preset.id;
     this.projectTitle = preset.name;
     this.paletteId = preset.palette ?? 0;
+    this.fabricMode = preset.fabricMode ?? 0;
 
-    const pal = DERIVED_PALETTES[this.paletteId] || DERIVED_PALETTES[0];
-    this.engine.params.sunAzimuth = pal.sunAz;
-    this.engine.params.sunElevation = pal.sunEl;
+    // Apply preset's non-layer visual & emitter configuration cleanly
+    const ep = this.engine.params;
+    ep.landscape = preset.id;
+    ep.materialTheme = this.paletteId;
+    ep.fabricMode = this.fabricMode;
+    ep.emitterMode = preset.emitterMode ?? DEFAULT_EROSION_PARAMS.emitterMode;
+    ep.particleCount = preset.particleCount ?? DEFAULT_EROSION_PARAMS.particleCount;
+    ep.particleInertia = preset.particleInertia ?? DEFAULT_EROSION_PARAMS.particleInertia;
+    ep.pipeFlowBlend = preset.pipeFlowBlend ?? DEFAULT_EROSION_PARAMS.pipeFlowBlend;
+    ep.sunAzimuth = preset.sunAzimuth ?? DEFAULT_EROSION_PARAMS.sunAzimuth;
+    ep.sunElevation = preset.sunElevation ?? DEFAULT_EROSION_PARAMS.sunElevation;
+    ep.showWater = preset.showWater ?? true;
+    ep.showParticles = preset.showParticles ?? true;
 
     // Clear old sculpt buffers and populate fresh editable stack layers
     for (const [, entry] of this.sculptStore) {
@@ -258,13 +275,14 @@ export class TerrainStackPipeline {
     this.sculptStore.clear();
 
     this.layers = preset.layers();
+    // Select Base Landform or top meaningful layer
     this.selectedLayerId = this.layers[0]?.id || null;
     this.evaluateStack({ reseedPlacements: true });
+    this.engine.camera.target[1] = (ep.relief || 168) * 0.30;
   }
 
   addLayer(type, overrides = {}) {
     const newLayer = createStackLayer(type, overrides);
-    // Insert right above the currently selected layer (or at top of its natural stage)
     const selIdx = this.layers.findIndex((l) => l.id === this.selectedLayerId);
     const insertAt = selIdx >= 0 ? selIdx : 0;
     this.layers.splice(insertAt, 0, newLayer);
@@ -341,16 +359,13 @@ export class TerrainStackPipeline {
     for (let i = this.layers.length - 1; i >= 0; i--) {
       const l = this.layers[i];
       if (!l.enabled) continue;
-      if (l.type === 'base-landform') r = Math.max(60, l.params.relief || 150);
+      if (l.type === 'base-landform') r = Math.max(55, l.params.relief || 150);
       else if (l.type === 'mountain-ridges' && l.params.combineMode === 0) r += (l.params.amplitude || 40) * 0.55;
       else if (l.type === 'rock-stacks') r += (l.params.height || 40) * 0.5;
     }
     return Math.min(280, r);
   }
 
-  /**
-   * Stamps a brush stroke into the active (or auto-created) `sculpt-layer`!
-   */
   applySculptStroke(worldX, worldZ, isFirstSampleOfStroke = false) {
     let target = this.getSelectedLayer();
     if (!target || target.type !== 'sculpt-layer') {
@@ -367,7 +382,6 @@ export class TerrainStackPipeline {
     const strength = target.params.brushStrength ?? 0.72;
 
     if (tool === 'cave-carve' || tool === 'cave-fill') {
-      // Sample current surface height at (worldX, worldZ) from CPU snapshot
       const st = this.engine.rockCalving.sampleTerrain(worldX, worldZ);
       const centerY = Math.max(4, st.surfaceH - (target.params.caveHeightOffset ?? 8.0));
       const last = entry.caveStrokes[entry.caveStrokes.length - 1];
@@ -386,7 +400,6 @@ export class TerrainStackPipeline {
       return;
     }
 
-    // Height / Smooth SDF Sculpt Stamp on GPU
     const gl = this.gl;
     const R = this.R;
     const next = 1 - entry.idx;
@@ -423,248 +436,412 @@ export class TerrainStackPipeline {
     this.evaluateStack({ reseedPlacements: false });
   }
 
+  _runStackOpPass(opKind, layer, u0, u1, u2, maxRelief) {
+    const gl = this.gl;
+    const R = this.R;
+    const span = this.engine.params.worldSpan;
+    const curT = this.engine.terrainIdx;
+    const nextT = 1 - curT;
+
+    if (this.vecIdx === nextT) {
+      this._copyTex(this.vecDispTex[this.vecIdx], this.fboVecOnly[curT]);
+      this.vecIdx = curT;
+    }
+
+    const { cfg1, cfg2 } = this._packMaskUniforms(layer.mask);
+    let sculptTex = this.emptySculptTex;
+    if (layer.type === 'sculpt-layer') {
+      const entry = this._getOrCreateSculptEntry(layer.id);
+      sculptTex = entry.tex[entry.idx];
+    }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboStackOp[nextT]);
+    gl.viewport(0, 0, R, R);
+    gl.useProgram(this.progStackOp);
+    gl.bindVertexArray(this.engine.emptyVao);
+    this._bindTex(this.progStackOp, 'uTerrainTex', this.engine.terrainTex[curT], 0);
+    this._bindTex(this.progStackOp, 'uVecDispTex', this.vecDispTex[this.vecIdx], 1);
+    this._bindTex(this.progStackOp, 'uSculptTex', sculptTex, 2);
+    this._bindTex(this.progStackOp, 'uVelocityFieldTex', this.engine.velocityFieldTex, 3);
+
+    gl.uniform4f(gl.getUniformLocation(this.progStackOp, 'uDomain'), span, R, maxRelief, opKind);
+    gl.uniform4fv(gl.getUniformLocation(this.progStackOp, 'uParam0'), u0);
+    gl.uniform4fv(gl.getUniformLocation(this.progStackOp, 'uParam1'), u1);
+    gl.uniform4fv(gl.getUniformLocation(this.progStackOp, 'uParam2'), u2);
+    gl.uniform4fv(gl.getUniformLocation(this.progStackOp, 'uMaskCfg1'), cfg1);
+    gl.uniform4fv(gl.getUniformLocation(this.progStackOp, 'uMaskCfg2'), cfg2);
+
+    if (opKind === 6) {
+      const pts = Array.isArray(layer.params.points) ? layer.params.points : [];
+      const count = Math.min(8, pts.length);
+      const flat = new Float32Array(16);
+      for (let k = 0; k < count; k++) {
+        flat[k * 2 + 0] = pts[k][0];
+        flat[k * 2 + 1] = pts[k][1];
+      }
+      gl.uniform4fv(gl.getUniformLocation(this.progStackOp, 'uSplinePts'), flat);
+      gl.uniform1i(gl.getUniformLocation(this.progStackOp, 'uSplineCount'), count);
+    }
+
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    this.engine.terrainIdx = nextT;
+    this.vecIdx = nextT;
+  }
+
+  _bakeMaskTexture(mask, maxRelief) {
+    const gl = this.gl;
+    const R = this.R;
+    const span = this.engine.params.worldSpan;
+    const { cfg1, cfg2 } = this._packMaskUniforms(mask);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboMask);
+    gl.viewport(0, 0, R, R);
+    gl.useProgram(this.progMaskBake);
+    gl.bindVertexArray(this.engine.emptyVao);
+    this._bindTex(this.progMaskBake, 'uTerrainTex', this.engine.terrainTex[this.engine.terrainIdx], 0);
+    this._bindTex(this.progMaskBake, 'uVelocityFieldTex', this.engine.velocityFieldTex, 1);
+    gl.uniform4f(gl.getUniformLocation(this.progMaskBake, 'uBakeDomain'), span, R, maxRelief, 0);
+    gl.uniform4fv(gl.getUniformLocation(this.progMaskBake, 'uMaskCfg1'), cfg1);
+    gl.uniform4fv(gl.getUniformLocation(this.progMaskBake, 'uMaskCfg2'), cfg2);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  _runMaskedSimulation(layer, maxRelief, runFn) {
+    const hasMask = Boolean(layer.mask && layer.mask.enabled);
+    if (hasMask) {
+      this._copyTex(this.engine.terrainTex[this.engine.terrainIdx], this.fboPrevScratch);
+      this._bakeMaskTexture(layer.mask, maxRelief);
+    }
+
+    runFn();
+
+    if (hasMask) {
+      const gl = this.gl;
+      const curT = this.engine.terrainIdx;
+      const nextT = 1 - curT;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.engine.fboTerrainSingle[nextT]);
+      gl.viewport(0, 0, this.R, this.R);
+      gl.useProgram(this.progMaskBlend);
+      gl.bindVertexArray(this.engine.emptyVao);
+      this._bindTex(this.progMaskBlend, 'uPrevTex', this.prevTerrainScratchTex, 0);
+      this._bindTex(this.progMaskBlend, 'uNextTex', this.engine.terrainTex[curT], 1);
+      this._bindTex(this.progMaskBlend, 'uMaskTex', this.maskTex, 2);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      this.engine.terrainIdx = nextT;
+    }
+  }
+
   /**
    * FULL BOTTOM-TO-TOP PIPELINE EVALUATION!
    * Iterates from `layers.length - 1` (bottom) up to `0` (top), executing each enabled
-   * Landform, Sculpt, Spline, and Simulation operation in exact stack order.
+   * Landform, Sculpt, Spline, Cave, Simulation, Rock-Placement, and Grass-Placement stage!
    */
   evaluateStack({ reseedPlacements = true, fastPreview = false } = {}) {
     const t0 = performance.now();
     const gl = this.gl;
     const R = this.R;
-    const span = this.engine.params.worldSpan;
+    const ep = this.engine.params;
+    const span = ep.worldSpan;
     const maxRelief = this._maxReliefEstimate();
+
+    ep.materialTheme = this.paletteId;
+    ep.fabricMode = this.fabricMode;
+
+    // Reset per-layer active simulation & placement flags before bottom-up walk
+    ep.simHydraulicPlaying = false;
+    ep.simCryoPlaying = false;
+    ep.simWindPlaying = false;
+    ep.simRockfallPlaying = false;
+    ep.strataLayerEnabled = false;
+    ep.snowLayerEnabled = false;
+    ep.showOutcrops = false;
+    ep.grassEnabled = false;
+    ep.rainIntensity = 0.0;
+    ep.headwaterFlow = 0.0;
+    ep.oasisSpring = false;
+    ep.snowfallRate = 0.0;
+    ep.glacierStrength = 0.0;
+    ep.windSpeed = 0.0;
+    ep.dryAeolianMode = 0.0;
 
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
     gl.disable(gl.CULL_FACE);
     gl.bindVertexArray(this.engine.emptyVao);
-    gl.viewport(0, 0, R, R);
 
-    // 1. Initialize empty working terrain state at bottom of stack
-    this.curIdx = 0;
+    // 1. Clear working buffers at bottom of stack
+    this.engine.terrainIdx = 0;
+    this.engine.snowIdx = 0;
+    this.engine.fluxIdx = 0;
     this.vecIdx = 0;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboLandform[0]);
-    gl.clearBufferfv(gl.COLOR, 0, new Float32Array([14.0, 0.0, 0.0, 0.0])); // bedrock=14m
-    gl.clearBufferfv(gl.COLOR, 1, new Float32Array([0.52, 0.0, 0.0, 0.0])); // hardness=0.52
-    gl.clearBufferfv(gl.COLOR, 2, new Float32Array([0.0, 0.0, 0.0, 0.0]));  // 3D vecDisp=0
+    this.hasActiveVecDisp = false;
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboStackOp[0]);
+    gl.viewport(0, 0, R, R);
+    gl.clearBufferfv(gl.COLOR, 0, new Float32Array([8.0, 0.0, 0.0, 0.0]));
+    gl.clearBufferfv(gl.COLOR, 1, new Float32Array([0.0, 0.0, 0.0, 0.0]));
+
+    for (let i = 0; i < 2; i++) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.engine.fboFlux[i]);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.engine.fboSnowClear[i]);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+
+    // Determine bottom seed early so particle cloud initializes deterministically
+    const baseLayer = [...this.layers].reverse().find((l) => l.type === 'base-landform' && l.enabled);
+    if (baseLayer) {
+      ep.seed = baseLayer.params.seed ?? DEFAULT_EROSION_PARAMS.seed;
+      ep.relief = baseLayer.params.relief ?? DEFAULT_EROSION_PARAMS.relief;
+      ep.roughness = baseLayer.params.roughness ?? DEFAULT_EROSION_PARAMS.roughness;
+    }
+
+    const emitter = EMITTER_MODES[ep.emitterMode] || EMITTER_MODES['sky-rain'];
+    gl.viewport(0, 0, PART_TEX_W, PART_TEX_H);
+    gl.useProgram(this.engine.progInitParticles);
+    gl.uniform4f(
+      gl.getUniformLocation(this.engine.progInitParticles, 'uSpawnBox'),
+      span,
+      ep.cloudHeight,
+      ep.seed,
+      emitter.code
+    );
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.engine.fboInitParticles[0]);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    this.engine.partIdx = 0;
+    this.engine.stepCount = 0;
 
     const activeCaveLayers = [];
     const activeSculptCaveStrokes = [];
+    let activeRockLayer = null;
 
-    // 2. Evaluate BOTTOM -> TOP (`i = layers.length - 1` down to `0`)!
+    // 2. Walk strictly BOTTOM -> TOP (`i = layers.length - 1` down to `0`)!
     for (let i = this.layers.length - 1; i >= 0; i--) {
       const layer = this.layers[i];
       if (!layer.enabled) continue;
       const p = layer.params;
-      const { cfg1, cfg2 } = this._packMaskUniforms(layer.mask);
 
-      if (
-        layer.type === 'base-landform' ||
-        layer.type === 'mountain-ridges' ||
-        layer.type === 'stratigraphic-beds' ||
-        layer.type === 'rock-stacks' ||
-        layer.type === 'cliff-push-pull' ||
-        layer.type === 'sculpt-layer' ||
-        layer.type === 'spline-feature'
-      ) {
-        const next = 1 - this.curIdx;
-        if (this.vecIdx === next) {
-          this._copyVecDisp(this.vecIdx, this.curIdx);
-          this.vecIdx = this.curIdx;
-        }
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboLandform[next]);
-        gl.useProgram(this.progLandform);
-        this._bindTex(this.progLandform, 'uStateTex', this.stateTex[this.curIdx], 0);
-        this._bindTex(this.progLandform, 'uGeoTex', this.geoTex[this.curIdx], 1);
-        this._bindTex(this.progLandform, 'uVecDispTex', this.vecDispTex[this.vecIdx], 2);
+      if (layer.type === 'base-landform') {
+        ep.relief = p.relief ?? DEFAULT_EROSION_PARAMS.relief;
+        ep.roughness = p.roughness ?? DEFAULT_EROSION_PARAMS.roughness;
+        ep.seed = p.seed ?? DEFAULT_EROSION_PARAMS.seed;
 
-        let sculptTex = this.emptySculptTex;
-        if (layer.type === 'sculpt-layer') {
-          const entry = this._getOrCreateSculptEntry(layer.id);
-          sculptTex = entry.tex[entry.idx];
-          for (const cs of entry.caveStrokes) activeSculptCaveStrokes.push(cs);
-        }
-        this._bindTex(this.progLandform, 'uSculptTex', sculptTex, 3);
-
-        gl.uniform4fv(gl.getUniformLocation(this.progLandform, 'uMaskCfg1'), cfg1);
-        gl.uniform4fv(gl.getUniformLocation(this.progLandform, 'uMaskCfg2'), cfg2);
-
-        let opKind = 0;
-        let u0 = [0, 0, 0, 0], u1 = [0, 0, 0, 0], u2 = [0, 0, 0, 0];
-
-        if (layer.type === 'base-landform') {
-          opKind = 0;
-          u0 = [p.archetype ?? 0, p.relief ?? 155, p.scale ?? 1.85, p.roughness ?? 0.62];
-          u1 = [p.ridgeSharpness ?? 0.68, p.warpStrength ?? 0.45, p.valleyFloor ?? 0.22, p.baseHardness ?? 0.54];
-          u2 = [p.seed ?? 4029, 0, 0, 0];
-        } else if (layer.type === 'mountain-ridges') {
-          opKind = 1;
-          u0 = [p.generator ?? 0, p.combineMode ?? 0, p.amplitude ?? 62, p.scale ?? 2.2];
-          u1 = [p.sharpness ?? 0.64, p.azimuth ?? 28, p.opacity ?? 1.0, p.hardnessDelta ?? 0.15];
-          u2 = [p.seed ?? 7104, 0, 0, 0];
-        } else if (layer.type === 'stratigraphic-beds') {
-          opKind = 2;
-          u0 = [p.bedCount ?? 9, p.terraceStrength ?? 0.58, p.hardSoftContrast ?? 0.78, p.dipAngle ?? 11];
-          u1 = [p.strikeAzimuth ?? 24, p.bedFoldWarp ?? 0.28, p.ledgeOverhang ?? 0.35, p.opacity ?? 1.0];
-          u2 = [p.seed ?? 3190, 0, 0, 0];
-        } else if (layer.type === 'rock-stacks') {
-          opKind = 3;
-          u0 = [p.height ?? 54, p.spacing ?? 68, p.radius ?? 16, p.taper ?? 0.42];
-          u1 = [p.tiers ?? 5, p.lean ?? 0.30, p.leanAzimuth ?? 35, p.caprockOverhang ?? 0.48];
-          u2 = [p.opacity ?? 1.0, p.seed ?? 8821, 0, 0];
-        } else if (layer.type === 'cliff-push-pull') {
-          opKind = 4;
-          u0 = [p.displacement ?? 11.5, p.featureScale ?? 2.6, p.slopeThreshold ?? 28, p.ledgeStrength ?? 0.62];
-          u1 = [p.overhangBias ?? 0.55, p.verticalCrease ?? 0.58, p.opacity ?? 1.0, p.seed ?? 5512];
-        } else if (layer.type === 'sculpt-layer') {
-          opKind = 5;
-          u0 = [p.opacity ?? 1.0, 0, 0, 0];
-        } else if (layer.type === 'spline-feature') {
-          opKind = 6;
-          u0 = [p.mode ?? 0, p.width ?? 44, p.depth ?? 48, p.wallSteepness ?? 0.74];
-          u1 = [p.meanderAmp ?? 0.32, p.waterFill ?? 0.28, p.bankFalloff ?? 0.55, p.opacity ?? 1.0];
-          const pts = Array.isArray(p.points) ? p.points : [];
-          const count = Math.min(8, pts.length);
-          const flat = new Float32Array(16);
-          for (let k = 0; k < count; k++) {
-            flat[k * 2 + 0] = pts[k][0];
-            flat[k * 2 + 1] = pts[k][1];
-          }
-          gl.uniform4fv(gl.getUniformLocation(this.progLandform, 'uSplinePts'), flat);
-          gl.uniform1i(gl.getUniformLocation(this.progLandform, 'uSplineCount'), count);
-        }
-
-        gl.uniform4f(gl.getUniformLocation(this.progLandform, 'uDomain'), span, R, maxRelief, opKind);
-        gl.uniform4fv(gl.getUniformLocation(this.progLandform, 'uParam0'), u0);
-        gl.uniform4fv(gl.getUniformLocation(this.progLandform, 'uParam1'), u1);
-        gl.uniform4fv(gl.getUniformLocation(this.progLandform, 'uParam2'), u2);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.engine.fboTerrainSingle[this.engine.terrainIdx]);
+        gl.viewport(0, 0, R, R);
+        gl.useProgram(this.engine.progInitTerrain);
+        gl.bindVertexArray(this.engine.emptyVao);
+        gl.uniform4f(
+          gl.getUniformLocation(this.engine.progInitTerrain, 'uInitParams'),
+          ep.relief,
+          ep.roughness,
+          p.archetype ?? 6,
+          ep.seed
+        );
+        gl.uniform1f(gl.getUniformLocation(this.engine.progInitTerrain, 'uWorldSpan'), span);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
-        this.curIdx = next;
-        this.vecIdx = next;
+      } else if (layer.type === 'stratigraphic-beds') {
+        ep.strataLayerEnabled = true;
+        ep.rockHardness = p.rockHardness ?? DEFAULT_EROSION_PARAMS.rockHardness;
+        ep.strataStrength = (p.strataStrength ?? DEFAULT_EROSION_PARAMS.strataStrength) * (p.opacity ?? 1.0);
+        ep.strataFreq = p.strataFreq ?? DEFAULT_EROSION_PARAMS.strataFreq;
+        ep.strataDip = p.strataDip ?? DEFAULT_EROSION_PARAMS.strataDip;
+        ep.strataStrike = p.strataStrike ?? DEFAULT_EROSION_PARAMS.strataStrike;
+        ep.faultWeakness = p.faultWeakness ?? DEFAULT_EROSION_PARAMS.faultWeakness;
+
+        const terrace = p.terraceCarve ?? 0.0;
+        const overhang = p.ledgeOverhang ?? 0.0;
+        if (terrace > 0.001 || overhang > 0.001) {
+          if (overhang > 0.005) this.hasActiveVecDisp = true;
+          this._runStackOpPass(
+            2,
+            layer,
+            [ep.strataFreq, terrace, ep.strataStrength, ep.strataDip],
+            [ep.strataStrike, 0.25, overhang, p.opacity ?? 1.0],
+            [p.seed ?? ep.seed, 0, 0, 0],
+            maxRelief
+          );
+        }
+      } else if (layer.type === 'mountain-ridges') {
+        this._runStackOpPass(
+          1,
+          layer,
+          [p.generator ?? 0, p.combineMode ?? 0, p.amplitude ?? 48, p.scale ?? 2.2],
+          [p.sharpness ?? 0.60, p.azimuth ?? 28, p.opacity ?? 1.0, 0],
+          [p.seed ?? ep.seed, 0, 0, 0],
+          maxRelief
+        );
+      } else if (layer.type === 'rock-stacks') {
+        if ((p.caprockOverhang ?? 0.45) > 0.005 || (p.lean ?? 0.28) > 0.005) {
+          this.hasActiveVecDisp = true;
+        }
+        this._runStackOpPass(
+          3,
+          layer,
+          [p.height ?? 48, p.spacing ?? 68, p.radius ?? 15, p.taper ?? 0.42],
+          [p.tiers ?? 5, p.lean ?? 0.28, p.leanAzimuth ?? 35, p.caprockOverhang ?? 0.45],
+          [p.opacity ?? 1.0, p.seed ?? ep.seed, 0, 0],
+          maxRelief
+        );
+      } else if (layer.type === 'cliff-push-pull') {
+        if ((p.displacement ?? 10.5) > 0.01) {
+          this.hasActiveVecDisp = true;
+        }
+        this._runStackOpPass(
+          4,
+          layer,
+          [p.displacement ?? 10.5, p.featureScale ?? 2.6, p.slopeThreshold ?? 28, p.ledgeStrength ?? 0.62],
+          [p.overhangBias ?? 0.52, p.verticalCrease ?? 0.58, p.opacity ?? 1.0, p.seed ?? ep.seed],
+          [0, 0, 0, 0],
+          maxRelief
+        );
+      } else if (layer.type === 'sculpt-layer') {
+        const entry = this.sculptStore.get(layer.id);
+        if (entry) {
+          for (const cs of entry.caveStrokes) activeSculptCaveStrokes.push(cs);
+          if ((p.strokeCount ?? 0) > 0) {
+            this._runStackOpPass(5, layer, [p.opacity ?? 1.0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], maxRelief);
+          }
+        }
+      } else if (layer.type === 'spline-feature') {
+        this._runStackOpPass(
+          6,
+          layer,
+          [p.mode ?? 0, p.width ?? 44, p.depth ?? 48, p.wallSteepness ?? 0.74],
+          [p.meanderAmp ?? 0.32, p.waterFill ?? 0.28, p.bankFalloff ?? 0.55, p.opacity ?? 1.0],
+          [0, 0, 0, 0],
+          maxRelief
+        );
       } else if (layer.type === 'sdf-caves') {
         activeCaveLayers.push(layer);
       } else if (layer.type === 'river-incision') {
-        const iters = Math.max(1, Math.min(80, Math.round((p.iterations ?? 28) * (fastPreview ? 0.5 : 1.0))));
-        gl.useProgram(this.progRiver);
-        gl.uniform4f(
-          gl.getUniformLocation(this.progRiver, 'uSimParams'),
-          R, span, p.incisionStrength ?? 0.68, p.headwaterRain ?? 0.58
-        );
-        for (let it = 0; it < iters; it++) {
-          const next = 1 - this.curIdx;
-          gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSim[next]);
-          this._bindTex(this.progRiver, 'uStateTex', this.stateTex[this.curIdx], 0);
-          this._bindTex(this.progRiver, 'uGeoTex', this.geoTex[this.curIdx], 1);
-          gl.uniform4f(
-            gl.getUniformLocation(this.progRiver, 'uSimExtra'),
-            p.basinPooling ?? 0.42, p.hardnessRespect ?? 0.80, p.channelWidth ?? 0.45, it
-          );
-          gl.drawArrays(gl.TRIANGLES, 0, 3);
-          this.curIdx = next;
-        }
+        const steps = Math.max(1, Math.min(80, Math.round((p.iterations ?? 20) * (fastPreview ? 0.5 : 1.0))));
+        this._runMaskedSimulation(layer, maxRelief, () => {
+          const prevFlags = {
+            h: ep.simHydraulicPlaying,
+            c: ep.simCryoPlaying,
+            w: ep.simWindPlaying,
+            r: ep.simRockfallPlaying,
+            rain: ep.rainIntensity,
+            erod: ep.erosionStrength,
+            hw: ep.headwaterFlow,
+            lake: ep.lakeRetention,
+          };
+          ep.simHydraulicPlaying = true;
+          ep.simCryoPlaying = false;
+          ep.simWindPlaying = false;
+          ep.simRockfallPlaying = false;
+          ep.rainIntensity = p.headwaterRain ?? 0.68;
+          ep.erosionStrength = p.incisionStrength ?? 0.85;
+          ep.headwaterFlow = Math.max(ep.headwaterFlow, (p.headwaterRain ?? 0.68) * 0.65);
+          ep.lakeRetention = p.basinPooling ?? 0.45;
+          this.engine.stepSimulation(steps, { skipTelemetry: true });
+          ep.simHydraulicPlaying = prevFlags.h;
+          ep.simCryoPlaying = prevFlags.c;
+          ep.simWindPlaying = prevFlags.w;
+          ep.simRockfallPlaying = prevFlags.r;
+          ep.rainIntensity = prevFlags.rain;
+          ep.erosionStrength = prevFlags.erod;
+          ep.headwaterFlow = prevFlags.hw;
+          ep.lakeRetention = prevFlags.lake;
+        });
       } else if (layer.type === 'hydraulic-erosion') {
-        const iters = Math.max(1, Math.min(120, Math.round((p.iterations ?? 52) * (fastPreview ? 0.45 : 1.0))));
-        gl.useProgram(this.progHydraulic);
-        gl.uniform4f(
-          gl.getUniformLocation(this.progHydraulic, 'uHydParams'),
-          R, span, p.erosionStrength ?? 0.74, p.sedimentCapacity ?? 0.82
-        );
-        for (let it = 0; it < iters; it++) {
-          const next = 1 - this.curIdx;
-          gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSim[next]);
-          this._bindTex(this.progHydraulic, 'uStateTex', this.stateTex[this.curIdx], 0);
-          this._bindTex(this.progHydraulic, 'uGeoTex', this.geoTex[this.curIdx], 1);
-          gl.uniform4f(
-            gl.getUniformLocation(this.progHydraulic, 'uHydExtra'),
-            p.depositionRate ?? 0.58, p.rainRate ?? 0.65, p.evaporation ?? 0.16, it
-          );
-          gl.drawArrays(gl.TRIANGLES, 0, 3);
-          this.curIdx = next;
+        ep.rainIntensity = p.rainIntensity ?? DEFAULT_EROSION_PARAMS.rainIntensity;
+        ep.erosionStrength = p.erosionStrength ?? DEFAULT_EROSION_PARAMS.erosionStrength;
+        ep.sedimentCapacity = p.sedimentCapacity ?? DEFAULT_EROSION_PARAMS.sedimentCapacity;
+        ep.depositionRate = p.depositionRate ?? DEFAULT_EROSION_PARAMS.depositionRate;
+        ep.evaporation = p.evaporation ?? DEFAULT_EROSION_PARAMS.evaporation;
+        ep.headwaterFlow = p.headwaterFlow ?? 0;
+        ep.lakeRetention = p.lakeRetention ?? 0.4;
+        ep.oasisSpring = Boolean(p.oasisSpring);
+        ep.simHydraulicPlaying = true;
+
+        const bakeSteps = Math.max(0, Math.min(120, Math.round((p.bakeSteps ?? 0) * (fastPreview ? 0.5 : 1.0))));
+        if (bakeSteps > 0) {
+          this._runMaskedSimulation(layer, maxRelief, () => {
+            const prevC = ep.simCryoPlaying, prevW = ep.simWindPlaying, prevR = ep.simRockfallPlaying;
+            ep.simCryoPlaying = false;
+            ep.simWindPlaying = false;
+            ep.simRockfallPlaying = false;
+            this.engine.stepSimulation(bakeSteps, { skipTelemetry: true });
+            ep.simCryoPlaying = prevC;
+            ep.simWindPlaying = prevW;
+            ep.simRockfallPlaying = prevR;
+          });
         }
       } else if (layer.type === 'thermal-talus') {
-        const iters = Math.max(1, Math.min(90, Math.round((p.iterations ?? 34) * (fastPreview ? 0.5 : 1.0))));
-        gl.useProgram(this.progThermal);
-        gl.uniform4f(
-          gl.getUniformLocation(this.progThermal, 'uTalusCfg'),
-          R, span, p.reposeAngle ?? 33, p.spallingRate ?? 0.66
-        );
-        for (let it = 0; it < iters; it++) {
-          const next = 1 - this.curIdx;
-          gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSim[next]);
-          this._bindTex(this.progThermal, 'uStateTex', this.stateTex[this.curIdx], 0);
-          this._bindTex(this.progThermal, 'uGeoTex', this.geoTex[this.curIdx], 1);
-          gl.uniform4f(
-            gl.getUniformLocation(this.progThermal, 'uTalusExt'),
-            p.talusSpread ?? 0.58, p.hardnessShield ?? 0.72, it, 0
-          );
-          gl.drawArrays(gl.TRIANGLES, 0, 3);
-          this.curIdx = next;
+        ep.talusAngle = p.talusAngle ?? DEFAULT_EROSION_PARAMS.talusAngle;
+        ep.rockfallRate = p.rockfallRate ?? DEFAULT_EROSION_PARAMS.rockfallRate;
+        ep.simRockfallPlaying = true;
+
+        const bakePasses = Math.max(0, Math.min(80, Math.round((p.bakePasses ?? 0) * (fastPreview ? 0.5 : 1.0))));
+        if (bakePasses > 0) {
+          this._runMaskedSimulation(layer, maxRelief, () => {
+            this.engine.stepThermalTalusOnly(bakePasses);
+          });
         }
       } else if (layer.type === 'aeolian-glacial') {
-        const iters = Math.max(1, Math.min(70, Math.round((p.iterations ?? 22) * (fastPreview ? 0.5 : 1.0))));
-        gl.useProgram(this.progAeolianGlacial);
-        gl.uniform4f(
-          gl.getUniformLocation(this.progAeolianGlacial, 'uProcCfg'),
-          R, span, p.processMode ?? 0, p.intensity ?? 0.68
-        );
-        gl.uniform4f(
-          gl.getUniformLocation(this.progAeolianGlacial, 'uProcExt'),
-          p.snowline ?? 0.54, p.glacierCarve ?? 0.55, p.azimuth ?? 32, maxRelief
-        );
-        for (let it = 0; it < iters; it++) {
-          const next = 1 - this.curIdx;
-          gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSim[next]);
-          this._bindTex(this.progAeolianGlacial, 'uStateTex', this.stateTex[this.curIdx], 0);
-          this._bindTex(this.progAeolianGlacial, 'uGeoTex', this.geoTex[this.curIdx], 1);
-          gl.drawArrays(gl.TRIANGLES, 0, 3);
-          this.curIdx = next;
+        ep.snowline = p.snowline ?? DEFAULT_EROSION_PARAMS.snowline;
+        ep.snowfallRate = p.snowfallRate ?? 0.0;
+        ep.glacierStrength = p.glacierStrength ?? 0.0;
+        ep.iceMeltRate = p.iceMeltRate ?? DEFAULT_EROSION_PARAMS.iceMeltRate;
+        ep.windSpeed = p.windSpeed ?? 0.0;
+        ep.windAzimuth = p.windAzimuth ?? DEFAULT_EROSION_PARAMS.windAzimuth;
+        ep.dryAeolianMode = p.dryAeolianMode ?? 0.0;
+        ep.snowLayerEnabled = true;
+        ep.simCryoPlaying = ep.snowfallRate > 0.015 || ep.glacierStrength > 0.015;
+        ep.simWindPlaying = ep.windSpeed > 0.03;
+
+        // Seed snowpack & valley glaciers (`progInitSnow`) on the terrain constructed up to this stage!
+        this.engine.seedInitialSnow();
+
+        const bakePasses = Math.max(0, Math.min(64, Math.round((p.bakePasses ?? 0) * (fastPreview ? 0.5 : 1.0))));
+        if (bakePasses > 0) {
+          this._runMaskedSimulation(layer, maxRelief, () => {
+            const prevH = ep.simHydraulicPlaying, prevR = ep.simRockfallPlaying;
+            ep.simHydraulicPlaying = false;
+            ep.simRockfallPlaying = false;
+            this.engine.stepSimulation(bakePasses, { skipTelemetry: true });
+            ep.simHydraulicPlaying = prevH;
+            ep.simRockfallPlaying = prevR;
+          });
         }
+      } else if (layer.type === 'rock-placement') {
+        activeRockLayer = layer;
+      } else if (layer.type === 'vegetation-placement') {
+        ep.grassEnabled = true;
+        ep.grassMode = p.species ?? 0;
+        ep.grassDensity = p.density ?? 0.55;
+        ep.grassHeight = p.bladeHeight ?? 1.15;
+        ep.grassSlopeMax = p.slopeMax ?? 0.62;
+        ep.grassElevMax = p.elevationMax ?? 0.52;
+        ep.grassPatchiness = p.patchiness ?? 0.58;
+        ep.grassWindSway = p.windSway ?? 0.65;
+        ep.grassDryBlend = p.dryBlend ?? (p.species === 1 ? 0.85 : 0.14);
       }
     }
 
-    // 3. Bake Surface Data (Horizon AO, Protrusions & Selected Layer's B&W Mask Preview)
-    const sel = this.getSelectedLayer();
-    const maskUniforms = this._packMaskUniforms(
-      sel?.mask?.enabled ? sel.mask : { enabled: true, ...(sel?.mask || { mode: 'height', min: 0.2, max: 0.85 }) }
-    );
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboBaked);
-    gl.viewport(0, 0, R, R);
-    gl.useProgram(this.progBake);
-    this._bindTex(this.progBake, 'uStateTex', this.stateTex[this.curIdx], 0);
-    this._bindTex(this.progBake, 'uGeoTex', this.geoTex[this.curIdx], 1);
-    gl.uniform4f(gl.getUniformLocation(this.progBake, 'uBakeDomain'), span, R, maxRelief, 0);
-    gl.uniform4fv(gl.getUniformLocation(this.progBake, 'uMaskCfg1'), maskUniforms.cfg1);
-    gl.uniform4fv(gl.getUniformLocation(this.progBake, 'uMaskCfg2'), maskUniforms.cfg2);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    // 3. Copy evaluated initial terrain into `engine.initialTerrainTex` (ANGLE-safe shader copy!)
+    this._copyTex(this.engine.terrainTex[this.engine.terrainIdx], this.engine.fboInitialTerrain);
 
-    // 4. Sync State+Geo into engine.terrainTex[0] (bedrock, coarse, fine, water) + engine.snowTex[0] (snow)
-    this.engine.terrainIdx = 0;
-    this.engine.snowIdx = 0;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSyncEngine);
-    gl.viewport(0, 0, R, R);
-    gl.useProgram(this.progSyncExport);
-    this._bindTex(this.progSyncExport, 'uStateTex', this.stateTex[this.curIdx], 0);
-    this._bindTex(this.progSyncExport, 'uGeoTex', this.geoTex[this.curIdx], 1);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    // 4. Bake Selected Layer's B&W Mask Preview Texture (`uViewMode == 7`)
+    const sel = this.getSelectedLayer();
+    const previewMask = sel?.mask?.enabled
+      ? sel.mask
+      : { enabled: true, ...(sel?.mask || { mode: 'height', min: 0.2, max: 0.85, feather: 0.15 }) };
+    this._bakeMaskTexture(previewMask, maxRelief);
 
     // 5. Read back fast 64x64 snapshot for 3D SDF Caves, Rock Placement & Telemetry!
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSnap);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.engine.fboTelemetry);
     gl.viewport(0, 0, this.snapN, this.snapN);
     gl.useProgram(this.engine.progTelemetry);
-    this._bindTex(this.engine.progTelemetry, 'uTerrainTex', this.stateTex[this.curIdx], 0);
+    gl.bindVertexArray(this.engine.emptyVao);
+    this._bindTex(this.engine.progTelemetry, 'uTerrainTex', this.engine.terrainTex[this.engine.terrainIdx], 0);
     gl.uniform1f(gl.getUniformLocation(this.engine.progTelemetry, 'uGridRes'), R);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.readPixels(0, 0, this.snapN, this.snapN, gl.RGBA, gl.FLOAT, this.snapBuf);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-    // Remap [bedrock, water, coarse, fine] -> [bedrock, coarse, fine, water] for RockCalvingSystem
-    for (let k = 0; k < this.snapBuf.length; k += 4) {
-      this.rockSnapBuf[k] = this.snapBuf[k];
-      this.rockSnapBuf[k + 1] = this.snapBuf[k + 2];
-      this.rockSnapBuf[k + 2] = this.snapBuf[k + 3];
-      this.rockSnapBuf[k + 3] = this.snapBuf[k + 1];
-    }
+    this.engine.initialSnap64.set(this.snapBuf);
 
     // 6. Rebuild 3D Volumetric SDF Caves & Cliff Undercuts + Upload Portal Mask Texture
     const caveRes = this.caveSystem.rebuildCaveVolume({
@@ -691,124 +868,51 @@ export class TerrainStackPipeline {
     }
 
     // 7. Update Rock Placement Layer & Telemetry
-    this.engine.rockCalving.updateTerrainSnapshot(this.rockSnapBuf, this.snapN, span);
-    const rockLayer = this.layers.find((l) => l.type === 'rock-placement' && l.enabled);
-    if (rockLayer && reseedPlacements) {
-      this.engine.params.showOutcrops = true;
-      this.engine.params.boulderDensity = rockLayer.params.density ?? 0.62;
-      this.engine.params.rockfallRate = rockLayer.params.talusAffinity ?? 0.72;
-      this.engine.params.seed = rockLayer.params.seed ?? 4410;
-      this.engine.rockCalving.seedForLandscape(this.engine.params);
-      const settle = Math.max(0, Math.min(60, Math.round(rockLayer.params.settleSteps ?? 28)));
+    this.engine.rockCalving.updateTerrainSnapshot(this.snapBuf, this.snapN, span);
+    if (activeRockLayer && reseedPlacements) {
+      ep.showOutcrops = true;
+      ep.boulderDensity = activeRockLayer.params.density ?? DEFAULT_EROSION_PARAMS.boulderDensity;
+      ep.rockfallRate = activeRockLayer.params.talusAffinity ?? ep.rockfallRate;
+      const prevSeed = ep.seed;
+      ep.seed = activeRockLayer.params.seed ?? prevSeed;
+      this.engine.rockCalving.seedForLandscape(ep);
+      ep.seed = prevSeed;
+      const settle = Math.max(0, Math.min(60, Math.round(activeRockLayer.params.settleSteps ?? 0)));
       for (let s = 0; s < settle; s++) {
         this.engine.rockCalving.stepPhysics(0.04, true);
       }
-    } else if (!rockLayer) {
-      this.engine.params.showOutcrops = false;
+    } else if (activeRockLayer) {
+      ep.showOutcrops = true;
+    } else {
+      ep.showOutcrops = false;
     }
 
+    gl.bindVertexArray(null);
     this.lastEvalMs = Math.max(0.1, performance.now() - t0);
     this._publishTelemetry();
-  }
-
-  _copyVecDisp(fromIdx, toIdx) {
-    // Shader-based 1:1 RGBA32F copy (zero blitFramebuffer driver quirks on ANGLE D3D11)
-    if (fromIdx === toIdx) return;
-    const gl = this.gl;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboVecOnly[toIdx]);
-    gl.viewport(0, 0, this.R, this.R);
-    gl.useProgram(this.progCopyVec);
-    this._bindTex(this.progCopyVec, 'uSrcTex', this.vecDispTex[fromIdx], 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-  }
-
-  /**
-   * Optional Live Simulation Tick (runs 1 real-time step of enabled simulation layers per frame when Play is active).
-   */
-  stepLiveSimulation() {
-    const gl = this.gl;
-    const R = this.R;
-    const span = this.engine.params.worldSpan;
-    const maxRelief = this._maxReliefEstimate();
-
-    let ranAny = false;
-    gl.disable(gl.DEPTH_TEST);
-    gl.disable(gl.BLEND);
-    gl.bindVertexArray(this.engine.emptyVao);
-    gl.viewport(0, 0, R, R);
-
-    for (let i = this.layers.length - 1; i >= 0; i--) {
-      const l = this.layers[i];
-      if (!l.enabled) continue;
-      const p = l.params;
-      if (l.type === 'hydraulic-erosion') {
-        const next = 1 - this.curIdx;
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSim[next]);
-        gl.useProgram(this.progHydraulic);
-        this._bindTex(this.progHydraulic, 'uStateTex', this.stateTex[this.curIdx], 0);
-        this._bindTex(this.progHydraulic, 'uGeoTex', this.geoTex[this.curIdx], 1);
-        gl.uniform4f(gl.getUniformLocation(this.progHydraulic, 'uHydParams'), R, span, p.erosionStrength ?? 0.74, p.sedimentCapacity ?? 0.82);
-        gl.uniform4f(gl.getUniformLocation(this.progHydraulic, 'uHydExtra'), p.depositionRate ?? 0.58, p.rainRate ?? 0.65, p.evaporation ?? 0.16, 0);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-        this.curIdx = next;
-        ranAny = true;
-      } else if (l.type === 'thermal-talus') {
-        const next = 1 - this.curIdx;
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSim[next]);
-        gl.useProgram(this.progThermal);
-        this._bindTex(this.progThermal, 'uStateTex', this.stateTex[this.curIdx], 0);
-        this._bindTex(this.progThermal, 'uGeoTex', this.geoTex[this.curIdx], 1);
-        gl.uniform4f(gl.getUniformLocation(this.progThermal, 'uTalusCfg'), R, span, p.reposeAngle ?? 33, p.spallingRate ?? 0.66);
-        gl.uniform4f(gl.getUniformLocation(this.progThermal, 'uTalusExt'), p.talusSpread ?? 0.58, p.hardnessShield ?? 0.72, 0, 0);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-        this.curIdx = next;
-        ranAny = true;
-      }
-    }
-
-    if (ranAny) {
-      // Re-bake AO/protrusions & sync to engine.terrainTex[0] / engine.snowTex[0]
-      const sel = this.getSelectedLayer();
-      const maskUniforms = this._packMaskUniforms(sel?.mask);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboBaked);
-      gl.useProgram(this.progBake);
-      this._bindTex(this.progBake, 'uStateTex', this.stateTex[this.curIdx], 0);
-      this._bindTex(this.progBake, 'uGeoTex', this.geoTex[this.curIdx], 1);
-      gl.uniform4f(gl.getUniformLocation(this.progBake, 'uBakeDomain'), span, R, maxRelief, 0);
-      gl.uniform4fv(gl.getUniformLocation(this.progBake, 'uMaskCfg1'), maskUniforms.cfg1);
-      gl.uniform4fv(gl.getUniformLocation(this.progBake, 'uMaskCfg2'), maskUniforms.cfg2);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSyncEngine);
-      gl.useProgram(this.progSyncExport);
-      this._bindTex(this.progSyncExport, 'uStateTex', this.stateTex[this.curIdx], 0);
-      this._bindTex(this.progSyncExport, 'uGeoTex', this.geoTex[this.curIdx], 1);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    }
   }
 
   _publishTelemetry() {
     const cellArea = Math.pow(this.engine.params.worldSpan / this.snapN, 2);
     let coarseM3 = 0, fineM3 = 0, waterM3 = 0;
     for (let i = 0; i < this.snapBuf.length; i += 4) {
-      waterM3 += Math.max(0, this.snapBuf[i + 1]) * cellArea;
-      coarseM3 += Math.max(0, this.snapBuf[i + 2]) * cellArea;
-      fineM3 += Math.max(0, this.snapBuf[i + 3]) * cellArea;
+      coarseM3 += Math.max(0, this.snapBuf[i + 1]) * cellArea;
+      fineM3 += Math.max(0, this.snapBuf[i + 2]) * cellArea;
+      waterM3 += Math.max(0, this.snapBuf[i + 3]) * cellArea;
     }
+    this.engine.telemetry.steps = this.engine.stepCount;
+    this.engine.telemetry.erodedVolumeM3 = 0;
     this.engine.telemetry.coarseSedM3 = Math.round(coarseM3);
     this.engine.telemetry.fineSedM3 = Math.round(fineM3);
     this.engine.telemetry.waterVolumeM3 = Math.round(waterM3);
+    this.engine.telemetry.boulders = this.engine.rockCalving.rocks.length;
+    this.engine.telemetry.particles = this.engine.params.particleCount;
     this.engine.telemetry.evalMs = Number(this.lastEvalMs.toFixed(1));
     this.engine.telemetry.layerCount = this.layers.length;
     this.engine.telemetry.caveTris = Math.round(this.caveSystem.vertexCount / 3);
     if (this.engine.onTelemetry) this.engine.onTelemetry(this.engine.telemetry);
   }
 
-  /**
-   * Projects a 3D world point (wx, wy, wz) into normalized [0..1] viewport screen coords
-   * for interactive 3D Spline Gizmos.
-   */
   projectWorldToScreen(wx, wy, wz) {
     const m = this.lastViewProj;
     if (!m) return null;
@@ -824,141 +928,267 @@ export class TerrainStackPipeline {
     };
   }
 
+  _resolveEngineViewCode() {
+    // Maps toolbar shadingMode -> `TERRAIN_RENDER_FRAG` `uViewMode`
+    switch (this.shadingMode) {
+      case 0: return 0; // Derived Geology (Natural)
+      case 1: return 8; // AO & Ridge Protrusions
+      case 2: return 2; // 3D Rock Hardness & Strata
+      case 3: return 3; // Drainage Flow & Velocity
+      case 4: return 1; // Sedimentation & Cut/Fill
+      case 5: return 7; // Selected Layer B&W Mask
+      case 6: return 4; // Pure Sculptor Clay
+      case 7: return 5; // Cryosphere (Snow & Glacier Ice)
+      case 8: return 6; // 2.5D Hydrology & Basins
+      default: return 0;
+    }
+  }
+
   /**
-   * Renders the evaluated 3D Vector-Displaced Terrain + 3D SDF Caves + Rock Placement + 3D Grass!
+   * Renders the terrain using `c5ae88b` / `2cc3d34`'s exact `progSkyBg`, `progTerrainRender`,
+   * `progRockInstance`, `progGrassInstance`, and `progParticleRender`, plus `progCave` when
+   * 3D SDF Caves / Cliff Undercuts are active in the stack!
    */
   renderPipelineFrame(viewProj, eye, sunDir, timeSec) {
     this.lastViewProj = viewProj;
     const gl = this.gl;
     const R = this.R;
     const p = this.engine.params;
+    p.materialTheme = this.paletteId;
+    p.fabricMode = this.fabricMode;
+
     const maxRelief = this._maxReliefEstimate();
+    const viewCode = this._resolveEngineViewCode();
+    const hasCaves = this.caveSystem.vertexCount > 0;
+
+    if (viewCode === 7) {
+      const sel = this.getSelectedLayer();
+      const previewMask = sel?.mask?.enabled
+        ? sel.mask
+        : { enabled: true, ...(sel?.mask || { mode: 'height', min: 0.2, max: 0.85, feather: 0.15 }) };
+      this._bakeMaskTexture(previewMask, maxRelief);
+    }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.engine.canvas.width, this.engine.canvas.height);
-    gl.clearColor(0.06, 0.065, 0.07, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.clear(gl.DEPTH_BUFFER_BIT);
 
-    // 1. Atmospheric Sky Backdrop
+    // 1. Studio Sky Backdrop (`progSkyBg`)
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
-    gl.depthMask(false);
+    gl.depthMask(true);
     gl.useProgram(this.engine.progSkyBg);
-    gl.uniform1i(gl.getUniformLocation(this.engine.progSkyBg, 'uMaterialTheme'), this.paletteId === 5 ? 7 : 0);
+    gl.uniform1i(gl.getUniformLocation(this.engine.progSkyBg, 'uMaterialTheme'), this.engine._themeCode());
     gl.bindVertexArray(this.engine.emptyVao);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-    // 2. 3D Vector-Displaced Terrain Mesh (with true 3D Overhangs & SDF Cave Portal Cutouts)
+    // 2. Proven Geological Terrain Renderer (`progTerrainRender` from `erosion-shaders.js`!)
+    const { hardnessVec, strataVec } = this.engine._getHardnessUniforms();
+    const layerVisVec = this.engine._getLayerVisUniforms();
+    const climate = this.engine._getClimateUniforms();
+
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
     gl.depthMask(true);
-    gl.disable(gl.CULL_FACE);
+    if (this.hasActiveVecDisp || hasCaves) {
+      gl.disable(gl.CULL_FACE);
+    } else {
+      gl.enable(gl.CULL_FACE);
+      gl.cullFace(gl.BACK);
+    }
 
-    gl.useProgram(this.progTerrain);
+    gl.useProgram(this.engine.progTerrainRender);
     gl.bindVertexArray(this.engine.terrainVao);
-    this._bindTex(this.progTerrain, 'uStateTex', this.stateTex[this.curIdx], 0);
-    this._bindTex(this.progTerrain, 'uGeoTex', this.geoTex[this.curIdx], 1);
-    this._bindTex(this.progTerrain, 'uVecDispTex', this.vecDispTex[this.vecIdx], 2);
-    this._bindTex(this.progTerrain, 'uBakedTex', this.bakedTex, 3);
-    this._bindTex(this.progTerrain, 'uCavePortalTex', this.cavePortalTex, 4);
 
-    gl.uniformMatrix4fv(gl.getUniformLocation(this.progTerrain, 'uViewProj'), false, viewProj);
-    gl.uniform3fv(gl.getUniformLocation(this.progTerrain, 'uCameraPos'), eye);
-    gl.uniform3fv(gl.getUniformLocation(this.progTerrain, 'uSunDir'), sunDir);
-    gl.uniform4f(gl.getUniformLocation(this.progTerrain, 'uRenderDomain'), p.worldSpan, R, p.showWater !== false ? 1.0 : 0.0, maxRelief);
-    gl.uniform2i(gl.getUniformLocation(this.progTerrain, 'uShadeConfig'), this.paletteId, this.shadingMode);
+    this.engine._bindTex(this.engine.progTerrainRender, 'uTerrainTex', this.engine.terrainTex[this.engine.terrainIdx], 0);
+    this.engine._bindTex(this.engine.progTerrainRender, 'uInitialTex', this.engine.initialTerrainTex, 1);
+    this.engine._bindTex(this.engine.progTerrainRender, 'uVelocityFieldTex', this.engine.velocityFieldTex, 2);
+    this.engine._bindTex(this.engine.progTerrainRender, 'uSnowTex', this.engine.snowTex[this.engine.snowIdx], 3);
+    this.engine._bindTex(this.engine.progTerrainRender, 'uVecDispTex', this.vecDispTex[this.vecIdx], 4);
+    this.engine._bindTex(this.engine.progTerrainRender, 'uCavePortalTex', this.cavePortalTex, 5);
+    this.engine._bindTex(this.engine.progTerrainRender, 'uMaskPreviewTex', this.maskTex, 6);
+
+    gl.uniformMatrix4fv(gl.getUniformLocation(this.engine.progTerrainRender, 'uViewProj'), false, viewProj);
+    gl.uniform3fv(gl.getUniformLocation(this.engine.progTerrainRender, 'uCameraPos'), eye);
+    gl.uniform3fv(gl.getUniformLocation(this.engine.progTerrainRender, 'uSunDir'), sunDir);
+    gl.uniform4f(
+      gl.getUniformLocation(this.engine.progTerrainRender, 'uRenderDomain'),
+      p.worldSpan,
+      R,
+      (p.showWater && p.waterLayerEnabled !== false) ? 1.0 : 0.0,
+      timeSec
+    );
+    gl.uniform4fv(gl.getUniformLocation(this.engine.progTerrainRender, 'uLayerVis'), layerVisVec);
+    gl.uniform4fv(gl.getUniformLocation(this.engine.progTerrainRender, 'uHardnessParams'), hardnessVec);
+    gl.uniform4fv(gl.getUniformLocation(this.engine.progTerrainRender, 'uStrataOrient'), strataVec);
 
     const sel = this.getSelectedLayer();
     const isSculptTool = this.authorTool.startsWith('sculpt-') || this.authorTool.startsWith('cave-');
     const brushRad = sel?.type === 'sculpt-layer' ? (sel.params.brushRadius ?? 34) : p.brushRadius;
-    const brushCode = isSculptTool ? (this.authorTool.startsWith('cave-') ? 3 : 1) : 0;
+    const brushCode = isSculptTool ? (this.authorTool.startsWith('cave-') ? 3 : 2) : 0;
     gl.uniform4f(
-      gl.getUniformLocation(this.progTerrain, 'uBrushCursor'),
+      gl.getUniformLocation(this.engine.progTerrainRender, 'uBrush'),
       this.engine.pointerWorldXZ[0],
       this.engine.pointerWorldXZ[1],
       brushRad,
       brushCode
     );
+    gl.uniform1i(gl.getUniformLocation(this.engine.progTerrainRender, 'uViewMode'), viewCode);
+    gl.uniform1i(gl.getUniformLocation(this.engine.progTerrainRender, 'uMaterialTheme'), this.engine._themeCode());
+    gl.uniform1i(gl.getUniformLocation(this.engine.progTerrainRender, 'uFabricMode'), this.engine._fabricCode());
+    gl.uniform4fv(gl.getUniformLocation(this.engine.progTerrainRender, 'uClimate'), climate.snowVec);
+    gl.uniform4f(
+      gl.getUniformLocation(this.engine.progTerrainRender, 'uWindRender'),
+      climate.windVec[0],
+      climate.windVec[1],
+      p.windSpeed || 0.0,
+      p.dryAeolianMode || 0.0
+    );
+    gl.uniform1f(gl.getUniformLocation(this.engine.progTerrainRender, 'uSeed'), p.seed);
+    gl.uniform1f(gl.getUniformLocation(this.engine.progTerrainRender, 'uUseVecDisp'), this.hasActiveVecDisp ? 1.0 : 0.0);
+    gl.uniform1f(gl.getUniformLocation(this.engine.progTerrainRender, 'uHasCaves'), hasCaves ? 1.0 : 0.0);
+
     gl.drawElements(gl.TRIANGLES, this.engine.terrainIndexCount, gl.UNSIGNED_INT, 0);
 
-    // 3. Real 3D Volumetric SDF Cave & Cliff-Undercut Interior Mesh!
-    if (this.caveSystem.vertexCount > 0) {
+    // 3. Real 3D Volumetric SDF Cave & Cliff-Undercut Interior Mesh (when active)
+    if (hasCaves) {
+      gl.disable(gl.CULL_FACE);
       gl.useProgram(this.progCave);
       gl.bindVertexArray(this.caveVao);
       gl.uniformMatrix4fv(gl.getUniformLocation(this.progCave, 'uViewProj'), false, viewProj);
       gl.uniform3fv(gl.getUniformLocation(this.progCave, 'uCameraPos'), eye);
       gl.uniform3fv(gl.getUniformLocation(this.progCave, 'uSunDir'), sunDir);
       gl.uniform4f(gl.getUniformLocation(this.progCave, 'uRenderDomain'), p.worldSpan, R, 1.0, maxRelief);
-      gl.uniform2i(gl.getUniformLocation(this.progCave, 'uShadeConfig'), this.paletteId, this.shadingMode);
+      gl.uniform2i(gl.getUniformLocation(this.progCave, 'uShadeConfig'), this.engine._themeCode(), viewCode);
       gl.drawArrays(gl.TRIANGLES, 0, this.caveSystem.vertexCount);
     }
 
-    // 4. Rock-Placement Layer (3D Outcrops & Talus Boulders locked to exact 512x512 terrain!)
-    const rockLayer = this.layers.find((l) => l.type === 'rock-placement' && l.enabled);
-    if (rockLayer && this.engine.rockCalving.rocks.length > 0 && this.shadingMode !== 5) {
+    // 4. 3D Polyhedral Outcrops & Gravity-Settled Cliff-Calved Boulders (`progRockInstance`)
+    if (p.showOutcrops !== false && this.engine.rockCalving.rocks.length > 0 && viewCode !== 7) {
       gl.enable(gl.CULL_FACE);
       gl.cullFace(gl.BACK);
-      const { hardnessVec, strataVec } = this.engine._getHardnessUniforms();
-      const climate = this.engine._getClimateUniforms();
-      const mapTheme = this.paletteId === 1 ? 3 : this.paletteId === 2 ? 2 : this.paletteId === 3 ? 4 : this.paletteId === 5 ? 7 : 1;
-
       gl.useProgram(this.engine.progRockInstance);
       gl.bindVertexArray(this.engine.rockVao);
-      this._bindTex(this.engine.progRockInstance, 'uTerrainTex', this.engine.terrainTex[0], 0);
-      this._bindTex(this.engine.progRockInstance, 'uSnowTex', this.engine.snowTex[0], 1);
+
+      this.engine._bindTex(this.engine.progRockInstance, 'uTerrainTex', this.engine.terrainTex[this.engine.terrainIdx], 0);
+      this.engine._bindTex(this.engine.progRockInstance, 'uSnowTex', this.engine.snowTex[this.engine.snowIdx], 1);
+
       gl.uniformMatrix4fv(gl.getUniformLocation(this.engine.progRockInstance, 'uViewProj'), false, viewProj);
       gl.uniform3fv(gl.getUniformLocation(this.engine.progRockInstance, 'uCameraPos'), eye);
       gl.uniform3fv(gl.getUniformLocation(this.engine.progRockInstance, 'uSunDir'), sunDir);
-      gl.uniform4f(gl.getUniformLocation(this.engine.progRockInstance, 'uRenderDomain'), p.worldSpan, R, 1.0, timeSec);
-      gl.uniform4f(gl.getUniformLocation(this.engine.progRockInstance, 'uLayerVis'), 1, 1, 1, 1);
+      gl.uniform4f(
+        gl.getUniformLocation(this.engine.progRockInstance, 'uRenderDomain'),
+        p.worldSpan,
+        R,
+        (p.showWater && p.waterLayerEnabled !== false) ? 1.0 : 0.0,
+        timeSec
+      );
+      gl.uniform4fv(gl.getUniformLocation(this.engine.progRockInstance, 'uLayerVis'), layerVisVec);
       gl.uniform4fv(gl.getUniformLocation(this.engine.progRockInstance, 'uHardnessParams'), hardnessVec);
       gl.uniform4fv(gl.getUniformLocation(this.engine.progRockInstance, 'uStrataOrient'), strataVec);
-      gl.uniform1i(gl.getUniformLocation(this.engine.progRockInstance, 'uViewMode'), this.shadingMode === 6 ? 4 : 0);
-      gl.uniform1i(gl.getUniformLocation(this.engine.progRockInstance, 'uMaterialTheme'), mapTheme);
-      gl.uniform1i(gl.getUniformLocation(this.engine.progRockInstance, 'uFabricMode'), 0);
       gl.uniform4fv(gl.getUniformLocation(this.engine.progRockInstance, 'uClimate'), climate.snowVec);
-      gl.uniform1f(gl.getUniformLocation(this.engine.progRockInstance, 'uSeed'), rockLayer.params.seed ?? 4410);
+      gl.uniform1i(gl.getUniformLocation(this.engine.progRockInstance, 'uViewMode'), viewCode === 8 ? 0 : viewCode);
+      gl.uniform1i(gl.getUniformLocation(this.engine.progRockInstance, 'uMaterialTheme'), this.engine._themeCode());
+      gl.uniform1i(gl.getUniformLocation(this.engine.progRockInstance, 'uFabricMode'), this.engine._fabricCode());
+      gl.uniform1f(gl.getUniformLocation(this.engine.progRockInstance, 'uSeed'), p.seed);
 
       gl.bindBuffer(gl.ARRAY_BUFFER, this.engine.rockInstVbo);
       const subs = this.engine.rockCalving.atlas.submeshes;
       for (let b = 0; b < subs.length; b++) {
         const count = this.engine.rockCalving.bucketCounts[b];
         if (count <= 0) continue;
-        const sub = subs[b];
-        const slice = this.engine.rockCalving.bucketData[b].subarray(0, count * 16);
-        gl.bufferSubData(gl.ARRAY_BUFFER, 0, slice);
-        gl.drawElementsInstanced(gl.TRIANGLES, sub.indexCount, gl.UNSIGNED_SHORT, sub.firstIndex * 2, count);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.engine.rockCalving.bucketData[b].subarray(0, count * 16));
+        gl.drawElementsInstanced(
+          gl.TRIANGLES,
+          subs[b].indexCount,
+          gl.UNSIGNED_SHORT,
+          subs[b].firstIndex * 2,
+          count
+        );
       }
       gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
 
-    // 5. Vegetation-Placement Layer (Real 3D Curved Grass Tufts driven by slope/height/water masks!)
-    const vegLayer = this.layers.find((l) => l.type === 'vegetation-placement' && l.enabled);
-    if (vegLayer && (vegLayer.params.density ?? 0) > 0.01 && (this.shadingMode === 0 || this.shadingMode === 6)) {
-      const vp = vegLayer.params;
-      const tuftCount = Math.max(512, Math.min(MAX_GRASS_TUFTS, Math.round(vp.density * MAX_GRASS_TUFTS)));
-      const slopeTan = Math.tan(((vp.slopeMax ?? 32) * Math.PI) / 180);
-
+    // 5. Real 3D GPU-Instanced Grass Vegetation Layer (`progGrassInstance`)
+    if (p.grassEnabled && (p.grassDensity ?? 0.5) > 0.01 && (viewCode === 0 || viewCode === 4)) {
+      const tuftCount = Math.max(512, Math.min(MAX_GRASS_TUFTS, Math.round((p.grassDensity ?? 0.55) * MAX_GRASS_TUFTS)));
       gl.disable(gl.CULL_FACE);
       gl.useProgram(this.engine.progGrassInstance);
       gl.bindVertexArray(this.engine.grassVao);
-      this._bindTex(this.engine.progGrassInstance, 'uTerrainTex', this.engine.terrainTex[0], 0);
-      this._bindTex(this.engine.progGrassInstance, 'uSnowTex', this.engine.snowTex[0], 1);
+
+      this.engine._bindTex(this.engine.progGrassInstance, 'uTerrainTex', this.engine.terrainTex[this.engine.terrainIdx], 0);
+      this.engine._bindTex(this.engine.progGrassInstance, 'uSnowTex', this.engine.snowTex[this.engine.snowIdx], 1);
 
       gl.uniformMatrix4fv(gl.getUniformLocation(this.engine.progGrassInstance, 'uViewProj'), false, viewProj);
       gl.uniform3fv(gl.getUniformLocation(this.engine.progGrassInstance, 'uCameraPos'), eye);
       gl.uniform3fv(gl.getUniformLocation(this.engine.progGrassInstance, 'uSunDir'), sunDir);
-      gl.uniform4f(gl.getUniformLocation(this.engine.progGrassInstance, 'uRenderDomain'), p.worldSpan, R, 1.0, timeSec);
-      gl.uniform4f(gl.getUniformLocation(this.engine.progGrassInstance, 'uGrassParams'), tuftCount, vp.bladeHeight ?? 1.18, vp.windSway ?? 0.65, slopeTan);
-      gl.uniform4f(gl.getUniformLocation(this.engine.progGrassInstance, 'uGrassStyle'), vp.species ?? 0, vp.species === 1 ? 0.88 : 0.14, vp.elevationMax ?? 0.62, vp.patchiness ?? 0.56);
-      gl.uniform4f(gl.getUniformLocation(this.engine.progGrassInstance, 'uWindRender'), 0.85, 0.52, 0.42, vp.species === 1 ? 0.5 : 0.0);
-      gl.uniform4f(gl.getUniformLocation(this.engine.progGrassInstance, 'uStrataOrient'), 0.2, 1.0, 0.0, 1.0);
-      gl.uniform1i(gl.getUniformLocation(this.engine.progGrassInstance, 'uViewMode'), this.shadingMode === 6 ? 4 : 0);
-      gl.uniform1i(gl.getUniformLocation(this.engine.progGrassInstance, 'uMaterialTheme'), 8);
-      gl.uniform1f(gl.getUniformLocation(this.engine.progGrassInstance, 'uSeed'), vp.seed ?? 9012);
+      gl.uniform4f(
+        gl.getUniformLocation(this.engine.progGrassInstance, 'uRenderDomain'),
+        p.worldSpan,
+        R,
+        p.showWater ? 1.0 : 0.0,
+        timeSec
+      );
+      gl.uniform4f(
+        gl.getUniformLocation(this.engine.progGrassInstance, 'uGrassParams'),
+        tuftCount,
+        p.grassHeight ?? 1.15,
+        p.grassWindSway ?? 0.65,
+        p.grassSlopeMax ?? 0.62
+      );
+      gl.uniform4f(
+        gl.getUniformLocation(this.engine.progGrassInstance, 'uGrassStyle'),
+        p.grassMode ?? 0,
+        p.grassDryBlend ?? 0.15,
+        p.grassElevMax ?? 0.52,
+        p.grassPatchiness ?? 0.58
+      );
+      gl.uniform4f(
+        gl.getUniformLocation(this.engine.progGrassInstance, 'uWindRender'),
+        climate.windVec[0],
+        climate.windVec[1],
+        p.windSpeed || 0.25,
+        p.dryAeolianMode || 0.0
+      );
+      gl.uniform4fv(gl.getUniformLocation(this.engine.progGrassInstance, 'uStrataOrient'), strataVec);
+      gl.uniform1i(gl.getUniformLocation(this.engine.progGrassInstance, 'uViewMode'), viewCode);
+      gl.uniform1i(gl.getUniformLocation(this.engine.progGrassInstance, 'uMaterialTheme'), this.engine._themeCode());
+      gl.uniform1f(gl.getUniformLocation(this.engine.progGrassInstance, 'uSeed'), p.seed);
 
       gl.drawElementsInstanced(gl.TRIANGLES, this.engine.grassIndexCount, gl.UNSIGNED_SHORT, 0, tuftCount);
       gl.enable(gl.CULL_FACE);
+    }
+
+    // 6. 3D Falling Sky Raindrops, Snow, Wind Sand & Runoff Particles (`progParticleRender`)
+    if (this.liveSimRunning && p.showParticles && p.particleOpacity > 0.01 && climate.anyParticleSpecies && viewCode !== 7) {
+      const activeCount = Math.min(MAX_GPU_PARTICLES, Math.max(1024, Math.floor(p.particleCount)));
+      gl.disable(gl.CULL_FACE);
+      gl.depthMask(false);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+      gl.useProgram(this.engine.progParticleRender);
+      gl.bindVertexArray(this.engine.emptyVao);
+
+      this.engine._bindTex(this.engine.progParticleRender, 'uPosAgeTex', this.engine.partPosAge[this.engine.partIdx], 0);
+      this.engine._bindTex(this.engine.progParticleRender, 'uVelWaterTex', this.engine.partVelWater[this.engine.partIdx], 1);
+      this.engine._bindTex(this.engine.progParticleRender, 'uSedimentTex', this.engine.partSediment[this.engine.partIdx], 2);
+      this.engine._bindTex(this.engine.progParticleRender, 'uTerrainTex', this.engine.terrainTex[this.engine.terrainIdx], 3);
+
+      gl.uniformMatrix4fv(gl.getUniformLocation(this.engine.progParticleRender, 'uViewProj'), false, viewProj);
+      gl.uniform3fv(gl.getUniformLocation(this.engine.progParticleRender, 'uCameraPos'), eye);
+      gl.uniform4f(
+        gl.getUniformLocation(this.engine.progParticleRender, 'uPartVis'),
+        p.worldSpan,
+        R,
+        p.particleOpacity,
+        activeCount
+      );
+
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, activeCount);
+
+      gl.disable(gl.BLEND);
+      gl.depthMask(true);
     }
 
     gl.bindVertexArray(null);

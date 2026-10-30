@@ -136,7 +136,7 @@ export class SdfCaveSystem {
 
       const hAt = (ii, jj) => {
         const idx = (jj * gridN + ii) * 4;
-        return gridRgba[idx] + gridRgba[idx + 2] + gridRgba[idx + 3];
+        return gridRgba[idx] + gridRgba[idx + 1] + gridRgba[idx + 2];
       };
       const h00 = hAt(i0, j0), h10 = hAt(i0 + 1, j0);
       const h01 = hAt(i0, j0 + 1), h11 = hAt(i0 + 1, j0 + 1);

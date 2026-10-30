@@ -10,6 +10,7 @@
 import {
   BASE_ARCHETYPES,
   COMBINE_MODES,
+  DERIVED_FABRICS,
   DERIVED_PALETTES,
   LAYER_CATEGORIES,
   LAYER_OPERATION_SPECS,
@@ -55,20 +56,15 @@ const OP_DESCRIPTIONS = {
   'vegetation-placement': 'Instantiates up to 44,000 real 3D multi-blade grass tufts masked by slope, elevation, snow, and water.',
 };
 
-// Complete Inspector Control Schema per Layer Type
+// Complete Inspector Control Schema per Layer Type (1:1 aligned with canonical generators & conservative physics)
 const INSPECTOR_SCHEMAS = {
   'base-landform': {
     selects: [
-      { key: 'archetype', label: 'Base Landform Type', options: Object.values(BASE_ARCHETYPES).map((o) => ({ value: o.id, label: o.label })) },
+      { key: 'archetype', label: 'Landform Generator', options: Object.values(BASE_ARCHETYPES).map((o) => ({ value: o.id, label: o.label })) },
     ],
     sliders: [
       { key: 'relief', label: 'Vertical Relief', min: 55, max: 260, step: 1, fmt: (v) => `${Math.round(v)} m` },
-      { key: 'scale', label: 'Feature Frequency', min: 0.7, max: 4.2, step: 0.05, fmt: (v) => `${Number(v).toFixed(2)}×` },
-      { key: 'ridgeSharpness', label: 'Ridge Crest Sharpness', min: 0.05, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
       { key: 'roughness', label: 'Tectonic Roughness', min: 0.05, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-      { key: 'warpStrength', label: 'Domain Fold Warp', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-      { key: 'valleyFloor', label: 'Valley Basin Width', min: 0.0, max: 0.85, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-      { key: 'baseHardness', label: 'Basement Rock Hardness', min: 0.1, max: 0.95, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
     ],
     hasSeed: true,
   },
@@ -92,7 +88,6 @@ const INSPECTOR_SCHEMAS = {
       { key: 'scale', label: 'Spatial Frequency', min: 0.6, max: 5.0, step: 0.05, fmt: (v) => `${Number(v).toFixed(2)}×` },
       { key: 'sharpness', label: 'Crest / Rim Sharpness', min: 0.05, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
       { key: 'azimuth', label: 'Strike / Wind Azimuth', min: -180, max: 180, step: 1, fmt: (v) => `${Math.round(v)}°` },
-      { key: 'hardnessDelta', label: 'Hardness Contribution', min: -0.5, max: 0.5, step: 0.02, fmt: (v) => `${v >= 0 ? '+' : ''}${Math.round(v * 100)}%` },
       { key: 'opacity', label: 'Layer Blend Weight', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
     ],
     hasSeed: true,
@@ -100,13 +95,14 @@ const INSPECTOR_SCHEMAS = {
   'stratigraphic-beds': {
     selects: [],
     sliders: [
-      { key: 'bedCount', label: 'Stratigraphic Bed Count', min: 3, max: 20, step: 1, fmt: (v) => `${Math.round(v)} beds` },
-      { key: 'terraceStrength', label: 'Bench & Cliff Step', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-      { key: 'hardSoftContrast', label: 'Hard / Soft Rock Contrast', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'rockHardness', label: 'Base Rock Hardness', min: 0.08, max: 0.96, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'strataStrength', label: '3D Strata Contrast', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'strataFreq', label: 'Stratigraphic Bed Count', min: 2, max: 24, step: 0.5, fmt: (v) => `${Number(v).toFixed(1)} beds` },
+      { key: 'strataDip', label: 'Bedding Dip Angle', min: 0, max: 45, step: 1, fmt: (v) => `${Math.round(v)}°` },
+      { key: 'strataStrike', label: 'Strike Azimuth', min: -180, max: 180, step: 1, fmt: (v) => `${Math.round(v)}°` },
+      { key: 'faultWeakness', label: 'Fracture & Fault Weakness', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'terraceCarve', label: 'Geometric Terrace Carve', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
       { key: 'ledgeOverhang', label: '3D Caprock Ledge Overhang', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-      { key: 'dipAngle', label: 'Bedding Dip Angle', min: 0, max: 42, step: 1, fmt: (v) => `${Math.round(v)}°` },
-      { key: 'strikeAzimuth', label: 'Strike Azimuth', min: -180, max: 180, step: 1, fmt: (v) => `${Math.round(v)}°` },
-      { key: 'bedFoldWarp', label: 'Anticline Fold Warp', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
       { key: 'opacity', label: 'Layer Blend Weight', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
     ],
     hasSeed: true,
@@ -167,7 +163,7 @@ const INSPECTOR_SCHEMAS = {
   'river-incision': {
     selects: [],
     sliders: [
-      { key: 'iterations', label: 'Drainage Solver Passes', min: 4, max: 75, step: 1, fmt: (v) => `${Math.round(v)} passes` },
+      { key: 'iterations', label: 'Drainage Solver Passes', min: 2, max: 80, step: 1, fmt: (v) => `${Math.round(v)} passes` },
       { key: 'incisionStrength', label: 'Gorge Cutting Power', min: 0.05, max: 1.4, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
       { key: 'headwaterRain', label: 'Catchment Runoff Supply', min: 0.05, max: 1.3, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
       { key: 'basinPooling', label: 'Channel & Basin Water Fill', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
@@ -178,43 +174,37 @@ const INSPECTOR_SCHEMAS = {
   'hydraulic-erosion': {
     selects: [],
     sliders: [
-      { key: 'iterations', label: 'Simulation Iterations', min: 6, max: 110, step: 2, fmt: (v) => `${Math.round(v)} iters` },
-      { key: 'erosionStrength', label: 'Hydraulic Detachment', min: 0.1, max: 1.4, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-      { key: 'sedimentCapacity', label: 'Sediment Transport Capacity', min: 0.1, max: 1.5, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-      { key: 'depositionRate', label: 'Alluvial Fan Deposition', min: 0.05, max: 1.2, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-      { key: 'rainRate', label: 'Rainfall Intensity', min: 0.05, max: 1.4, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-      { key: 'evaporation', label: 'Evaporation Rate', min: 0.02, max: 0.75, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'bakeSteps', label: 'Stack Bake Steps', min: 0, max: 120, step: 2, fmt: (v) => (v > 0 ? `${Math.round(v)} steps` : 'Live sim') },
+      { key: 'rainIntensity', label: 'Rainfall Intensity', min: 0.0, max: 1.2, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'erosionStrength', label: 'Hydraulic Detachment', min: 0.05, max: 1.3, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'sedimentCapacity', label: 'Sediment Capacity', min: 0.05, max: 1.4, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'depositionRate', label: 'Alluvial Deposition', min: 0.05, max: 1.2, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'evaporation', label: 'Evaporation Rate', min: 0.01, max: 0.60, step: 0.01, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'headwaterFlow', label: 'River / Spring Discharge', min: 0.0, max: 1.2, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'lakeRetention', label: 'Basin Lake Retention', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
     ],
     hasSeed: false,
   },
   'thermal-talus': {
     selects: [],
     sliders: [
-      { key: 'iterations', label: 'Relaxation Passes', min: 4, max: 80, step: 2, fmt: (v) => `${Math.round(v)} passes` },
-      { key: 'reposeAngle', label: 'Angle of Repose', min: 20, max: 48, step: 1, fmt: (v) => `${Math.round(v)}°` },
-      { key: 'spallingRate', label: 'Cliff Rock Spalling Rate', min: 0.05, max: 1.2, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-      { key: 'talusSpread', label: 'Scree Apron Runout', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-      { key: 'hardnessShield', label: 'Hard Caprock Shielding', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'bakePasses', label: 'Stack Bake Passes', min: 0, max: 80, step: 2, fmt: (v) => (v > 0 ? `${Math.round(v)} passes` : 'Live sim') },
+      { key: 'talusAngle', label: 'Angle of Repose', min: 0.30, max: 1.10, step: 0.02, fmt: (v) => `${Math.round((Math.atan(v) * 180) / Math.PI)}°` },
+      { key: 'rockfallRate', label: 'Cliff Spalling & Rockfall', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
     ],
     hasSeed: false,
   },
   'aeolian-glacial': {
-    selects: [
-      {
-        key: 'processMode',
-        label: 'Surface Process Regime',
-        options: [
-          { value: 0, label: 'Alpine Snowpack & Cirque Glaciers' },
-          { value: 1, label: 'Aeolian Wind Sand Saltation' },
-        ],
-      },
-    ],
+    selects: [],
     sliders: [
-      { key: 'iterations', label: 'Process Iterations', min: 4, max: 64, step: 2, fmt: (v) => `${Math.round(v)} passes` },
-      { key: 'intensity', label: 'Accumulation / Saltation Flux', min: 0.05, max: 1.3, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-      { key: 'snowline', label: 'Snowline Elevation', min: 0.15, max: 0.95, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-      { key: 'glacierCarve', label: 'Cirque Ice Plucking', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-      { key: 'azimuth', label: 'Prevailing Wind Azimuth', min: -180, max: 180, step: 1, fmt: (v) => `${Math.round(v)}°` },
+      { key: 'bakePasses', label: 'Stack Bake Passes', min: 0, max: 64, step: 2, fmt: (v) => (v > 0 ? `${Math.round(v)} passes` : 'Live sim') },
+      { key: 'snowline', label: 'Snowline Elevation', min: 0.05, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'snowfallRate', label: 'Snowfall Rate', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'glacierStrength', label: 'Glacier Ice Strength', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'iceMeltRate', label: 'Glacial Meltwater Recharge', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'windSpeed', label: 'Wind Speed & Saltation', min: 0.0, max: 1.2, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'windAzimuth', label: 'Prevailing Wind Azimuth', min: -180, max: 180, step: 1, fmt: (v) => `${Math.round(v)}°` },
+      { key: 'dryAeolianMode', label: 'Arid Erg Regime', min: 0.0, max: 1.0, step: 0.05, fmt: (v) => `${Math.round(v * 100)}%` },
     ],
     hasSeed: false,
   },
@@ -237,8 +227,8 @@ const INSPECTOR_SCHEMAS = {
     selects: [],
     sliders: [
       { key: 'density', label: '3D Boulder Scatter Density', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-      { key: 'talusAffinity', label: 'Cliff-Toe & Talus Clustering', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
-      { key: 'settleSteps', label: 'Gravity Tumble Settle Steps', min: 0, max: 56, step: 2, fmt: (v) => `${Math.round(v)} steps` },
+      { key: 'talusAffinity', label: 'Cliff-Toe & Rockfall Rate', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
+      { key: 'settleSteps', label: 'Pre-Settle Tumble Steps', min: 0, max: 56, step: 2, fmt: (v) => `${Math.round(v)} steps` },
     ],
     hasSeed: true,
   },
@@ -249,7 +239,7 @@ const INSPECTOR_SCHEMAS = {
     sliders: [
       { key: 'density', label: '3D Tuft Scatter Density', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
       { key: 'bladeHeight', label: '3D Blade Height', min: 0.4, max: 2.4, step: 0.05, fmt: (v) => `${Number(v).toFixed(2)} m` },
-      { key: 'slopeMax', label: 'Maximum Slope Cutoff', min: 10, max: 52, step: 1, fmt: (v) => `${Math.round(v)}°` },
+      { key: 'slopeMax', label: 'Maximum Slope Cutoff', min: 0.20, max: 1.30, step: 0.02, fmt: (v) => `${Math.round((Math.atan(v) * 180) / Math.PI)}°` },
       { key: 'elevationMax', label: 'Treeline / Meadow Ceiling', min: 0.15, max: 0.98, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
       { key: 'patchiness', label: 'Meadow Clumping', min: 0.0, max: 1.0, step: 0.02, fmt: (v) => `${Math.round(v * 100)}%` },
       { key: 'windSway', label: 'Wind Gust Sway', min: 0.0, max: 1.4, step: 0.05, fmt: (v) => `${Math.round(v * 100)}%` },
@@ -818,11 +808,19 @@ export class ErosionLayerStackUI {
     const sunEl = this.engine.params.sunElevation ?? 28;
     const sunAzPct = (((sunAz + 180) / 360) * 100).toFixed(1);
     const sunElPct = (((sunEl - 4) / 81) * 100).toFixed(1);
+    const curFab = this.pipeline.fabricMode ?? 0;
+    const fabOpts = Object.values(DERIVED_FABRICS)
+      .map((f) => `<option value="${f.id}" ${Number(curFab) === f.id ? 'selected' : ''}>${f.label}</option>`)
+      .join('');
 
     const shadingCardHtml = `
       <section class="tp-property-card">
         <h2><i style="background:#82939e"></i><span>Derived Surface Shading &amp; Sun</span></h2>
         <p class="tp-card-note">Shading is derived purely from AO, protrusions, height, rock hardness, sediment &amp; flow — independent of the geometry stack.</p>
+        <div class="tp-control-row">
+          <div class="tp-control-label"><span>Rock Micro-Fabric</span></div>
+          <select class="tp-select" id="tp-select-fabric">${fabOpts}</select>
+        </div>
         <div class="tp-control-row">
           <div class="tp-control-label"><span>Sun Azimuth</span></div>
           <div class="tp-amount" style="--fill:${sunAzPct}%">
@@ -840,6 +838,10 @@ export class ErosionLayerStackUI {
         <label class="tp-check-row">
           <input type="checkbox" id="tp-chk-show-water" ${this.engine.params.showWater !== false ? 'checked' : ''} />
           <span>Render 2.5D River &amp; Basin Water</span>
+        </label>
+        <label class="tp-check-row">
+          <input type="checkbox" id="tp-chk-show-particles" ${this.engine.params.showParticles !== false ? 'checked' : ''} />
+          <span>Show 3D Rain / Snow / Wind Particles</span>
         </label>
       </section>`;
 
@@ -1032,7 +1034,14 @@ export class ErosionLayerStackUI {
       });
     }
 
-    // Sun & Water bindings
+    // Fabric, Sun, Water & Particle bindings
+    const selFab = document.getElementById('tp-select-fabric');
+    if (selFab) {
+      selFab.addEventListener('change', () => {
+        this.pipeline.fabricMode = Number(selFab.value);
+        this.engine.params.fabricMode = this.pipeline.fabricMode;
+      });
+    }
     const slAz = document.getElementById('tp-slider-sun-az');
     const outAz = document.getElementById('tp-out-sun-az');
     if (slAz) {
@@ -1057,6 +1066,12 @@ export class ErosionLayerStackUI {
     if (chkWater) {
       chkWater.addEventListener('change', () => {
         this.engine.params.showWater = chkWater.checked;
+      });
+    }
+    const chkPart = document.getElementById('tp-chk-show-particles');
+    if (chkPart) {
+      chkPart.addEventListener('change', () => {
+        this.engine.params.showParticles = chkPart.checked;
       });
     }
   }
