@@ -8,8 +8,11 @@ import {
   EROSION_LANDSCAPES,
   MATERIAL_THEMES,
   ROCK_FABRIC_MODES,
+  getVegetationDefaultsForLandscape,
 } from '../src/erosion/erosion-presets.js';
 import { RockCalvingSystem, buildRockArchetypeAtlas } from '../src/erosion/rock-calving.js';
+import { buildGrassTuftMesh, MAX_GRASS_TUFTS } from '../src/erosion/grass-system.js';
+import { PROCEDURAL_MODIFIER_CATALOG, glyphSvg } from '../src/erosion/layer-stack-ui.js';
 import * as Shaders from '../src/erosion/erosion-shaders.js';
 
 const ALL_SHADER_EXPORTS = [
@@ -31,6 +34,9 @@ const ALL_SHADER_EXPORTS = [
   'SKY_BG_FRAG',
   'ROCK_INSTANCE_VERT',
   'ROCK_INSTANCE_FRAG',
+  'PROCEDURAL_MODIFIER_FRAG',
+  'GRASS_INSTANCE_VERT',
+  'GRASS_INSTANCE_FRAG',
 ];
 
 test('GPU Erosion presets cover all 19 landscapes including non-periodic Himalayas, Sahara Grand Erg, Rugged Desert, Moon, Icelandic Green Highlands & Oasis', () => {
@@ -136,6 +142,7 @@ test('All 18 WebGL2 GLSL ES 3.00 shaders satisfy strict ANGLE precision, brace, 
   const uniformRegex = /(?:getUniformLocation|_bindTex)\(\s*this\.(\w+)\s*,\s*'(\w+)'/g;
   const progMap = {
     progInitTerrain: [Shaders.FULLSCREEN_VERT, Shaders.INIT_TERRAIN_FRAG],
+    progProceduralMod: [Shaders.FULLSCREEN_VERT, Shaders.PROCEDURAL_MODIFIER_FRAG],
     progInitSnow: [Shaders.FULLSCREEN_VERT, Shaders.INIT_SNOW_FRAG],
     progInitParticles: [Shaders.FULLSCREEN_VERT, Shaders.INIT_PARTICLES_FRAG],
     progParticleStep: [Shaders.FULLSCREEN_VERT, Shaders.PARTICLE_STEP_FRAG],
@@ -146,6 +153,7 @@ test('All 18 WebGL2 GLSL ES 3.00 shaders satisfy strict ANGLE precision, brace, 
     progSnowCryo: [Shaders.FULLSCREEN_VERT, Shaders.SNOW_CRYO_FRAG],
     progTerrainRender: [Shaders.TERRAIN_RENDER_VERT, Shaders.TERRAIN_RENDER_FRAG],
     progRockInstance: [Shaders.ROCK_INSTANCE_VERT, Shaders.ROCK_INSTANCE_FRAG],
+    progGrassInstance: [Shaders.GRASS_INSTANCE_VERT, Shaders.GRASS_INSTANCE_FRAG],
     progParticleRender: [Shaders.PARTICLE_RENDER_VERT, Shaders.PARTICLE_RENDER_FRAG],
   };
 
@@ -437,4 +445,91 @@ test('Asymmetric Namib/Sahara sand dune profile joins windward stoss & 33.8-deg 
   assert.equal(evalDune(140.0), 0, 'Interdune floor beyond slipface toe must be clean exposed desert pan');
   assert.equal(evalDune(-190.0), 0, 'Upwind stoss toe merges smoothly onto flat desert pan');
 });
+
+test('3D Rocks pack non-negative airLift and ROCK_INSTANCE_VERT locks footprints to exact 512x512 terrain heightfield', () => {
+  assert.ok(
+    Shaders.ROCK_INSTANCE_VERT.includes('texelFetch(uTerrainTex') &&
+    Shaders.ROCK_INSTANCE_VERT.includes('texelFetch(uSnowTex') &&
+    Shaders.ROCK_INSTANCE_VERT.includes('max(0.0, aInstPosMeta.y)'),
+    'ROCK_INSTANCE_VERT must lock 3D rock footprints onto exact 512x512 uTerrainTex + uSnowTex with non-negative airLift'
+  );
+
+  const sys = new RockCalvingSystem(6);
+  const N = 64;
+  const grid = new Float32Array(N * N * 4);
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const idx = (j * N + i) * 4;
+      const u = i / (N - 1);
+      // Create convex rocky crown on left, steep cliff in center, gentle talus apron on right
+      const h = u < 0.35
+        ? 110.0 - Math.pow((u - 0.18) * 12.0, 2.0) * 1.4
+        : u < 0.55
+          ? 105.0 - (u - 0.35) * 360.0
+          : 33.0 - (u - 0.55) * 14.0;
+      grid[idx] = h;
+      grid[idx + 1] = 0.0; // dry
+      grid[idx + 2] = u >= 0.55 && u < 0.72 ? 1.4 : 0.0; // coarse scree at cliff toe
+      grid[idx + 3] = 0.0; // low sand
+    }
+  }
+  sys.updateTerrainSnapshot(grid, N, 512.0);
+  sys.seedForLandscape({ seed: 4029, boulderDensity: 0.85, rockfallRate: 0.75 });
+  assert.ok(sys.rocks.length >= 25, `Expected >= 25 seeded outcrops + talus boulders, got ${sys.rocks.length}`);
+
+  for (let s = 0; s < 30; s++) sys.stepPhysics(0.04);
+  for (let v = 0; v < 6; v++) {
+    const count = sys.bucketCounts[v];
+    const arr = sys.bucketData[v];
+    for (let k = 0; k < count; k++) {
+      const airLift = arr[k * 16 + 13];
+      assert.ok(Number.isFinite(airLift) && airLift >= 0.0, `Rock airLift must be >= 0 so rocks never sink underground, got ${airLift}`);
+    }
+  }
+});
+
+test('Real 3D Grass tuft mesh, biome vegetation defaults (Green / Dry / Auto-Blend), and Layer Stack preserve preset visual invariance', () => {
+  // 1. 3D Curved Grass Tuft Geometry
+  const tuft = buildGrassTuftMesh();
+  assert.equal(tuft.vertexCount, 35, '5 curved 3D grass blades * 7 verts = 35 vertices per tuft');
+  assert.equal(tuft.indexCount, 75, '5 curved 3D grass blades * 5 segments * 3 indices = 75 indices per tuft');
+  assert.equal(tuft.positions.length, 35 * 3);
+  assert.equal(tuft.normals.length, 35 * 3);
+  assert.equal(tuft.bladeMeta.length, 35 * 2);
+  assert.ok(MAX_GRASS_TUFTS >= 32000);
+  for (let i = 0; i < tuft.positions.length; i++) {
+    assert.ok(Number.isFinite(tuft.positions[i]), 'Non-finite grass vertex position');
+    assert.ok(Number.isFinite(tuft.normals[i]), 'Non-finite grass vertex normal');
+  }
+
+  // 2. Biome Vegetation Defaults (Green Grass vs Dry Grass vs Disabled)
+  const greenHighlands = getVegetationDefaultsForLandscape('icelandic-green-highlands');
+  assert.equal(greenHighlands.grassEnabled, true);
+  assert.equal(greenHighlands.grassMode, 0, 'Icelandic Green Highlands uses lush Green Grass');
+
+  const oasis = getVegetationDefaultsForLandscape('desert-oasis-erg');
+  assert.equal(oasis.grassEnabled, true);
+  assert.equal(oasis.grassMode, 2, 'Desert Oasis uses Biome Auto-Blend (green oasis shore -> dry outer fringe)');
+
+  const ruggedDesert = getVegetationDefaultsForLandscape('rugged-desert-crags');
+  assert.equal(ruggedDesert.grassEnabled, true);
+  assert.equal(ruggedDesert.grassMode, 1, 'Rugged Desert Crags uses Dry Grass');
+
+  const moon = getVegetationDefaultsForLandscape('lunar-mare-craters');
+  assert.equal(moon.grassEnabled, false, 'Lunar Mare Craters disables grass');
+
+  // 3. Layer Stack Default Visual Invariance & Independent Simulation Flags
+  assert.deepEqual(DEFAULT_EROSION_PARAMS.proceduralModifiers, [], 'Default preset must have zero procedural modifiers so existing terrains are visually unchanged');
+  assert.equal(DEFAULT_EROSION_PARAMS.lithologyLayerEnabled, true);
+  assert.equal(DEFAULT_EROSION_PARAMS.fabricLayerEnabled, true);
+  assert.equal(DEFAULT_EROSION_PARAMS.snowLayerEnabled, true);
+  assert.equal(DEFAULT_EROSION_PARAMS.waterLayerEnabled, true);
+  assert.equal(DEFAULT_EROSION_PARAMS.simHydraulicPlaying, true);
+  assert.equal(DEFAULT_EROSION_PARAMS.simCryoPlaying, true);
+  assert.equal(DEFAULT_EROSION_PARAMS.simWindPlaying, true);
+  assert.equal(DEFAULT_EROSION_PARAMS.simRockfallPlaying, true);
+  assert.equal(PROCEDURAL_MODIFIER_CATALOG.length, 6);
+  assert.ok(glyphSvg('grass').includes('<svg') && glyphSvg('layers').includes('<svg'));
+});
+
 

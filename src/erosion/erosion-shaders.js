@@ -1927,6 +1927,7 @@ uniform sampler2D uTerrainTex;
 uniform sampler2D uSnowTex;
 uniform mat4 uViewProj;
 uniform vec4 uRenderDomain; // (worldSpan, gridRes, showWater, timeSec)
+uniform vec4 uLayerVis;     // (lithologyOpacity, fabricStrength, snowVisOpacity, waterVisOpacity)
 
 out vec2 vUv;
 out vec3 vWorldPos;
@@ -1938,9 +1939,9 @@ void main() {
   vec4 terr = texelFetch(uTerrainTex, tc, 0);
   vec4 cryo = texelFetch(uSnowTex, tc, 0);
 
-  float waterLift = uRenderDomain.z > 0.5 ? terr.a : 0.0;
+  float waterLift = uRenderDomain.z > 0.5 ? terr.a * uLayerVis.w : 0.0;
   // Snowpack & glacier ice physically raise the visible surface (capped so drifts never balloon)
-  float cryoLift = min(3.4, cryo.r * 0.85 + cryo.g * 0.62);
+  float cryoLift = min(3.4, cryo.r * 0.85 + cryo.g * 0.62) * uLayerVis.z;
   float hSurf = terr.r + terr.g + terr.b + waterLift + cryoLift;
 
   vec2 xz = (clampedUv - 0.5) * uRenderDomain.x;
@@ -1978,6 +1979,7 @@ uniform vec4 uStrataOrient;   // (sinStrike, cosStrike, tanDip, reliefScale)
 uniform vec4 uBrush;          // (brushX, brushZ, brushRadius, brushMode)
 uniform vec4 uClimate;        // (snowlineNorm, snowfallRate, glacierStrength, meltRate)
 uniform vec4 uWindRender;     // (windX, windZ, windSpeed, dryAeolianMode)
+uniform vec4 uLayerVis;       // (lithologyOpacity, fabricStrength, snowVisOpacity, waterVisOpacity)
 uniform int uViewMode;
 uniform int uMaterialTheme;   // 0..2 = Baseline, 3 = Grand Canyon, 4 = Studlagil, 5 = Yardang, 6 = Namib Erg
 uniform int uFabricMode;      // 0 = Baseline, 1 = Columnar, 2 = Cross-Bed/Ripples, 3 = Tafoni, 4 = Gneiss
@@ -2191,7 +2193,9 @@ void main() {
   // ==========================================================================
   // PROCEDURAL LITHOLOGY FABRIC TEXTURING (uFabricMode 1..4; 0 = untouched baseline!)
   // ==========================================================================
-  if (uFabricMode > 0 && (uMaterialTheme != 6 || tC.b < 0.08)) {
+  vec3 preFabricAlbedo = rockAlbedo;
+  vec3 preFabricNormal = bedNormal;
+  if (uFabricMode > 0 && uLayerVis.y > 0.001 && (uMaterialTheme != 6 || tC.b < 0.08)) {
     float steepFace = smoothstep(0.18, 0.72, 1.0 - bedNormal.y);
     if (uFabricMode == 1) {
       // Hexagonal Columnar Basalt Colonnades + Chisel Cross-Joints
@@ -2224,6 +2228,13 @@ void main() {
       float gneissBand = smoothstep(-0.55, 0.55, sin(fold * 3.1));
       rockAlbedo = mix(rockAlbedo * 0.78, rockAlbedo * 1.22 + vec3(0.03), gneissBand);
     }
+    if (uLayerVis.y < 0.999) {
+      rockAlbedo = mix(preFabricAlbedo, rockAlbedo, uLayerVis.y);
+      bedNormal = safeNorm3(mix(preFabricNormal, bedNormal, uLayerVis.y), preFabricNormal);
+    }
+  }
+  if (uLayerVis.x < 0.999) {
+    rockAlbedo = mix(vec3(0.24, 0.23, 0.22) * (1.0 + 0.08 * grain), rockAlbedo, uLayerVis.x);
   }
 
   // ==========================================================================
@@ -2239,8 +2250,8 @@ void main() {
   // Subtle wind-fluted sastrugi & exposed rock ribs ONLY on steep walls; broad snowfields stay rich & continuous!
   float snowPatch = mix(1.0, 0.62 + 0.38 * ridgedFbm2D(vWorldPos.xz * 0.055 + 5.3, 3, 0.5), smoothstep(0.28, 0.65, 1.0 - bedNormal.y));
   float snowCover = isSideSkirt ? 0.0
-    : clamp(smoothstep(0.018, 0.32, snowDepth) * mix(0.35, 1.0, slopeHold) * snowPatch, 0.0, 1.0);
-  float iceCover = isSideSkirt ? 0.0 : smoothstep(0.06, 0.70, iceDepth) * mix(0.45, 1.0, slopeHold);
+    : clamp(smoothstep(0.018, 0.32, snowDepth) * mix(0.35, 1.0, slopeHold) * snowPatch, 0.0, 1.0) * uLayerVis.z;
+  float iceCover = (isSideSkirt ? 0.0 : smoothstep(0.06, 0.70, iceDepth) * mix(0.45, 1.0, slopeHold)) * uLayerVis.z;
 
   // Fresh snow is high-albedo; shaded snow picks up cold Himalayan sky-blue subsurface bounce!
   vec3 snowAlbedo = mix(vec3(0.56, 0.64, 0.76), vec3(0.89, 0.92, 0.97), clamp(bedNormal.y, 0.0, 1.0));
@@ -2294,7 +2305,7 @@ void main() {
       float dRip2 = f2 < 0.72 ? 0.22 : -0.60;
       // Fade micro-ripples cleanly with camera distance to prevent aliasing shimmer!
       float distAtten = 1.0 - smoothstep(90.0, 420.0, length(uCameraPos - vWorldPos));
-      float ripStrength = (dRip1 * 0.065 + dRip2 * 0.032) * sandRippleMask * distAtten;
+      float ripStrength = (dRip1 * 0.065 + dRip2 * 0.032) * sandRippleMask * distAtten * uLayerVis.y;
       bedNormal = safeNorm3(bedNormal - vec3(wDir.x * ripStrength, 0.0, wDir.y * ripStrength), bedNormal);
     }
   }
@@ -2420,7 +2431,7 @@ void main() {
     vec3 waterTint = mix(clearWaterCol, vec3(0.24, 0.22, 0.15), turbidity * 0.55 * (1.0 - smoothstep(0.4, 2.0, wDepth)));
 
     float absorb = 1.0 - exp(-wDepth * 2.6);
-    float waterAlpha = smoothstep(0.004, 0.045, wDepth);
+    float waterAlpha = smoothstep(0.004, 0.045, wDepth) * uLayerVis.w;
     float oneMinusNdotV = max(0.0, 1.0 - clamp(dot(waterN, V), 0.0, 1.0));
     float fresnel = 0.04 + 0.62 * sq(sq(oneMinusNdotV));
     vec3 skyReflect = mix(vec3(0.22, 0.30, 0.40), vec3(0.55, 0.66, 0.80), clamp(waterN.y, 0.0, 1.0));
@@ -2629,18 +2640,68 @@ layout(location = 2) in vec4 aMask;        // (ao, cavity, edge, localY)
 layout(location = 3) in vec4 aInstCol0;    // (rightScaled.xyz, seedHash)
 layout(location = 4) in vec4 aInstCol1;    // (upScaled.xyz, wear)
 layout(location = 5) in vec4 aInstCol2;    // (fwdScaled.xyz, radiusY)
-layout(location = 6) in vec4 aInstPosMeta; // (worldPos.xyz, isOutcrop)
+layout(location = 6) in vec4 aInstPosMeta; // (worldX, airLift, worldZ, isOutcrop)
 
+uniform sampler2D uTerrainTex;
+uniform sampler2D uSnowTex;
 uniform mat4 uViewProj;
+uniform vec4 uRenderDomain; // (worldSpan, gridRes, showWater, timeSec)
+uniform vec4 uLayerVis;     // (lithologyOpacity, fabricStrength, snowVisOpacity, waterVisOpacity)
 
 out vec3 vWorldPos;
 out vec3 vWorldNormal;
 out vec4 vMask;
 out vec3 vInstMeta; // (seedHash, wear, isOutcrop)
 
+float sampleSurfaceAtXZ(vec2 xz, float span, float res, float snowVis) {
+  vec2 uv = clamp(xz / max(span, 1.0) + 0.5, vec2(0.001), vec2(0.999));
+  vec2 grid = uv * (res - 1.0);
+  ivec2 i0 = ivec2(floor(grid));
+  vec2 f = fract(grid);
+  int maxI = int(res) - 1;
+  ivec2 i00 = clamp(i0, ivec2(0), ivec2(maxI));
+  ivec2 i10 = clamp(i0 + ivec2(1, 0), ivec2(0), ivec2(maxI));
+  ivec2 i01 = clamp(i0 + ivec2(0, 1), ivec2(0), ivec2(maxI));
+  ivec2 i11 = clamp(i0 + ivec2(1, 1), ivec2(0), ivec2(maxI));
+
+  vec4 t00 = texelFetch(uTerrainTex, i00, 0);
+  vec4 t10 = texelFetch(uTerrainTex, i10, 0);
+  vec4 t01 = texelFetch(uTerrainTex, i01, 0);
+  vec4 t11 = texelFetch(uTerrainTex, i11, 0);
+  vec4 terr = mix(mix(t00, t10, f.x), mix(t01, t11, f.x), f.y);
+
+  vec4 s00 = texelFetch(uSnowTex, i00, 0);
+  vec4 s10 = texelFetch(uSnowTex, i10, 0);
+  vec4 s01 = texelFetch(uSnowTex, i01, 0);
+  vec4 s11 = texelFetch(uSnowTex, i11, 0);
+  vec4 cryo = mix(mix(s00, s10, f.x), mix(s01, s11, f.x), f.y);
+
+  float cryoLift = min(3.4, cryo.r * 0.85 + cryo.g * 0.62) * snowVis;
+  return terr.r + terr.g + terr.b + cryoLift;
+}
+
 void main() {
   mat3 M = mat3(aInstCol0.xyz, aInstCol1.xyz, aInstCol2.xyz);
-  vec3 wp = M * aPos + aInstPosMeta.xyz;
+  float span = uRenderDomain.x;
+  float res = uRenderDomain.y;
+  vec2 centerXZ = aInstPosMeta.xz;
+  float airLift = max(0.0, aInstPosMeta.y);
+  float radiusY = max(0.25, aInstCol2.w);
+  bool isOutcrop = aInstPosMeta.w > 0.5;
+
+  // Sample exact 512x512 GPU terrain + snow across the rock footprint so rocks NEVER sink under
+  // sub-8m ridges, dunes, or snowdrifts that were smoothed out in the 64x64 CPU telemetry grid!
+  float rFoot = min(3.2, 0.50 * max(length(aInstCol0.xyz), length(aInstCol2.xyz)));
+  float hC = sampleSurfaceAtXZ(centerXZ, span, res, uLayerVis.z);
+  float hE = sampleSurfaceAtXZ(centerXZ + vec2(rFoot, 0.0), span, res, uLayerVis.z);
+  float hW = sampleSurfaceAtXZ(centerXZ - vec2(rFoot, 0.0), span, res, uLayerVis.z);
+  float hN = sampleSurfaceAtXZ(centerXZ + vec2(0.0, rFoot), span, res, uLayerVis.z);
+  float hS = sampleSurfaceAtXZ(centerXZ - vec2(0.0, rFoot), span, res, uLayerVis.z);
+  float hFoot = max(hC, 0.55 * hC + 0.45 * max(max(hE, hW), max(hN, hS)));
+
+  float centerY = hFoot + radiusY * (isOutcrop ? 0.36 : 0.48) + airLift;
+  vec3 wp = M * aPos + vec3(centerXZ.x, centerY, centerXZ.y);
+
   // Cofactor / inverse-transpose for non-uniform rock scaling so facet normals stay exact!
   vec3 nWorld = cross(M[1], M[2]) * aNormal.x
               + cross(M[2], M[0]) * aNormal.y
@@ -2802,3 +2863,352 @@ void main() {
   outColor = vec4(pow(max(vec3(1e-6), clamp(mapped, 0.0, 1.0)), vec3(1.0 / 2.2)), 1.0);
 }
 `;
+
+export const PROCEDURAL_MODIFIER_FRAG = `#version 300 es
+${GLSL_PRECISION_HEADER}
+in vec2 vUv;
+layout(location = 0) out vec4 outTerrain;
+
+uniform sampler2D uTerrainTex;
+uniform vec4 uModShape;  // (amplitude, scale, detail, angleDeg)
+uniform vec4 uModBlend;  // (strength, blendMode, maskType, seed)
+uniform vec4 uModMask;   // (maskLow, maskHigh, maskInvert, reliefRef)
+uniform float uWorldSpan;
+uniform float uGridRes;
+
+${COMMON_GEOLOGY_GLSL}
+
+void main() {
+  ivec2 c = ivec2(gl_FragCoord.xy);
+  int maxI = int(uGridRes) - 1;
+  vec4 tC = texelFetch(uTerrainTex, c, 0);
+
+  int kind = int(uModMask.w + 0.5);
+  int blendMode = int(uModBlend.y + 0.5);
+  int maskType = int(uModBlend.z + 0.5);
+  float strength = uModBlend.x;
+  float seed = uModBlend.w;
+
+  vec2 p = vUv * 2.0 - 1.0;
+  vec2 seedVec = vec2(fract(seed * 0.0137) * 53.0, fract(seed * 0.0293) * 71.0);
+  float amp = uModShape.x;
+  float freq = max(0.35, uModShape.y);
+  float detail = clamp(uModShape.z, 0.05, 0.98);
+  float ang = uModShape.w * 0.01745329;
+  vec2 dir = vec2(cos(ang), sin(ang));
+  vec2 perp = vec2(-dir.y, dir.x);
+
+  vec2 warp = vec2(
+    fbm2D(p * 1.6 + seedVec, 3, 0.52) - 0.5,
+    fbm2D(p * 1.6 + seedVec + vec2(17.1, 31.4), 3, 0.52) - 0.5
+  ) * 0.36;
+  vec2 wp = p + warp;
+
+  float deltaBed = 0.0;
+  float deltaFine = 0.0;
+
+  if (kind == 0) {
+    // Ridge & Horn Uplift
+    vec2 rotP = vec2(dot(wp, dir), dot(wp, perp));
+    float spineA = ridgedFbm2D(rotP * vec2(freq * 0.85, freq * 1.35) + seedVec, 5, detail);
+    float spineB = ridgedFbm2D(rotP.yx * (freq * 1.15) + seedVec + 11.4, 4, detail);
+    deltaBed = pow(max(0.0, 0.62 * spineA + 0.38 * spineA * spineB), 1.35) * amp;
+  } else if (kind == 1) {
+    // Continental Massif & Plateau
+    float raw = fbm2D(wp * freq + seedVec, 5, 0.54);
+    float plat = 1.0 - pow(max(0.0, 1.0 - raw), 3.0);
+    deltaBed = mix(raw, plat, detail) * amp;
+  } else if (kind == 2) {
+    // Tectonic Fault Escarpment
+    float across = dot(p, dir) + 0.16 * (fbm2D(p * freq + seedVec, 3, 0.5) - 0.5);
+    float stepUp = smoothstep(-0.22 * (1.15 - detail), 0.22 * (1.15 - detail), across);
+    deltaBed = stepUp * (0.72 + 0.28 * ridgedFbm2D(wp * (freq * 1.4) + seedVec, 4, 0.52)) * amp;
+  } else if (kind == 3) {
+    // Strata Terrace Package
+    float bedH = max(4.0, 48.0 / freq);
+    float dipShift = dot(p * (0.5 * uWorldSpan), dir) * tan(detail * 0.45);
+    float zStrat = (tC.r + dipShift) / bedH;
+    float f = fract(zStrat);
+    float stepped = (floor(zStrat) + smoothstep(0.5 - 0.35 * (1.0 - detail), 0.5 + 0.35 * (1.0 - detail), f)) * bedH - dipShift;
+    deltaBed = (stepped - tC.r) * clamp(amp / 80.0, 0.0, 1.5);
+  } else if (kind == 4) {
+    // Aeolian Sand Dune Field (writes to fine sand layer!)
+    float u = dot(p, dir) * freq * 2.2 + 0.28 * sin(dot(p, perp) * freq * 2.6 + seed * 0.01);
+    float f = fract(u);
+    float duneProf = f < 0.72 ? sq(f / 0.72) : max(0.0, 1.0 - (f - 0.72) / 0.28);
+    deltaFine = duneProf * amp * 0.45;
+  } else if (kind == 5) {
+    // Impact Crater Field
+    vec2 cell = floor((p * freq * 1.8) + seedVec);
+    vec2 f = fract((p * freq * 1.8) + seedVec) - 0.5;
+    vec3 rnd = hash32(cell);
+    float d = length(f - (rnd.xy - 0.5) * 0.36) / max(0.14, 0.34 * detail);
+    if (d < 1.0) {
+      deltaBed = -amp * 0.55 * (1.0 - d * d) + amp * 0.14 * smoothstep(0.70, 1.0, d);
+    } else if (d < 2.2) {
+      deltaBed = amp * 0.14 * exp(-(d - 1.0) * 3.2);
+    }
+  }
+
+  // Channel masking (0 = None, 1 = Normalized Height, 2 = Slope)
+  float maskW = 1.0;
+  if (maskType > 0) {
+    float val = 0.0;
+    if (maskType == 1) {
+      val = clamp((tC.r + tC.g + tC.b) / 180.0, 0.0, 1.0);
+    } else {
+      vec4 tR = texelFetch(uTerrainTex, ivec2(min(maxI, c.x + 1), c.y), 0);
+      vec4 tL = texelFetch(uTerrainTex, ivec2(max(0, c.x - 1), c.y), 0);
+      vec4 tU = texelFetch(uTerrainTex, ivec2(c.x, min(maxI, c.y + 1)), 0);
+      vec4 tD = texelFetch(uTerrainTex, ivec2(c.x, max(0, c.y - 1)), 0);
+      float cellSz = uWorldSpan / max(1.0, uGridRes - 1.0);
+      vec2 grad = vec2((tR.r - tL.r), (tU.r - tD.r)) / (2.0 * cellSz);
+      val = clamp(length(grad) / 1.5, 0.0, 1.0);
+    }
+    maskW = smoothstep(uModMask.x, max(uModMask.x + 0.02, uModMask.y), val);
+    if (uModMask.z > 0.5) maskW = 1.0 - maskW;
+  }
+
+  float w = clamp(strength * maskW, 0.0, 1.5);
+  float nextBed = tC.r;
+  if (blendMode == 0) {
+    nextBed = max(1.0, tC.r + deltaBed * w);
+  } else if (blendMode == 1) {
+    nextBed = max(1.0, tC.r - abs(deltaBed) * w);
+  } else if (blendMode == 2) {
+    nextBed = mix(tC.r, max(tC.r, 8.0 + deltaBed), clamp(w, 0.0, 1.0));
+  } else {
+    nextBed = mix(tC.r, max(1.0, 8.0 + deltaBed), clamp(w, 0.0, 1.0));
+  }
+  float nextFine = max(0.0, tC.b + deltaFine * w);
+
+  outTerrain = vec4(nextBed, tC.g, nextFine, tC.a);
+}
+`;
+
+export const GRASS_INSTANCE_VERT = `#version 300 es
+${GLSL_PRECISION_HEADER}
+
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aNormal;
+layout(location = 2) in vec2 aBladeMeta; // (tAlong [0..1], bladeHash [0..1])
+
+uniform sampler2D uTerrainTex;
+uniform sampler2D uSnowTex;
+uniform mat4 uViewProj;
+uniform vec3 uCameraPos;
+uniform vec4 uRenderDomain; // (worldSpan, gridRes, showWater, timeSec)
+uniform vec4 uGrassParams;  // (tuftCount, bladeHeight, windSway, slopeMaxTan)
+uniform vec4 uGrassStyle;   // (grassMode, dryBlend, elevMax, patchiness)
+uniform vec4 uWindRender;   // (windX, windZ, windSpeed, dryAeolianMode)
+uniform vec4 uStrataOrient; // (sinStrike, cosStrike, tanDip, reliefScale)
+uniform float uSeed;
+
+out vec3 vWorldPos;
+out vec3 vWorldNormal;
+out vec3 vGrassFactors; // (bladeT, dryAmount, tuftVar)
+
+${COMMON_GEOLOGY_GLSL}
+
+void main() {
+  int id = gl_InstanceID;
+  float totalTufts = max(1.0, uGrassParams.x);
+  if (float(id) >= totalTufts) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    vWorldPos = vec3(0.0);
+    vWorldNormal = vec3(0.0, 1.0, 0.0);
+    vGrassFactors = vec3(0.0);
+    return;
+  }
+
+  // Stratified jittered lattice across the 500m domain (zero grid artifacts, zero CPU overhead!)
+  float side = ceil(sqrt(totalTufts));
+  float ix = mod(float(id), side);
+  float iz = floor(float(id) / side);
+  vec3 rnd = hash32(vec2(ix, iz) + fract(uSeed * 0.0173) * 91.0);
+
+  vec2 uv = (vec2(ix, iz) + rnd.xy) / side;
+  uv = mix(vec2(0.025), vec2(0.975), clamp(uv, vec2(0.0), vec2(1.0)));
+
+  float span = uRenderDomain.x;
+  float res = uRenderDomain.y;
+  vec2 worldXZ = (uv - 0.5) * span;
+
+  // Distance cull / thin beyond 440m for blazing-fast GPU performance
+  float camDist = length(uCameraPos.xz - worldXZ);
+  if (camDist > 455.0) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    vWorldPos = vec3(0.0);
+    vWorldNormal = vec3(0.0, 1.0, 0.0);
+    vGrassFactors = vec3(0.0);
+    return;
+  }
+
+  vec4 terr = sampleGridBilinear(uTerrainTex, uv, res);
+  vec4 cryo = sampleGridBilinear(uSnowTex, uv, res);
+  float eps = 1.0 / res;
+  vec4 tR = sampleGridBilinear(uTerrainTex, uv + vec2(eps, 0.0), res);
+  vec4 tL = sampleGridBilinear(uTerrainTex, uv - vec2(eps, 0.0), res);
+  vec4 tU = sampleGridBilinear(uTerrainTex, uv + vec2(0.0, eps), res);
+  vec4 tD = sampleGridBilinear(uTerrainTex, uv - vec2(0.0, eps), res);
+
+  float cellSz = span / max(1.0, res - 1.0);
+  float hC = terr.r + terr.g + terr.b;
+  vec2 grad = vec2((tR.r + tR.g + tR.b) - (tL.r + tL.g + tL.b), (tU.r + tU.g + tU.b) - (tD.r + tD.g + tD.b)) / (2.0 * cellSz);
+  float slope = length(grad);
+  float elevFrac = clamp(hC / max(1.0, uStrataOrient.w), 0.0, 1.3);
+
+  // Nearby moisture boost along riverbanks & desert oasis shorelines!
+  float nearWater = max(max(tR.a, tL.a), max(tU.a, tD.a));
+  float moisture = smoothstep(0.002, 0.06, nearWater) * (1.0 - smoothstep(0.015, 0.055, terr.a));
+
+  // Ecological suitability mask: reject open water, snow/glacier pack, steep cliffs, high summits & thick dry sand dunes
+  float dryCheck = 1.0 - smoothstep(0.012, 0.045, terr.a);
+  float snowCheck = 1.0 - smoothstep(0.04, 0.16, cryo.r + cryo.g);
+  float slopeCheck = 1.0 - smoothstep(uGrassParams.w * 0.76, uGrassParams.w, slope);
+  float elevCheck = 1.0 - smoothstep(max(0.08, uGrassStyle.z - 0.14), uGrassStyle.z + 0.04, elevFrac);
+  float sandCheck = mix(1.0 - smoothstep(0.65, 1.55, terr.b), 1.0, moisture);
+
+  // Natural meadow clumping / patchiness
+  float meadowNoise = fbm2D(worldXZ * 0.038 + vec2(13.4, 7.9), 3, 0.55);
+  float patchGate = mix(1.0, smoothstep(0.28, 0.62, meadowNoise + moisture * 0.32), uGrassStyle.w);
+
+  float vitality = dryCheck * snowCheck * slopeCheck * elevCheck * sandCheck * patchGate;
+  if (vitality < 0.16) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    vWorldPos = vec3(0.0);
+    vWorldNormal = vec3(0.0, 1.0, 0.0);
+    vGrassFactors = vec3(0.0);
+    return;
+  }
+
+  // Random tuft rotation & organic height variation
+  float yaw = rnd.z * 6.2831853;
+  float cy = cos(yaw);
+  float sy = sin(yaw);
+  float distFade = 1.0 - smoothstep(290.0, 450.0, camDist);
+  float hScale = uGrassParams.y * (0.68 + 0.64 * fract(rnd.x * 13.7)) * vitality * (1.0 + 0.32 * moisture) * distFade;
+  float wScale = (0.85 + 0.45 * fract(rnd.y * 19.3)) * max(0.65, vitality);
+
+  vec3 localP = vec3(aPos.x * wScale, aPos.y * hScale, aPos.z * wScale);
+  vec3 rotP = vec3(localP.x * cy - localP.z * sy, localP.y, localP.x * sy + localP.z * cy);
+  vec3 rotN = vec3(aNormal.x * cy - aNormal.z * sy, aNormal.y, aNormal.x * sy + aNormal.z * cy);
+
+  // Traveling wind-gust bend (quadratic from root t=0 to blade tip t=1!)
+  float t = aBladeMeta.x;
+  float tSec = uRenderDomain.w;
+  vec2 wDir = safeNorm2(uWindRender.xy, vec2(0.85, 0.52));
+  float gustPhase = dot(worldXZ, wDir) * 0.14 - tSec * (2.1 + 2.2 * uWindRender.z) + rnd.z * 3.1;
+  float gust = (0.55 + 0.45 * sin(gustPhase) * cos(gustPhase * 0.47 + aBladeMeta.y * 2.5))
+             * uGrassParams.z * (0.30 + 0.85 * uWindRender.z);
+  float bend = gust * t * t * hScale * 0.48;
+  rotP.xz += wDir * bend;
+  rotP.y -= abs(bend) * 0.22 * t;
+
+  float cryoLift = min(3.4, cryo.r * 0.85 + cryo.g * 0.62);
+  vec3 wp = vec3(worldXZ.x, hC + cryoLift - 0.04, worldXZ.y) + rotP;
+
+  // Compute dry vs green factor: 0 = lush green, 1 = golden dry grass!
+  int gMode = int(uGrassStyle.x + 0.5);
+  float dryFactor = clamp(uGrassStyle.y, 0.0, 1.0);
+  if (gMode == 1) {
+    dryFactor = clamp(0.78 + 0.22 * fract(rnd.y * 7.3) - moisture * 0.35, 0.0, 1.0);
+  } else if (gMode == 2) {
+    // Auto biome blend: lush green in moist valleys/shorelines, golden dry on high/steep/sunny slopes!
+    float aridity = clamp(elevFrac * 0.75 + slope * 0.45 + (1.0 - meadowNoise) * 0.35 - moisture * 0.85, 0.0, 1.0);
+    dryFactor = clamp(mix(aridity, uGrassStyle.y, 0.35), 0.0, 1.0);
+  }
+
+  vec3 surfN = safeNorm3(vec3(-grad.x, 1.0, -grad.y), vec3(0.0, 1.0, 0.0));
+  vWorldNormal = safeNorm3(mix(rotN, surfN, 0.38), vec3(0.0, 1.0, 0.0));
+  vWorldPos = wp;
+  vGrassFactors = vec3(t, dryFactor, fract(rnd.x + aBladeMeta.y * 0.37));
+  gl_Position = uViewProj * vec4(wp, 1.0);
+}
+`;
+
+export const GRASS_INSTANCE_FRAG = `#version 300 es
+${GLSL_PRECISION_HEADER}
+
+in vec3 vWorldPos;
+in vec3 vWorldNormal;
+in vec3 vGrassFactors; // (bladeT, dryFactor, tuftVar)
+
+layout(location = 0) out vec4 outColor;
+
+uniform sampler2D uTerrainTex;
+uniform vec3 uCameraPos;
+uniform vec3 uSunDir;
+uniform vec4 uRenderDomain; // (worldSpan, gridRes, showWater, timeSec)
+uniform int uViewMode;
+uniform int uMaterialTheme;
+
+${COMMON_GEOLOGY_GLSL}
+
+void main() {
+  float span = uRenderDomain.x;
+  float res = uRenderDomain.y;
+  float bladeT = clamp(vGrassFactors.x, 0.0, 1.0);
+  float dryF = clamp(vGrassFactors.y, 0.0, 1.0);
+  float varH = vGrassFactors.z;
+
+  // Lush Green Grass palette (rich mossy base -> sunlit emerald-chartreuse tip)
+  vec3 greenRoot = vec3(0.048, 0.115, 0.028);
+  vec3 greenTip  = mix(vec3(0.125, 0.285, 0.052), vec3(0.205, 0.340, 0.068), varH);
+  vec3 greenCol  = mix(greenRoot, greenTip, pow(max(1e-4, bladeT), 0.78));
+
+  // Dry Savanna / Steppe Grass palette (warm olive-straw base -> sun-bleached golden wheat tip)
+  vec3 dryRoot = vec3(0.145, 0.112, 0.048);
+  vec3 dryTip  = mix(vec3(0.395, 0.305, 0.135), vec3(0.475, 0.378, 0.182), varH);
+  vec3 dryCol  = mix(dryRoot, dryTip, pow(max(1e-4, bladeT), 0.74));
+
+  vec3 albedo = mix(greenCol, dryCol, dryF);
+  if (uViewMode == 4) {
+    albedo = vec3(0.28, 0.27, 0.26);
+  }
+
+  vec3 N = safeNorm3(vWorldNormal, vec3(0.0, 1.0, 0.0));
+  if (!gl_FrontFacing) N = -N;
+  vec3 L = safeNorm3(uSunDir, vec3(0.4, 0.8, 0.4));
+  vec3 V = safeNorm3(uCameraPos - vWorldPos, vec3(0.0, 1.0, 0.0));
+
+  // Terrain sun shadow raymarch so valley shadows fall naturally across meadows!
+  vec2 uv = clamp(vWorldPos.xz / max(span, 1.0) + 0.5, vec2(0.001), vec2(0.999));
+  float shadow = 1.0;
+  vec2 stepUv = L.xz / max(span, 1.0);
+  float stepY = max(0.02, L.y);
+  for (int i = 1; i <= 7; i++) {
+    float distM = float(i * i) * 1.9;
+    vec2 sUv = uv + stepUv * distM;
+    if (sUv.x < 0.0 || sUv.x > 1.0 || sUv.y < 0.0 || sUv.y > 1.0) break;
+    vec4 ts = sampleGridBilinear(uTerrainTex, sUv, res);
+    float occH = ts.r + ts.g + ts.b;
+    float rayH = vWorldPos.y + 0.25 + stepY * distM;
+    if (occH > rayH) {
+      shadow = min(shadow, 0.22);
+      break;
+    }
+  }
+
+  // Root-to-tip ambient occlusion + two-sided foliage wrap diffuse + backlit subsurface glow!
+  float ao = mix(0.40, 1.08, bladeT);
+  float wrapDiff = clamp((dot(N, L) + 0.42) / 1.42, 0.0, 1.0);
+  float backlit = pow(max(0.0, dot(-L, V) * 0.5 + 0.5), 2.4) * bladeT;
+  vec3 sssTint = mix(vec3(0.26, 0.42, 0.06), vec3(0.46, 0.34, 0.12), dryF);
+
+  vec3 sunRad = vec3(2.35, 2.20, 1.96) * wrapDiff * shadow;
+  vec3 amb = mix(vec3(0.12, 0.13, 0.11), vec3(0.34, 0.42, 0.52), 0.5 + 0.5 * N.y) * ao;
+  vec3 lit = albedo * (sunRad + amb) + sssTint * backlit * shadow * 0.42;
+
+  float camDist = length(uCameraPos - vWorldPos);
+  if (uMaterialTheme != 7) {
+    float fog = 1.0 - exp(-max(0.0, camDist - span * 0.55) * 0.0009);
+    lit = mix(lit, vec3(0.045, 0.055, 0.070), clamp(fog, 0.0, 0.45));
+  }
+
+  vec3 x = max(vec3(0.0), lit);
+  vec3 mapped = (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14);
+  outColor = vec4(pow(max(vec3(1e-6), clamp(mapped, 0.0, 1.0)), vec3(1.0 / 2.2)), 1.0);
+}
+`;
+

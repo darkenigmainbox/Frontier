@@ -797,6 +797,37 @@ export const DEFAULT_EROSION_PARAMS = {
   showOutcrops: true,
   boulderDensity: 0.65,
 
+  // Layer Stack Visual & Structural Layer Controls (defaults preserve 100% identical terrain & shading output!)
+  strataLayerEnabled: true,
+  lithologyLayerEnabled: true,
+  lithologyOpacity: 1.0,
+  fabricLayerEnabled: true,
+  fabricStrength: 1.0,
+  snowLayerEnabled: true,
+  snowVisOpacity: 1.0,
+  waterLayerEnabled: true,
+  waterVisOpacity: 1.0,
+
+  // Independent Simulation Layer Play/Pause Controls (can play/pause together or solo one at a time!)
+  simHydraulicPlaying: true,
+  simCryoPlaying: true,
+  simWindPlaying: true,
+  simRockfallPlaying: true,
+
+  // Non-destructive Procedural Generator Modifier Layers (empty by default so presets match 100%!)
+  proceduralModifiers: [],
+
+  // Real 3D GPU-Instanced Grass Vegetation Layer (Green Grass / Dry Grass / Biome Auto-Blend)
+  grassEnabled: true,
+  grassMode: 0,           // 0 = Green Grass, 1 = Dry Grass, 2 = Biome Auto-Blend
+  grassDensity: 0.55,
+  grassHeight: 1.15,
+  grassDryBlend: 0.12,
+  grassSlopeMax: 0.62,
+  grassElevMax: 0.52,
+  grassWindSway: 0.65,
+  grassPatchiness: 0.58,
+
   // Visuals & Interactive Tool
   viewMode: 'natural',    // 'natural' | 'sediment' | 'hardness' | 'flow' | 'hydro' | 'cryo' | 'clay'
   showParticles: true,
@@ -809,3 +840,34 @@ export const DEFAULT_EROSION_PARAMS = {
   brushRadius: 34.0,
   brushStrength: 0.65,
 };
+
+export function getVegetationDefaultsForLandscape(landscapeId) {
+  switch (landscapeId) {
+    case 'icelandic-green-highlands':
+      return { grassEnabled: true, grassMode: 0, grassDensity: 0.82, grassHeight: 1.25, grassDryBlend: 0.06, grassSlopeMax: 0.78, grassElevMax: 0.72, grassPatchiness: 0.42 };
+    case 'icelandic-highlands':
+    case 'fjadrargljufur-palagonite':
+    case 'studlagil-basalt':
+    case 'coastal-massif':
+      return { grassEnabled: true, grassMode: 0, grassDensity: 0.54, grassHeight: 1.08, grassDryBlend: 0.12, grassSlopeMax: 0.62, grassElevMax: 0.48, grassPatchiness: 0.58 };
+    case 'alpine-divide':
+    case 'volcanic-caldera':
+    case 'glacial-lake-watershed':
+      return { grassEnabled: true, grassMode: 2, grassDensity: 0.46, grassHeight: 1.02, grassDryBlend: 0.25, grassSlopeMax: 0.56, grassElevMax: 0.42, grassPatchiness: 0.64 };
+    case 'desert-oasis-erg':
+      return { grassEnabled: true, grassMode: 2, grassDensity: 0.64, grassHeight: 1.42, grassDryBlend: 0.18, grassSlopeMax: 0.58, grassElevMax: 0.24, grassPatchiness: 0.48 };
+    case 'layered-plateau':
+    case 'fault-escarpment':
+    case 'grand-canyon':
+    case 'badlands-domes':
+    case 'rugged-desert-crags':
+    case 'yardang-wind-corridor':
+      return { grassEnabled: true, grassMode: 1, grassDensity: 0.34, grassHeight: 1.05, grassDryBlend: 0.88, grassSlopeMax: 0.48, grassElevMax: 0.40, grassPatchiness: 0.76 };
+    case 'lunar-mare-craters':
+    case 'namib-erg-dunes':
+    case 'sahara-tassili-erg':
+    case 'himalayan-karakoram':
+    default:
+      return { grassEnabled: false, grassMode: 1, grassDensity: 0.45, grassHeight: 1.10, grassDryBlend: 0.75, grassSlopeMax: 0.55, grassElevMax: 0.45, grassPatchiness: 0.62 };
+  }
+}

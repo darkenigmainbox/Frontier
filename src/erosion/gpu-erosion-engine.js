@@ -2,9 +2,12 @@ import {
   DEFAULT_EROSION_PARAMS,
   EMITTER_MODES,
   EROSION_LANDSCAPES,
+  getVegetationDefaultsForLandscape,
 } from './erosion-presets.js';
 import {
   FULLSCREEN_VERT,
+  GRASS_INSTANCE_FRAG,
+  GRASS_INSTANCE_VERT,
   INIT_PARTICLES_FRAG,
   INIT_SNOW_FRAG,
   INIT_TERRAIN_FRAG,
@@ -13,6 +16,7 @@ import {
   PARTICLE_SCATTER_FRAG,
   PARTICLE_SCATTER_VERT,
   PARTICLE_STEP_FRAG,
+  PROCEDURAL_MODIFIER_FRAG,
   ROCK_INSTANCE_FRAG,
   ROCK_INSTANCE_VERT,
   SKY_BG_FRAG,
@@ -23,6 +27,7 @@ import {
   THERMAL_TALUS_FRAG,
   WATER_FLUX_FRAG,
 } from './erosion-shaders.js';
+import { MAX_GRASS_TUFTS, buildGrassTuftMesh } from './grass-system.js';
 import { RockCalvingSystem } from './rock-calving.js';
 
 const PART_TEX_W = 256;
@@ -174,14 +179,17 @@ export class GpuErosionEngine {
     this._initBuffersAndTextures();
     this._initMeshVao();
     this._initRockInstanceVao();
+    this._initGrassInstanceVao();
     this._bindEvents();
 
+    Object.assign(this.params, getVegetationDefaultsForLandscape(this.params.landscape));
     this.resetSimulation();
   }
 
   _initPrograms() {
     const gl = this.gl;
     this.progInitTerrain = createProgram(gl, FULLSCREEN_VERT, INIT_TERRAIN_FRAG, 'InitTerrain');
+    this.progProceduralMod = createProgram(gl, FULLSCREEN_VERT, PROCEDURAL_MODIFIER_FRAG, 'ProceduralModifier');
     this.progInitSnow = createProgram(gl, FULLSCREEN_VERT, INIT_SNOW_FRAG, 'InitSnow');
     this.progInitParticles = createProgram(gl, FULLSCREEN_VERT, INIT_PARTICLES_FRAG, 'InitParticles');
     this.progParticleStep = createProgram(gl, FULLSCREEN_VERT, PARTICLE_STEP_FRAG, 'ParticleStep');
@@ -192,6 +200,7 @@ export class GpuErosionEngine {
     this.progThermalTalus = createProgram(gl, FULLSCREEN_VERT, THERMAL_TALUS_FRAG, 'ThermalTalus');
     this.progTerrainRender = createProgram(gl, TERRAIN_RENDER_VERT, TERRAIN_RENDER_FRAG, 'TerrainRender');
     this.progRockInstance = createProgram(gl, ROCK_INSTANCE_VERT, ROCK_INSTANCE_FRAG, 'RockInstance');
+    this.progGrassInstance = createProgram(gl, GRASS_INSTANCE_VERT, GRASS_INSTANCE_FRAG, 'GrassInstance');
     this.progParticleRender = createProgram(gl, PARTICLE_RENDER_VERT, PARTICLE_RENDER_FRAG, 'ParticleRender');
     this.progSkyBg = createProgram(gl, FULLSCREEN_VERT, SKY_BG_FRAG, 'SkyBg');
     this.progTelemetry = createProgram(gl, FULLSCREEN_VERT, TELEMETRY_FRAG, 'Telemetry');
@@ -379,6 +388,38 @@ export class GpuErosionEngine {
     const idxBuf = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, atlas.indices, gl.STATIC_DRAW);
+
+    gl.bindVertexArray(null);
+  }
+
+  _initGrassInstanceVao() {
+    const gl = this.gl;
+    const tuft = buildGrassTuftMesh();
+    this.grassIndexCount = tuft.indexCount;
+    this.grassVao = gl.createVertexArray();
+    gl.bindVertexArray(this.grassVao);
+
+    const posBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, tuft.positions, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+
+    const nrmBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, nrmBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, tuft.normals, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+
+    const metaBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, metaBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, tuft.bladeMeta, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 0, 0);
+
+    const idxBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, tuft.indices, gl.STATIC_DRAW);
 
     gl.bindVertexArray(null);
   }
@@ -658,10 +699,21 @@ export class GpuErosionEngine {
     const p = this.params;
     const strikeRad = (p.strataStrike * Math.PI) / 180;
     const dipRad = (p.strataDip * Math.PI) / 180;
+    const strataStr = p.strataLayerEnabled === false ? 0.0 : p.strataStrength;
     return {
-      hardnessVec: [p.rockHardness, p.strataStrength, p.strataFreq, p.faultWeakness],
+      hardnessVec: [p.rockHardness, strataStr, p.strataFreq, p.faultWeakness],
       strataVec: [Math.sin(strikeRad), Math.cos(strikeRad), Math.tan(dipRad), Math.max(40, p.relief)],
     };
+  }
+
+  _getLayerVisUniforms() {
+    const p = this.params;
+    return [
+      p.lithologyLayerEnabled === false ? 0.0 : (p.lithologyOpacity ?? 1.0),
+      p.fabricLayerEnabled === false ? 0.0 : (p.fabricStrength ?? 1.0),
+      p.snowLayerEnabled === false ? 0.0 : (p.snowVisOpacity ?? 1.0),
+      (p.waterLayerEnabled === false || !p.showWater) ? 0.0 : (p.waterVisOpacity ?? 1.0),
+    ];
   }
 
   /**
@@ -707,13 +759,25 @@ export class GpuErosionEngine {
       rock = 0.14 + 0.30 * clamp01(p.rockfallRate);
     }
 
-    const sum = Math.max(1e-4, rain + snow + wind + rock);
+    // Independent Simulation Layer Play/Pause Gating: allows running all active simulations
+    // simultaneously OR soloing/pausing Hydraulic, Cryo, Wind, or Rockfall one at a time!
+    if (p.simHydraulicPlaying === false) rain = 0.0;
+    if (p.simCryoPlaying === false) snow = 0.0;
+    if (p.simWindPlaying === false) wind = 0.0;
+    if (p.simRockfallPlaying === false) rock = 0.0;
+
+    const rawSum = rain + snow + wind + rock;
+    const sum = Math.max(1e-4, rawSum);
     const azRad = (p.windAzimuth * Math.PI) / 180;
     const windMag = 0.35 + 0.65 * clamp01(p.windSpeed);
+    const activeWind = p.simWindPlaying === false ? 0.0 : clamp01(p.windSpeed);
+    const activeSnow = p.simCryoPlaying === false ? 0.0 : clamp01(p.snowfallRate);
     return {
-      speciesVec: [rain / sum, snow / sum, wind / sum, rock / sum],
-      snowVec: [p.snowline, clamp01(p.snowfallRate), clamp01(p.glacierStrength), 0.35 + 0.9 * clamp01(p.snowfallRate)],
-      windVec: [Math.cos(azRad) * windMag, Math.sin(azRad) * windMag, 0.25 + 0.95 * clamp01(p.windSpeed), 0.35 + 0.65 * clamp01(p.windSpeed)],
+      anySimActive: rawSum > 1e-4 || p.simHydraulicPlaying !== false || p.simCryoPlaying !== false || p.simWindPlaying !== false || p.simRockfallPlaying !== false,
+      anyParticleSpecies: rawSum > 1e-4,
+      speciesVec: rawSum > 1e-4 ? [rain / sum, snow / sum, wind / sum, rock / sum] : [0, 0, 0, 0],
+      snowVec: [p.snowline, activeSnow, p.simCryoPlaying === false ? 0.0 : clamp01(p.glacierStrength), 0.35 + 0.9 * activeSnow],
+      windVec: [Math.cos(azRad) * windMag, Math.sin(azRad) * windMag, p.simWindPlaying === false ? 0.0 : (0.25 + 0.95 * activeWind), 0.35 + 0.65 * activeWind],
       materialTheme: Number.isFinite(p.materialTheme) ? p.materialTheme : 0,
     };
   }
@@ -731,8 +795,14 @@ export class GpuErosionEngine {
       viewMode: this.params.viewMode,
       brushMode: this.params.brushMode,
       brushRadius: this.params.brushRadius,
+      simHydraulicPlaying: this.params.simHydraulicPlaying,
+      simCryoPlaying: this.params.simCryoPlaying,
+      simWindPlaying: this.params.simWindPlaying,
+      simRockfallPlaying: this.params.simRockfallPlaying,
     };
-    Object.assign(this.params, DEFAULT_EROSION_PARAMS, preset.defaults, keep);
+    const vegDefaults = getVegetationDefaultsForLandscape(preset.id);
+    Object.assign(this.params, DEFAULT_EROSION_PARAMS, vegDefaults, preset.defaults, keep);
+    this.params.proceduralModifiers = [];
     this.params.materialTheme = preset.defaults.materialTheme ?? preset.materialTheme ?? 0;
     this.params.fabricMode = preset.defaults.fabricMode ?? preset.fabricMode ?? 0;
     if (preset.defaults.showWater !== undefined) {
@@ -773,10 +843,51 @@ export class GpuErosionEngine {
     gl.viewport(0, 0, R, R);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboTerrainSingle[0]);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboInitialTerrain);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
     this.terrainIdx = 0;
+
+    // 1B. Non-destructively evaluate any user-added Procedural Shape Modifier Layers!
+    // When proceduralModifiers is empty (default for all 19 presets), zero passes run -> 100% bit-exact output!
+    const mods = Array.isArray(p.proceduralModifiers) ? p.proceduralModifiers : [];
+    for (let m = 0; m < mods.length; m++) {
+      const mod = mods[m];
+      if (!mod || mod.enabled === false || (mod.strength ?? 1.0) <= 0.001) continue;
+      const nextT = 1 - this.terrainIdx;
+      gl.useProgram(this.progProceduralMod);
+      this._bindTex(this.progProceduralMod, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
+      gl.uniform4f(
+        gl.getUniformLocation(this.progProceduralMod, 'uModShape'),
+        mod.amplitude ?? 48.0,
+        mod.scale ?? 2.2,
+        mod.detail ?? 0.55,
+        mod.angle ?? 25.0
+      );
+      gl.uniform4f(
+        gl.getUniformLocation(this.progProceduralMod, 'uModBlend'),
+        mod.strength ?? 0.85,
+        mod.blendMode ?? 0,
+        mod.maskType ?? 0,
+        mod.seed ?? 4029
+      );
+      gl.uniform4f(
+        gl.getUniformLocation(this.progProceduralMod, 'uModMask'),
+        mod.maskLow ?? 0.0,
+        mod.maskHigh ?? 1.0,
+        mod.maskInvert ? 1.0 : 0.0,
+        mod.kind ?? 0
+      );
+      gl.uniform1f(gl.getUniformLocation(this.progProceduralMod, 'uWorldSpan'), p.worldSpan);
+      gl.uniform1f(gl.getUniformLocation(this.progProceduralMod, 'uGridRes'), R);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboTerrainSingle[nextT]);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      this.terrainIdx = nextT;
+    }
+
+    // Copy final initial terrain into initialTerrainTex for Cut/Fill telemetry & view mode
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.fboTerrainSingle[this.terrainIdx]);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.fboInitialTerrain);
+    gl.blitFramebuffer(0, 0, R, R, 0, 0, R, R, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
 
     // 2. Clear shallow-water flux & seed initial mountain snowpack + valley glaciers (`progInitSnow`)
     for (let i = 0; i < 2; i++) {
@@ -791,9 +902,9 @@ export class GpuErosionEngine {
     const cellSize = p.worldSpan / R;
     gl.viewport(0, 0, R, R);
     gl.useProgram(this.progInitSnow);
-    this._bindTex(this.progInitSnow, 'uTerrainTex', this.terrainTex[0], 0);
+    this._bindTex(this.progInitSnow, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
     gl.uniform4f(gl.getUniformLocation(this.progInitSnow, 'uCryoParams'), R, cellSize, 0.085, p.worldSpan);
-    gl.uniform4fv(gl.getUniformLocation(this.progInitSnow, 'uClimate'), climate.snowVec);
+    gl.uniform4fv(gl.getUniformLocation(this.progInitSnow, 'uClimate'), [p.snowline, Math.max(0, Math.min(1, p.snowfallRate || 0)), Math.max(0, Math.min(1, p.glacierStrength || 0)), 0.8]);
     gl.uniform4fv(gl.getUniformLocation(this.progInitSnow, 'uStrataOrient'), strataVec);
     gl.uniform1f(gl.getUniformLocation(this.progInitSnow, 'uSeed'), p.seed);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSnowClear[0]);
@@ -822,7 +933,7 @@ export class GpuErosionEngine {
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboTelemetry);
     gl.viewport(0, 0, TELEMETRY_RES, TELEMETRY_RES);
     gl.useProgram(this.progTelemetry);
-    this._bindTex(this.progTelemetry, 'uTerrainTex', this.terrainTex[0], 0);
+    this._bindTex(this.progTelemetry, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
     gl.uniform1f(gl.getUniformLocation(this.progTelemetry, 'uGridRes'), this.gridRes);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.readPixels(0, 0, TELEMETRY_RES, TELEMETRY_RES, gl.RGBA, gl.FLOAT, this.initialSnap64);
@@ -873,96 +984,100 @@ export class GpuErosionEngine {
       const nextP = 1 - prevP;
 
       // ---------------------------------------------------------------------
-      // PASS A: GPU Lagrangian Particle Kinematics, Hardness Cutting & Cargo
-      // ---------------------------------------------------------------------
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboStepParticles[nextP]);
-      gl.viewport(0, 0, PART_TEX_W, PART_TEX_H);
-      gl.disable(gl.BLEND);
-      gl.useProgram(this.progParticleStep);
-      gl.bindVertexArray(this.emptyVao);
-
-      this._bindTex(this.progParticleStep, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
-      this._bindTex(this.progParticleStep, 'uPosAgeTex', this.partPosAge[prevP], 1);
-      this._bindTex(this.progParticleStep, 'uVelWaterTex', this.partVelWater[prevP], 2);
-      this._bindTex(this.progParticleStep, 'uSedimentTex', this.partSediment[prevP], 3);
-      this._bindTex(this.progParticleStep, 'uVelocityFieldTex', this.velocityFieldTex, 4);
-      this._bindTex(this.progParticleStep, 'uSnowTex', this.snowTex[this.snowIdx], 5);
-
-      gl.uniform4f(gl.getUniformLocation(this.progParticleStep, 'uDomain'), p.worldSpan, R, dt, this.stepCount);
-      gl.uniform4f(
-        gl.getUniformLocation(this.progParticleStep, 'uRainEmitter'),
-        p.cloudHeight,
-        p.rainIntensity,
-        emitter.code,
-        activeCount
-      );
-      gl.uniform4f(
-        gl.getUniformLocation(this.progParticleStep, 'uStormTarget'),
-        this.stormTarget[0],
-        this.stormTarget[1],
-        Math.max(24.0, p.brushRadius * 1.8),
-        0.35
-      );
-      gl.uniform4f(
-        gl.getUniformLocation(this.progParticleStep, 'uHydraulics'),
-        p.erosionStrength,
-        p.sedimentCapacity,
-        p.depositionRate,
-        p.particleInertia
-      );
-      gl.uniform4f(
-        gl.getUniformLocation(this.progParticleStep, 'uLifeEvap'),
-        p.evaporation,
-        p.gravity,
-        38.0,
-        p.pipeFlowBlend
-      );
-      gl.uniform4fv(gl.getUniformLocation(this.progParticleStep, 'uHardnessParams'), hardnessVec);
-      gl.uniform4fv(gl.getUniformLocation(this.progParticleStep, 'uStrataOrient'), strataVec);
-      gl.uniform4fv(gl.getUniformLocation(this.progParticleStep, 'uSpeciesMix'), climate.speciesVec);
-      gl.uniform4fv(gl.getUniformLocation(this.progParticleStep, 'uSnowParams'), climate.snowVec);
-      gl.uniform4fv(gl.getUniformLocation(this.progParticleStep, 'uWindParams'), climate.windVec);
-      gl.uniform1f(gl.getUniformLocation(this.progParticleStep, 'uDryAeolian'), p.dryAeolianMode || 0.0);
-      gl.uniform1f(gl.getUniformLocation(this.progParticleStep, 'uSeed'), p.seed);
-
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      this.partIdx = nextP;
-
-      // ---------------------------------------------------------------------
-      // PASS B: Additive GPU Point-Sprite Scatter into `uDeltaTex` (512x512)
+      // PASS A & B: GPU Lagrangian Particle Kinematics & Scatter (only when >=1 particle sim layer is playing)
       // ---------------------------------------------------------------------
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboDelta);
       gl.viewport(0, 0, R, R);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
 
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.ONE, gl.ONE);
-      gl.useProgram(this.progParticleScatter);
+      if (climate.anyParticleSpecies) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboStepParticles[nextP]);
+        gl.viewport(0, 0, PART_TEX_W, PART_TEX_H);
+        gl.disable(gl.BLEND);
+        gl.useProgram(this.progParticleStep);
+        gl.bindVertexArray(this.emptyVao);
 
-      this._bindTex(this.progParticleScatter, 'uPrevPosAgeTex', this.partPosAge[prevP], 0);
-      this._bindTex(this.progParticleScatter, 'uNextPosAgeTex', this.partPosAge[nextP], 1);
-      this._bindTex(this.progParticleScatter, 'uExchangeTex', this.partExchange, 2);
-      this._bindTex(this.progParticleScatter, 'uExchange2Tex', this.partExchange2, 3);
-      gl.uniform2f(gl.getUniformLocation(this.progParticleScatter, 'uDomainAndRes'), p.worldSpan, R);
+        this._bindTex(this.progParticleStep, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
+        this._bindTex(this.progParticleStep, 'uPosAgeTex', this.partPosAge[prevP], 1);
+        this._bindTex(this.progParticleStep, 'uVelWaterTex', this.partVelWater[prevP], 2);
+        this._bindTex(this.progParticleStep, 'uSedimentTex', this.partSediment[prevP], 3);
+        this._bindTex(this.progParticleStep, 'uVelocityFieldTex', this.velocityFieldTex, 4);
+        this._bindTex(this.progParticleStep, 'uSnowTex', this.snowTex[this.snowIdx], 5);
 
-      gl.drawArrays(gl.POINTS, 0, activeCount);
-      gl.disable(gl.BLEND);
+        gl.uniform4f(gl.getUniformLocation(this.progParticleStep, 'uDomain'), p.worldSpan, R, dt, this.stepCount);
+        gl.uniform4f(
+          gl.getUniformLocation(this.progParticleStep, 'uRainEmitter'),
+          p.cloudHeight,
+          p.simHydraulicPlaying === false ? 0.0 : p.rainIntensity,
+          emitter.code,
+          activeCount
+        );
+        gl.uniform4f(
+          gl.getUniformLocation(this.progParticleStep, 'uStormTarget'),
+          this.stormTarget[0],
+          this.stormTarget[1],
+          Math.max(24.0, p.brushRadius * 1.8),
+          0.35
+        );
+        gl.uniform4f(
+          gl.getUniformLocation(this.progParticleStep, 'uHydraulics'),
+          p.erosionStrength,
+          p.sedimentCapacity,
+          p.depositionRate,
+          p.particleInertia
+        );
+        gl.uniform4f(
+          gl.getUniformLocation(this.progParticleStep, 'uLifeEvap'),
+          p.evaporation,
+          p.gravity,
+          38.0,
+          p.pipeFlowBlend
+        );
+        gl.uniform4fv(gl.getUniformLocation(this.progParticleStep, 'uHardnessParams'), hardnessVec);
+        gl.uniform4fv(gl.getUniformLocation(this.progParticleStep, 'uStrataOrient'), strataVec);
+        gl.uniform4fv(gl.getUniformLocation(this.progParticleStep, 'uSpeciesMix'), climate.speciesVec);
+        gl.uniform4fv(gl.getUniformLocation(this.progParticleStep, 'uSnowParams'), climate.snowVec);
+        gl.uniform4fv(gl.getUniformLocation(this.progParticleStep, 'uWindParams'), climate.windVec);
+        gl.uniform1f(gl.getUniformLocation(this.progParticleStep, 'uDryAeolian'), p.dryAeolianMode || 0.0);
+        gl.uniform1f(gl.getUniformLocation(this.progParticleStep, 'uSeed'), p.seed);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        this.partIdx = nextP;
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboDelta);
+        gl.viewport(0, 0, R, R);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE);
+        gl.useProgram(this.progParticleScatter);
+
+        this._bindTex(this.progParticleScatter, 'uPrevPosAgeTex', this.partPosAge[prevP], 0);
+        this._bindTex(this.progParticleScatter, 'uNextPosAgeTex', this.partPosAge[nextP], 1);
+        this._bindTex(this.progParticleScatter, 'uExchangeTex', this.partExchange, 2);
+        this._bindTex(this.progParticleScatter, 'uExchange2Tex', this.partExchange2, 3);
+        gl.uniform2f(gl.getUniformLocation(this.progParticleScatter, 'uDomainAndRes'), p.worldSpan, R);
+
+        gl.drawArrays(gl.POINTS, 0, activeCount);
+        gl.disable(gl.BLEND);
+      }
 
       // ---------------------------------------------------------------------
-      // PASS C: GPU Shallow-Water Pipe Flux (`uFluxTex`)
+      // PASS C: GPU Shallow-Water Pipe Flux (`uFluxTex`) — gated by Hydraulic Sim Layer!
       // ---------------------------------------------------------------------
-      const nextFlux = 1 - this.fluxIdx;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboFlux[nextFlux]);
-      gl.viewport(0, 0, R, R);
-      gl.useProgram(this.progWaterFlux);
+      if (p.simHydraulicPlaying !== false) {
+        const nextFlux = 1 - this.fluxIdx;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboFlux[nextFlux]);
+        gl.viewport(0, 0, R, R);
+        gl.useProgram(this.progWaterFlux);
+        gl.bindVertexArray(this.emptyVao);
 
-      this._bindTex(this.progWaterFlux, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
-      this._bindTex(this.progWaterFlux, 'uFluxTex', this.fluxTex[this.fluxIdx], 1);
-      gl.uniform4f(gl.getUniformLocation(this.progWaterFlux, 'uPipeParams'), R, cellSize, dt, p.gravity);
+        this._bindTex(this.progWaterFlux, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
+        this._bindTex(this.progWaterFlux, 'uFluxTex', this.fluxTex[this.fluxIdx], 1);
+        gl.uniform4f(gl.getUniformLocation(this.progWaterFlux, 'uPipeParams'), R, cellSize, dt, p.gravity);
 
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      this.fluxIdx = nextFlux;
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        this.fluxIdx = nextFlux;
+      }
 
       // ---------------------------------------------------------------------
       // PASS D: Integrate Terrain + Water + Scattered Exchanges + Brush
@@ -971,16 +1086,17 @@ export class GpuErosionEngine {
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboTerrainIntegrate[nextTerr]);
       gl.viewport(0, 0, R, R);
       gl.useProgram(this.progTerrainIntegrate);
+      gl.bindVertexArray(this.emptyVao);
 
       this._bindTex(this.progTerrainIntegrate, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
       this._bindTex(this.progTerrainIntegrate, 'uDeltaTex', this.deltaTex, 1);
       this._bindTex(this.progTerrainIntegrate, 'uFluxTex', this.fluxTex[this.fluxIdx], 2);
       this._bindTex(this.progTerrainIntegrate, 'uSnowTex', this.snowTex[this.snowIdx], 3);
 
-      gl.uniform4f(gl.getUniformLocation(this.progTerrainIntegrate, 'uIntParams'), R, cellSize, dt, p.evaporation);
+      gl.uniform4f(gl.getUniformLocation(this.progTerrainIntegrate, 'uIntParams'), R, cellSize, dt, p.simHydraulicPlaying === false ? 0.0 : p.evaporation);
       gl.uniform4f(
         gl.getUniformLocation(this.progTerrainIntegrate, 'uPipeErode'),
-        p.pipeFlowBlend,
+        p.simHydraulicPlaying === false ? 0.0 : p.pipeFlowBlend,
         p.erosionStrength,
         p.rockHardness,
         p.worldSpan
@@ -988,10 +1104,13 @@ export class GpuErosionEngine {
       gl.uniform4fv(gl.getUniformLocation(this.progTerrainIntegrate, 'uHardnessParams'), hardnessVec);
       gl.uniform4fv(gl.getUniformLocation(this.progTerrainIntegrate, 'uStrataOrient'), strataVec);
       gl.uniform4fv(gl.getUniformLocation(this.progTerrainIntegrate, 'uClimate'), climate.snowVec);
+      const riverSpring = p.simHydraulicPlaying === false
+        ? 0.0
+        : (p.oasisSpring ? -Math.max(0.05, p.headwaterFlow ?? 0.65) : (p.headwaterFlow ?? 0.0));
       gl.uniform4f(
         gl.getUniformLocation(this.progTerrainIntegrate, 'uHydrology'),
-        p.iceMeltRate ?? 0.22,
-        p.oasisSpring ? -Math.max(0.05, p.headwaterFlow ?? 0.65) : (p.headwaterFlow ?? 0.0),
+        p.simCryoPlaying === false ? 0.0 : (p.iceMeltRate ?? 0.22),
+        riverSpring,
         p.lakeRetention ?? 0.40,
         p.dryAeolianMode ?? 0.0
       );
@@ -999,7 +1118,7 @@ export class GpuErosionEngine {
         gl.getUniformLocation(this.progTerrainIntegrate, 'uWindField'),
         climate.windVec[0],
         climate.windVec[1],
-        p.windSpeed ?? 0.0,
+        p.simWindPlaying === false ? 0.0 : (p.windSpeed ?? 0.0),
         p.erosionStrength ?? 0.70
       );
 
@@ -1023,55 +1142,59 @@ export class GpuErosionEngine {
       this.terrainIdx = nextTerr;
 
       // ---------------------------------------------------------------------
-      // PASS E: GPU Differential Cliff Spalling & Talus Angle-of-Repose Pass
+      // PASS E: GPU Differential Cliff Spalling & Talus Angle-of-Repose Pass — gated by Rockfall/Talus Sim Layer!
       // ---------------------------------------------------------------------
-      const nextTalus = 1 - this.terrainIdx;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboTerrainSingle[nextTalus]);
-      gl.viewport(0, 0, R, R);
-      gl.useProgram(this.progThermalTalus);
+      if (p.simRockfallPlaying !== false) {
+        const nextTalus = 1 - this.terrainIdx;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboTerrainSingle[nextTalus]);
+        gl.viewport(0, 0, R, R);
+        gl.useProgram(this.progThermalTalus);
 
-      this._bindTex(this.progThermalTalus, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
-      gl.uniform4f(
-        gl.getUniformLocation(this.progThermalTalus, 'uTalusParams'),
-        R,
-        cellSize,
-        p.talusAngle,
-        p.worldSpan
-      );
-      gl.uniform4fv(gl.getUniformLocation(this.progThermalTalus, 'uHardnessParams'), hardnessVec);
-      gl.uniform4fv(gl.getUniformLocation(this.progThermalTalus, 'uStrataOrient'), strataVec);
-      gl.uniform1f(gl.getUniformLocation(this.progThermalTalus, 'uDryAeolian'), p.dryAeolianMode || 0.0);
-      gl.uniform1f(gl.getUniformLocation(this.progThermalTalus, 'uSeed'), p.seed);
+        this._bindTex(this.progThermalTalus, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
+        gl.uniform4f(
+          gl.getUniformLocation(this.progThermalTalus, 'uTalusParams'),
+          R,
+          cellSize,
+          p.talusAngle,
+          p.worldSpan
+        );
+        gl.uniform4fv(gl.getUniformLocation(this.progThermalTalus, 'uHardnessParams'), hardnessVec);
+        gl.uniform4fv(gl.getUniformLocation(this.progThermalTalus, 'uStrataOrient'), strataVec);
+        gl.uniform1f(gl.getUniformLocation(this.progThermalTalus, 'uDryAeolian'), p.dryAeolianMode || 0.0);
+        gl.uniform1f(gl.getUniformLocation(this.progThermalTalus, 'uSeed'), p.seed);
 
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      this.terrainIdx = nextTalus;
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        this.terrainIdx = nextTalus;
+      }
 
       // ---------------------------------------------------------------------
-      // PASS F: GPU Cryosphere — Snowpack Accumulation, Avalanche, Firn & Glacier Creep
+      // PASS F: GPU Cryosphere — Snowpack, Avalanche, Firn & Glacier Creep — gated by Cryo Sim Layer!
       // ---------------------------------------------------------------------
-      const nextSnow = 1 - this.snowIdx;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSnowClear[nextSnow]);
-      gl.viewport(0, 0, R, R);
-      gl.useProgram(this.progSnowCryo);
+      if (p.simCryoPlaying !== false) {
+        const nextSnow = 1 - this.snowIdx;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboSnowClear[nextSnow]);
+        gl.viewport(0, 0, R, R);
+        gl.useProgram(this.progSnowCryo);
 
-      this._bindTex(this.progSnowCryo, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
-      this._bindTex(this.progSnowCryo, 'uSnowTex', this.snowTex[this.snowIdx], 1);
-      this._bindTex(this.progSnowCryo, 'uSnowDeltaTex', this.snowDeltaTex, 2);
-      gl.uniform4f(gl.getUniformLocation(this.progSnowCryo, 'uCryoParams'), R, cellSize, dt, p.worldSpan);
-      gl.uniform4fv(gl.getUniformLocation(this.progSnowCryo, 'uClimate'), climate.snowVec);
-      gl.uniform4fv(gl.getUniformLocation(this.progSnowCryo, 'uStrataOrient'), strataVec);
-      gl.uniform4f(
-        gl.getUniformLocation(this.progSnowCryo, 'uWindCryo'),
-        climate.windVec[0],
-        climate.windVec[1],
-        p.windSpeed ?? 0.0,
-        this.stepCount * dt
-      );
-      gl.uniform1f(gl.getUniformLocation(this.progSnowCryo, 'uIceMeltRate'), p.iceMeltRate ?? 0.22);
-      gl.uniform1f(gl.getUniformLocation(this.progSnowCryo, 'uSeed'), p.seed);
+        this._bindTex(this.progSnowCryo, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
+        this._bindTex(this.progSnowCryo, 'uSnowTex', this.snowTex[this.snowIdx], 1);
+        this._bindTex(this.progSnowCryo, 'uSnowDeltaTex', this.snowDeltaTex, 2);
+        gl.uniform4f(gl.getUniformLocation(this.progSnowCryo, 'uCryoParams'), R, cellSize, dt, p.worldSpan);
+        gl.uniform4fv(gl.getUniformLocation(this.progSnowCryo, 'uClimate'), climate.snowVec);
+        gl.uniform4fv(gl.getUniformLocation(this.progSnowCryo, 'uStrataOrient'), strataVec);
+        gl.uniform4f(
+          gl.getUniformLocation(this.progSnowCryo, 'uWindCryo'),
+          climate.windVec[0],
+          climate.windVec[1],
+          p.simWindPlaying === false ? 0.0 : (p.windSpeed ?? 0.0),
+          this.stepCount * dt
+        );
+        gl.uniform1f(gl.getUniformLocation(this.progSnowCryo, 'uIceMeltRate'), p.iceMeltRate ?? 0.22);
+        gl.uniform1f(gl.getUniformLocation(this.progSnowCryo, 'uSeed'), p.seed);
 
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      this.snowIdx = nextSnow;
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        this.snowIdx = nextSnow;
+      }
     }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -1178,6 +1301,7 @@ export class GpuErosionEngine {
     const el = (p.sunElevation * Math.PI) / 180;
     const sunDir = [Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az)];
     const { hardnessVec, strataVec } = this._getHardnessUniforms();
+    const layerVisVec = this._getLayerVisUniforms();
     const climate = this._getClimateUniforms();
     const timeSec = (performance.now() - this.startTimeMs) * 0.001;
 
@@ -1210,9 +1334,10 @@ export class GpuErosionEngine {
       gl.getUniformLocation(this.progTerrainRender, 'uRenderDomain'),
       p.worldSpan,
       this.gridRes,
-      p.showWater ? 1.0 : 0.0,
+      (p.showWater && p.waterLayerEnabled !== false) ? 1.0 : 0.0,
       timeSec
     );
+    gl.uniform4fv(gl.getUniformLocation(this.progTerrainRender, 'uLayerVis'), layerVisVec);
     gl.uniform4fv(gl.getUniformLocation(this.progTerrainRender, 'uHardnessParams'), hardnessVec);
     gl.uniform4fv(gl.getUniformLocation(this.progTerrainRender, 'uStrataOrient'), strataVec);
 
@@ -1259,9 +1384,10 @@ export class GpuErosionEngine {
         gl.getUniformLocation(this.progRockInstance, 'uRenderDomain'),
         p.worldSpan,
         this.gridRes,
-        p.showWater ? 1.0 : 0.0,
+        (p.showWater && p.waterLayerEnabled !== false) ? 1.0 : 0.0,
         timeSec
       );
+      gl.uniform4fv(gl.getUniformLocation(this.progRockInstance, 'uLayerVis'), layerVisVec);
       gl.uniform4fv(gl.getUniformLocation(this.progRockInstance, 'uHardnessParams'), hardnessVec);
       gl.uniform4fv(gl.getUniformLocation(this.progRockInstance, 'uStrataOrient'), strataVec);
       gl.uniform4fv(gl.getUniformLocation(this.progRockInstance, 'uClimate'), climate.snowVec);
@@ -1287,8 +1413,58 @@ export class GpuErosionEngine {
       gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
 
+    // 2C. Real 3D GPU-Instanced Grass Vegetation Layer (Green Grass / Dry Grass / Biome Auto-Blend)!
+    if (p.grassEnabled && (p.grassDensity ?? 0.5) > 0.01 && (viewCode === 0 || viewCode === 4)) {
+      const tuftCount = Math.max(512, Math.min(MAX_GRASS_TUFTS, Math.round((p.grassDensity ?? 0.55) * MAX_GRASS_TUFTS)));
+      gl.disable(gl.CULL_FACE);
+      gl.useProgram(this.progGrassInstance);
+      gl.bindVertexArray(this.grassVao);
+
+      this._bindTex(this.progGrassInstance, 'uTerrainTex', this.terrainTex[this.terrainIdx], 0);
+      this._bindTex(this.progGrassInstance, 'uSnowTex', this.snowTex[this.snowIdx], 1);
+
+      gl.uniformMatrix4fv(gl.getUniformLocation(this.progGrassInstance, 'uViewProj'), false, viewProj);
+      gl.uniform3fv(gl.getUniformLocation(this.progGrassInstance, 'uCameraPos'), eye);
+      gl.uniform3fv(gl.getUniformLocation(this.progGrassInstance, 'uSunDir'), sunDir);
+      gl.uniform4f(
+        gl.getUniformLocation(this.progGrassInstance, 'uRenderDomain'),
+        p.worldSpan,
+        this.gridRes,
+        p.showWater ? 1.0 : 0.0,
+        timeSec
+      );
+      gl.uniform4f(
+        gl.getUniformLocation(this.progGrassInstance, 'uGrassParams'),
+        tuftCount,
+        p.grassHeight ?? 1.15,
+        p.grassWindSway ?? 0.65,
+        p.grassSlopeMax ?? 0.62
+      );
+      gl.uniform4f(
+        gl.getUniformLocation(this.progGrassInstance, 'uGrassStyle'),
+        p.grassMode ?? 0,
+        p.grassDryBlend ?? 0.15,
+        p.grassElevMax ?? 0.52,
+        p.grassPatchiness ?? 0.58
+      );
+      gl.uniform4f(
+        gl.getUniformLocation(this.progGrassInstance, 'uWindRender'),
+        climate.windVec[0],
+        climate.windVec[1],
+        p.windSpeed || 0.25,
+        p.dryAeolianMode || 0.0
+      );
+      gl.uniform4fv(gl.getUniformLocation(this.progGrassInstance, 'uStrataOrient'), strataVec);
+      gl.uniform1i(gl.getUniformLocation(this.progGrassInstance, 'uViewMode'), viewCode);
+      gl.uniform1i(gl.getUniformLocation(this.progGrassInstance, 'uMaterialTheme'), this._themeCode());
+      gl.uniform1f(gl.getUniformLocation(this.progGrassInstance, 'uSeed'), p.seed);
+
+      gl.drawElementsInstanced(gl.TRIANGLES, this.grassIndexCount, gl.UNSIGNED_SHORT, 0, tuftCount);
+      gl.enable(gl.CULL_FACE);
+    }
+
     // 3. 3D Falling Sky Raindrops & Sediment-Colored Surface Runoff Particles!
-    if (p.showParticles && p.particleOpacity > 0.01) {
+    if (p.showParticles && p.particleOpacity > 0.01 && climate.anyParticleSpecies) {
       const activeCount = Math.min(MAX_GPU_PARTICLES, Math.max(1024, Math.floor(p.particleCount)));
       gl.disable(gl.CULL_FACE);
       gl.depthMask(false);
@@ -1344,11 +1520,20 @@ export class GpuErosionEngine {
         this._fpsLastMs = now;
       }
 
-      if (this.playing) {
+      const anySimLayerOn =
+        this.params.simHydraulicPlaying !== false ||
+        this.params.simCryoPlaying !== false ||
+        this.params.simWindPlaying !== false ||
+        this.params.simRockfallPlaying !== false;
+      if (this.playing && anySimLayerOn) {
         this.stepSimulation(this.params.substepsPerFrame);
-        this.rockCalving.stepPhysics(frameDt);
+        if (this.params.simRockfallPlaying !== false) {
+          this.rockCalving.stepPhysics(frameDt);
+        }
       } else {
-        this.rockCalving.stepPhysics(frameDt);
+        if (this.params.simRockfallPlaying !== false) {
+          this.rockCalving.stepPhysics(frameDt);
+        }
         if (this.brushDown && this.params.brushMode !== 'orbit') {
           this.stepSimulation(1);
         }

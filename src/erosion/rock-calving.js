@@ -168,24 +168,28 @@ export class RockCalvingSystem {
       const r = this.rocks[i];
       const s = this.sampleTerrain(r.x, r.z);
       if (r.isOutcrop) {
-        if (s.slope > 0.44) {
+        if (s.slope > 0.44 || s.water > 0.35) {
           // Cliff erosion undercut this rim outcrop into a steep slope -> calve & tumble down!
           r.isOutcrop = false;
           r.settled = false;
+          r.airLift = 0.25;
           r.wakeTimer = 4.5;
         } else {
-          // Outcrop stays rooted on gentle crown/rim
-          r.y = s.bedrock + s.coarse * 0.35 - r.radiusY * 0.36;
+          // Outcrop stays rooted on gentle crown/rim above ground
+          r.y = s.totalH + r.radiusY * 0.34;
+          r.airLift = 0.0;
         }
       } else if (r.settled) {
-        const targetY = s.totalH - r.radiusY * 0.30;
+        const targetY = s.totalH + r.radiusY * 0.44;
         const drop = r.y - targetY;
         if (drop > 0.24 || s.slope > 0.40) {
           // GPU erosion undercut or steepened the ground beneath this boulder -> wake & slide!
           r.settled = false;
+          r.airLift = Math.max(0.0, drop);
           r.wakeTimer = 4.0;
         } else {
           r.y = targetY;
+          r.airLift = 0.0;
           this._alignToSlope(r, s.nx, s.ny, s.nz, 0.22);
         }
       }
@@ -264,47 +268,68 @@ export class RockCalvingSystem {
     const strikeRad = ((params.strataStrike ?? 0) * Math.PI) / 180;
     const dipRad = ((params.strataDip ?? 8) * Math.PI) / 180;
 
-    // Collect gentle ridge/rim candidates for rooted bedrock outcrops (NEVER steep slopes!)
+    // Collect convex rocky ridge/rim candidates for rooted bedrock outcrops (NEVER steep slopes, water, or deep sand!)
     const rimCells = [];
+    const apronCells = [];
     const N = this.gridRes;
+    const cellStep = span / N;
     for (let iz = 3; iz < N - 3; iz++) {
       for (let ix = 3; ix < N - 3; ix++) {
         const wx = ((ix + 0.5) / N - 0.5) * span;
         const wz = ((iz + 0.5) / N - 0.5) * span;
         if (Math.abs(wx) > half || Math.abs(wz) > half) continue;
         const s = this.sampleTerrain(wx, wz);
-        if (s.water > 0.30 || s.fine > 2.2) continue;
-        // Rooted outcrops ONLY belong on flat/gentle ridge crowns, rims & knolls (slope < 0.38 = 20.8 deg)
-        // so rocks NEVER look stuck sideways on steep cliff walls!
-        if (s.slope >= 0.06 && s.slope <= 0.38 && s.bedrock > 14.0) {
-          rimCells.push({ wx, wz, s });
+        if (s.water > 0.06 || s.fine > 1.35) continue;
+
+        // Check neighborhood for ridge convexity (outcrops) and nearby cliff scarps (talus aprons)
+        const sE = this.sampleTerrain(wx + cellStep, wz);
+        const sW = this.sampleTerrain(wx - cellStep, wz);
+        const sN = this.sampleTerrain(wx, wz + cellStep);
+        const sS = this.sampleTerrain(wx, wz - cellStep);
+        const meanNb = 0.25 * (sE.totalH + sW.totalH + sN.totalH + sS.totalH);
+        const convexity = s.totalH - meanNb;
+        const maxNbSlope = Math.max(sE.slope, sW.slope, sN.slope, sS.slope);
+
+        // Rooted outcrops ONLY belong on flat/gentle convex ridge crowns, rims & knolls (slope <= 0.36)
+        if (s.slope >= 0.04 && s.slope <= 0.36 && s.bedrock > 12.0 && s.fine < 0.75 && convexity > -0.35) {
+          rimCells.push({ wx, wz, s, convexity });
+        }
+        // Cliff-toe talus & bench cells: gentle dry ground near steeper rocky slopes!
+        if (s.slope <= 0.34 && s.bedrock > 4.0 && (maxNbSlope > 0.45 || s.coarse > 0.08)) {
+          apronCells.push({ wx, wz, s });
         }
       }
     }
 
-    const targetOutcrops = Math.min(72, Math.round(density * 76));
-    if (rimCells.length > 0) {
-      for (let i = 0; i < targetOutcrops * 4 && this.rocks.length < targetOutcrops; i++) {
-        const pick = rimCells[rng.int(0, rimCells.length - 1)];
-        const jx = pick.wx + rng.signed() * 3.5;
-        const jz = pick.wz + rng.signed() * 3.5;
-        if (this._tooClose(jx, jz, 8.0)) continue;
+    // Prefer the most prominent convex ridge/rim crowns for bedrock outcrops
+    rimCells.sort((a, b) => b.convexity - a.convexity);
+    const crownPool = rimCells.slice(0, Math.max(24, Math.floor(rimCells.length * 0.65)));
+
+    const targetOutcrops = Math.min(68, Math.round(density * 72));
+    if (crownPool.length > 0) {
+      for (let i = 0; i < targetOutcrops * 5 && this.rocks.length < targetOutcrops; i++) {
+        const pick = crownPool[rng.int(0, crownPool.length - 1)];
+        const jx = pick.wx + rng.signed() * 3.0;
+        const jz = pick.wz + rng.signed() * 3.0;
+        if (this._tooClose(jx, jz, 8.5)) continue;
 
         const st = this.sampleTerrain(jx, jz);
-        if (st.water > 0.25 || st.slope > 0.40 || st.fine > 2.2) continue;
-        const scale = rng.range(2.5, 5.8);
-        const sx = scale * rng.range(0.95, 1.35);
-        const sy = scale * rng.range(0.68, 1.05);
-        const sz = scale * rng.range(0.85, 1.20);
+        if (st.water > 0.06 || st.slope > 0.38 || st.fine > 0.85) continue;
+        const scale = rng.range(2.4, 5.4);
+        const sx = scale * rng.range(0.95, 1.32);
+        const sy = scale * rng.range(0.70, 1.06);
+        const sz = scale * rng.range(0.86, 1.20);
         const yaw = strikeRad + rng.signed() * 0.28;
-        const gentleDip = Math.min(0.20, Math.abs(dipRad)) * Math.sign(dipRad || 1);
+        const gentleDip = Math.min(0.18, Math.abs(dipRad)) * Math.sign(dipRad || 1);
 
-        const r = {
+        this.rocks.push({
           submesh: rng.int(0, 1),
           isOutcrop: true,
           settled: true,
+          grounded: true,
           x: jx,
-          y: st.bedrock + st.coarse * 0.25 - sy * 0.48,
+          y: st.totalH + sy * 0.34,
+          airLift: 0.0,
           z: jz,
           vx: 0, vy: 0, vz: 0,
           sx, sy, sz,
@@ -316,21 +341,67 @@ export class RockCalvingSystem {
           seedHash: rng.float(),
           wear: rng.range(0.15, 0.55),
           wakeTimer: 0,
-        };
-        this.rocks.push(r);
+        });
       }
     }
 
-    // Spawn cliff-calved boulders & run initial fast settling so boulders plunge off steep cliffs
-    // and pile naturally onto low-angle talus toes & valley benches (< 21 deg)!
+    // 1. Seed natural clustered talus-fan boulders directly along cliff toes & benches
     const targetBoulders = Math.min(185, Math.round(density * 195));
-    this.calveCliffBoulders(targetBoulders, rng, true);
+    const directApronTarget = Math.round(targetBoulders * 0.58);
+    if (apronCells.length > 0) {
+      let placed = 0;
+      for (let tries = 0; tries < directApronTarget * 5 && placed < directApronTarget; tries++) {
+        const anchor = apronCells[rng.int(0, apronCells.length - 1)];
+        const clusterCount = rng.int(1, 3);
+        for (let k = 0; k < clusterCount && placed < directApronTarget; k++) {
+          const bx = clamp(anchor.wx + rng.signed() * 5.2, -half, half);
+          const bz = clamp(anchor.wz + rng.signed() * 5.2, -half, half);
+          if (this._tooClose(bx, bz, 2.6)) continue;
+          const st = this.sampleTerrain(bx, bz);
+          if (st.water > 0.06 || st.slope > 0.34 || st.fine > 1.45) continue;
+
+          const isSlab = rng.chance(0.40);
+          const submesh = isSlab ? rng.int(4, 5) : rng.int(2, 3);
+          const baseR = (k === 0 ? 1.55 : 0.95) + Math.pow(rng.float(), 2.1) * (k === 0 ? 2.75 : 1.65);
+          const sx = baseR * rng.range(0.90, 1.30);
+          const sy = baseR * (isSlab ? rng.range(0.54, 0.74) : rng.range(0.78, 1.08));
+          const sz = baseR * rng.range(0.86, 1.22);
+
+          const rk = {
+            submesh,
+            isOutcrop: false,
+            settled: true,
+            grounded: true,
+            x: bx,
+            y: st.totalH + sy * 0.44,
+            airLift: 0.0,
+            z: bz,
+            vx: 0, vy: 0, vz: 0,
+            sx, sy, sz,
+            radiusY: sy,
+            yaw: rng.float() * Math.PI * 2,
+            upX: 0, upY: 1, upZ: 0,
+            isSlab,
+            seedHash: rng.float(),
+            wear: rng.range(0.25, 0.78),
+            wakeTimer: 0,
+          };
+          this._alignToSlope(rk, st.nx * 0.65, 1.0, st.nz * 0.65, 0.92);
+          this.rocks.push(rk);
+          placed++;
+        }
+      }
+    }
+
+    // 2. Calve remaining boulders from steep cliffs & run gravity settling into couloir fans
+    const calveCount = Math.max(24, targetBoulders - (this.rocks.length - targetOutcrops));
+    this.calveCliffBoulders(calveCount, rng, true);
 
     for (let step = 0; step < 95; step++) {
       this.stepPhysics(0.06, true);
     }
     // Trigger a live rockfall batch at boot so user immediately sees brisk tumbling boulders!
-    this.calveCliffBoulders(Math.round(density * 22), rng, false);
+    this.calveCliffBoulders(Math.round(density * 18), rng, false);
     this._rebuildInstanceBuckets();
   }
 
@@ -341,17 +412,17 @@ export class RockCalvingSystem {
     if (!this.hasHeightSnapshot || count <= 0) return 0;
     const rng = customRng || createRng(Math.floor(performance.now()) + this.rocks.length * 37);
     const span = this.worldSpan;
-    const half = span * 0.455;
+    const half = span * 0.42;
     const N = this.gridRes;
 
     const cliffs = [];
-    for (let iz = 3; iz < N - 3; iz++) {
-      for (let ix = 3; ix < N - 3; ix++) {
+    for (let iz = 4; iz < N - 4; iz++) {
+      for (let ix = 4; ix < N - 4; ix++) {
         const wx = ((ix + 0.5) / N - 0.5) * span;
         const wz = ((iz + 0.5) / N - 0.5) * span;
         if (Math.abs(wx) > half || Math.abs(wz) > half) continue;
         const s = this.sampleTerrain(wx, wz);
-        if (s.slope > (allowAllPool ? 0.52 : 0.68) && s.water < 0.25 && s.fine < 3.5) {
+        if (s.slope > (allowAllPool ? 0.52 : 0.68) && s.water < 0.08 && s.fine < 1.35) {
           cliffs.push({ wx, wz, s });
         }
       }
@@ -389,11 +460,13 @@ export class RockCalvingSystem {
         submesh,
         isOutcrop: false,
         settled: false,
+        grounded: false,
         x: bx + dx * 1.4,
-        y: st.totalH + sy * 0.45,
+        y: st.totalH + sy * 0.72,
+        airLift: sy * 0.28,
         z: bz + dz * 1.4,
         vx: dx * rng.range(4.5, 11.5) + rng.signed() * 1.4,
-        vy: rng.range(-1.5, 2.0),
+        vy: rng.range(-1.0, 2.2),
         vz: dz * rng.range(4.5, 11.5) + rng.signed() * 1.4,
         sx, sy, sz,
         radiusY: sy,
@@ -479,7 +552,8 @@ export class RockCalvingSystem {
         const stEdge = this.sampleTerrain(r.x, r.z);
         if (stEdge.slope <= maxRestSlope + 0.12) {
           r.vx = 0; r.vz = 0; r.vy = 0;
-          r.y = stEdge.totalH - r.radiusY * 0.34;
+          r.y = stEdge.totalH + r.radiusY * 0.44;
+          r.airLift = 0.0;
           r.settled = true;
           this._alignToSlope(r, stEdge.nx * 0.5, 1.0, stEdge.nz * 0.5, 0.9);
           continue;
@@ -487,17 +561,32 @@ export class RockCalvingSystem {
       }
 
       const st = this.sampleTerrain(r.x, r.z);
-      const restY = st.totalH - r.radiusY * 0.34;
+      const restY = st.totalH + r.radiusY * 0.44;
+
+      // Halt on shoreline bank before plunging deep underwater so boulders never vanish into lakes!
+      if (st.water > 0.55) {
+        r.vx *= 0.25;
+        r.vz *= 0.25;
+        if (Math.hypot(r.vx, r.vz) < 1.8 && st.slope <= maxRestSlope + 0.08) {
+          r.vx = 0; r.vz = 0; r.vy = 0;
+          r.y = restY;
+          r.airLift = 0.0;
+          r.settled = true;
+          continue;
+        }
+      }
 
       // Keep sliding boulders in continuous contact with steep mountain walls/couloirs (up to 74 deg)
       // so downslope gravity accelerates vx/vz EVERY frame instead of skipping frames in mid-air!
       if (r.grounded && st.slope <= 3.5 && r.y < restY + r.radiusY * 1.6) {
         r.y = restY;
+        r.airLift = 0.0;
         r.vy = 0;
       }
 
       if (r.y <= restY) {
         r.y = restY;
+        r.airLift = 0.0;
         r.grounded = true;
         if (r.vy < -22.0) {
           r.vy = -r.vy * 0.16;
@@ -548,6 +637,8 @@ export class RockCalvingSystem {
           r.yaw += (nextSpeed / Math.max(0.6, r.radiusY)) * dt * 0.65;
           this._alignToSlope(r, st.nx * 0.55, 1.0, st.nz * 0.55, 0.28);
         }
+      } else {
+        r.airLift = Math.max(0.0, r.y - restY);
       }
     }
 
@@ -604,9 +695,11 @@ export class RockCalvingSystem {
       arr[o + 9] = by * r.sz;
       arr[o + 10] = bz * r.sz;
       arr[o + 11] = r.radiusY;
-      // aInstPosMeta: world position (xyz) + isOutcrop (w)
+      // aInstPosMeta: (worldX, airLiftAboveGround, worldZ, isOutcrop)
+      // ROCK_INSTANCE_VERT samples exact 512x512 uTerrainTex + uSnowTex at (worldX, worldZ) so rocks
+      // NEVER sink or disappear under sub-8m terrain ridges, dunes, or snowdrifts!
       arr[o + 12] = r.x;
-      arr[o + 13] = r.y;
+      arr[o + 13] = Math.max(0.0, r.airLift || 0.0);
       arr[o + 14] = r.z;
       arr[o + 15] = r.isOutcrop ? 1.0 : 0.0;
     }

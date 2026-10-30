@@ -384,50 +384,81 @@
          RIGHT DOCK (Switches cleanly between GPU Erosion Params & Rock Params)
          ===================================================================== -->
     <aside class="dock dock-right">
-      <!-- EROSION RIGHT PANELS -->
-      <div id="right-erosion-panels">
-        <section class="panel-section">
-          <div class="section-header">
-            <span>SKY PARTICLES &amp; RAINFALL</span>
-            <button id="btn-erosion-reset-params" class="btn-mini">Reset Preset</button>
+      <!-- EROSION RIGHT PANELS (c7egoist/Frontier Alloy Layer Stack Inspector) -->
+      <div id="right-erosion-panels" class="ls-inspector-shell">
+        <div class="ls-inspector-header">
+          <div class="ls-inspector-top">
+            <span class="ls-inspector-title">Terrain Inspector</span>
+            <span id="er-stack-badge" class="ls-status-pill">Ready</span>
+            <button id="btn-erosion-reset-params" class="btn-mini" title="Reset active preset to defaults">↺ Preset</button>
           </div>
-          <div id="er-sliders-particles"></div>
-        </section>
+          <div class="ls-identity-row">
+            <div class="ls-identity-name" id="er-identity-name">Icelandic Basalt Highlands</div>
+            <div class="ls-identity-kind" id="er-identity-kind">512² GPGPU · 12 Layers</div>
+          </div>
+          <div class="ls-segmented" id="er-inspector-tabs">
+            <button data-tab="layers" class="active">Layers <span class="ls-tab-count" id="er-layer-count">12</span></button>
+            <button data-tab="brush">Brush</button>
+            <button data-tab="scene">Scene &amp; Export</button>
+          </div>
+        </div>
 
-        <section class="panel-section">
-          <div class="section-header">
-            <span>3D ROCK HARDNESS &amp; STRATA</span>
+        <!-- TAB 1: LAYER STACK & SELECTED LAYER PROPERTIES -->
+        <div id="er-page-layers" class="ls-tab-page">
+          <div class="ls-sim-bar">
+            <button id="er-sim-play-all" class="ls-sim-bar-btn" title="Play all 4 simulation layers simultaneously">▶ All Sims</button>
+            <button id="er-sim-pause-all" class="ls-sim-bar-btn" title="Pause all 4 simulation layers">⏸ Pause All</button>
+            <span id="er-sim-count-pill" class="ls-sim-count">4/4 Simulating</span>
           </div>
-          <div id="er-sliders-hardness"></div>
-        </section>
 
-        <section class="panel-section">
-          <div class="section-header">
-            <span>CUTTING &amp; SEDIMENTATION</span>
+          <div class="ls-section-caption">
+            <span>LAYER STACK (TOP → BASE)</span>
+            <span class="ls-caption-hint">Click layer to edit</span>
           </div>
-          <div id="er-sliders-hydraulics"></div>
-        </section>
+          <div id="er-layer-stack" class="ls-layer-stack"></div>
 
-        <section class="panel-section">
-          <div class="section-header">
-            <span>GLACIAL &amp; CLIMATE PARTICLES</span>
-            <span class="tag-pill">Snow / Ice / Wind</span>
-          </div>
-          <div id="er-sliders-climate"></div>
-        </section>
+          <button id="er-add-layer-btn" class="ls-add-layer-button" type="button">+ Add Procedural Shape Layer</button>
 
-        <section class="panel-section">
-          <div class="section-header">
-            <span>EXPORT ERODED TERRAIN MESH</span>
+          <div class="ls-section-caption" style="margin-top:10px;">
+            <span>SELECTED LAYER PROPERTIES</span>
           </div>
-          <div class="export-buttons">
-            <button id="btn-er-export-glb" class="btn-primary">Export Eroded Terrain (.GLB)</button>
-            <button id="btn-er-export-obj" class="btn-secondary">Export Wavefront (.OBJ)</button>
+          <div id="er-layer-properties" class="ls-layer-properties"></div>
+        </div>
+
+        <!-- TAB 2: INTERACTIVE SCULPT & CLOUDBURST BRUSH -->
+        <div id="er-page-brush" class="ls-tab-page hidden-panel">
+          <div class="ls-prop-card">
+            <div class="ls-prop-head"><span class="ls-prop-title">Interactive Terrain &amp; Storm Brush</span></div>
+            <div class="ls-prop-sub">Paint directly on the 512² GPU terrain heightfield or summon localized storm cloudbursts.</div>
+            <div class="ls-prop-body" id="er-brush-inspector-mount"></div>
           </div>
-          <p class="export-note" style="margin-top:8px;margin-bottom:0;">
-            Exports GPU-carved heightfield with smooth normals and baked bedrock vs coarse gravel &amp; fine alluvial fan vertex colors.
-          </p>
-        </section>
+        </div>
+
+        <!-- TAB 3: SCENE LIGHTING, DIAGNOSTICS & MESH EXPORT -->
+        <div id="er-page-scene" class="ls-tab-page hidden-panel">
+          <section class="panel-section">
+            <div class="section-header">
+              <span>EXPORT ERODED TERRAIN MESH</span>
+            </div>
+            <div class="export-buttons">
+              <button id="btn-er-export-glb" class="btn-primary">Export Eroded Terrain (.GLB)</button>
+              <button id="btn-er-export-obj" class="btn-secondary">Export Wavefront (.OBJ)</button>
+            </div>
+            <p class="export-note" style="margin-top:8px;margin-bottom:0;">
+              Exports GPU-carved heightfield with smooth normals and baked bedrock vs coarse gravel &amp; fine alluvial fan vertex colors.
+            </p>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-header">
+              <span>ALL SIMULATION PARAMETERS (OVERVIEW)</span>
+            </div>
+            <div id="er-sliders-particles"></div>
+            <div id="er-sliders-hardness"></div>
+            <div id="er-sliders-hydraulics"></div>
+            <div id="er-sliders-climate"></div>
+          </section>
+        </div>
       </div>
 
       <!-- ROCK STUDIO RIGHT PANELS -->

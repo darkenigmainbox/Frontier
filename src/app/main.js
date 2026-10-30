@@ -1,5 +1,6 @@
 import { EROSION_LANDSCAPES } from '../erosion/erosion-presets.js';
 import { GpuErosionEngine } from '../erosion/gpu-erosion-engine.js';
+import { ErosionLayerStackUI } from '../erosion/layer-stack-ui.js';
 import { FORMATION_PRESETS, LITHOLOGY_PALETTES, resolveParams } from '../geology/presets.js';
 import { exportFormationToGLB } from '../io/glb-exporter.js';
 import { exportFormationToOBJ } from '../io/obj-exporter.js';
@@ -285,6 +286,7 @@ document.getElementById('mode-btn-rock').addEventListener('click', () => setStud
 // ============================================================================
 
 const erosionSliderRefs = new Map();
+let erosionLayerStackUI = null;
 
 function buildErosionLandscapeCards() {
   const mount = document.getElementById('erosion-landscape-list');
@@ -378,6 +380,11 @@ function syncErosionSliders() {
   }
   const chkWater = document.getElementById('chk-erosion-water');
   if (chkWater) chkWater.checked = Boolean(erosionEngine.params.showWater);
+  const chkOut = document.getElementById('chk-erosion-outcrops');
+  if (chkOut) chkOut.checked = erosionEngine.params.showOutcrops !== false;
+  const seedIn = document.getElementById('input-erosion-seed');
+  if (seedIn) seedIn.value = String(erosionEngine.params.seed);
+  if (erosionLayerStackUI) erosionLayerStackUI.refreshAll();
 }
 
 // ============================================================================
@@ -613,6 +620,53 @@ function initErosionControls() {
     erosionEngine.applyLandscapePreset(erosionEngine.params.landscape);
     syncErosionSliders();
   });
+
+  // Initialize c7egoist/Frontier Alloy Layer Stack Inspector!
+  erosionLayerStackUI = new ErosionLayerStackUI(erosionEngine, {
+    onTransportSync: () => syncPlayBtn(),
+    onExternalSync: () => syncErosionSliders(),
+    onPresetChanged: (presetId) => {
+      document.querySelectorAll('#erosion-landscape-list .arch-card').forEach((el) => {
+        el.classList.toggle('active', el.dataset.id === presetId);
+      });
+      syncErosionSliders();
+    },
+  });
+
+  // Populate Right-Dock Brush Tab (`#er-brush-inspector-mount`)
+  const brushMount = document.getElementById('er-brush-inspector-mount');
+  if (brushMount && erosionLayerStackUI) {
+    brushMount.appendChild(erosionLayerStackUI._makeSelect({
+      label: 'Pointer Tool Mode',
+      options: [
+        { value: 'orbit', label: 'Orbit Camera (Default)' },
+        { value: 'cloudburst', label: 'Storm Cloudburst Rain' },
+        { value: 'raise', label: 'Tectonic Uplift Sculpt' },
+        { value: 'carve', label: 'Canyon Carve Sculpt' },
+      ],
+      get: () => erosionEngine.params.brushMode,
+      set: (mode) => {
+        erosionEngine.params.brushMode = mode;
+        document.querySelectorAll('#erosion-brush-buttons button').forEach((b) => {
+          b.classList.toggle('active', b.dataset.brush === mode);
+        });
+      },
+    }));
+    brushMount.appendChild(erosionLayerStackUI._makePillSlider({
+      label: 'Brush Radius', min: 10, max: 110, step: 2, unit: 'm',
+      get: () => erosionEngine.params.brushRadius,
+      set: (v) => {
+        erosionEngine.params.brushRadius = v;
+        radSlider.value = String(v);
+        radOut.textContent = `${v}m`;
+      },
+    }));
+    brushMount.appendChild(erosionLayerStackUI._makePillSlider({
+      label: 'Sculpt / Storm Strength', min: 0.15, max: 2.2, step: 0.05, unit: '×',
+      get: () => erosionEngine.params.brushStrength,
+      set: (v) => { erosionEngine.params.brushStrength = v; },
+    }));
+  }
 
   // Export Eroded Terrain Mesh (.GLB / .OBJ)
   document.getElementById('btn-er-export-glb').addEventListener('click', () => {
