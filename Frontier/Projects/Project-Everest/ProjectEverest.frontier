@@ -1,0 +1,23 @@
+# Project Everest — the VehicleHMI port target. Field-for-field mirror of the Project-Networking precedent.
+[Project]
+ProjectName = "Project Everest"
+ProjectFormatNumber = 1
+ContentLocation = "Content"
+OpeningScene = ""
+CodeImage = "Build/Output/ProjectEverest.dll"
+CodeInterchangeNumber = 3
+InterfaceFingerprint = 0xb6725f24d0869173
+
+# Categories this project publishes. The host registers them with these colours when the project opens, and the
+# Log Stream filters by them; declared here rather than in code so a project owns its own diagnostics vocabulary.
+[[LogCategories]]
+Name = "Vehicle"
+Colour = "pink"
+
+[[LogCategories]]
+Name = "Weather"
+Colour = "blue"
+
+[[LogCategories]]
+Name = "Illumination"
+Colour = "purple"

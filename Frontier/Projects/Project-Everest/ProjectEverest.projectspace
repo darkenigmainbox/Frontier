@@ -1,0 +1,81 @@
+catalogue = []
+content_roots = [ 'Content' ]
+dependency_pins = []
+format = 'frontier.projectspace.editor'
+levels = []
+required_features = []
+version = 1
+
+[engine]
+configuration_version = 1
+startup_level = ''
+
+[project]
+identity = 'project-everest-v1'
+name = 'Project Everest'
+template_revision = 1
+
+[workspace.appearance]
+accent = 6
+caution = 0
+corner_radius = 16.0
+font_family = 'Inter'
+format = 1
+info = 0
+interface_scale = 100.0
+sizes = [ 32.0, 24.0, 18.0, 14.0, 12.0, 10.0 ]
+success = 1
+theme = 1
+warning = 0
+weights = [ 700, 700, 500, 400, 500, 400 ]
+
+[workspace.hosting]
+allow_detached_windows = true
+dockable_content_browser = true
+format = 1
+
+[workspace.input]
+advanced_controls = false
+custom_shortcuts = false
+format = 1
+invert_pitch = false
+mouse_sensitivity = 50.0
+
+    [[workspace.input.shortcuts]]
+    alt = false
+    command = 'ControlCentre'
+    control = true
+    key = 'Comma'
+    shift = false
+    super = false
+
+    [[workspace.input.shortcuts]]
+    alt = true
+    command = 'Typography'
+    control = true
+    key = 'F'
+    shift = false
+    super = false
+
+    [[workspace.input.shortcuts]]
+    alt = true
+    command = 'Theme'
+    control = true
+    key = 'T'
+    shift = false
+    super = false
+
+    [[workspace.input.shortcuts]]
+    alt = false
+    command = 'DismissPanel'
+    control = false
+    key = 'Escape'
+    shift = false
+    super = false
+
+[workspace.notifications]
+format = 1
+frame_rate_overlay = true
+hold_seconds = 3.5
+preference_errors = true
+preferences_applied = true
