@@ -490,6 +490,9 @@ int main(int argc, char** argv)
     }
 
     Everest::EverestCameraSpecification CamSpec{};
+    CamSpec.EyePosition        = {13.6f, 0.0f, 2.75f};
+    CamSpec.LookAtTarget       = { 1.6f, 0.0f, 0.82f};
+    CamSpec.VerticalFovDegrees = 54.0f;
     Everest::EverestEnvironmentSettings EnvSettings{};
     EnvSettings.Pipeline.QualityTier = 2;
     std::vector<uint8_t>                CoupledPixels;

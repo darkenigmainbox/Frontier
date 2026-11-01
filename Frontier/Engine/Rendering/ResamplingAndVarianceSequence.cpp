@@ -1475,7 +1475,7 @@ ShaderCompilationSummary VerifyVehicleHmiShaderSuite(const std::filesystem::path
         const std::filesystem::path SourcePath = ShaderDirectory / Spec.FileName;
         const std::filesystem::path OutputPath = std::filesystem::temp_directory_path() / (std::string(Spec.EntryPoint) + ".spv");
         const std::string Command = "\"" + SlangCompilerPath.string() + "\" \"" + SourcePath.string() +
-                                    "\" -target spirv -profile spirv_1_5 -I \"" + ShaderDirectory.string() +
+                                    "\" -target spirv -profile spirv_1_3 -emit-spirv-directly -O0 -I \"" + ShaderDirectory.string() +
                                     "\" -entry " + Spec.EntryPoint + " -stage " + Spec.Stage +
                                     " -o \"" + OutputPath.string() + "\"";
         const int ExitCode = std::system(Command.c_str());

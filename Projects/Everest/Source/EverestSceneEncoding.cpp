@@ -229,21 +229,23 @@ struct EverestSceneEncoding::GpuEncodingAllocation
     BufferSlot            BlasTriangles{};
     BufferSlot            Occupants{};
     BufferSlot            Materials{};
-    BufferSlot            UniformsAndLights{};
+    BufferSlot            UniformsAndLightsPass0{};
+    BufferSlot            UniformsAndLightsPass1{};
     BufferSlot            SkyLut{};
     BufferSlot            Reservoirs{};
     BufferSlot            Accumulation{};
 
-    VkImage               OutputImage     = VK_NULL_HANDLE;
-    VkDeviceMemory        OutputMemory    = VK_NULL_HANDLE;
-    VkImageView           OutputView      = VK_NULL_HANDLE;
+    VkImage               OutputImage        = VK_NULL_HANDLE;
+    VkDeviceMemory        OutputMemory       = VK_NULL_HANDLE;
+    VkImageView           OutputView         = VK_NULL_HANDLE;
 
-    VkShaderModule        ShaderModule    = VK_NULL_HANDLE;
-    VkDescriptorSetLayout SetLayout       = VK_NULL_HANDLE;
-    VkDescriptorPool      DescriptorPool  = VK_NULL_HANDLE;
-    VkDescriptorSet       DescriptorSet   = VK_NULL_HANDLE;
-    VkPipelineLayout      PipelineLayout  = VK_NULL_HANDLE;
-    VkPipeline            Pipeline        = VK_NULL_HANDLE;
+    VkShaderModule        ShaderModule       = VK_NULL_HANDLE;
+    VkDescriptorSetLayout SetLayout          = VK_NULL_HANDLE;
+    VkDescriptorPool      DescriptorPool     = VK_NULL_HANDLE;
+    VkDescriptorSet       DescriptorSetPass0 = VK_NULL_HANDLE;
+    VkDescriptorSet       DescriptorSetPass1 = VK_NULL_HANDLE;
+    VkPipelineLayout      PipelineLayout     = VK_NULL_HANDLE;
+    VkPipeline            Pipeline           = VK_NULL_HANDLE;
 
     [[nodiscard]] uint32_t SelectMemoryType(uint32_t TypeBits, VkMemoryPropertyFlags Flags) const noexcept
     {
@@ -377,7 +379,8 @@ struct EverestSceneEncoding::GpuEncodingAllocation
         ReleaseBuffer(BlasTriangles);
         ReleaseBuffer(Occupants);
         ReleaseBuffer(Materials);
-        ReleaseBuffer(UniformsAndLights);
+        ReleaseBuffer(UniformsAndLightsPass0);
+        ReleaseBuffer(UniformsAndLightsPass1);
         ReleaseBuffer(SkyLut);
         ReleaseBuffer(Reservoirs);
         ReleaseBuffer(Accumulation);
@@ -480,11 +483,12 @@ bool EverestSceneEncoding::InitializeGpu(const VulkanRasterAccess& Access)
         return false;
     }
 
-    // 4. Allocate UniformsAndLights (64 float4s), SkyLut (96*54 float4s), Reservoirs, and Accumulation
+    // 4. Allocate UniformsAndLights (96 float4s per pass), SkyLut (96*54 float4s), Reservoirs (4x for ping-pong history), and Accumulation (4x)
     const VkDeviceSize PixelCount     = static_cast<VkDeviceSize>(GpuRenderWidth) * GpuRenderHeight;
-    const VkDeviceSize ReservoirBytes = PixelCount * 2u * 4u * sizeof(float);
-    if (!Gpu_->AllocateBuffer(64u * 4u * sizeof(float),      HostVisibleCoherent,                nullptr, Gpu_->UniformsAndLights) ||
-        !Gpu_->AllocateBuffer(96u * 54u * 4u * sizeof(float), HostVisibleCoherent,               nullptr, Gpu_->SkyLut) ||
+    const VkDeviceSize ReservoirBytes = PixelCount * 4u * 4u * sizeof(float);
+    if (!Gpu_->AllocateBuffer(96u * 4u * sizeof(float),       HostVisibleCoherent,                nullptr, Gpu_->UniformsAndLightsPass0) ||
+        !Gpu_->AllocateBuffer(96u * 4u * sizeof(float),       HostVisibleCoherent,                nullptr, Gpu_->UniformsAndLightsPass1) ||
+        !Gpu_->AllocateBuffer(96u * 54u * 4u * sizeof(float), HostVisibleCoherent,                nullptr, Gpu_->SkyLut) ||
         !Gpu_->AllocateBuffer(ReservoirBytes,                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, nullptr, Gpu_->Reservoirs) ||
         !Gpu_->AllocateBuffer(ReservoirBytes,                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, nullptr, Gpu_->Accumulation))
     {
@@ -586,11 +590,11 @@ bool EverestSceneEncoding::InitializeGpu(const VulkanRasterAccess& Access)
     }
 
     std::array<VkDescriptorPoolSize, 2> PoolSizes = {{
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 8u},
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  1u}
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 16u},
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  2u}
     }};
     VkDescriptorPoolCreateInfo PoolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-    PoolInfo.maxSets       = 1u;
+    PoolInfo.maxSets       = 2u;
     PoolInfo.poolSizeCount = static_cast<uint32_t>(PoolSizes.size());
     PoolInfo.pPoolSizes    = PoolSizes.data();
     if (Gpu_->CreateDescriptorPool(Access.Device, &PoolInfo, nullptr, &Gpu_->DescriptorPool) != VK_SUCCESS)
@@ -599,53 +603,64 @@ bool EverestSceneEncoding::InitializeGpu(const VulkanRasterAccess& Access)
         return false;
     }
 
+    std::array<VkDescriptorSetLayout, 2> SetLayouts = {Gpu_->SetLayout, Gpu_->SetLayout};
+    std::array<VkDescriptorSet, 2>       AllocSets  = {VK_NULL_HANDLE, VK_NULL_HANDLE};
     VkDescriptorSetAllocateInfo SetAlloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
     SetAlloc.descriptorPool     = Gpu_->DescriptorPool;
-    SetAlloc.descriptorSetCount = 1u;
-    SetAlloc.pSetLayouts        = &Gpu_->SetLayout;
-    if (Gpu_->AllocateDescriptorSets(Access.Device, &SetAlloc, &Gpu_->DescriptorSet) != VK_SUCCESS)
+    SetAlloc.descriptorSetCount = 2u;
+    SetAlloc.pSetLayouts        = SetLayouts.data();
+    if (Gpu_->AllocateDescriptorSets(Access.Device, &SetAlloc, AllocSets.data()) != VK_SUCCESS)
     {
         FinalizeGpu();
         return false;
     }
-
-    const std::array<const GpuEncodingAllocation::BufferSlot*, 8> BufSlots = {{
-        &Gpu_->BvhNodes,
-        &Gpu_->BlasTriangles,
-        &Gpu_->Occupants,
-        &Gpu_->Materials,
-        &Gpu_->UniformsAndLights,
-        &Gpu_->SkyLut,
-        &Gpu_->Reservoirs,
-        &Gpu_->Accumulation
-    }};
-    std::array<VkDescriptorBufferInfo, 8> BufInfos{};
-    std::array<VkWriteDescriptorSet, 9>   Writes{};
-    for (uint32_t B = 0u; B < 8u; ++B)
-    {
-        BufInfos[B].buffer = BufSlots[B]->Buffer;
-        BufInfos[B].offset = 0u;
-        BufInfos[B].range  = BufSlots[B]->Bytes;
-
-        Writes[B].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        Writes[B].dstSet          = Gpu_->DescriptorSet;
-        Writes[B].dstBinding      = B;
-        Writes[B].descriptorCount = 1u;
-        Writes[B].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        Writes[B].pBufferInfo     = &BufInfos[B];
-    }
+    Gpu_->DescriptorSetPass0 = AllocSets[0];
+    Gpu_->DescriptorSetPass1 = AllocSets[1];
 
     VkDescriptorImageInfo ImgDescInfo{};
     ImgDescInfo.imageView   = Gpu_->OutputView;
     ImgDescInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    Writes[8].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    Writes[8].dstSet          = Gpu_->DescriptorSet;
-    Writes[8].dstBinding      = 8u;
-    Writes[8].descriptorCount = 1u;
-    Writes[8].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    Writes[8].pImageInfo      = &ImgDescInfo;
 
-    Gpu_->UpdateDescriptorSets(Access.Device, static_cast<uint32_t>(Writes.size()), Writes.data(), 0u, nullptr);
+    for (uint32_t Pass = 0u; Pass < 2u; ++Pass)
+    {
+        const GpuEncodingAllocation::BufferSlot* UboSlot =
+            (Pass == 0u) ? &Gpu_->UniformsAndLightsPass0 : &Gpu_->UniformsAndLightsPass1;
+        VkDescriptorSet TargetSet = (Pass == 0u) ? Gpu_->DescriptorSetPass0 : Gpu_->DescriptorSetPass1;
+
+        const std::array<const GpuEncodingAllocation::BufferSlot*, 8> BufSlots = {{
+            &Gpu_->BvhNodes,
+            &Gpu_->BlasTriangles,
+            &Gpu_->Occupants,
+            &Gpu_->Materials,
+            UboSlot,
+            &Gpu_->SkyLut,
+            &Gpu_->Reservoirs,
+            &Gpu_->Accumulation
+        }};
+        std::array<VkDescriptorBufferInfo, 8> BufInfos{};
+        std::array<VkWriteDescriptorSet, 9>   Writes{};
+        for (uint32_t B = 0u; B < 8u; ++B)
+        {
+            BufInfos[B].buffer = BufSlots[B]->Buffer;
+            BufInfos[B].offset = 0u;
+            BufInfos[B].range  = BufSlots[B]->Bytes;
+
+            Writes[B].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            Writes[B].dstSet          = TargetSet;
+            Writes[B].dstBinding      = B;
+            Writes[B].descriptorCount = 1u;
+            Writes[B].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            Writes[B].pBufferInfo     = &BufInfos[B];
+        }
+        Writes[8].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        Writes[8].dstSet          = TargetSet;
+        Writes[8].dstBinding      = 8u;
+        Writes[8].descriptorCount = 1u;
+        Writes[8].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        Writes[8].pImageInfo      = &ImgDescInfo;
+
+        Gpu_->UpdateDescriptorSets(Access.Device, static_cast<uint32_t>(Writes.size()), Writes.data(), 0u, nullptr);
+    }
     Gpu_->Ready = true;
     return true;
 }
@@ -868,18 +883,26 @@ void EverestSceneEncoding::ConfigureLiveGpu(float                             Vi
     if (PipelineCfg.TemporalAntiAliasing)   Flags |= (1u << 11u);
     if (PipelineCfg.AcesFilmicTonemap)      Flags |= (1u << 12u);
 
-    const uint32_t LightCount = static_cast<uint32_t>(
-        std::min<size_t>(Course_.StreetPoles.size() + Course_.PointLamps.size(), 24u));
+    if (!HasPrevCamera_)
+    {
+        PrevEye_       = Camera.EyePosition;
+        PrevForward_   = Forward;
+        PrevRight_     = Right;
+        PrevUp_        = Up;
+        PrevTanHalf_   = TanHalf;
+        PrevAspect_    = Aspect;
+        HasPrevCamera_ = true;
+    }
 
-    std::array<std::array<float, 4>, 64> Ubo{};
+    std::array<std::array<float, 4>, 96> Ubo{};
     Ubo[ 0] = {Camera.EyePosition[0], Camera.EyePosition[1], Camera.EyePosition[2], TanHalf};
     Ubo[ 1] = {Forward[0], Forward[1], Forward[2], Aspect};
     Ubo[ 2] = {Right[0], Right[1], Right[2], static_cast<float>(GpuRenderWidth)};
     Ubo[ 3] = {Up[0], Up[1], Up[2], static_cast<float>(GpuRenderHeight)};
-    Ubo[ 4] = {SunDirection[0], SunDirection[1], SunDirection[2], std::max(0.002f, SolarCfg.AngularDiameterDeg * 0.5f * Degrees)};
+    Ubo[ 4] = {SunDirection[0], SunDirection[1], SunDirection[2], std::max(0.00465f, SolarCfg.AngularDiameterDeg * 0.5f * Degrees)};
     Ubo[ 5] = {SunRadiance[0], SunRadiance[1], SunRadiance[2], DaylightFactor};
     Ubo[ 6] = {0.18f * DaylightFactor + 0.015f, 0.36f * DaylightFactor + 0.025f, 0.72f * DaylightFactor + 0.055f, std::pow(2.0f, PipelineCfg.ExposureCompensationEv)};
-    Ubo[ 7] = {0.58f * DaylightFactor + 0.04f,  0.52f * DaylightFactor + 0.04f,  0.48f * DaylightFactor + 0.06f,  static_cast<float>(LightCount)};
+    Ubo[ 7] = {0.58f * DaylightFactor + 0.04f,  0.52f * DaylightFactor + 0.04f,  0.48f * DaylightFactor + 0.06f,  0.0f};
     const float CloudBase = std::max(200.0f, CloudCfg.BaseAltitudeMetres);
     Ubo[ 8] = {
         std::clamp(CloudCfg.Coverage, 0.0f, 1.0f),
@@ -902,33 +925,76 @@ void EverestSceneEncoding::ConfigureLiveGpu(float                             Vi
     Ubo[11] = {SunNdcX, SunNdcY, static_cast<float>(std::max(3u, FlareCfg.ApertureBladeCount)), 1.0f};
     Ubo[12] = {PrimaryMoonDir[0], PrimaryMoonDir[1], PrimaryMoonDir[2], MoonCfg.PrimaryPhase * MoonCfg.PrimaryAlbedo};
     Ubo[13] = {SecondaryMoonDir[0], SecondaryMoonDir[1], SecondaryMoonDir[2], MoonCfg.EarthshineLuminance};
-    Ubo[14] = {StarCfg.MagnitudeGain, StarCfg.AtmosphericScintillate, StarCfg.MilkyWayLuminance, 1.0f};
+    Ubo[14] = {StarCfg.MagnitudeGain, StarCfg.AtmosphericScintillate, StarCfg.MilkyWayLuminance, 0.0f};
     Ubo[15] = {
         static_cast<float>(FrameCounter_),
         static_cast<float>(AccumulatedFrames_),
         static_cast<float>(std::max(0, PipelineCfg.InspectionModeIndex)),
         static_cast<float>(Flags)
     };
+    Ubo[16] = {PrevEye_[0], PrevEye_[1], PrevEye_[2], PrevTanHalf_};
+    Ubo[17] = {PrevForward_[0], PrevForward_[1], PrevForward_[2], PrevAspect_};
+    Ubo[18] = {PrevRight_[0], PrevRight_[1], PrevRight_[2], (CamDelta > 1.0e-3f) ? 1.0f : 0.0f};
+    Ubo[19] = {PrevUp_[0], PrevUp_[1], PrevUp_[2], 0.0f};
+
+    PrevEye_     = Camera.EyePosition;
+    PrevForward_ = Forward;
+    PrevRight_   = Right;
+    PrevUp_      = Up;
+    PrevTanHalf_ = TanHalf;
+    PrevAspect_  = Aspect;
 
     size_t LightCursor = 0u;
+    // 1. Add VehicleHMI Low-Beam Headlight Spotlights + Rear Taillight Glow for each of the 5 Showcase Vehicles
+    for (const auto& V : Course_.ShowcaseVehicles)
+    {
+        if (LightCursor + 2u > 32u) break;
+        const float CosYaw = std::cos(V.YawRadians);
+        const float SinYaw = std::sin(V.YawRadians);
+
+        // Front Low-Beam Headlight Spotlight (local +2.48m forward, +0.22m up from CoM)
+        const float HeadX = V.WorldPosition[0] + 2.48f * CosYaw;
+        const float HeadY = V.WorldPosition[1] + 2.48f * SinYaw;
+        const float HeadZ = V.WorldPosition[2] + 0.22f;
+        Ubo[20u + LightCursor * 2u + 0u] = {HeadX, HeadY, HeadZ, 34.0f};
+        Ubo[20u + LightCursor * 2u + 1u] = {0.92f * 26.0f, 0.96f * 26.0f, 1.00f * 26.0f, V.YawRadians};
+        ++LightCursor;
+
+        // Rear Taillight Red Ground-Glow Lamp (local -2.32m rear, +0.22m up from CoM)
+        const float TailX = V.WorldPosition[0] - 2.32f * CosYaw;
+        const float TailY = V.WorldPosition[1] - 2.32f * SinYaw;
+        const float TailZ = V.WorldPosition[2] + 0.22f;
+        Ubo[20u + LightCursor * 2u + 0u] = {TailX, TailY, TailZ, 6.2f};
+        Ubo[20u + LightCursor * 2u + 1u] = {6.50f, 0.06f, 0.12f, -100.0f};
+        ++LightCursor;
+    }
+
+    // 2. Add Street Poles & Hangar/Tunnel Point Lamps
     for (const auto& Pole : Course_.StreetPoles)
     {
-        if (LightCursor >= 24u) break;
-        Ubo[16u + LightCursor * 2u + 0u] = {Pole.BulbPosition[0], Pole.BulbPosition[1], Pole.BulbPosition[2], Pole.Radius};
-        Ubo[16u + LightCursor * 2u + 1u] = {Pole.Colour[0] * Pole.Intensity, Pole.Colour[1] * Pole.Intensity, Pole.Colour[2] * Pole.Intensity, 0.0f};
+        if (LightCursor >= 32u) break;
+        Ubo[20u + LightCursor * 2u + 0u] = {Pole.BulbPosition[0], Pole.BulbPosition[1], Pole.BulbPosition[2], Pole.Radius};
+        Ubo[20u + LightCursor * 2u + 1u] = {Pole.Colour[0] * Pole.Intensity, Pole.Colour[1] * Pole.Intensity, Pole.Colour[2] * Pole.Intensity, -100.0f};
         ++LightCursor;
     }
     for (const auto& Lamp : Course_.PointLamps)
     {
-        if (LightCursor >= 24u) break;
-        Ubo[16u + LightCursor * 2u + 0u] = {Lamp.Position[0], Lamp.Position[1], Lamp.Position[2], Lamp.Radius};
-        Ubo[16u + LightCursor * 2u + 1u] = {Lamp.Colour[0] * Lamp.Intensity, Lamp.Colour[1] * Lamp.Intensity, Lamp.Colour[2] * Lamp.Intensity, 0.0f};
+        if (LightCursor >= 32u) break;
+        Ubo[20u + LightCursor * 2u + 0u] = {Lamp.Position[0], Lamp.Position[1], Lamp.Position[2], Lamp.Radius};
+        Ubo[20u + LightCursor * 2u + 1u] = {Lamp.Colour[0] * Lamp.Intensity, Lamp.Colour[1] * Lamp.Intensity, Lamp.Colour[2] * Lamp.Intensity, -100.0f};
         ++LightCursor;
     }
+    Ubo[7][3] = static_cast<float>(LightCursor);
 
-    if (Gpu_->UniformsAndLights.Mapped != nullptr)
+    if (Gpu_->UniformsAndLightsPass0.Mapped != nullptr)
     {
-        std::memcpy(Gpu_->UniformsAndLights.Mapped, Ubo.data(), sizeof(Ubo));
+        Ubo[14][3] = 0.0f; // Pass 0: Integrate + Motion Reproject
+        std::memcpy(Gpu_->UniformsAndLightsPass0.Mapped, Ubo.data(), sizeof(Ubo));
+    }
+    if (Gpu_->UniformsAndLightsPass1.Mapped != nullptr)
+    {
+        Ubo[14][3] = 1.0f; // Pass 1: SVGF 5x5 Spatial Wavelet Denoise + Present
+        std::memcpy(Gpu_->UniformsAndLightsPass1.Mapped, Ubo.data(), sizeof(Ubo));
     }
     Gpu_->PendingDispatch = true;
 }
@@ -963,9 +1029,30 @@ void EverestSceneEncoding::ConstructGpuCommands(VkCommandBuffer Commands)
         0u, nullptr,
         1u, &PreBarrier);
 
+    const uint32_t GroupsX = (GpuRenderWidth  + 7u) / 8u;
+    const uint32_t GroupsY = (GpuRenderHeight + 7u) / 8u;
+
+    // Pass 0: Primary Ray Trace + Direct Lighting + Indirect GI/Reflections + Motion-Vector Temporal Reprojection
     Gpu_->CmdBindPipeline(Commands, VK_PIPELINE_BIND_POINT_COMPUTE, Gpu_->Pipeline);
-    Gpu_->CmdBindDescriptorSets(Commands, VK_PIPELINE_BIND_POINT_COMPUTE, Gpu_->PipelineLayout, 0u, 1u, &Gpu_->DescriptorSet, 0u, nullptr);
-    Gpu_->CmdDispatch(Commands, (GpuRenderWidth + 7u) / 8u, (GpuRenderHeight + 7u) / 8u, 1u);
+    Gpu_->CmdBindDescriptorSets(Commands, VK_PIPELINE_BIND_POINT_COMPUTE, Gpu_->PipelineLayout, 0u, 1u, &Gpu_->DescriptorSetPass0, 0u, nullptr);
+    Gpu_->CmdDispatch(Commands, GroupsX, GroupsY, 1u);
+
+    // Compute-to-Compute memory barrier so Pass 1 (SVGF 5x5 Wavelet Denoiser) sees all Pass 0 reservoir/accumulation writes
+    VkMemoryBarrier ComputeBarrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+    ComputeBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    ComputeBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    Gpu_->CmdPipelineBarrier(
+        Commands,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0u,
+        1u, &ComputeBarrier,
+        0u, nullptr,
+        0u, nullptr);
+
+    // Pass 1: SVGF 5x5 Edge-Stopping Spatial Wavelet Filter + Volumetric Clouds/Sky/Fog/LensFlare + ACES Present
+    Gpu_->CmdBindDescriptorSets(Commands, VK_PIPELINE_BIND_POINT_COMPUTE, Gpu_->PipelineLayout, 0u, 1u, &Gpu_->DescriptorSetPass1, 0u, nullptr);
+    Gpu_->CmdDispatch(Commands, GroupsX, GroupsY, 1u);
 
     VkImageMemoryBarrier PostBarrier = PreBarrier;
     PostBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;

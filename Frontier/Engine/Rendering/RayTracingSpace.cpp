@@ -156,16 +156,16 @@ std::vector<SurfaceMaterialSpecification> ConstructDefaultMaterials()
     Set(CourseMaterial::BodyCoatBlue,   ConstructAutomotiveFlakePreset({0.014f, 0.10f, 0.58f},  {0.14f, 0.42f, 0.96f}, {1.80f, 0.75f, 0.06f}, 0.72f));
     Set(CourseMaterial::BodyCoatOrange, ConstructAutomotiveFlakePreset({0.68f, 0.14f, 0.010f},  {0.98f, 0.38f, 0.06f}, {0.06f, 0.90f, 2.00f}, 0.72f));
     Set(CourseMaterial::BodyTrim,         {{0.045f, 0.047f, 0.052f}, 0.36f, {0, 0, 0},     0.0f,  0.30f, 0.08f, 0.04f, 0.0f});
-    Set(CourseMaterial::VehicleGlass,     {{0.040f, 0.055f, 0.065f}, 0.02f, {0, 0, 0},     0.0f,  1.0f,  0.015f,0.04f, 0.72f});
-    Set(CourseMaterial::VehiclePlastic,   {{0.055f, 0.058f, 0.062f}, 0.48f, {0, 0, 0},     0.0f,  0.0f,  0.06f, 0.04f, 0.0f});
-    Set(CourseMaterial::Tyre,             {{0.035f, 0.036f, 0.039f}, 0.76f, {0, 0, 0},     0.0f,  0.0f,  0.06f, 0.03f, 0.0f});
-    Set(CourseMaterial::RimCarbon,        {{0.105f, 0.108f, 0.116f}, 0.24f, {0, 0, 0},     0.32f, 0.85f, 0.04f, 0.05f, 0.0f});
-    Set(CourseMaterial::Hub,              {{0.780f, 0.790f, 0.810f}, 0.18f, {0, 0, 0},     0.92f, 0.0f,  0.06f, 0.04f, 0.0f});
-    Set(CourseMaterial::Brake,            {{0.720f, 0.045f, 0.040f}, 0.28f, {0, 0, 0},     0.35f, 0.6f,  0.05f, 0.05f, 0.0f});
-    Set(CourseMaterial::VehicleTrim,      {{0.065f, 0.070f, 0.078f}, 0.28f, {0, 0, 0},     0.45f, 0.0f,  0.06f, 0.04f, 0.0f});
-    Set(CourseMaterial::Headlight,        {{0.042f, 0.048f, 0.062f}, 0.04f, {0.0f,  0.0f,  0.0f},  0.25f, 0.85f, 0.02f, 0.05f, 0.0f});
-    Set(CourseMaterial::Taillight,        {{0.240f, 0.015f, 0.015f}, 0.06f, {0.35f, 0.02f, 0.02f}, 0.0f,  0.85f, 0.02f, 0.05f, 0.0f});
-    Set(CourseMaterial::VehicleDefault,   {{0.085f, 0.090f, 0.100f}, 0.38f, {0, 0, 0},     0.20f, 0.0f,  0.06f, 0.04f, 0.0f});
+    Set(CourseMaterial::VehicleGlass,     {{0.026f, 0.028f, 0.030f}, 0.02f, {0, 0, 0},     0.0f,  1.0f,  0.015f,0.04f, 1.00f});
+    Set(CourseMaterial::VehiclePlastic,   {{0.012f, 0.014f, 0.018f}, 0.50f, {0, 0, 0},     0.0f,  0.0f,  0.06f, 0.04f, 0.0f});
+    Set(CourseMaterial::Tyre,             {{0.037f, 0.037f, 0.037f}, 0.76f, {0, 0, 0},     0.0f,  0.0f,  0.06f, 0.04f, 0.0f});
+    Set(CourseMaterial::RimCarbon,        {{0.037f, 0.037f, 0.037f}, 0.24f, {0, 0, 0},     0.32f, 0.85f, 0.04f, 0.05f, 0.0f});
+    Set(CourseMaterial::Hub,              {{0.060f, 0.220f, 0.620f}, 0.22f, {0.0f, 0.0333f, 0.12f}, 1.0f, 0.0f, 0.06f, 0.04f, 0.0f});
+    Set(CourseMaterial::Brake,            {{0.300f, 0.075f, 0.025f}, 0.29f, {0, 0, 0},     0.82f, 0.6f,  0.05f, 0.05f, 0.0f});
+    Set(CourseMaterial::VehicleTrim,      {{0.800f, 0.800f, 0.800f}, 0.50f, {0, 0, 0},     0.45f, 0.0f,  0.06f, 0.04f, 0.0f});
+    Set(CourseMaterial::Headlight,        {{0.800f, 0.800f, 0.800f}, 0.10f, {48.7f, 48.7f, 48.7f}, 0.0f,  0.85f, 0.02f, 0.05f, 0.0f});
+    Set(CourseMaterial::Taillight,        {{0.800f, 0.800f, 0.800f}, 0.10f, {6.50f, 0.0f,  0.107f}, 0.0f, 0.85f, 0.02f, 0.05f, 0.0f});
+    Set(CourseMaterial::VehicleDefault,   {{0.800f, 0.800f, 0.800f}, 0.50f, {0, 0, 0},     0.20f, 0.0f,  0.06f, 0.04f, 0.0f});
 
     Set(CourseMaterial::WallCrimson,      {{0.780f, 0.075f, 0.085f}, 0.68f, {0, 0, 0},     0.0f,  0.0f,  0.06f, 0.04f, 0.0f});
     Set(CourseMaterial::WallViridian,     {{0.085f, 0.680f, 0.240f}, 0.68f, {0, 0, 0},     0.0f,  0.0f,  0.06f, 0.04f, 0.0f});
@@ -221,10 +221,10 @@ std::vector<SurfaceMaterialSpecification> ConstructDefaultMaterials()
     Set(CourseMaterial::DerezGlow,        {{0.120f, 0.860f, 1.000f}, 0.12f, {14, 22, 28},  0.0f,  0.0f,  0.06f, 0.04f, 0.0f});
     Set(CourseMaterial::DerezHot,         {{1.000f, 0.420f, 0.080f}, 0.12f, {28, 12, 3},   0.0f,  0.0f,  0.06f, 0.04f, 0.0f});
     Set(CourseMaterial::DerezGlitch,      {{0.950f, 0.150f, 0.850f}, 0.12f, {22, 4, 20},   0.0f,  0.0f,  0.06f, 0.04f, 0.0f});
-    Set(CourseMaterial::GateLamp,         {{0.200f, 0.920f, 0.980f}, 0.12f, {6, 18, 22},   0.0f,  0.0f,  0.06f, 0.04f, 0.0f});
-    Set(CourseMaterial::GateLampRed,      {{0.980f, 0.160f, 0.120f}, 0.12f, {22, 2.5f, 2}, 0.0f,  0.0f,  0.06f, 0.04f, 0.0f});
-    Set(CourseMaterial::SignBoard,        {{0.080f, 0.280f, 0.180f}, 0.42f, {0, 0, 0},     0.15f, 0.0f,  0.06f, 0.04f, 0.0f});
-    Set(CourseMaterial::SignLetter,       {{0.920f, 0.940f, 0.960f}, 0.28f, {0.8f, 0.8f, 0.8f}, 0.0f, 0.0f, 0.06f, 0.05f, 0.0f});
+    Set(CourseMaterial::GateLamp,         {{0.300f, 0.900f, 0.400f}, 0.30f, {1.2f, 9.0f, 2.4f},   0.0f,  0.0f,  0.06f, 0.04f, 0.0f});
+    Set(CourseMaterial::GateLampRed,      {{0.900f, 0.200f, 0.150f}, 0.30f, {9.0f, 1.0f, 0.6f},   0.0f,  0.0f,  0.06f, 0.04f, 0.0f});
+    Set(CourseMaterial::SignBoard,        {{0.035f, 0.037f, 0.042f}, 0.60f, {0, 0, 0},            0.0f,  0.0f,  0.06f, 0.04f, 0.0f});
+    Set(CourseMaterial::SignLetter,       {{0.820f, 0.820f, 0.800f}, 0.45f, {1.6f, 1.6f, 1.55f},  0.0f,  0.0f,  0.06f, 0.04f, 0.0f});
 
     Set(CourseMaterial::CabinLeather,     {{0.068f, 0.065f, 0.064f}, 0.52f, {0, 0, 0},     0.0f,  0.12f, 0.18f, 0.038f,0.0f});
     Set(CourseMaterial::CabinTrim,        {{0.095f, 0.098f, 0.104f}, 0.34f, {0, 0, 0},     0.22f, 0.25f, 0.08f, 0.045f,0.0f});

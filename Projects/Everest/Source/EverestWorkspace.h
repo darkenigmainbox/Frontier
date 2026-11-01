@@ -102,12 +102,13 @@ class EverestWorkspace
     EverestSceneEncoding                 SceneEncoding;
     std::function<uint64_t(VkImageView)> DescribeGpuTexture;
     std::vector<uint8_t>                 ViewportRgba8Pixels;
-    float                 CameraOrbitYawRad    = 0.00f;
-    float                 CameraOrbitPitchRad  = 0.18f;
-    float                 CameraOrbitRadiusM   = 9.80f;
-    bool                  GameModeFullscreen   = (FRONTIER_EDITOR == 0);
+    std::array<float, 3>  CameraEye           = {13.60f, 0.00f, 2.75f};
+    float                 CameraYawRad        = 3.14159265f;
+    float                 CameraPitchRad      = -0.155f;
+    float                 CameraMoveSpeedMps  = 8.50f;
+    bool                  GameModeFullscreen  = (FRONTIER_EDITOR == 0);
     std::string           Diagnostic;
-    double                ElapsedSeconds       = 0.0;
+    double                ElapsedSeconds      = 0.0;
 };
 
 } // namespace Everest

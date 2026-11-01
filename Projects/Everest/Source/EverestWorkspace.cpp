@@ -192,12 +192,17 @@ void EverestWorkspace::ConstructGpuCommands(VkCommandBuffer Commands)
 EverestCameraSpecification EverestWorkspace::BuildCameraSpecification() const noexcept
 {
     EverestCameraSpecification CameraSpec{};
-    CameraSpec.LookAtTarget = {1.4f, 0.0f, 0.68f};
-    const float CosPitch    = std::cos(CameraOrbitPitchRad);
-    CameraSpec.EyePosition  = {
-        CameraSpec.LookAtTarget[0] - CameraOrbitRadiusM * CosPitch * std::cos(CameraOrbitYawRad),
-        CameraSpec.LookAtTarget[1] - CameraOrbitRadiusM * CosPitch * std::sin(CameraOrbitYawRad),
-        CameraSpec.LookAtTarget[2] + CameraOrbitRadiusM * std::sin(CameraOrbitPitchRad)
+    CameraSpec.EyePosition = CameraEye;
+    const float CosPitch   = std::cos(CameraPitchRad);
+    const std::array<float, 3> Forward = {
+        CosPitch * std::cos(CameraYawRad),
+        CosPitch * std::sin(CameraYawRad),
+        std::sin(CameraPitchRad)
+    };
+    CameraSpec.LookAtTarget = {
+        CameraEye[0] + Forward[0] * 10.0f,
+        CameraEye[1] + Forward[1] * 10.0f,
+        CameraEye[2] + Forward[2] * 10.0f
     };
     CameraSpec.VerticalFovDegrees = 54.0f;
     return CameraSpec;
@@ -552,17 +557,86 @@ void EverestWorkspace::ConstructViewportSurface()
     const float  H     = std::max(64.0f, Avail.y);
     const ImVec2 Min   = ImGui::GetCursorScreenPos();
     const ImVec2 Max(Min.x + W, Min.y + H);
-    ImGui::InvisibleButton("##SceneViewportCanvas", ImVec2(W, H));
+    ImGui::InvisibleButton("##SceneViewportCanvas", ImVec2(W, H),
+                           ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
 
-    if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+    const ImGuiIO& Io              = ImGui::GetIO();
+    const bool     ViewportHovered = ImGui::IsItemHovered();
+    const bool     ViewportActive  = ImGui::IsItemActive();
+    const bool     RmbHeld         = (ViewportHovered || ViewportActive || GameModeFullscreen) && ImGui::IsMouseDown(ImGuiMouseButton_Right);
+    const bool     LmbDrag         = ViewportActive && ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+    const bool     MmbDrag         = (ViewportHovered || ViewportActive) && ImGui::IsMouseDragging(ImGuiMouseButton_Middle);
+
+    const float CosPitch = std::cos(CameraPitchRad);
+    const std::array<float, 3> Forward = {
+        CosPitch * std::cos(CameraYawRad),
+        CosPitch * std::sin(CameraYawRad),
+        std::sin(CameraPitchRad)
+    };
+    const std::array<float, 3> Right = {
+        -std::sin(CameraYawRad),
+         std::cos(CameraYawRad),
+         0.0f
+    };
+
+    // Unreal Engine Mouse Look (RMB free-look or LMB drag)
+    if (RmbHeld || LmbDrag)
     {
-        const ImVec2 Delta   = ImGui::GetIO().MouseDelta;
-        CameraOrbitYawRad   -= Delta.x * 0.0055f;
-        CameraOrbitPitchRad  = std::clamp(CameraOrbitPitchRad + Delta.y * 0.0045f, 0.04f, 1.25f);
+        const ImVec2 Delta = Io.MouseDelta;
+        CameraYawRad      -= Delta.x * 0.0042f;
+        CameraPitchRad     = std::clamp(CameraPitchRad - Delta.y * 0.0038f, -1.42f, 1.42f);
     }
-    if (ImGui::IsItemHovered() && std::abs(ImGui::GetIO().MouseWheel) > 1.0e-3f)
+
+    // Middle-Mouse Pan
+    if (MmbDrag)
     {
-        CameraOrbitRadiusM = std::clamp(CameraOrbitRadiusM - ImGui::GetIO().MouseWheel * 0.85f, 3.8f, 28.0f);
+        const ImVec2 Delta = Io.MouseDelta;
+        const float  Pan   = 0.018f;
+        CameraEye[0]      -= Right[0] * Delta.x * Pan;
+        CameraEye[1]      -= Right[1] * Delta.x * Pan;
+        CameraEye[2]      += Delta.y * Pan;
+    }
+
+    // Mouse Wheel: adjusts fly speed while holding RMB (Unreal Engine style), or dollies along view ray
+    if (ViewportHovered && std::abs(Io.MouseWheel) > 1.0e-3f)
+    {
+        if (RmbHeld)
+        {
+            CameraMoveSpeedMps = std::clamp(CameraMoveSpeedMps * std::pow(1.18f, Io.MouseWheel), 1.5f, 45.0f);
+        }
+        else
+        {
+            const float Dolly = Io.MouseWheel * 1.15f;
+            CameraEye[0]     += Forward[0] * Dolly;
+            CameraEye[1]     += Forward[1] * Dolly;
+            CameraEye[2]     = std::max(0.35f, CameraEye[2] + Forward[2] * Dolly);
+        }
+    }
+
+    // Unreal Engine WASD + Q/E Free-Fly Navigation (active in Game Mode, when RMB is held, or when viewport is hovered)
+    if ((GameModeFullscreen || RmbHeld || ViewportHovered) && !Io.WantTextInput)
+    {
+        const float Dt    = std::clamp(Io.DeltaTime, 0.0f, 0.1f);
+        const float Boost = (ImGui::IsKeyDown(ImGuiKey_LeftShift) || ImGui::IsKeyDown(ImGuiKey_RightShift)) ? 2.5f : 1.0f;
+        const float Step  = CameraMoveSpeedMps * Boost * Dt;
+
+        float MoveFwd   = 0.0f;
+        float MoveRight = 0.0f;
+        float MoveUp    = 0.0f;
+
+        if (ImGui::IsKeyDown(ImGuiKey_W) || ImGui::IsKeyDown(ImGuiKey_UpArrow))    MoveFwd   += 1.0f;
+        if (ImGui::IsKeyDown(ImGuiKey_S) || ImGui::IsKeyDown(ImGuiKey_DownArrow))  MoveFwd   -= 1.0f;
+        if (ImGui::IsKeyDown(ImGuiKey_D) || ImGui::IsKeyDown(ImGuiKey_RightArrow)) MoveRight += 1.0f;
+        if (ImGui::IsKeyDown(ImGuiKey_A) || ImGui::IsKeyDown(ImGuiKey_LeftArrow))  MoveRight -= 1.0f;
+        if (ImGui::IsKeyDown(ImGuiKey_E) || ImGui::IsKeyDown(ImGuiKey_Space))      MoveUp    += 1.0f;
+        if (ImGui::IsKeyDown(ImGuiKey_Q) || ImGui::IsKeyDown(ImGuiKey_C))          MoveUp    -= 1.0f;
+
+        if (MoveFwd != 0.0f || MoveRight != 0.0f || MoveUp != 0.0f)
+        {
+            CameraEye[0] += (Forward[0] * MoveFwd + Right[0] * MoveRight) * Step;
+            CameraEye[1] += (Forward[1] * MoveFwd + Right[1] * MoveRight) * Step;
+            CameraEye[2]  = std::max(0.30f, CameraEye[2] + (Forward[2] * MoveFwd + MoveUp) * Step);
+        }
     }
 
     ImDrawList* DrawList = ImGui::GetWindowDrawList();

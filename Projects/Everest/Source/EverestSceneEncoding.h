@@ -120,6 +120,13 @@ class EverestSceneEncoding
     uint32_t                                AccumulatedFrames_  = 0u;
     uint32_t                                FrameCounter_       = 0u;
     EverestCameraSpecification              LastCamera_{};
+    std::array<float, 3>                    PrevEye_            = {11.2f, 0.0f, 3.1f};
+    std::array<float, 3>                    PrevForward_        = {-1.0f, 0.0f, 0.0f};
+    std::array<float, 3>                    PrevRight_          = { 0.0f, 1.0f, 0.0f};
+    std::array<float, 3>                    PrevUp_             = { 0.0f, 0.0f, 1.0f};
+    float                                   PrevTanHalf_        = 0.445f;
+    float                                   PrevAspect_         = 1.777f;
+    bool                                    HasPrevCamera_      = false;
     uint64_t                                LastWorldSignature_ = 0u;
     std::vector<Frontier::TracePixelGuide>  PrimaryGuides_{};
     std::vector<std::array<float, 3>>       AccumulatedHdr_{};

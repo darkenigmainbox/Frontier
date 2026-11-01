@@ -149,8 +149,23 @@ void AppendBox(std::vector<TriangleFacetRecord>& Out,
 {
     std::vector<TriangleFacetRecord> Out = EmitBoxFacets(0.32f, 0.44f, 1.10f, CourseMaterial::SteelDark, 0.0f);
     AppendBox(Out, {-0.18f, -0.14f, 0.76f}, {0.18f, 0.14f, 0.98f}, CourseMaterial::GateLampRed);
-    AppendBox(Out, {-0.18f, -0.14f, 0.44f}, {0.18f, 0.14f, 0.66f}, CourseMaterial::StressAmber);
+    AppendBox(Out, {-0.18f, -0.14f, 0.44f}, {0.18f, 0.14f, 0.66f}, CourseMaterial::LampWarm);
     AppendBox(Out, {-0.18f, -0.14f, 0.12f}, {0.18f, 0.14f, 0.34f}, CourseMaterial::GateLamp);
+    return Out;
+}
+
+[[nodiscard]] std::vector<TriangleFacetRecord> EmitGantryBoardFacets()
+{
+    std::vector<TriangleFacetRecord> Out = EmitBoxFacets(0.35f, 8.5f, 2.2f, CourseMaterial::SignBoard, 0.0f);
+    // Glowing green GateLamp LED strip along the bottom of the gantry board (matching VehicleHMI GantryLamp)
+    AppendBox(Out, {-0.22f, -9.8f, -0.12f}, {0.22f, 9.8f, 0.02f}, CourseMaterial::GateLamp);
+    // Glowing white SignLetter bars across the sign face
+    for (int Bar = -2; Bar <= 2; ++Bar)
+    {
+        const float Y0 = static_cast<float>(Bar) * 1.45f - 0.48f;
+        const float Y1 = static_cast<float>(Bar) * 1.45f + 0.48f;
+        AppendBox(Out, {-0.20f, Y0, 0.72f}, {0.20f, Y1, 1.48f}, CourseMaterial::SignLetter);
+    }
     return Out;
 }
 
@@ -166,9 +181,9 @@ void AppendBox(std::vector<TriangleFacetRecord>& Out,
     AppendQuad(Out, {-14.2f,  11.5f, 0.008f}, {14.2f,  11.5f, 0.008f}, {14.2f,  11.8f, 0.008f}, {-14.2f,  11.8f, 0.008f}, CourseMaterial::PaintWhite);
     for (int Bay = -2; Bay <= 2; ++Bay)
     {
-        const float YCenter = static_cast<float>(Bay) * 3.8f;
-        AppendQuad(Out, {-3.4f, YCenter - 1.75f, 0.009f}, {3.8f, YCenter - 1.75f, 0.009f}, {3.8f, YCenter - 1.62f, 0.009f}, {-3.4f, YCenter - 1.62f, 0.009f}, CourseMaterial::PaintYellow);
-        AppendQuad(Out, {-3.4f, YCenter + 1.62f, 0.009f}, {3.8f, YCenter + 1.62f, 0.009f}, {3.8f, YCenter + 1.75f, 0.009f}, {-3.4f, YCenter + 1.75f, 0.009f}, CourseMaterial::PaintYellow);
+        const float YCenter = static_cast<float>(Bay) * 4.2f;
+        AppendQuad(Out, {-3.8f, YCenter - 1.85f, 0.009f}, {5.4f, YCenter - 1.85f, 0.009f}, {5.4f, YCenter - 1.72f, 0.009f}, {-3.8f, YCenter - 1.72f, 0.009f}, CourseMaterial::PaintYellow);
+        AppendQuad(Out, {-3.8f, YCenter + 1.72f, 0.009f}, {5.4f, YCenter + 1.72f, 0.009f}, {5.4f, YCenter + 1.85f, 0.009f}, {-3.8f, YCenter + 1.85f, 0.009f}, CourseMaterial::PaintYellow);
     }
 
     for (int Segment = 0; Segment < 16; ++Segment)
@@ -279,7 +294,7 @@ struct DecodedFacetStream
     switch (ArchiveFamily)
     {
         case 6u:  return PaintFamily;
-        case 7u:  return CourseMaterial::Glass;
+        case 7u:  return CourseMaterial::VehicleGlass;
         case 8u:  return CourseMaterial::VehiclePlastic;
         case 9u:  return CourseMaterial::Tyre;
         case 10u: return CourseMaterial::Hub;
@@ -318,9 +333,10 @@ struct DecodedFacetStream
         CourseMaterial             Family = MapArchiveFamilyToCourseMaterial(BodyStream.Families[F], PaintFamily);
         if (BodyStream.Families[F] == 13u)
         {
-            const float AbsAvgY = std::abs((Corners[0][1] + Corners[1][1] + Corners[2][1]) / 3.0f);
-            if (AbsAvgY < 0.22f)
+            const float MaxAuthoredZ = std::max({Corners[0][2], Corners[1][2], Corners[2][2]}) + VehicleCoMAuthoredRebaseZ;
+            if (MaxAuthoredZ > 0.45f)
             {
+                // Authored Z in [0.437, 0.697] is the upper front nose hood panel; [0.382, 0.437] is the 5.5cm LED headlight bar
                 Family = PaintFamily;
             }
         }
@@ -467,7 +483,7 @@ EverestCourseScene ConstructEverestCourseScene()
         MakeFacetSet("BridgePier",           EmitBoxFacets(2.2f, 2.2f, 6.2f, CourseMaterial::TunnelConcrete),           0.25f),
         MakeFacetSet("GantryBeam",           EmitBoxFacets(0.8f, 22.0f, 0.8f, CourseMaterial::SteelDark),               0.25f),
         MakeFacetSet("GantryPost",           EmitBoxFacets(0.7f, 0.7f, 7.2f, CourseMaterial::SteelDark),                0.20f),
-        MakeFacetSet("GantryBoard",          EmitBoxFacets(0.35f, 8.5f, 2.2f, CourseMaterial::SignBoard),               0.20f),
+        MakeFacetSet("GantryBoard",          EmitGantryBoardFacets(),                                                   0.20f),
         MakeFacetSet("ContainerLong",        EmitContainerFacets(12.0f, 2.4f, 2.6f, CourseMaterial::ContainerOrange),   0.20f),
         MakeFacetSet("ContainerShort",       EmitContainerFacets(6.0f, 2.4f, 2.6f, CourseMaterial::ContainerBlue),      0.20f),
         MakeFacetSet("Barrier",              EmitBoxFacets(3.0f, 0.6f, 0.9f, CourseMaterial::BarrierConcrete),          0.12f),
@@ -523,11 +539,11 @@ EverestCourseScene ConstructEverestCourseScene()
         float          YawDeg;
     };
     static constexpr std::array<CarPlacementSpec, 5> ShowcaseSpecs = {{
-        {"Crimson Red Metallic Flake",      CourseMaterial::BodyCoat,       SlotVehicleBodyRed,    3.2f,  0.0f, -152.0f},
-        {"Emerald Green Metallic Flake",    CourseMaterial::BodyCoatGreen,  SlotVehicleBodyGreen,  1.8f,  3.1f, -132.0f},
-        {"Solar Yellow Metallic Flake",     CourseMaterial::BodyCoatYellow, SlotVehicleBodyYellow, 1.8f, -3.1f,  168.0f},
-        {"Cobalt Blue Metallic Flake",      CourseMaterial::BodyCoatBlue,   SlotVehicleBodyBlue,  -0.4f,  5.8f, -112.0f},
-        {"Tangerine Orange Metallic Flake", CourseMaterial::BodyCoatOrange, SlotVehicleBodyOrange,-0.4f, -5.8f,  148.0f}
+        {"Crimson Red Metallic Flake",      CourseMaterial::BodyCoat,       SlotVehicleBodyRed,    4.2f,   0.0f,  -18.0f},
+        {"Emerald Green Metallic Flake",    CourseMaterial::BodyCoatGreen,  SlotVehicleBodyGreen,  0.8f,   5.2f, -158.0f},
+        {"Solar Yellow Metallic Flake",     CourseMaterial::BodyCoatYellow, SlotVehicleBodyYellow, 0.8f,  -5.2f,   18.0f},
+        {"Cobalt Blue Metallic Flake",      CourseMaterial::BodyCoatBlue,   SlotVehicleBodyBlue,  -2.8f,  10.4f,  -24.0f},
+        {"Tangerine Orange Metallic Flake", CourseMaterial::BodyCoatOrange, SlotVehicleBodyOrange,-2.8f, -10.4f,  156.0f}
     }};
 
     for (size_t CarIdx = 0u; CarIdx < ShowcaseSpecs.size(); ++CarIdx)
