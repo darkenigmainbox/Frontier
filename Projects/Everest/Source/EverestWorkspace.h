@@ -43,6 +43,11 @@ class EverestWorkspace
 
     void IntegrateSimulation(double DeltaSeconds);
 
+    // Real-time GPU Vulkan compute initialization & command recording
+    bool InitializeGpu(const Frontier::VulkanRasterAccess&  Access,
+                       std::function<uint64_t(VkImageView)> DescribeTexture = {});
+    void ConstructGpuCommands(VkCommandBuffer Commands);
+
     // Encodes a frame of the Everest scene (usable in both Editor mode and standalone Game/Shipping mode).
     void EncodeViewportFrame(uint32_t Width, uint32_t Height, std::vector<uint8_t>& OutRgba8Pixels);
 
@@ -73,7 +78,9 @@ class EverestWorkspace
     [[nodiscard]] double                       QueryElapsedSeconds() const noexcept { return ElapsedSeconds; }
 
   private:
-    void InitializeWorld();
+    void                                InitializeWorld();
+    [[nodiscard]] EverestCameraSpecification BuildCameraSpecification() const noexcept;
+    [[nodiscard]] EverestEnvironmentSettings BuildEnvironmentSettings();
 
 #if FRONTIER_EDITOR && defined(FRONTIER_WITH_INTERFACE_SDK)
     void ServiceDynamicSceneRequests();
@@ -89,11 +96,12 @@ class EverestWorkspace
     uint64_t                      ObservedLayoutRevision = 0;
 #endif
 
-    std::filesystem::path ProjectRoot;
-    std::filesystem::path ActiveLevelPath;
-    EverestApplication    Application;
-    EverestSceneEncoding  SceneEncoding;
-    std::vector<uint8_t>  ViewportRgba8Pixels;
+    std::filesystem::path                ProjectRoot;
+    std::filesystem::path                ActiveLevelPath;
+    EverestApplication                   Application;
+    EverestSceneEncoding                 SceneEncoding;
+    std::function<uint64_t(VkImageView)> DescribeGpuTexture;
+    std::vector<uint8_t>                 ViewportRgba8Pixels;
     float                 CameraOrbitYawRad    = 0.00f;
     float                 CameraOrbitPitchRad  = 0.18f;
     float                 CameraOrbitRadiusM   = 9.80f;

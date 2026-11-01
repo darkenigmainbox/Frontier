@@ -177,7 +177,19 @@ void EverestWorkspace::IntegrateSimulation(double DeltaSeconds)
     }
 }
 
-void EverestWorkspace::EncodeViewportFrame(uint32_t Width, uint32_t Height, std::vector<uint8_t>& OutRgba8Pixels)
+bool EverestWorkspace::InitializeGpu(const Frontier::VulkanRasterAccess&  Access,
+                                     std::function<uint64_t(VkImageView)> DescribeTexture)
+{
+    DescribeGpuTexture = std::move(DescribeTexture);
+    return SceneEncoding.InitializeGpu(Access);
+}
+
+void EverestWorkspace::ConstructGpuCommands(VkCommandBuffer Commands)
+{
+    SceneEncoding.ConstructGpuCommands(Commands);
+}
+
+EverestCameraSpecification EverestWorkspace::BuildCameraSpecification() const noexcept
 {
     EverestCameraSpecification CameraSpec{};
     CameraSpec.LookAtTarget = {1.4f, 0.0f, 0.68f};
@@ -188,9 +200,13 @@ void EverestWorkspace::EncodeViewportFrame(uint32_t Width, uint32_t Height, std:
         CameraSpec.LookAtTarget[2] + CameraOrbitRadiusM * std::sin(CameraOrbitPitchRad)
     };
     CameraSpec.VerticalFovDegrees = 54.0f;
+    return CameraSpec;
+}
 
+EverestEnvironmentSettings EverestWorkspace::BuildEnvironmentSettings()
+{
     EverestEnvironmentSettings EnvSettings{};
-    auto& WorldRef = QuerySceneWorld();
+    auto&                      WorldRef = QuerySceneWorld();
     if (const auto* R = dynamic_cast<const Frontier::SolarRecord*>(WorldRef.FindFirstByType("Solar")))
         EnvSettings.Solar = R->QueryConfiguration();
     if (const auto* R = dynamic_cast<const Frontier::AtmosphereRecord*>(WorldRef.FindFirstByType("Atmosphere")))
@@ -207,8 +223,12 @@ void EverestWorkspace::EncodeViewportFrame(uint32_t Width, uint32_t Height, std:
         EnvSettings.Star = R->QueryConfiguration();
     if (const auto* R = dynamic_cast<const Frontier::RenderPipelineRecord*>(WorldRef.FindFirstByType("RenderPipeline")))
         EnvSettings.Pipeline = R->QueryConfiguration();
+    return EnvSettings;
+}
 
-    SceneEncoding.EncodeFrame(Width, Height, CameraSpec, EnvSettings, OutRgba8Pixels);
+void EverestWorkspace::EncodeViewportFrame(uint32_t Width, uint32_t Height, std::vector<uint8_t>& OutRgba8Pixels)
+{
+    SceneEncoding.EncodeFrame(Width, Height, BuildCameraSpecification(), BuildEnvironmentSettings(), OutRgba8Pixels);
 }
 
 //------------------------------------------------------------------------------------------------------------------------
@@ -545,32 +565,48 @@ void EverestWorkspace::ConstructViewportSurface()
         CameraOrbitRadiusM = std::clamp(CameraOrbitRadiusM - ImGui::GetIO().MouseWheel * 0.85f, 3.8f, 28.0f);
     }
 
-    const uint32_t PixelWidth  = static_cast<uint32_t>(std::clamp(W * 0.36f, 128.0f, 384.0f));
-    const uint32_t PixelHeight = static_cast<uint32_t>(std::clamp(H * 0.36f, 72.0f, 216.0f));
-
-    EncodeViewportFrame(PixelWidth, PixelHeight, ViewportRgba8Pixels);
-
     ImDrawList* DrawList = ImGui::GetWindowDrawList();
     DrawList->PushClipRect(Min, Max, true);
 
-    Frontier::BlitWorkspaceViewportCpuFrame(
-        DrawList,
-        {PixelWidth, PixelHeight, ViewportRgba8Pixels},
-        Min,
-        Max,
-        Min,
-        Max);
+    bool UsedGpu = false;
+    if (SceneEncoding.GpuReady() && DescribeGpuTexture)
+    {
+        SceneEncoding.ConfigureLiveGpu(W / std::max(1.0f, H), BuildCameraSpecification(), BuildEnvironmentSettings());
+        const uint64_t TextureHandle = DescribeGpuTexture(SceneEncoding.QueryLiveView());
+        if (TextureHandle != 0u)
+        {
+            DrawList->AddImage(static_cast<ImTextureID>(TextureHandle), Min, Max);
+            UsedGpu = true;
+        }
+    }
+
+    if (!UsedGpu)
+    {
+        const uint32_t PixelWidth  = static_cast<uint32_t>(std::clamp(W * 0.36f, 128.0f, 384.0f));
+        const uint32_t PixelHeight = static_cast<uint32_t>(std::clamp(H * 0.36f, 72.0f, 216.0f));
+
+        EncodeViewportFrame(PixelWidth, PixelHeight, ViewportRgba8Pixels);
+
+        Frontier::BlitWorkspaceViewportCpuFrame(
+            DrawList,
+            {PixelWidth, PixelHeight, ViewportRgba8Pixels},
+            Min,
+            Max,
+            Min,
+            Max);
+    }
 
     int InspectionMode = 0;
     if (const auto* PipeRec = dynamic_cast<const Frontier::RenderPipelineRecord*>(QuerySceneWorld().FindFirstByType("RenderPipeline")))
     {
         InspectionMode = std::clamp(PipeRec->QueryConfiguration().InspectionModeIndex, 0, 14);
     }
-    char OverlayLine[180]{};
+    char OverlayLine[192]{};
     std::snprintf(OverlayLine, sizeof(OverlayLine),
-                  "VIEW: %s (%s)  |  ReSTIR + ATMOSPHERE + 5 FLAKE CARS (%u spp)  |  SIM: %.1f s",
+                  "VIEW: %s (%s · %s)  |  ReSTIR + ATMOSPHERE + 5 FLAKE CARS (%u spp)  |  SIM: %.1f s",
                   Frontier::RenderInspectionModes::ModeNames[InspectionMode],
                   GameModeFullscreen ? "GAME FULLSCREEN" : "EDITOR VIEWPORT",
+                  UsedGpu ? "GPU VULKAN" : "CPU",
                   SceneEncoding.AccumulatedFrames(),
                   ElapsedSeconds);
     const float CardW = MeasureLabelWidth(Faces.Monospace, 10.0f, OverlayLine) + 20.0f;

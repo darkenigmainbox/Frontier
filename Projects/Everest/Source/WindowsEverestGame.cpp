@@ -2,9 +2,9 @@
                                                          WINDOWSEVERESTGAME.CPP
                                      ------------------------------------------------------------------
                  Standalone Windows Game Mode executable for Project Everest. Opens directly into the full-screen
-                 Everest 3D viewport (EverestSceneEncoding: coupled PlanetaryAtmosphere + ReSTIR GI + 5 automotive-flake
-                 ControlVehicle showcase cars). Press F11 to toggle between Game Mode (full-screen viewport) and
-                 Editor Mode (docked viewport with Outliner + Inspector + Log Stream).
+                 Everest 3D viewport rendered on the GPU via Vulkan compute (EverestSceneEncoding: coupled
+                 PlanetaryAtmosphere + ReSTIR GI + 5 automotive-flake ControlVehicle showcase cars).
+                 Press F11 to toggle between Game Mode (full-screen viewport) and Editor Mode (docked viewport).
 ==========================================================================================================================================*/
 
 #ifndef GLFW_INCLUDE_NONE
@@ -26,8 +26,10 @@
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <imgui.h>
+#include <imgui_impl_vulkan.h>
 
 #include <filesystem>
+#include <map>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -35,13 +37,30 @@
 int main()
 {
     Frontier::DiagnosticJournal::Initialize("EverestGame");
-    Frontier::DiagnosticJournal::Append("Startup", "Everest Game Mode (Full-Screen Viewport)");
+    Frontier::DiagnosticJournal::Append("Startup", "Everest Game Mode (Full-Screen GPU Vulkan Viewport)");
 
     Frontier::ActivationOwnership               AppearanceOwnership;
     Frontier::ControlCentrePanel*               Appearance = nullptr;
     std::unique_ptr<Everest::EverestWorkspace>  EverestSpace;
+    std::map<VkImageView, VkDescriptorSet>      ViewportDescriptors;
     GLFWwindow*                                 Window = nullptr;
     std::filesystem::path                       Preferences;
+
+    const auto Describe = [&](VkImageView View) -> uint64_t
+    {
+        if (!View)
+        {
+            return 0u;
+        }
+        const auto Cached = ViewportDescriptors.find(View);
+        if (Cached != ViewportDescriptors.end())
+        {
+            return reinterpret_cast<uint64_t>(Cached->second);
+        }
+        const VkDescriptorSet Descriptor = ImGui_ImplVulkan_AddTexture(View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        ViewportDescriptors.emplace(View, Descriptor);
+        return reinterpret_cast<uint64_t>(Descriptor);
+    };
 
     Frontier::ApplicationWindowCallbacks Callbacks;
     Callbacks.Title      = "Everest — Game Mode [" FRONTIER_BUILD_COMMIT "]";
@@ -85,6 +104,23 @@ int main()
         EverestSpace->SetGameModeFullscreen(true);
     };
 
+    Callbacks.InitializeVulkan = [&](Frontier::VulkanPresentation& Display)
+    {
+        if (EverestSpace)
+        {
+            (void)EverestSpace->InitializeGpu(Display.QueryRasterAccess(), Describe);
+        }
+        Display.ConfigureRendering(
+            [&](VkCommandBuffer Commands, uint64_t /*Completed*/, uint64_t /*Serial*/)
+            {
+                if (EverestSpace)
+                {
+                    EverestSpace->ConstructGpuCommands(Commands);
+                }
+            },
+            []() {});
+    };
+
     Callbacks.PrepareInterface = [&]() { Appearance->PrepareInterface(); };
     Callbacks.RecoverWindows   = [&]()
     {
@@ -115,6 +151,14 @@ int main()
     };
     Callbacks.Finalize = [&]()
     {
+        for (const auto& Entry : ViewportDescriptors)
+        {
+            if (Entry.second)
+            {
+                ImGui_ImplVulkan_RemoveTexture(Entry.second);
+            }
+        }
+        ViewportDescriptors.clear();
         EverestSpace.reset();
         AppearanceOwnership.reset();
         Frontier::DiagnosticJournal::Append("Shutdown", "EverestGame resources reclaimed");

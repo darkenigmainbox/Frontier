@@ -12,6 +12,7 @@ add_library(EverestProject STATIC
 )
 target_include_directories(EverestProject PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/Source
+    ${CMAKE_SOURCE_DIR}/ExternalPackages/vulkan-headers/include
 )
 target_link_libraries(EverestProject PUBLIC FrontierEngine)
 

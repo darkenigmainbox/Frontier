@@ -151,7 +151,8 @@ add_library(EverestProjectEditor STATIC
 target_include_directories(EverestProjectEditor PUBLIC
     "${CMAKE_SOURCE_DIR}"
     "${CMAKE_SOURCE_DIR}/Frontier"
-    "${CMAKE_SOURCE_DIR}/Projects/Everest/Source")
+    "${CMAKE_SOURCE_DIR}/Projects/Everest/Source"
+    "${CMAKE_SOURCE_DIR}/ExternalPackages/vulkan-headers/include")
 target_compile_definitions(EverestProjectEditor PUBLIC FRONTIER_WITH_INTERFACE_SDK=1 FRONTIER_EDITOR_PROFILE=1 FRONTIER_EDITOR=1)
 target_link_libraries(EverestProjectEditor PUBLIC FrontierSceneEditorUI)
 frontier_stage_project_content(EverestProjectEditor
@@ -176,7 +177,8 @@ target_include_directories(EverestProjectRuntime PUBLIC
     "${CMAKE_SOURCE_DIR}"
     "${CMAKE_SOURCE_DIR}/Frontier"
     "${CMAKE_SOURCE_DIR}/Projects/Everest/Source"
-    "${CMAKE_SOURCE_DIR}/ExternalPackages/tomlpp/include")
+    "${CMAKE_SOURCE_DIR}/ExternalPackages/tomlpp/include"
+    "${CMAKE_SOURCE_DIR}/ExternalPackages/vulkan-headers/include")
 target_compile_definitions(EverestProjectRuntime PUBLIC FRONTIER_SHIPPING_PROFILE=1 FRONTIER_EDITOR=0)
 target_link_libraries(EverestProjectRuntime PUBLIC Threads::Threads)
 frontier_stage_project_content(EverestProjectRuntime

@@ -3,12 +3,14 @@
 ==========================================================================================================================================*/
 
 #include "EverestSceneEncoding.h"
+#include "EverestSceneEncodingSpv.h"
 #include "Engine/PlanetaryAtmosphere/FogSpace.h"
 #include "Engine/PlanetaryAtmosphere/OpticalLensFlare.h"
 #include "Engine/PlanetaryAtmosphere/VolumetricClouds.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <numbers>
 
 namespace Everest
@@ -19,7 +21,9 @@ using namespace Frontier;
 namespace
 {
 
-constexpr float Degrees = std::numbers::pi_v<float> / 180.0f;
+constexpr float    Degrees         = std::numbers::pi_v<float> / 180.0f;
+constexpr uint32_t GpuRenderWidth  = 1280u;
+constexpr uint32_t GpuRenderHeight = 720u;
 
 [[nodiscard]] float Dot3(const std::array<float, 3>& A, const std::array<float, 3>& B) noexcept
 {
@@ -50,10 +54,10 @@ constexpr float Degrees = std::numbers::pi_v<float> / 180.0f;
     std::array<float, 3> Out{};
     for (size_t C = 0u; C < 3u; ++C)
     {
-        const float V = std::max(0.0f, X[C]);
+        const float V   = std::max(0.0f, X[C]);
         const float Num = V * (2.51f * V + 0.03f);
         const float Den = V * (2.43f * V + 0.59f) + 0.14f;
-        Out[C] = std::clamp(Num / std::max(Den, 1.0e-6f), 0.0f, 1.0f);
+        Out[C]          = std::clamp(Num / std::max(Den, 1.0e-6f), 0.0f, 1.0f);
     }
     return Out;
 }
@@ -78,11 +82,11 @@ constexpr float Degrees = std::numbers::pi_v<float> / 180.0f;
         return {0.0f, 0.0f, 0.0f};
     }
 
-    const float Visibility = (1.0f - DaylightSuppression) * std::clamp(RayDir[2] * 3.5f, 0.0f, 1.0f);
-    const int32_t CellX    = static_cast<int32_t>(std::floor(RayDir[0] * 140.0f));
-    const int32_t CellY    = static_cast<int32_t>(std::floor(RayDir[1] * 140.0f));
-    const int32_t CellZ    = static_cast<int32_t>(std::floor(RayDir[2] * 140.0f));
-    const uint32_t H       = HashDirectionCell(CellX, CellY, CellZ);
+    const float    Visibility = (1.0f - DaylightSuppression) * std::clamp(RayDir[2] * 3.5f, 0.0f, 1.0f);
+    const int32_t  CellX      = static_cast<int32_t>(std::floor(RayDir[0] * 140.0f));
+    const int32_t  CellY      = static_cast<int32_t>(std::floor(RayDir[1] * 140.0f));
+    const int32_t  CellZ      = static_cast<int32_t>(std::floor(RayDir[2] * 140.0f));
+    const uint32_t H          = HashDirectionCell(CellX, CellY, CellZ);
 
     std::array<float, 3> Out = {0.0f, 0.0f, 0.0f};
     if ((H & 0xFFu) < 4u)
@@ -187,7 +191,213 @@ constexpr float Degrees = std::numbers::pi_v<float> / 180.0f;
 
 } // namespace
 
+//==========================================================================================================================================
+//                                                 GPU VULKAN COMPUTE ALLOCATION
+//==========================================================================================================================================
+struct EverestSceneEncoding::GpuEncodingAllocation
+{
+    VulkanRasterAccess               Access{};
+    VkPhysicalDeviceMemoryProperties MemoryProperties{};
+    bool                             Ready            = false;
+    bool                             ImageInitialized = false;
+    bool                             PendingDispatch  = false;
+    uint64_t                         UploadedSkyRev   = 0u;
+
+#define EVEREST_VK_FUNCTIONS(Fn)                                                                   \
+    Fn(CreateBuffer) Fn(DestroyBuffer) Fn(GetBufferMemoryRequirements)                             \
+    Fn(AllocateMemory) Fn(FreeMemory) Fn(BindBufferMemory) Fn(MapMemory) Fn(UnmapMemory)           \
+    Fn(CreateImage) Fn(DestroyImage) Fn(GetImageMemoryRequirements) Fn(BindImageMemory)            \
+    Fn(CreateImageView) Fn(DestroyImageView) Fn(CreateShaderModule) Fn(DestroyShaderModule)        \
+    Fn(CreateDescriptorSetLayout) Fn(DestroyDescriptorSetLayout)                                   \
+    Fn(CreateDescriptorPool) Fn(DestroyDescriptorPool) Fn(AllocateDescriptorSets)                  \
+    Fn(UpdateDescriptorSets) Fn(CreatePipelineLayout) Fn(DestroyPipelineLayout)                    \
+    Fn(CreateComputePipelines) Fn(DestroyPipeline)                                                 \
+    Fn(CmdBindPipeline) Fn(CmdBindDescriptorSets) Fn(CmdDispatch) Fn(CmdPipelineBarrier)
+#define EVEREST_DECL_VK(Name) PFN_vk##Name Name = nullptr;
+    EVEREST_VK_FUNCTIONS(EVEREST_DECL_VK)
+#undef EVEREST_DECL_VK
+
+    struct BufferSlot
+    {
+        VkBuffer       Buffer = VK_NULL_HANDLE;
+        VkDeviceMemory Memory = VK_NULL_HANDLE;
+        VkDeviceSize   Bytes  = 0u;
+        void*          Mapped = nullptr;
+    };
+
+    BufferSlot            BvhNodes{};
+    BufferSlot            BlasTriangles{};
+    BufferSlot            Occupants{};
+    BufferSlot            Materials{};
+    BufferSlot            UniformsAndLights{};
+    BufferSlot            SkyLut{};
+    BufferSlot            Reservoirs{};
+    BufferSlot            Accumulation{};
+
+    VkImage               OutputImage     = VK_NULL_HANDLE;
+    VkDeviceMemory        OutputMemory    = VK_NULL_HANDLE;
+    VkImageView           OutputView      = VK_NULL_HANDLE;
+
+    VkShaderModule        ShaderModule    = VK_NULL_HANDLE;
+    VkDescriptorSetLayout SetLayout       = VK_NULL_HANDLE;
+    VkDescriptorPool      DescriptorPool  = VK_NULL_HANDLE;
+    VkDescriptorSet       DescriptorSet   = VK_NULL_HANDLE;
+    VkPipelineLayout      PipelineLayout  = VK_NULL_HANDLE;
+    VkPipeline            Pipeline        = VK_NULL_HANDLE;
+
+    [[nodiscard]] uint32_t SelectMemoryType(uint32_t TypeBits, VkMemoryPropertyFlags Flags) const noexcept
+    {
+        for (uint32_t I = 0u; I < MemoryProperties.memoryTypeCount; ++I)
+        {
+            if ((TypeBits & (1u << I)) != 0u && (MemoryProperties.memoryTypes[I].propertyFlags & Flags) == Flags)
+            {
+                return I;
+            }
+        }
+        for (uint32_t I = 0u; I < MemoryProperties.memoryTypeCount; ++I)
+        {
+            if ((TypeBits & (1u << I)) != 0u)
+            {
+                return I;
+            }
+        }
+        return 0u;
+    }
+
+    bool AllocateBuffer(VkDeviceSize Bytes, VkMemoryPropertyFlags MemFlags, const void* InitialData, BufferSlot& Out)
+    {
+        VkBufferCreateInfo Info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+        Info.size        = std::max<VkDeviceSize>(Bytes, 16u);
+        Info.usage       = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        Info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        if (CreateBuffer(Access.Device, &Info, nullptr, &Out.Buffer) != VK_SUCCESS)
+        {
+            return false;
+        }
+        VkMemoryRequirements Req{};
+        GetBufferMemoryRequirements(Access.Device, Out.Buffer, &Req);
+        VkMemoryAllocateInfo Alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+        Alloc.allocationSize  = Req.size;
+        Alloc.memoryTypeIndex = SelectMemoryType(Req.memoryTypeBits, MemFlags);
+        if (AllocateMemory(Access.Device, &Alloc, nullptr, &Out.Memory) != VK_SUCCESS)
+        {
+            return false;
+        }
+        if (BindBufferMemory(Access.Device, Out.Buffer, Out.Memory, 0u) != VK_SUCCESS)
+        {
+            return false;
+        }
+        Out.Bytes = Info.size;
+        if ((MemFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0u)
+        {
+            if (MapMemory(Access.Device, Out.Memory, 0u, Out.Bytes, 0u, &Out.Mapped) != VK_SUCCESS)
+            {
+                return false;
+            }
+            std::memset(Out.Mapped, 0, static_cast<size_t>(Out.Bytes));
+            if (InitialData != nullptr && Bytes > 0u)
+            {
+                std::memcpy(Out.Mapped, InitialData, static_cast<size_t>(Bytes));
+            }
+        }
+        return true;
+    }
+
+    void ReleaseBuffer(BufferSlot& Slot) noexcept
+    {
+        if (!Access.Device)
+        {
+            return;
+        }
+        if (Slot.Mapped && UnmapMemory)
+        {
+            UnmapMemory(Access.Device, Slot.Memory);
+            Slot.Mapped = nullptr;
+        }
+        if (Slot.Buffer && DestroyBuffer)
+        {
+            DestroyBuffer(Access.Device, Slot.Buffer, nullptr);
+            Slot.Buffer = VK_NULL_HANDLE;
+        }
+        if (Slot.Memory && FreeMemory)
+        {
+            FreeMemory(Access.Device, Slot.Memory, nullptr);
+            Slot.Memory = VK_NULL_HANDLE;
+        }
+        Slot.Bytes = 0u;
+    }
+
+    void Finalize() noexcept
+    {
+        if (!Access.Device)
+        {
+            return;
+        }
+        if (Pipeline && DestroyPipeline)
+        {
+            DestroyPipeline(Access.Device, Pipeline, nullptr);
+            Pipeline = VK_NULL_HANDLE;
+        }
+        if (PipelineLayout && DestroyPipelineLayout)
+        {
+            DestroyPipelineLayout(Access.Device, PipelineLayout, nullptr);
+            PipelineLayout = VK_NULL_HANDLE;
+        }
+        if (DescriptorPool && DestroyDescriptorPool)
+        {
+            DestroyDescriptorPool(Access.Device, DescriptorPool, nullptr);
+            DescriptorPool = VK_NULL_HANDLE;
+        }
+        if (SetLayout && DestroyDescriptorSetLayout)
+        {
+            DestroyDescriptorSetLayout(Access.Device, SetLayout, nullptr);
+            SetLayout = VK_NULL_HANDLE;
+        }
+        if (ShaderModule && DestroyShaderModule)
+        {
+            DestroyShaderModule(Access.Device, ShaderModule, nullptr);
+            ShaderModule = VK_NULL_HANDLE;
+        }
+        if (OutputView && DestroyImageView)
+        {
+            DestroyImageView(Access.Device, OutputView, nullptr);
+            OutputView = VK_NULL_HANDLE;
+        }
+        if (OutputImage && DestroyImage)
+        {
+            DestroyImage(Access.Device, OutputImage, nullptr);
+            OutputImage = VK_NULL_HANDLE;
+        }
+        if (OutputMemory && FreeMemory)
+        {
+            FreeMemory(Access.Device, OutputMemory, nullptr);
+            OutputMemory = VK_NULL_HANDLE;
+        }
+        ReleaseBuffer(BvhNodes);
+        ReleaseBuffer(BlasTriangles);
+        ReleaseBuffer(Occupants);
+        ReleaseBuffer(Materials);
+        ReleaseBuffer(UniformsAndLights);
+        ReleaseBuffer(SkyLut);
+        ReleaseBuffer(Reservoirs);
+        ReleaseBuffer(Accumulation);
+        Ready            = false;
+        ImageInitialized = false;
+        PendingDispatch  = false;
+        Access           = {};
+    }
+
+    ~GpuEncodingAllocation()
+    {
+        Finalize();
+    }
+};
+
+//==========================================================================================================================================
+//                                                    EVEREST SCENE ENCODING
+//==========================================================================================================================================
 EverestSceneEncoding::EverestSceneEncoding()
+    : Gpu_(std::make_unique<GpuEncodingAllocation>())
 {
     Course_ = ConstructEverestCourseScene();
     RaySpace_.ConstructResources(Course_.Scene);
@@ -203,9 +413,271 @@ EverestSceneEncoding::EverestSceneEncoding()
     AtmosphereParams_ = MakeEarthAtmosphere();
 }
 
+EverestSceneEncoding::~EverestSceneEncoding()
+{
+    FinalizeGpu();
+}
+
+bool EverestSceneEncoding::InitializeGpu(const VulkanRasterAccess& Access)
+{
+    FinalizeGpu();
+    if (!Access.Device || !Access.PhysicalDevice || !Access.ResolveDevice || !Access.QueryMemory)
+    {
+        return false;
+    }
+
+    Gpu_->Access = Access;
+    Access.QueryMemory(Access.PhysicalDevice, &Gpu_->MemoryProperties);
+
+#define EVEREST_RESOLVE_VK(Name)                                                                       \
+    Gpu_->Name = reinterpret_cast<PFN_vk##Name>(Access.ResolveDevice(Access.Device, "vk" #Name));      \
+    if (!Gpu_->Name)                                                                                   \
+    {                                                                                                  \
+        FinalizeGpu();                                                                                 \
+        return false;                                                                                  \
+    }
+    EVEREST_VK_FUNCTIONS(EVEREST_RESOLVE_VK)
+#undef EVEREST_RESOLVE_VK
+
+    constexpr VkMemoryPropertyFlags HostVisibleCoherent =
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+    // 1. Upload BvhNodes & BlasTriangles
+    const auto& CellWords = RaySpace_.AllCellWords();
+    const auto& TriWords  = RaySpace_.AllTriangleWords();
+    if (!Gpu_->AllocateBuffer(CellWords.size() * sizeof(uint32_t), HostVisibleCoherent, CellWords.data(), Gpu_->BvhNodes) ||
+        !Gpu_->AllocateBuffer(TriWords.size() * sizeof(uint32_t),  HostVisibleCoherent, TriWords.data(),  Gpu_->BlasTriangles))
+    {
+        FinalizeGpu();
+        return false;
+    }
+
+    // 2. Upload Occupants (36 uint32 words = 144 bytes per occupant)
+    std::vector<uint32_t> OccupantWords(Course_.Scene.Occupants.size() * 36u, 0u);
+    for (size_t I = 0u; I < Course_.Scene.Occupants.size(); ++I)
+    {
+        const SceneOccupantInstance& Occ = Course_.Scene.Occupants[I];
+        const std::array<float, 16>  Inv = InvertRigidOrAffineTransform(Occ.Transform);
+        uint32_t*                    Dst = &OccupantWords[I * 36u];
+        std::memcpy(Dst +  0u, Occ.Transform.data(), 16u * sizeof(float));
+        std::memcpy(Dst + 16u, Inv.data(),           16u * sizeof(float));
+        Dst[32u] = Occ.Assignments;
+        Dst[33u] = Occ.MaterialOverride;
+        Dst[34u] = 0u;
+        Dst[35u] = 0u;
+    }
+    if (!Gpu_->AllocateBuffer(OccupantWords.size() * sizeof(uint32_t), HostVisibleCoherent, OccupantWords.data(), Gpu_->Occupants))
+    {
+        FinalizeGpu();
+        return false;
+    }
+
+    // 3. Upload Materials (24 floats = 96 bytes per material)
+    const std::vector<float> MaterialFloats = Frontier::EncodeMaterialRecords(Course_.Materials);
+    if (!Gpu_->AllocateBuffer(MaterialFloats.size() * sizeof(float), HostVisibleCoherent, MaterialFloats.data(), Gpu_->Materials))
+    {
+        FinalizeGpu();
+        return false;
+    }
+
+    // 4. Allocate UniformsAndLights (64 float4s), SkyLut (96*54 float4s), Reservoirs, and Accumulation
+    const VkDeviceSize PixelCount     = static_cast<VkDeviceSize>(GpuRenderWidth) * GpuRenderHeight;
+    const VkDeviceSize ReservoirBytes = PixelCount * 2u * 4u * sizeof(float);
+    if (!Gpu_->AllocateBuffer(64u * 4u * sizeof(float),      HostVisibleCoherent,                nullptr, Gpu_->UniformsAndLights) ||
+        !Gpu_->AllocateBuffer(96u * 54u * 4u * sizeof(float), HostVisibleCoherent,               nullptr, Gpu_->SkyLut) ||
+        !Gpu_->AllocateBuffer(ReservoirBytes,                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, nullptr, Gpu_->Reservoirs) ||
+        !Gpu_->AllocateBuffer(ReservoirBytes,                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, nullptr, Gpu_->Accumulation))
+    {
+        FinalizeGpu();
+        return false;
+    }
+
+    // 5. Allocate OutputImage (1280x720 RGBA8 storage + sampled image)
+    VkImageCreateInfo ImageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+    ImageInfo.imageType     = VK_IMAGE_TYPE_2D;
+    ImageInfo.format        = VK_FORMAT_R8G8B8A8_UNORM;
+    ImageInfo.extent        = {GpuRenderWidth, GpuRenderHeight, 1u};
+    ImageInfo.mipLevels     = 1u;
+    ImageInfo.arrayLayers   = 1u;
+    ImageInfo.samples       = VK_SAMPLE_COUNT_1_BIT;
+    ImageInfo.tiling        = VK_IMAGE_TILING_OPTIMAL;
+    ImageInfo.usage         = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    ImageInfo.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+    ImageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    if (Gpu_->CreateImage(Access.Device, &ImageInfo, nullptr, &Gpu_->OutputImage) != VK_SUCCESS)
+    {
+        FinalizeGpu();
+        return false;
+    }
+
+    VkMemoryRequirements ImgReq{};
+    Gpu_->GetImageMemoryRequirements(Access.Device, Gpu_->OutputImage, &ImgReq);
+    VkMemoryAllocateInfo ImgAlloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+    ImgAlloc.allocationSize  = ImgReq.size;
+    ImgAlloc.memoryTypeIndex = Gpu_->SelectMemoryType(ImgReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    if (Gpu_->AllocateMemory(Access.Device, &ImgAlloc, nullptr, &Gpu_->OutputMemory) != VK_SUCCESS ||
+        Gpu_->BindImageMemory(Access.Device, Gpu_->OutputImage, Gpu_->OutputMemory, 0u) != VK_SUCCESS)
+    {
+        FinalizeGpu();
+        return false;
+    }
+
+    VkImageViewCreateInfo ViewInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    ViewInfo.image                           = Gpu_->OutputImage;
+    ViewInfo.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+    ViewInfo.format                          = VK_FORMAT_R8G8B8A8_UNORM;
+    ViewInfo.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+    ViewInfo.subresourceRange.baseMipLevel   = 0u;
+    ViewInfo.subresourceRange.levelCount     = 1u;
+    ViewInfo.subresourceRange.baseArrayLayer = 0u;
+    ViewInfo.subresourceRange.layerCount     = 1u;
+    if (Gpu_->CreateImageView(Access.Device, &ViewInfo, nullptr, &Gpu_->OutputView) != VK_SUCCESS)
+    {
+        FinalizeGpu();
+        return false;
+    }
+
+    // 6. Create ShaderModule, DescriptorSetLayout, PipelineLayout, ComputePipeline, and DescriptorSet
+    VkShaderModuleCreateInfo ShaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    ShaderInfo.codeSize = sizeof(EverestSceneEncodingSpvWords);
+    ShaderInfo.pCode    = EverestSceneEncodingSpvWords;
+    if (Gpu_->CreateShaderModule(Access.Device, &ShaderInfo, nullptr, &Gpu_->ShaderModule) != VK_SUCCESS)
+    {
+        FinalizeGpu();
+        return false;
+    }
+
+    std::array<VkDescriptorSetLayoutBinding, 9> Bindings{};
+    for (uint32_t B = 0u; B < 9u; ++B)
+    {
+        Bindings[B].binding         = B;
+        Bindings[B].descriptorType  = (B == 8u) ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        Bindings[B].descriptorCount = 1u;
+        Bindings[B].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT;
+    }
+    VkDescriptorSetLayoutCreateInfo LayoutInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    LayoutInfo.bindingCount = static_cast<uint32_t>(Bindings.size());
+    LayoutInfo.pBindings    = Bindings.data();
+    if (Gpu_->CreateDescriptorSetLayout(Access.Device, &LayoutInfo, nullptr, &Gpu_->SetLayout) != VK_SUCCESS)
+    {
+        FinalizeGpu();
+        return false;
+    }
+
+    VkPipelineLayoutCreateInfo PipeLayoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    PipeLayoutInfo.setLayoutCount = 1u;
+    PipeLayoutInfo.pSetLayouts    = &Gpu_->SetLayout;
+    if (Gpu_->CreatePipelineLayout(Access.Device, &PipeLayoutInfo, nullptr, &Gpu_->PipelineLayout) != VK_SUCCESS)
+    {
+        FinalizeGpu();
+        return false;
+    }
+
+    VkComputePipelineCreateInfo PipeInfo{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+    PipeInfo.stage.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    PipeInfo.stage.stage  = VK_SHADER_STAGE_COMPUTE_BIT;
+    PipeInfo.stage.module = Gpu_->ShaderModule;
+    PipeInfo.stage.pName  = "main";
+    PipeInfo.layout       = Gpu_->PipelineLayout;
+    if (Gpu_->CreateComputePipelines(Access.Device, VK_NULL_HANDLE, 1u, &PipeInfo, nullptr, &Gpu_->Pipeline) != VK_SUCCESS)
+    {
+        FinalizeGpu();
+        return false;
+    }
+
+    std::array<VkDescriptorPoolSize, 2> PoolSizes = {{
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 8u},
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  1u}
+    }};
+    VkDescriptorPoolCreateInfo PoolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    PoolInfo.maxSets       = 1u;
+    PoolInfo.poolSizeCount = static_cast<uint32_t>(PoolSizes.size());
+    PoolInfo.pPoolSizes    = PoolSizes.data();
+    if (Gpu_->CreateDescriptorPool(Access.Device, &PoolInfo, nullptr, &Gpu_->DescriptorPool) != VK_SUCCESS)
+    {
+        FinalizeGpu();
+        return false;
+    }
+
+    VkDescriptorSetAllocateInfo SetAlloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+    SetAlloc.descriptorPool     = Gpu_->DescriptorPool;
+    SetAlloc.descriptorSetCount = 1u;
+    SetAlloc.pSetLayouts        = &Gpu_->SetLayout;
+    if (Gpu_->AllocateDescriptorSets(Access.Device, &SetAlloc, &Gpu_->DescriptorSet) != VK_SUCCESS)
+    {
+        FinalizeGpu();
+        return false;
+    }
+
+    const std::array<const GpuEncodingAllocation::BufferSlot*, 8> BufSlots = {{
+        &Gpu_->BvhNodes,
+        &Gpu_->BlasTriangles,
+        &Gpu_->Occupants,
+        &Gpu_->Materials,
+        &Gpu_->UniformsAndLights,
+        &Gpu_->SkyLut,
+        &Gpu_->Reservoirs,
+        &Gpu_->Accumulation
+    }};
+    std::array<VkDescriptorBufferInfo, 8> BufInfos{};
+    std::array<VkWriteDescriptorSet, 9>   Writes{};
+    for (uint32_t B = 0u; B < 8u; ++B)
+    {
+        BufInfos[B].buffer = BufSlots[B]->Buffer;
+        BufInfos[B].offset = 0u;
+        BufInfos[B].range  = BufSlots[B]->Bytes;
+
+        Writes[B].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        Writes[B].dstSet          = Gpu_->DescriptorSet;
+        Writes[B].dstBinding      = B;
+        Writes[B].descriptorCount = 1u;
+        Writes[B].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        Writes[B].pBufferInfo     = &BufInfos[B];
+    }
+
+    VkDescriptorImageInfo ImgDescInfo{};
+    ImgDescInfo.imageView   = Gpu_->OutputView;
+    ImgDescInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    Writes[8].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    Writes[8].dstSet          = Gpu_->DescriptorSet;
+    Writes[8].dstBinding      = 8u;
+    Writes[8].descriptorCount = 1u;
+    Writes[8].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    Writes[8].pImageInfo      = &ImgDescInfo;
+
+    Gpu_->UpdateDescriptorSets(Access.Device, static_cast<uint32_t>(Writes.size()), Writes.data(), 0u, nullptr);
+    Gpu_->Ready = true;
+    return true;
+}
+
+void EverestSceneEncoding::FinalizeGpu() noexcept
+{
+    if (Gpu_)
+    {
+        Gpu_->Finalize();
+    }
+}
+
+bool EverestSceneEncoding::GpuReady() const noexcept
+{
+    return Gpu_ && Gpu_->Ready;
+}
+
+VkImage EverestSceneEncoding::QueryLiveImage() const noexcept
+{
+    return (Gpu_ && Gpu_->Ready) ? Gpu_->OutputImage : VK_NULL_HANDLE;
+}
+
+VkImageView EverestSceneEncoding::QueryLiveView() const noexcept
+{
+    return (Gpu_ && Gpu_->Ready) ? Gpu_->OutputView : VK_NULL_HANDLE;
+}
+
 void EverestSceneEncoding::ResetAccumulation() noexcept
 {
-    AccumulatedFrames_ = 0u;
+    AccumulatedFrames_  = 0u;
+    CachedOutputWidth_  = 0u;
+    CachedOutputHeight_ = 0u;
     if (InternalWidth_ > 0u && InternalHeight_ > 0u)
     {
         Illumination_.ConfigureDimensions(InternalWidth_, InternalHeight_, 1u);
@@ -257,6 +729,265 @@ void EverestSceneEncoding::EnsureAtmosphereBaked(const std::array<float, 3>& Sun
         const std::array<AtmosphereSolarSource, 1> Suns = {Solar};
         SkyViewLut_.Bake(AtmosphereParams_, TransmittanceLut_, MultiScatteringLut_, 0.05, Suns, 96u, 54u, 16u);
         LastBakedSunDir_ = SunDirection;
+        ++SkyLutRevision_;
+    }
+}
+
+void EverestSceneEncoding::ConfigureLiveGpu(float                             ViewportAspect,
+                                            const EverestCameraSpecification& Camera,
+                                            const EverestEnvironmentSettings& Environment)
+{
+    if (!GpuReady())
+    {
+        return;
+    }
+
+    const SolarConfiguration&          SolarCfg    = Environment.Solar;
+    const AtmosphereConfiguration&     AtmosCfg    = Environment.Atmosphere;
+    const CloudConfiguration&          CloudCfg    = Environment.Cloud;
+    const FogConfiguration&            FogCfg      = Environment.Fog;
+    const OpticalFlareConfiguration&   FlareCfg    = Environment.OpticalFlare;
+    const MoonConfiguration&           MoonCfg     = Environment.Moon;
+    const StarConfiguration&           StarCfg     = Environment.Star;
+    const RenderPipelineConfiguration& PipelineCfg = Environment.Pipeline;
+
+    const float ElevRad = SolarCfg.ElevationDegrees * Degrees;
+    const float AzimRad = SolarCfg.AzimuthDegrees * Degrees;
+    const std::array<float, 3> SunDirection = Normalize3({
+        std::cos(ElevRad) * std::cos(AzimRad),
+        std::cos(ElevRad) * std::sin(AzimRad),
+        std::sin(ElevRad)
+    });
+
+    const float SunFluxScale   = SolarCfg.Enabled ? std::max(0.0f, SolarCfg.IlluminanceKilolux / 42.0f) : 0.0f;
+    const float DaylightFactor = std::clamp((SunDirection[2] + 0.08f) / 0.35f, 0.0f, 1.0f);
+    std::array<float, 3> SunRadiance = {
+        SunFluxScale * (0.85f + 0.25f * DaylightFactor),
+        SunFluxScale * (0.62f + 0.36f * DaylightFactor),
+        SunFluxScale * (0.38f + 0.56f * DaylightFactor)
+    };
+
+    if (AtmosCfg.Enabled)
+    {
+        EnsureAtmosphereBaked(
+            SunDirection,
+            SunRadiance,
+            AtmosCfg.RayleighScattering,
+            AtmosCfg.MieTurbidity,
+            AtmosCfg.MieAnisotropyG,
+            AtmosCfg.OzoneAbsorptionScale);
+    }
+
+    if (Gpu_->UploadedSkyRev != SkyLutRevision_ && SkyViewLut_.Baked() && Gpu_->SkyLut.Mapped != nullptr)
+    {
+        const auto& Texels = SkyViewLut_.Texels();
+        float*      Dst    = static_cast<float*>(Gpu_->SkyLut.Mapped);
+        const size_t Count = std::min<size_t>(Texels.size(), 96u * 54u);
+        for (size_t I = 0u; I < Count; ++I)
+        {
+            Dst[I * 4u + 0u] = static_cast<float>(Texels[I].R);
+            Dst[I * 4u + 1u] = static_cast<float>(Texels[I].G);
+            Dst[I * 4u + 2u] = static_cast<float>(Texels[I].B);
+            Dst[I * 4u + 3u] = 1.0f;
+        }
+        Gpu_->UploadedSkyRev = SkyLutRevision_;
+    }
+
+    const uint64_t WorldSig = SolarCfg.Revision
+                            ^ (AtmosCfg.Revision << 1)
+                            ^ (CloudCfg.Revision << 2)
+                            ^ (FogCfg.Revision << 3)
+                            ^ (FlareCfg.Revision << 4)
+                            ^ (MoonCfg.Revision << 5)
+                            ^ (StarCfg.Revision << 6)
+                            ^ (PipelineCfg.Revision << 7)
+                            ^ static_cast<uint64_t>(PipelineCfg.InspectionModeIndex * 2654435761u);
+
+    const float CamDelta = std::abs(Camera.EyePosition[0] - LastCamera_.EyePosition[0])
+                         + std::abs(Camera.EyePosition[1] - LastCamera_.EyePosition[1])
+                         + std::abs(Camera.EyePosition[2] - LastCamera_.EyePosition[2])
+                         + std::abs(Camera.LookAtTarget[0] - LastCamera_.LookAtTarget[0])
+                         + std::abs(Camera.LookAtTarget[1] - LastCamera_.LookAtTarget[1])
+                         + std::abs(Camera.LookAtTarget[2] - LastCamera_.LookAtTarget[2])
+                         + std::abs(Camera.VerticalFovDegrees - LastCamera_.VerticalFovDegrees);
+
+    if (CamDelta > 1.0e-3f || WorldSig != LastWorldSignature_)
+    {
+        AccumulatedFrames_ = 0u;
+    }
+    LastCamera_         = Camera;
+    LastWorldSignature_ = WorldSig;
+
+    const std::array<float, 3> Forward = Normalize3({
+        Camera.LookAtTarget[0] - Camera.EyePosition[0],
+        Camera.LookAtTarget[1] - Camera.EyePosition[1],
+        Camera.LookAtTarget[2] - Camera.EyePosition[2]
+    });
+    const std::array<float, 3> WorldUp = {0.0f, 0.0f, 1.0f};
+    const std::array<float, 3> Right   = Normalize3(Cross3(Forward, WorldUp));
+    const std::array<float, 3> Up      = Normalize3(Cross3(Right, Forward));
+
+    const float Aspect  = std::clamp(ViewportAspect, 0.25f, 4.0f);
+    const float TanHalf = std::tan(0.5f * Camera.VerticalFovDegrees * Degrees);
+
+    const float SunViewDot   = Dot3(Forward, SunDirection);
+    const bool  FlareVisible = FlareCfg.Enabled && SolarCfg.Enabled && SunDirection[2] > 0.0f && SunViewDot > 0.25f;
+    float       SunNdcX      = 0.0f;
+    float       SunNdcY      = 0.0f;
+    if (FlareVisible)
+    {
+        SunNdcX = Dot3(SunDirection, Right) / (SunViewDot * Aspect * TanHalf);
+        SunNdcY = Dot3(SunDirection, Up)    / (SunViewDot * TanHalf);
+    }
+
+    const float OrbitRad = MoonCfg.PrimaryOrbitDegrees * Degrees;
+    const std::array<float, 3> PrimaryMoonDir = Normalize3({
+        std::cos(OrbitRad) * 0.78f,
+        std::sin(OrbitRad) * 0.78f,
+        0.62f
+    });
+    const float SecRad = MoonCfg.SecondaryOrbitDegrees * Degrees;
+    const std::array<float, 3> SecondaryMoonDir = Normalize3({
+        std::cos(SecRad) * 0.84f,
+        std::sin(SecRad) * 0.84f,
+        0.54f
+    });
+
+    uint32_t Flags = 0u;
+    if (SolarCfg.Enabled)                   Flags |= (1u << 0u);
+    if (SolarCfg.CastRaytracedShadow)       Flags |= (1u << 1u);
+    if (AtmosCfg.Enabled)                   Flags |= (1u << 2u);
+    if (CloudCfg.Enabled)                   Flags |= (1u << 3u);
+    if (FogCfg.Enabled)                     Flags |= (1u << 4u);
+    if (FlareVisible)                       Flags |= (1u << 5u);
+    if (MoonCfg.Enabled)                    Flags |= (1u << 6u);
+    if (MoonCfg.SecondaryMoonEnabled)       Flags |= (1u << 7u);
+    if (StarCfg.Enabled)                    Flags |= (1u << 8u);
+    if (PipelineCfg.GlobalIllumination)     Flags |= (1u << 9u);
+    if (PipelineCfg.ScreenSpaceReflections) Flags |= (1u << 10u);
+    if (PipelineCfg.TemporalAntiAliasing)   Flags |= (1u << 11u);
+    if (PipelineCfg.AcesFilmicTonemap)      Flags |= (1u << 12u);
+
+    const uint32_t LightCount = static_cast<uint32_t>(
+        std::min<size_t>(Course_.StreetPoles.size() + Course_.PointLamps.size(), 24u));
+
+    std::array<std::array<float, 4>, 64> Ubo{};
+    Ubo[ 0] = {Camera.EyePosition[0], Camera.EyePosition[1], Camera.EyePosition[2], TanHalf};
+    Ubo[ 1] = {Forward[0], Forward[1], Forward[2], Aspect};
+    Ubo[ 2] = {Right[0], Right[1], Right[2], static_cast<float>(GpuRenderWidth)};
+    Ubo[ 3] = {Up[0], Up[1], Up[2], static_cast<float>(GpuRenderHeight)};
+    Ubo[ 4] = {SunDirection[0], SunDirection[1], SunDirection[2], std::max(0.002f, SolarCfg.AngularDiameterDeg * 0.5f * Degrees)};
+    Ubo[ 5] = {SunRadiance[0], SunRadiance[1], SunRadiance[2], DaylightFactor};
+    Ubo[ 6] = {0.18f * DaylightFactor + 0.015f, 0.36f * DaylightFactor + 0.025f, 0.72f * DaylightFactor + 0.055f, std::pow(2.0f, PipelineCfg.ExposureCompensationEv)};
+    Ubo[ 7] = {0.58f * DaylightFactor + 0.04f,  0.52f * DaylightFactor + 0.04f,  0.48f * DaylightFactor + 0.06f,  static_cast<float>(LightCount)};
+    const float CloudBase = std::max(200.0f, CloudCfg.BaseAltitudeMetres);
+    Ubo[ 8] = {
+        std::clamp(CloudCfg.Coverage, 0.0f, 1.0f),
+        CloudBase,
+        CloudBase + std::max(200.0f, CloudCfg.LayerThicknessMetres),
+        0.025f * std::max(0.1f, CloudCfg.ExtinctionDensity)
+    };
+    Ubo[ 9] = {
+        0.0025f * std::max(0.0f, FogCfg.BaseDensity),
+        FogCfg.BaseAltitudeMetres,
+        std::max(1.0f, 1.0f / std::max(0.001f, FogCfg.HeightFalloff)),
+        FogCfg.StartDistanceMetres
+    };
+    Ubo[10] = {
+        0.58f * DaylightFactor + 0.05f,
+        0.66f * DaylightFactor + 0.06f,
+        0.78f * DaylightFactor + 0.09f,
+        FlareCfg.Intensity
+    };
+    Ubo[11] = {SunNdcX, SunNdcY, static_cast<float>(std::max(3u, FlareCfg.ApertureBladeCount)), 1.0f};
+    Ubo[12] = {PrimaryMoonDir[0], PrimaryMoonDir[1], PrimaryMoonDir[2], MoonCfg.PrimaryPhase * MoonCfg.PrimaryAlbedo};
+    Ubo[13] = {SecondaryMoonDir[0], SecondaryMoonDir[1], SecondaryMoonDir[2], MoonCfg.EarthshineLuminance};
+    Ubo[14] = {StarCfg.MagnitudeGain, StarCfg.AtmosphericScintillate, StarCfg.MilkyWayLuminance, 1.0f};
+    Ubo[15] = {
+        static_cast<float>(FrameCounter_),
+        static_cast<float>(AccumulatedFrames_),
+        static_cast<float>(std::max(0, PipelineCfg.InspectionModeIndex)),
+        static_cast<float>(Flags)
+    };
+
+    size_t LightCursor = 0u;
+    for (const auto& Pole : Course_.StreetPoles)
+    {
+        if (LightCursor >= 24u) break;
+        Ubo[16u + LightCursor * 2u + 0u] = {Pole.BulbPosition[0], Pole.BulbPosition[1], Pole.BulbPosition[2], Pole.Radius};
+        Ubo[16u + LightCursor * 2u + 1u] = {Pole.Colour[0] * Pole.Intensity, Pole.Colour[1] * Pole.Intensity, Pole.Colour[2] * Pole.Intensity, 0.0f};
+        ++LightCursor;
+    }
+    for (const auto& Lamp : Course_.PointLamps)
+    {
+        if (LightCursor >= 24u) break;
+        Ubo[16u + LightCursor * 2u + 0u] = {Lamp.Position[0], Lamp.Position[1], Lamp.Position[2], Lamp.Radius};
+        Ubo[16u + LightCursor * 2u + 1u] = {Lamp.Colour[0] * Lamp.Intensity, Lamp.Colour[1] * Lamp.Intensity, Lamp.Colour[2] * Lamp.Intensity, 0.0f};
+        ++LightCursor;
+    }
+
+    if (Gpu_->UniformsAndLights.Mapped != nullptr)
+    {
+        std::memcpy(Gpu_->UniformsAndLights.Mapped, Ubo.data(), sizeof(Ubo));
+    }
+    Gpu_->PendingDispatch = true;
+}
+
+void EverestSceneEncoding::ConstructGpuCommands(VkCommandBuffer Commands)
+{
+    if (!GpuReady() || !Commands || !Gpu_->PendingDispatch)
+    {
+        return;
+    }
+
+    VkImageMemoryBarrier PreBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+    PreBarrier.srcAccessMask                   = Gpu_->ImageInitialized ? VK_ACCESS_SHADER_READ_BIT : 0u;
+    PreBarrier.dstAccessMask                   = VK_ACCESS_SHADER_WRITE_BIT;
+    PreBarrier.oldLayout                       = Gpu_->ImageInitialized ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+    PreBarrier.newLayout                       = VK_IMAGE_LAYOUT_GENERAL;
+    PreBarrier.srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+    PreBarrier.dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+    PreBarrier.image                           = Gpu_->OutputImage;
+    PreBarrier.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+    PreBarrier.subresourceRange.baseMipLevel   = 0u;
+    PreBarrier.subresourceRange.levelCount     = 1u;
+    PreBarrier.subresourceRange.baseArrayLayer = 0u;
+    PreBarrier.subresourceRange.layerCount     = 1u;
+
+    Gpu_->CmdPipelineBarrier(
+        Commands,
+        Gpu_->ImageInitialized ? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0u,
+        0u, nullptr,
+        0u, nullptr,
+        1u, &PreBarrier);
+
+    Gpu_->CmdBindPipeline(Commands, VK_PIPELINE_BIND_POINT_COMPUTE, Gpu_->Pipeline);
+    Gpu_->CmdBindDescriptorSets(Commands, VK_PIPELINE_BIND_POINT_COMPUTE, Gpu_->PipelineLayout, 0u, 1u, &Gpu_->DescriptorSet, 0u, nullptr);
+    Gpu_->CmdDispatch(Commands, (GpuRenderWidth + 7u) / 8u, (GpuRenderHeight + 7u) / 8u, 1u);
+
+    VkImageMemoryBarrier PostBarrier = PreBarrier;
+    PostBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    PostBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    PostBarrier.oldLayout     = VK_IMAGE_LAYOUT_GENERAL;
+    PostBarrier.newLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    Gpu_->CmdPipelineBarrier(
+        Commands,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        0u,
+        0u, nullptr,
+        0u, nullptr,
+        1u, &PostBarrier);
+
+    Gpu_->ImageInitialized = true;
+    Gpu_->PendingDispatch  = false;
+    ++FrameCounter_;
+    if (AccumulatedFrames_ < 64u)
+    {
+        ++AccumulatedFrames_;
     }
 }
 
@@ -280,6 +1011,35 @@ void EverestSceneEncoding::EncodeFrame(uint32_t                          OutputW
     const MoonConfiguration&           MoonCfg     = Environment.Moon;
     const StarConfiguration&           StarCfg     = Environment.Star;
     const RenderPipelineConfiguration& PipelineCfg = Environment.Pipeline;
+
+    const uint64_t WorldSig = SolarCfg.Revision
+                            ^ (AtmosCfg.Revision << 1)
+                            ^ (CloudCfg.Revision << 2)
+                            ^ (FogCfg.Revision << 3)
+                            ^ (FlareCfg.Revision << 4)
+                            ^ (MoonCfg.Revision << 5)
+                            ^ (StarCfg.Revision << 6)
+                            ^ (PipelineCfg.Revision << 7)
+                            ^ static_cast<uint64_t>(PipelineCfg.InspectionModeIndex * 2654435761u);
+
+    const float CamDelta = std::abs(Camera.EyePosition[0] - LastCamera_.EyePosition[0])
+                         + std::abs(Camera.EyePosition[1] - LastCamera_.EyePosition[1])
+                         + std::abs(Camera.EyePosition[2] - LastCamera_.EyePosition[2])
+                         + std::abs(Camera.LookAtTarget[0] - LastCamera_.LookAtTarget[0])
+                         + std::abs(Camera.LookAtTarget[1] - LastCamera_.LookAtTarget[1])
+                         + std::abs(Camera.LookAtTarget[2] - LastCamera_.LookAtTarget[2])
+                         + std::abs(Camera.VerticalFovDegrees - LastCamera_.VerticalFovDegrees);
+
+    if (AccumulatedFrames_ >= 6u &&
+        CamDelta <= 1.0e-3f &&
+        WorldSig == LastWorldSignature_ &&
+        OutputWidth == CachedOutputWidth_ &&
+        OutputHeight == CachedOutputHeight_ &&
+        CachedRgba8Pixels_.size() == static_cast<size_t>(OutputWidth) * OutputHeight * 4u)
+    {
+        OutRgba8Pixels = CachedRgba8Pixels_;
+        return;
+    }
 
     const float ElevRad = SolarCfg.ElevationDegrees * Degrees;
     const float AzimRad = SolarCfg.AzimuthDegrees * Degrees;
@@ -334,24 +1094,6 @@ void EverestSceneEncoding::EncodeFrame(uint32_t                          OutputW
     const uint32_t MaxInternalHeight = (PipelineCfg.QualityTier == 0) ? 144u : ((PipelineCfg.QualityTier == 1) ? 216u : 360u);
     const uint32_t TraceWidth        = std::min(OutputWidth, MaxInternalWidth);
     const uint32_t TraceHeight       = std::min(OutputHeight, MaxInternalHeight);
-
-    const uint64_t WorldSig = SolarCfg.Revision
-                            ^ (AtmosCfg.Revision << 1)
-                            ^ (CloudCfg.Revision << 2)
-                            ^ (FogCfg.Revision << 3)
-                            ^ (FlareCfg.Revision << 4)
-                            ^ (MoonCfg.Revision << 5)
-                            ^ (StarCfg.Revision << 6)
-                            ^ (PipelineCfg.Revision << 7)
-                            ^ static_cast<uint64_t>(PipelineCfg.InspectionModeIndex * 2654435761u);
-
-    const float CamDelta = std::abs(Camera.EyePosition[0] - LastCamera_.EyePosition[0])
-                         + std::abs(Camera.EyePosition[1] - LastCamera_.EyePosition[1])
-                         + std::abs(Camera.EyePosition[2] - LastCamera_.EyePosition[2])
-                         + std::abs(Camera.LookAtTarget[0] - LastCamera_.LookAtTarget[0])
-                         + std::abs(Camera.LookAtTarget[1] - LastCamera_.LookAtTarget[1])
-                         + std::abs(Camera.LookAtTarget[2] - LastCamera_.LookAtTarget[2])
-                         + std::abs(Camera.VerticalFovDegrees - LastCamera_.VerticalFovDegrees);
 
     if (TraceWidth != InternalWidth_ || TraceHeight != InternalHeight_)
     {
@@ -472,9 +1214,9 @@ void EverestSceneEncoding::EncodeFrame(uint32_t                          OutputW
     }
 
     FlareOpticsProfile FlareProfile{};
-    FlareProfile.ApertureBlades    = std::max(3u, FlareCfg.ApertureBladeCount);
-    FlareProfile.GhostStrength     = static_cast<double>(FlareCfg.Intensity);
-    FlareProfile.StarburstStrength = FlareCfg.DiffractionStarburst ? static_cast<double>(FlareCfg.Intensity) : 0.0;
+    FlareProfile.ApertureBlades     = std::max(3u, FlareCfg.ApertureBladeCount);
+    FlareProfile.GhostStrength      = static_cast<double>(FlareCfg.Intensity);
+    FlareProfile.StarburstStrength  = FlareCfg.DiffractionStarburst ? static_cast<double>(FlareCfg.Intensity) : 0.0;
     FlareProfile.AnamorphicStrength = FlareCfg.AnamorphicStreak ? static_cast<double>(FlareCfg.Intensity * 0.5f) : 0.0;
 
     for (uint32_t Y = 0u; Y < TraceHeight; ++Y)
@@ -482,10 +1224,10 @@ void EverestSceneEncoding::EncodeFrame(uint32_t                          OutputW
         const float NdcY = 1.0f - 2.0f * (static_cast<float>(Y) + 0.5f) / static_cast<float>(TraceHeight);
         for (uint32_t X = 0u; X < TraceWidth; ++X)
         {
-            const size_t PixelIndex = static_cast<size_t>(Y) * TraceWidth + X;
-            const TracePixelGuide& Guide = PrimaryGuides_[PixelIndex];
-            const bool IsSky = (Guide.ViewDepth <= 0.0f);
-            const float NdcX = 2.0f * (static_cast<float>(X) + 0.5f) / static_cast<float>(TraceWidth) - 1.0f;
+            const size_t           PixelIndex = static_cast<size_t>(Y) * TraceWidth + X;
+            const TracePixelGuide& Guide      = PrimaryGuides_[PixelIndex];
+            const bool             IsSky      = (Guide.ViewDepth <= 0.0f);
+            const float            NdcX       = 2.0f * (static_cast<float>(X) + 0.5f) / static_cast<float>(TraceWidth) - 1.0f;
             const std::array<float, 3> RayDir = Normalize3({
                 Forward[0] + Right[0] * (NdcX * Aspect * TanHalf) + Up[0] * (NdcY * TanHalf),
                 Forward[1] + Right[1] * (NdcX * Aspect * TanHalf) + Up[1] * (NdcY * TanHalf),
@@ -642,8 +1384,8 @@ void EverestSceneEncoding::EncodeFrame(uint32_t                          OutputW
                 std::array<float, 3> TracedRefl = SkyRefl;
                 if (PipelineCfg.ScreenSpaceReflections && (Surface.CoatWeight > 0.1f || Surface.Metalness > 0.15f))
                 {
-                    StochasticGenerator ReflGen = ConstructGeneratorCpu(X, Y, AccumulatedFrames_, 17u);
-                    const float EffRough = (Surface.CoatWeight > 0.1f) ? Surface.CoatRoughness : Surface.Roughness;
+                    StochasticGenerator ReflGen  = ConstructGeneratorCpu(X, Y, AccumulatedFrames_, 17u);
+                    const float         EffRough = (Surface.CoatWeight > 0.1f) ? Surface.CoatRoughness : Surface.Roughness;
                     const ReflectionTraceSample ReflSample = TraceMultiBounceReflectionCpu(
                         Course_.Scene,
                         RaySpace_,
@@ -753,7 +1495,7 @@ void EverestSceneEncoding::EncodeFrame(uint32_t                          OutputW
 
         for (uint32_t Ox = 0u; Ox < OutputWidth; ++Ox)
         {
-            const float   SrcX = ((static_cast<float>(Ox) + 0.5f) / static_cast<float>(OutputWidth)) * static_cast<float>(TraceWidth) - 1.0f * 0.5f;
+            const float   SrcX = ((static_cast<float>(Ox) + 0.5f) / static_cast<float>(OutputWidth)) * static_cast<float>(TraceWidth) - 0.5f;
             const int32_t X0   = std::clamp(static_cast<int32_t>(std::floor(SrcX)), 0, static_cast<int32_t>(TraceWidth) - 1);
             const int32_t X1   = std::min(X0 + 1, static_cast<int32_t>(TraceWidth) - 1);
             const float   Fx   = std::clamp(SrcX - static_cast<float>(X0), 0.0f, 1.0f);
@@ -787,6 +1529,10 @@ void EverestSceneEncoding::EncodeFrame(uint32_t                          OutputW
             OutRgba8Pixels[OutBase + 3u] = 255u;
         }
     }
+
+    CachedOutputWidth_  = OutputWidth;
+    CachedOutputHeight_ = OutputHeight;
+    CachedRgba8Pixels_  = OutRgba8Pixels;
 }
 
 } // namespace Everest

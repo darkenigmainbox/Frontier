@@ -9,6 +9,7 @@
 
 // 🧩 1:1 C++20 port of Experimental/VehicleHmiPrototype/Tools/RestirPathTracer.test.mjs + Slang shader verification.
 
+#include "Exhibits/TextureStudio/Code/AtlasReadback.h"
 #include "Frontier/Engine/Rendering/ClusteredLightingSequence.h"
 #include "Frontier/Engine/Rendering/DistanceAndCardSequence.h"
 #include "Frontier/Engine/Rendering/RayTracingSpace.h"
@@ -501,11 +502,58 @@ int main(int argc, char** argv)
     const std::filesystem::path PngPath = OutputDir / "VehicleHmiRestirExhibit.png";
     stbi_write_png(PngPath.string().c_str(), static_cast<int>(ExhibitW), static_cast<int>(ExhibitH), 4, CoupledPixels.data(), static_cast<int>(ExhibitW * 4u));
 
-    std::cout << "[VehicleHmiIlluminationValidation] Passed all 10 suites ("
+    // 11. Validate Vulkan GPU compute path in EverestSceneEncoding if SwiftShader/Vulkan driver is available
+    const std::filesystem::path SwiftShaderPath = RepoRoot / "ExternalPackages/VulkanCompute/SwiftShader/libvulkan.so.1";
+    if (std::filesystem::exists(SwiftShaderPath))
+    {
+#if !defined(_WIN32)
+        const std::filesystem::path IcdJson = SwiftShaderPath.parent_path() / "vk_swiftshader_icd.json";
+        if (std::filesystem::exists(IcdJson))
+        {
+            setenv("VK_ICD_FILENAMES", IcdJson.string().c_str(), 1);
+        }
+#endif
+        AtlasValidationDevice GpuDevice(SwiftShaderPath.string().c_str(), VK_API_VERSION_1_2);
+        if (!CoupledEncoding.InitializeGpu(GpuDevice.QueryAccess()) || !CoupledEncoding.GpuReady())
+        {
+            std::cerr << "EverestSceneEncoding::InitializeGpu failed on Vulkan device\n";
+            return 1;
+        }
+        std::vector<unsigned char> GpuPixels;
+        for (uint32_t Frame = 0u; Frame < 4u; ++Frame)
+        {
+            CoupledEncoding.ConfigureLiveGpu(1280.0f / 720.0f, CamSpec, EnvSettings);
+            GpuPixels = GpuDevice.Capture(
+                CoupledEncoding.QueryLiveImage(),
+                {1280u, 720u},
+                [&](VkCommandBuffer Commands) { CoupledEncoding.ConstructGpuCommands(Commands); },
+                []() {});
+        }
+        CoupledEncoding.FinalizeGpu();
+        (void)GpuDevice.DeviceWaitIdle(GpuDevice.Device);
+
+        uint64_t NonBlackPixels = 0u;
+        for (size_t I = 0u; I + 3u < GpuPixels.size(); I += 4u)
+        {
+            if (GpuPixels[I + 0u] > 4u || GpuPixels[I + 1u] > 4u || GpuPixels[I + 2u] > 4u)
+            {
+                ++NonBlackPixels;
+            }
+        }
+        if (NonBlackPixels < (1280u * 720u) / 2u)
+        {
+            std::cerr << "EverestSceneEncoding GPU compute render produced too few lit pixels: " << NonBlackPixels << "\n";
+            return 1;
+        }
+        const std::filesystem::path GpuPngPath = OutputDir / "VehicleHmiRestirGpuExhibit.png";
+        stbi_write_png(GpuPngPath.string().c_str(), 1280, 720, 4, GpuPixels.data(), 1280 * 4);
+    }
+
+    std::cout << "[VehicleHmiIlluminationValidation] Passed all 11 suites ("
               << RaySpace.TotalTriangles() << " synthetic tris, "
               << CoupledEncoding.Course().Scene.Occupants.size() << " proving-grounds occupants, "
               << CoupledEncoding.Course().ShowcaseVehicles.size() << " static flake showcase cars, "
               << ClusteredLights.ActiveCount() << " clustered lights, "
-              << NonZeroReservoirs << " active reservoirs).\n";
+              << NonZeroReservoirs << " active reservoirs, GPU Vulkan compute verified).\n";
     return 0;
 }

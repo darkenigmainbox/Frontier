@@ -108,6 +108,7 @@ int main()
     std::unique_ptr<Frontier::ProjectBrowserPanel> Browser;
     std::unique_ptr<Frontier::EditorWorkspace> Workspace;
     std::unique_ptr<Everest::EverestWorkspace> EverestSpace;
+    Frontier::VulkanRasterAccess RasterAccess{};
     std::unique_ptr<Frontier::BrowserPreviewRendering> PreviewRendering;
     std::vector<Frontier::BrowserCatalogueEntry> PreviewCatalogue;
     std::map<VkImageView, VkDescriptorSet> PreviewDescriptors;
@@ -191,8 +192,9 @@ int main()
             if (GetModuleFileNameW(nullptr, Executable, MAX_PATH))
                 ShaderDirectory = std::filesystem::path(Executable).parent_path() / ShaderDirectory;
         }
+        RasterAccess = Display.QueryRasterAccess();
         PreviewRendering = std::make_unique<Frontier::BrowserPreviewRendering>();
-        PreviewRendering->Initialize(Display.QueryRasterAccess(), ShaderDirectory);
+        PreviewRendering->Initialize(RasterAccess, ShaderDirectory);
         Browser->QueryThumbnailImage = [&](const std::string &Key)
         {
             Frontier::BrowserPreviewImage Image;
@@ -280,6 +282,8 @@ int main()
                 try
                 {
                     PreviewRendering->ConstructCommands(Commands, Completed, Serial);
+                    if (EverestSpace)
+                        EverestSpace->ConstructGpuCommands(Commands);
                 }
                 catch (const std::exception &Failure) { NoteFailure("ConstructCommands", Failure); }
             },
@@ -292,6 +296,11 @@ int main()
         std::string Diagnostic;
         if (!Frontier::ProjectSpaceCodec::Decode(Requested, Document, Diagnostic))
             throw std::runtime_error("Project activation failed: " + Diagnostic);
+        if (EverestSpace)
+        {
+            if (const VkImageView OldView = EverestSpace->QuerySceneEncoding().QueryLiveView())
+                PreviewDescriptors.erase(OldView);
+        }
         Workspace.reset();
         EverestSpace.reset();
         AppearanceOwnership.reset(new Frontier::ControlCentrePanel("EngineContent/FontArchives", Preferences, Requested));
@@ -310,6 +319,9 @@ int main()
         if (Summary.Identity == "project-everest-v1" || Summary.Name == "Everest" || Summary.Name == "Project Everest")
         {
             EverestSpace = std::make_unique<Everest::EverestWorkspace>(*Appearance, Requested.parent_path());
+            (void)EverestSpace->InitializeGpu(
+                RasterAccess,
+                [&](VkImageView View) -> uint64_t { return reinterpret_cast<uint64_t>(Describe(View)); });
             EverestSpace->EvaluateReturnToBrowser = [&]() { ReturnRequested = true; };
         }
         else
@@ -334,6 +346,11 @@ int main()
         if (ReturnRequested && (Workspace || EverestSpace))
         {
             ReturnRequested = false;
+            if (EverestSpace)
+            {
+                if (const VkImageView OldView = EverestSpace->QuerySceneEncoding().QueryLiveView())
+                    PreviewDescriptors.erase(OldView);
+            }
             Workspace.reset();
             EverestSpace.reset();
             AppearanceOwnership.reset(new Frontier::ControlCentrePanel("EngineContent/FontArchives", Preferences));
