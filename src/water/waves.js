@@ -65,7 +65,8 @@ export class Waves {
     const lambdas = [], weights = [];
     let wsum = 0;
     for (let i = 0; i < NUM_WAVES; i++) {
-      const l = p.wavelength * Math.pow(0.77, i) * (0.9 + 0.2 * rand());
+      // Swell only: the FFT cascades (fft.js) carry the wind sea and all short waves
+      const l = p.wavelength * Math.pow(0.9, i) * (0.88 + 0.24 * rand());
       lambdas.push(l);
       const w = Math.pow(l, 0.85);
       weights.push(w); wsum += w;
@@ -74,7 +75,7 @@ export class Waves {
     for (let i = 0; i < NUM_WAVES; i++) {
       const l = lambdas[i];
       const k = (2 * Math.PI) / l;
-      let A = (p.height * 0.5 * weights[i]) / wsum * 2.4;
+      let A = (p.height * 0.5 * weights[i]) / wsum * 2.0;
       A = Math.min(A, 0.018 * l); // keep individual crests below breaking steepness
       const spreadI = p.spread * (0.35 + 0.65 * (i / (NUM_WAVES - 1)));
       const ang = wind + (rand() - 0.5) * 2 * spreadI;
@@ -99,6 +100,7 @@ export class Waves {
     const ks = (2 * Math.PI) / shoreLambda;
     this.shore = { amp: p.shoreAmp, k: ks, omega: Math.sqrt(G * ks * 0.6) * p.speed, on: p.shoreWaves ? 1 : 0 };
     this.uniforms.uShore.value.set(this.shore.amp, this.shore.k, this.shore.omega, this.shore.on);
+    if (this.onRebuild) this.onRebuild();
   }
 
   setTime(t) { this.time = t; this.uniforms.uTime.value = t; }

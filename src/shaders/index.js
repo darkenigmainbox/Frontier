@@ -3,6 +3,7 @@ import { particleSimShaders } from './particles.js';
 import { particleRenderShaders } from './particleRender.js';
 import { waterShaders } from './water.js';
 import { postShaders } from './post.js';
+import { fftShaders } from './fft.js';
 
 // Registry of every custom shader: [name, vertex, fragment, defines]
 export function allShaders() {
@@ -13,5 +14,6 @@ export function allShaders() {
   add(particleRenderShaders);
   add(waterShaders);
   add(postShaders);
+  add(fftShaders);
   return out;
 }

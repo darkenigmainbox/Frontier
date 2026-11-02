@@ -15,12 +15,12 @@ export class FluidRenderer {
     this.shared = shared;
     this.params = {
       ssf: true,
-      particleRadius: 0.12,
-      smoothing: 0.45,
-      blurIterations: 3,
-      whiteness: 0.85,
-      foamSize: 0.16,
-      foamOpacity: 0.85,
+      particleRadius: 0.075,
+      smoothing: 0.22,
+      blurIterations: 2,
+      whiteness: 0.18,
+      foamSize: 0.11,
+      foamOpacity: 0.55,
       spraySize: 0.035,
       streak: 0.02,
     };
@@ -49,7 +49,7 @@ export class FluidRenderer {
       uDepth: { value: null }, uThick: { value: null }, uScene: { value: null },
       uProj: { value: new THREE.Matrix4() }, uViewInv: { value: new THREE.Matrix4() },
       uCamPos: { value: new THREE.Vector3() }, uInvRes: { value: new THREE.Vector2() },
-      uAbsorb: shared.water.uAbsorb, uDeepColor: shared.water.uDeepColor, uWhiteness: { value: 0.85 },
+      uAbsorb: shared.water.uAbsorb, uDeepColor: shared.water.uDeepColor, uSSSColor: shared.water.uSSSColor, uWhiteness: { value: 0.18 },
     }, { transparent: true, depthTest: true, depthWrite: false, blending: THREE.NormalBlending });
 
     this.foamScene = new THREE.Scene();
@@ -135,7 +135,7 @@ export class FluidRenderer {
     const b = this.blurMat.uniforms;
     b.uProjScale.value = projScale;
     b.uBlurRadius.value = p.smoothing;
-    b.uFalloff.value = p.particleRadius * 4.0;
+    b.uFalloff.value = p.particleRadius * 3.0;
     let src = this.rtDepth;
     for (let i = 0; i < p.blurIterations; i++) {
       // Alternate axis-aligned and diagonal passes: a separable bilateral filter alone leaves blocky,
@@ -148,8 +148,8 @@ export class FluidRenderer {
       src = this.rtDepth;
     }
     // 4) shading + composite into the HDR frame (depth tested against the scene)
-    copyScene();
     const c = this.compositeMat.uniforms;
+    c.uScene.value = copyScene(); // scene incl. ocean, refracted through the splash water
     c.uDepth.value = this.rtDepth.texture;
     c.uThick.value = this.rtThick.texture;
     c.uProj.value.copy(camera.projectionMatrix);

@@ -4,6 +4,8 @@ import { GPU } from './core/gpu.js';
 import { Terrain } from './world/terrain.js';
 import { SkySystem } from './world/sky.js';
 import { Waves } from './water/waves.js';
+import { OceanFFT } from './water/fft.js';
+import { createFoamTexture } from './water/foamTexture.js';
 import { RippleSim } from './water/ripples.js';
 import { WaterSurface } from './water/surface.js';
 import { ParticleSystem, SIM_MODES } from './fluid/particles.js';
@@ -45,6 +47,8 @@ async function start() {
   // ---------- World ----------
   const terrain = new Terrain();
   const waves = new Waves(terrain);
+  const fft = new OceanFFT(gpu, waves); // adds the FFT cascade uniforms to waves.uniforms
+  const foamTex = createFoamTexture(renderer);
   const sky = new SkySystem(renderer);
   sky.apply();
   terrain.bakeShadows(sky.sunDir);
@@ -63,6 +67,7 @@ async function start() {
       uSSSColor: { value: new THREE.Vector3(0.04, 0.32, 0.27) },
     },
     fog: { uFogDensity: { value: 0.00022 } },
+    foamTex: { value: foamTex },
     caustics: { uCaustics: { value: 1.0 } },
   };
   const ripple = new RippleSim(gpu, shared, terrain.uniforms);
@@ -132,7 +137,7 @@ async function start() {
   // ---------- App object (GUI hooks) ----------
   const modeEl = document.getElementById('mode');
   const app = {
-    particles, fluid, ripple, water, waves, sky, pipeline, effects, boat, terrain, shared, settings, overlay,
+    particles, fluid, ripple, water, waves, fft, sky, pipeline, effects, boat, terrain, shared, settings, overlay,
     resize, updateOverlay,
     onModeChange() { modeEl.textContent = '3D splash solver: ' + particles.params.mode; },
     /** Move the boat and keep the camera at the same relative offset. */
@@ -206,6 +211,7 @@ async function start() {
     const dt = Math.min(timer.getDelta(), 1 / 20);
     time += dt;
     waves.setTime(time);
+    fft.update(time);
     wind.copy(waves.windVector);
 
     boat.update(dt, emitter);
@@ -232,6 +238,9 @@ async function start() {
     ripple.update(dt, time, boat, wind);
 
     sky.update(time, (env) => { opaqueScene.environment = env; });
+    water.params.gridFoam = ripple.params.foamGrid;
+    ripple.foamMat.uniforms.uCrestThresh.value = water.params.crestThreshold;
+    ripple.foamMat.uniforms.uCrestFoam.value = water.params.crestFoam;
     water.update(camera, waves, size);
     if (overlay.visible) updateOverlay();
 

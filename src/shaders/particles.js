@@ -152,22 +152,25 @@ void main(){
       if (vn < 0.0) v -= 1.3 * vn * n;
       v *= 0.6;
     }
-    // Collide with the boat (oriented box)
+    // Collide with the boat: box tapered to a pointed bow (same plan shape as the 2.5D hull footprint).
+    // Particles are only ever pushed out sideways or onto the deck - never down through the bottom.
     vec3 lp = uBoatInv * (p - uBoatPos);
-    vec3 qd = abs(lp) - uBoatHalf;
-    if (max(qd.x, max(qd.y, qd.z)) < 0.0){
-      vec3 ln = vec3(0.0);
-      if (qd.x > qd.y && qd.x > qd.z) ln.x = sign(lp.x);
-      else if (qd.y > qd.z) ln.y = sign(lp.y);
-      else ln.z = sign(lp.z);
-      lp += ln * (-max(qd.x, max(qd.y, qd.z)) + 0.01);
+    float tb = clamp(lp.x / uBoatHalf.x, -1.0, 1.0);
+    float bowT = clamp((tb - 0.25) / 0.75, 0.0, 1.0);
+    float hw = uBoatHalf.z * sqrt(max(0.0, 1.0 - bowT * bowT));
+    if (abs(lp.x) < uBoatHalf.x && abs(lp.y) < uBoatHalf.y && abs(lp.z) < hw){
+      vec3 ln;
+      float sz = lp.z >= 0.0 ? 1.0 : -1.0;
+      float dz = hw - abs(lp.z), dTop = uBoatHalf.y - lp.y;
+      if (dTop < dz && dTop < 0.3){ ln = vec3(0.0, 1.0, 0.0); lp.y = uBoatHalf.y + 0.01; }
+      else { ln = vec3(0.0, 0.0, sz); lp.z = sz * (hw + 0.01); }
       mat3 toWorld = transpose(uBoatInv);
       p = uBoatPos + toWorld * lp;
       vec3 n = toWorld * ln;
       vec3 rel = v - uBoatVel;
       float vn = dot(rel, n);
       if (vn < 0.0) rel -= 1.2 * vn * n;
-      v = uBoatVel + rel * 0.8;
+      v = uBoatVel + rel * 0.85;
     }
     // Hit the ocean: become foam / bubbles (or vanish) and record the impact for the 2.5D sim
     vec2 bxz;
@@ -279,7 +282,10 @@ void main(){
   vec3 wp = uGridOrigin + (vec3(c) + 0.5) * uGridH;
   float type = s.w > uFluidMass ? 1.0 : 0.0;
   if (wp.y < terrainAt(wp.xz).x){ type = 2.0; v = vec3(0.0); }
-  if (insideBoat(wp)){ type = 2.0; v = uBoatVel; }
+  // Hull cells are static solids for the pressure solve. With the full hull velocity the solve sucks
+  // the wake along behind the transom at boat speed and piles it into a wall; the particle collider
+  // already handles the hull pushing water aside.
+  if (insideBoat(wp)){ type = 2.0; v = vec3(0.0, uBoatVel.y, 0.0); }
   vec3 vn = v;
   if (type == 1.0) vn.y -= 9.81 * uDt * uGravityOn;
   oVelNew = vec4(vn, type);

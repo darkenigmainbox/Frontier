@@ -106,7 +106,7 @@ export class Pipeline {
 
     // 5) 3D particle foam, then spray (screen-space fluid or sprites)
     fluid.renderFoam(camera, this.rtMain);
-    fluid.renderSpray(camera, this.rtMain, () => this.copyScene());
+    fluid.renderSpray(camera, this.rtMain, () => { this.copyScene(); return this.rtRefr.texture; });
 
     // Debug overlays (grid bounds)
     if (overlayScene.visible) { r.setRenderTarget(this.rtMain); r.render(overlayScene, camera); }

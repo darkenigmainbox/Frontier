@@ -20,7 +20,7 @@ void main(){
   vec4 terr = terrainAt(base);
   float att = waveAtten(terr.x);
   float dist = length(cameraPosition - vec3(base.x, 0.0, base.y));
-  vec3 d = gerstnerDisp(base, dist * 0.012) * att;
+  vec3 d = (gerstnerDisp(base, dist * 0.012) + fftDisp(base, max(dist * 0.012, 0.03))) * att;
   float cr; float dh;
   float hs = shoreWave(base, terr.y, cr, dh);
   float rip = rippleHeight(base);
@@ -54,58 +54,11 @@ uniform float uWindAngle;
 uniform float uFogDensity;
 uniform float uRoughness;
 uniform float uDetailStrength;
+uniform sampler2D uFoamTex;
 in vec3 vWorld;
 in vec2 vBase;
 in float vViewZ;
 out vec4 fragColor;
-
-vec2 detailSlope(vec2 p, float dist, float pix){
-  vec2 s = vec2(0.0);
-  for (int i = 0; i < 14; i++){
-    float fi = float(i);
-    float ang = uWindAngle + (hash11(fi * 7.13 + 1.0) - 0.5) * 2.8;
-    vec2 dir = vec2(cos(ang), sin(ang));
-    float lambda = 4.5 * pow(0.79, fi);
-    float k = 6.2831853 / lambda;
-    float w = sqrt(9.81 * k);
-    float A = 0.008 * lambda;
-    float fade = smoothstep(pix * 2.0, pix * 6.0, lambda);
-    float th = k * dot(dir, p) - w * uTime + hash11(fi * 3.7) * 6.2831853;
-    s += dir * (k * A * cos(th)) * fade;
-  }
-  // non-periodic micro turbulence (breaks up tiling)
-  vec2 q = p * 1.3 + uTime * vec2(0.23, 0.17);
-  float e = 0.06;
-  float n0 = fbm3(q);
-  float nx = fbm3(q + vec2(e, 0.0));
-  float nz = fbm3(q + vec2(0.0, e));
-  s += vec2(nx - n0, nz - n0) / e * 0.035 * (1.0 - smoothstep(0.03, 0.12, pix));
-  return s * uDetailStrength;
-}
-
-float voronoiEdge(vec2 p){
-  vec2 ip = floor(p); vec2 fp = fract(p);
-  float d1 = 8.0; float d2 = 8.0;
-  for (int j = -1; j <= 1; j++){
-    for (int i = -1; i <= 1; i++){
-      vec2 o = vec2(float(i), float(j));
-      vec2 r = o + hash22(ip + o) - fp;
-      float d = dot(r, r);
-      if (d < d1){ d2 = d1; d1 = d; } else if (d < d2){ d2 = d; }
-    }
-  }
-  return sqrt(d2) - sqrt(d1);
-}
-
-float foamPattern(vec2 p, float dist){
-  vec2 q = p * uFoamParams.w;
-  float v1 = voronoiEdge(q * 1.6 + vec2(uTime * 0.05, 0.0));
-  float v2 = voronoiEdge(q * 4.3 - vec2(0.0, uTime * 0.07));
-  float n = fbm3(q * 0.7);
-  float lace = (1.0 - smoothstep(0.0, 0.22, v1)) * 0.6 + (1.0 - smoothstep(0.0, 0.18, v2)) * 0.4;
-  float pat = clamp(lace * 0.75 + n * 0.55, 0.0, 1.0);
-  return mix(pat, 0.55, smoothstep(40.0, 220.0, dist));
-}
 
 void main(){
   vec3 V = cameraPosition - vWorld;
@@ -117,14 +70,19 @@ void main(){
   float pix = dist * 0.0021 / max(abs(V.y), 0.07);
 
   // ---- Normal: Gerstner (per pixel) + shore breakers + ripples + capillary detail ----
-  vec3 disp; vec3 gn; float J;
-  gerstnerFull(vBase, att, pix * 2.5, disp, gn, J);
+  vec3 disp; vec3 gn; vec3 gjp;
+  gerstnerParts(vBase, att, pix * 2.5, disp, gn, gjp);
   vec2 slope = vec2(-gn.x, -gn.z) / max(gn.y, 0.15);
+  // FFT wind sea: slopes of the displaced surface (divide by the horizontal stretch)
+  vec3 fd; vec2 fs; vec3 fjp;
+  fftFull(vBase, att, fd, fs, fjp);
+  float jxx = 1.0 + gjp.x + fjp.x, jzz = 1.0 + gjp.y + fjp.y, jxz = gjp.z + fjp.z;
+  float J = jxx * jzz - jxz * jxz;
+  if (uToggles.w > 0.5) slope += fs / max(vec2(1.0 + fjp.x, 1.0 + fjp.y), vec2(0.3)) * uDetailStrength;
   float cr; float dHdd;
   shoreWave(vBase, terr.y, cr, dHdd);
   if (uShore.w > 0.5 && terr.y < 70.0) slope += dHdd * shoreGrad(vBase);
   slope += rippleSlope(vBase);
-  if (uToggles.w > 0.5) slope += detailSlope(vBase, dist, pix);
   vec3 N = normalize(vec3(-slope.x, 1.0, -slope.y));
   N = normalize(mix(N, vec3(0.0, 1.0, 0.0), smoothstep(0.5, 6.0, pix) * 0.6));
   float NdV = dot(N, V);
@@ -182,22 +140,42 @@ void main(){
   float Fs = 0.02 + 0.98 * pow(1.0 - max(dot(H, V), 0.0), 5.0);
   col += uSunColor * D * G * Fs / (4.0 * NdV * max(NdL, 1e-3) + 1e-4) * NdL;
 
-  // ---- Foam: whitecaps (Jacobian folding) + foam grid + shoreline ----
-  float foam = uFoamParams.x * smoothstep(uCrestThresh + 0.25, uCrestThresh - 0.15, J);
+  // ---- Foam ----
+  // Whitecaps where the surface folds (Jacobian). Near the player the world-anchored 2.5D foam grid
+  // owns the foam (it accumulates the same whitecaps, so foam lingers and trails behind crests);
+  // outside the grid we fall back to the instantaneous crest foam.
+  float wc = uFoamParams.x * smoothstep(uCrestThresh + 0.12, uCrestThresh - 0.3, J);
+  vec2 guv = rippleUV(vBase);
+  float gridW = (uFoamParams.y > 0.5 && rippleInside(guv)) ? rippleFade(guv) : 0.0;
   vec4 fg = foamGridAt(vBase);
-  foam += uFoamParams.y * (fg.r * 0.8 + fg.g * 0.5);
+  float foam = mix(wc, fg.r * 0.75 + fg.g * 0.55 + wc * 0.3, gridW);
   if (uFoamParams.z > 0.0){
-    float shoreBreak = cr * smoothstep(24.0, 5.0, terr.y) * 1.5;
+    float shoreBreak = cr * smoothstep(24.0, 5.0, terr.y) * 1.2;
     float depthHere = vWorld.y - terr.x;
-    float edge = 1.0 - smoothstep(0.0, 0.8, min(depthHere, thick));
-    float wash = edge * (0.55 + 0.45 * sin(terr.y * 1.3 - uTime * 1.1 + vnoise(vBase * 0.3) * 4.0));
+    float edgeW = 1.0 - smoothstep(0.0, 0.7, min(depthHere, thick));
+    float wash = edgeW * (0.45 + 0.4 * sin(terr.y * 1.3 - uTime * 1.1 + vnoise(vBase * 0.3) * 4.0));
     foam += uFoamParams.z * (shoreBreak + wash);
   }
-  float pat = foamPattern(vBase, pix * 40.0);
-  float cover = smoothstep(1.0 - foam, 1.0 - foam + 0.3, pat) * clamp(foam * 3.0, 0.0, 1.0);
-  vec3 amb = textureLod(uSkyCube, N, 6.0).rgb;
-  vec3 foamCol = vec3(0.9) * (uSunColor * (NdL * 0.7 + 0.3) * 0.8 + amb * 1.3);
-  col = mix(col, foamCol, cover * 0.95);
+  // Lace: two layers of the bubble texture (different scale + rotation), riding on the wave slope
+  vec2 fuv = vBase * (0.085 * uFoamParams.w) + slope * 0.012;
+  vec4 ft1 = texture(uFoamTex, fuv);
+  vec4 ft2 = texture(uFoamTex, mat2(0.8, -0.6, 0.6, 0.8) * fuv * 2.31 + vec2(0.31, 0.73) + vec2(uTime * 0.004, 0.0));
+  float lace = ft1.r * 0.6 + ft2.g * 0.4;
+  // never 100% coverage: real foam always keeps pores/holes
+  float amt = 0.9 * (1.0 - exp(-1.6 * max(foam, 0.0)));
+  float fw = 0.05 + min(pix * 0.25, 0.35);
+  float cover = smoothstep(1.0 - amt - fw, 1.0 - amt + fw, lace);
+  float dens = smoothstep(0.0, 0.3, lace - (1.0 - amt));
+  // Bubbles just below the surface: a soft turquoise glow under and around the foam
+  float sub = clamp(foam * 1.1, 0.0, 1.0) * (0.35 + 0.65 * texture(uFoamTex, fuv * 0.55 + 0.37, 2.0).b);
+  col += (uSSSColor * 1.4 + vec3(0.015, 0.06, 0.06)) * lightIn * sub * 0.8 * (1.0 - cover);
+  // Foam is a diffuse scatterer: light it with a neutral sky irradiance (the low cube mip mixes the warm
+  // sun glow with blue sky into a lavender tint otherwise); thin foam shows the water through it
+  vec3 amb = mix(skyAmb, textureLod(uSkyCube, N, 6.0).rgb, 0.4);
+  amb = mix(vec3(dot(amb, vec3(0.3, 0.5, 0.2))), amb, 0.45);
+  vec3 foamAlb = mix(vec3(0.5, 0.74, 0.76), vec3(0.88, 0.9, 0.91), dens) * (0.75 + 0.25 * dens);
+  vec3 foamCol = foamAlb * (uSunColor * (NdL * 0.75 + 0.25) * 0.85 + amb);
+  col = mix(col, foamCol, cover * (0.5 + 0.45 * dens));
 
   // ---- Aerial perspective ----
   vec3 horizon = textureLod(uSkyCube, normalize(vec3(-V.x, 0.03, -V.z)), 3.0).rgb;

@@ -69,7 +69,7 @@ export class RippleSim {
       boatWake: 1.0,
       impactStrength: 1.0,
       foamGrid: true,
-      foamDecay: 9,
+      foamDecay: 6,
       steepFoam: 2.0,
       boatFoam: 1.0,
       foamFlow: 0.6,
@@ -110,7 +110,8 @@ export class RippleSim {
       uC2: { value: 0.1 }, uDamp: { value: 0.01 }, uSolver: { value: 0 }, uUseImpulse: { value: 1 },
     });
     this.foamMat = rawMaterial(rippleShaders.foamStep, {
-      ...terrainUniforms, ...this.uniforms, ...boatU(),
+      ...terrainUniforms, ...shared.waves, ...this.uniforms, ...boatU(),
+      uCrestThresh: { value: 0.55 }, uCrestFoam: { value: 0.7 },
       uFoamPrev: { value: null }, uState: { value: null }, uImpulse: { value: this.impulse.texture },
       uDt: { value: 1 / 60 }, uDecay: { value: 9 }, uSteepFoam: { value: 2 }, uSteepThresh: { value: 0.12 },
       uWindDrift: { value: new THREE.Vector2() }, uRippleFlow: { value: 0.6 }, uBoatFoam: { value: 1 },

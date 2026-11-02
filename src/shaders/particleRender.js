@@ -39,6 +39,7 @@ void main(){
   float att = waveAtten(terr.x);
   vec3 d; vec3 n; float J;
   gerstnerFull(b, att, dist * 0.012, d, n, J);
+  d += fftDisp(b, max(dist * 0.01, 0.03)) * att;
   vec3 wp = vec3(b.x + d.x, d.y, b.y + d.z);
   float cr; float dh;
   wp.y += shoreWave(b, terr.y, cr, dh) + rippleHeight(b);
@@ -68,15 +69,26 @@ in vec3 vN;
 in float vSeed;
 out vec4 fragColor;
 void main(){
+  // A small raft of bubbles: jittered cells -> bright bubble walls, darker translucent interiors
   float r = length(vUv);
-  float n = vnoise(vUv * 2.7 + vSeed * 37.0);
-  float m = 1.0 - smoothstep(0.3, 1.0, r + (n - 0.5) * 0.7);
-  float a = m * vAlpha * uFoamOpacity;
+  float edge = 1.0 - smoothstep(0.45, 1.0, r + (vnoise(vUv * 2.3 + vSeed * 31.0) - 0.5) * 0.6);
+  vec2 g = vUv * 2.6 + vSeed * 17.0;
+  vec2 ip = floor(g); vec2 fp = fract(g);
+  float d1 = 8.0, d2 = 8.0;
+  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++){
+    vec2 o = vec2(float(i), float(j));
+    vec2 rr = o + hash22(ip + o) - fp;
+    float d = dot(rr, rr);
+    if (d < d1){ d2 = d1; d1 = d; } else if (d < d2){ d2 = d; }
+  }
+  float wall = 1.0 - smoothstep(0.0, 0.16, sqrt(d2) - sqrt(d1));
+  float a = edge * (0.25 + 0.75 * wall) * vAlpha * uFoamOpacity;
   if (a < 0.01) discard;
-  vec3 amb = textureLod(uSkyCube, vN, 6.0).rgb;
+  vec3 amb = textureLod(uSkyCube, vec3(0.0, 1.0, 0.0), 6.0).rgb;
+  amb = mix(vec3(dot(amb, vec3(0.3, 0.5, 0.2))), amb, 0.45);
   float ndl = max(dot(vN, uSunDir), 0.0);
-  vec3 col = vec3(0.9) * (uSunColor * (ndl * 0.7 + 0.3) * 0.85 + amb * 1.25);
-  fragColor = vec4(col * (0.85 + 0.15 * n), a);
+  vec3 col = vec3(0.84, 0.88, 0.9) * (uSunColor * (ndl * 0.75 + 0.25) * 0.85 + amb) * (0.7 + 0.3 * wall);
+  fragColor = vec4(col, a);
 }
 `;
 
@@ -205,7 +217,7 @@ void main(){
 }
 `;
 
-export const ssfCompositeFS = HEADER + LIGHT + /* glsl */ `
+export const ssfCompositeFS = HEADER + NOISE + LIGHT + /* glsl */ `
 uniform sampler2D uDepth;
 uniform sampler2D uThick;
 uniform sampler2D uScene;
@@ -215,6 +227,7 @@ uniform vec3 uCamPos;
 uniform vec2 uInvRes;
 uniform vec3 uAbsorb;
 uniform vec3 uDeepColor;
+uniform vec3 uSSSColor;
 uniform float uWhiteness;
 in vec2 vUv;
 out vec4 fragColor;
@@ -239,32 +252,41 @@ void main(){
   nV = dot(nV, nV) > 1e-12 ? normalize(nV) : vec3(0.0, 0.0, 1.0);
   vec3 N = normalize(mat3(uViewInv) * nV);
   vec3 Pw = (uViewInv * vec4(P, 1.0)).xyz;
+  // micro ripples on the sheets/droplets (detail the smoothed depth can't carry)
+  vec3 q = Pw * 9.0;
+  vec3 mN = vec3(vnoise(q.xy + q.z * 0.7), vnoise(q.yz + 13.1), vnoise(q.zx + 27.3)) - 0.5;
+  N = normalize(N + mN * 0.22);
   vec3 V = normalize(uCamPos - Pw);
   float thick = texture(uThick, vUv).r;
   float NdV = max(dot(N, V), 0.0);
   float F = 0.02 + 0.98 * pow(1.0 - NdV, 5.0);
-  vec3 R = reflect(-V, N); R.y = abs(R.y);
-  vec3 refl = textureLod(uSkyCube, R, 0.0).rgb;
-  vec2 ruv = vUv + nV.xy * min(thick, 1.0) * 0.035;
-  vec3 bg = texture(uScene, ruv).rgb;
-  vec3 T = exp(-uAbsorb * thick * 2.0);
-  vec3 amb = textureLod(uSkyCube, N, 6.0).rgb;
+  // Reflection: sky above the horizon, the dark ocean below it
+  vec3 R = reflect(-V, N);
+  vec3 sky = min(textureLod(uSkyCube, vec3(R.x, abs(R.y), R.z), 0.0).rgb, vec3(6.0));
   vec3 lightIn = uSunColor * max(uSunDir.y, 0.0) * 0.25 + textureLod(uSkyCube, vec3(0.0, 1.0, 0.0), 6.0).rgb;
-  // Splash water is churned and full of air: in-scattering keeps thick sheets bright and teal instead of
-  // the deep-ocean body colour, and thin sheets/droplets turn white (aerated)
-  vec3 scat = (uDeepColor * 6.0 + vec3(0.22, 0.38, 0.42)) * lightIn;
-  vec3 body = bg * T + scat * (1.0 - T);
+  vec3 sea = uDeepColor * lightIn * 3.0 + textureLod(uSkyCube, normalize(vec3(R.x, 0.05, R.z)), 2.0).rgb * 0.12;
+  vec3 refl = mix(sea, sky, smoothstep(-0.08, 0.06, R.y));
+  // Refraction: the scene seen through the water body, bent by the surface normal (lens-like)
+  vec2 ruv = vUv + nV.xy * (0.015 + 0.05 * min(thick, 1.0));
+  vec3 bg = texture(uScene, clamp(ruv, vec2(0.001), vec2(0.999))).rgb;
+  vec3 T = exp(-uAbsorb * thick * 1.3);
+  vec3 body = bg * T + uDeepColor * lightIn * 2.5 * (1.0 - T);
+  // Backlit sheets transmit a teal glow (light scattered inside the water)
+  float fwd = pow(max(dot(-V, uSunDir), 0.0), 6.0);
+  body += uSSSColor * uSunColor * fwd * (0.25 + 0.75 * (1.0 - T.g)) * 0.9;
+  // Only very thin, fragmented spray turns white (mist / aerated droplets)
   float ndl = max(dot(N, uSunDir), 0.0);
-  float thin = 1.0 - smoothstep(0.03, 0.6, thick);
-  float aer = clamp(mix(0.4, 1.0, thin) * uWhiteness, 0.0, 1.0);
-  float fwd = pow(max(dot(-V, uSunDir), 0.0), 6.0); // backlit spray glows (Mie forward scattering)
-  vec3 white = vec3(0.9) * (uSunColor * (ndl * 0.6 + 0.4 + fwd * (0.6 + thin)) * 0.8 + amb * 1.3);
-  vec3 col = mix(body, white, aer * 0.85);
-  col = mix(col, refl, F * (1.0 - aer * 0.7));
+  vec3 amb = textureLod(uSkyCube, N, 6.0).rgb;
+  float thin = 1.0 - smoothstep(0.012, 0.12, thick);
+  float aer = clamp(thin * uWhiteness * 2.0, 0.0, 1.0);
+  vec3 white = vec3(0.85) * (uSunColor * (ndl * 0.6 + 0.4 + fwd) * 0.8 + amb);
+  vec3 col = mix(body, white, aer);
+  col = mix(col, refl, F * (1.0 - aer * 0.5));
+  // Sun glints: sharp + broad lobe
   vec3 H = normalize(V + uSunDir);
-  float spec = pow(max(dot(N, H), 0.0), 900.0) * 60.0;
-  col += uSunColor * spec * (0.2 + F);
-  float alpha = smoothstep(0.0, 0.04, thick);
+  float ndh = max(dot(N, H), 0.0);
+  col += uSunColor * (pow(ndh, 1200.0) * 90.0 + pow(ndh, 120.0) * 2.0) * (0.15 + F);
+  float alpha = smoothstep(0.0, 0.025, thick);
   vec4 clip = uProj * vec4(P, 1.0);
   gl_FragDepth = clip.z / clip.w * 0.5 + 0.5;
   fragColor = vec4(col, alpha);

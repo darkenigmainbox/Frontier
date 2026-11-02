@@ -8,7 +8,8 @@ export class Effects {
     this.ripple = ripple;
     this.waves = waves;
     this.terrain = terrain;
-    this.params = { clickSplash: true, splashScale: 1.0, crestSpray: true, shoreSpray: true, rockSize: 0.7 };
+    // Splash comes from the boat only by default; the other sources are opt-in toggles
+    this.params = { clickSplash: false, splashScale: 1.0, crestSpray: false, shoreSpray: false, rockSize: 0.7 };
     this.rocks = [];
     this.rockMat = new THREE.MeshStandardMaterial({ color: 0x6b6660, roughness: 0.9, flatShading: true });
     this.focus = new THREE.Vector3();

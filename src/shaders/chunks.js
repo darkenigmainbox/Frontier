@@ -100,7 +100,8 @@ vec3 gerstnerDisp(vec2 p, float minLambda){
   return d;
 }
 
-void gerstnerFull(vec2 p, float att, float minLambda, out vec3 disp, out vec3 nrm, out float jac){
+// Gerstner swell with displacement partials (jxx, jzz, jxz of the horizontal displacement)
+void gerstnerParts(vec2 p, float att, float minLambda, out vec3 disp, out vec3 nrm, out vec3 jp){
   vec3 d = vec3(0.0);
   float nx = 0.0; float nz = 0.0; float ny = 0.0;
   float jxx = 0.0; float jzz = 0.0; float jxz = 0.0;
@@ -123,7 +124,55 @@ void gerstnerFull(vec2 p, float att, float minLambda, out vec3 disp, out vec3 nr
   }
   disp = d;
   nrm = vec3(-nx, 1.0 - ny, -nz);
-  jac = (1.0 - jxx) * (1.0 - jzz) - jxz * jxz;
+  jp = vec3(-jxx, -jzz, -jxz);
+}
+
+void gerstnerFull(vec2 p, float att, float minLambda, out vec3 disp, out vec3 nrm, out float jac){
+  vec3 jp;
+  gerstnerParts(p, att, minLambda, disp, nrm, jp);
+  jac = (1.0 + jp.x) * (1.0 + jp.y) - jp.z * jp.z;
+}
+
+// ---------------- FFT wind sea (3 cascades, see water/fft.js) ----------------
+uniform sampler2D uFFTDisp0; uniform sampler2D uFFTSlope0;
+uniform sampler2D uFFTDisp1; uniform sampler2D uFFTSlope1;
+uniform sampler2D uFFTDisp2; uniform sampler2D uFFTSlope2;
+uniform vec3 uFFTSize;
+uniform vec4 uFFTParams; // enabled, variation, N, 0
+
+// Low-frequency, per-cascade amplitude modulation: wind gusts / patches that break the tile period
+float fftVar(vec2 p, float i){
+  float n = vnoise(p / (uFFTSize.x * (0.9 + 0.55 * i)) + vec2(i * 17.31, i * 5.73));
+  n = 0.65 * n + 0.35 * vnoise(p / (uFFTSize.x * 0.37) + vec2(3.7 + i, 11.1 - i));
+  return max(1.0 + uFFTParams.y * (n * 2.0 - 1.0) * 1.6, 0.15);
+}
+
+// Vertex/compute path: explicit LOD from the sampling footprint (metres)
+vec3 fftDisp(vec2 p, float footprint){
+  if (uFFTParams.x < 0.5) return vec3(0.0);
+  float N = uFFTParams.z;
+  vec3 d = textureLod(uFFTDisp0, p / uFFTSize.x, max(log2(footprint * N / uFFTSize.x), 0.0)).xyz * fftVar(p, 0.0);
+  d += textureLod(uFFTDisp1, p / uFFTSize.y, max(log2(footprint * N / uFFTSize.y), 0.0)).xyz * fftVar(p, 1.0);
+  d += textureLod(uFFTDisp2, p / uFFTSize.z, max(log2(footprint * N / uFFTSize.z), 0.0)).xyz * fftVar(p, 2.0);
+  return d;
+}
+
+void fftAccum(sampler2D D, sampler2D S, vec2 uv, float m, inout vec3 d, inout vec4 sl, inout float dxz){
+  vec4 a = texture(D, uv);
+  vec4 b = texture(S, uv);
+  d += a.xyz * m; dxz += a.w * m; sl += b * m;
+}
+
+// Fragment path: hardware trilinear/anisotropic filtering band-limits every cascade automatically.
+// slope = (dh/dx, dh/dz), jp = (dDx/dx, dDz/dz, dDx/dz)
+void fftFull(vec2 p, float att, out vec3 disp, out vec2 slope, out vec3 jp){
+  disp = vec3(0.0); slope = vec2(0.0); jp = vec3(0.0);
+  if (uFFTParams.x < 0.5) return;
+  vec4 sl = vec4(0.0); float dxz = 0.0;
+  fftAccum(uFFTDisp0, uFFTSlope0, p / uFFTSize.x, fftVar(p, 0.0), disp, sl, dxz);
+  fftAccum(uFFTDisp1, uFFTSlope1, p / uFFTSize.y, fftVar(p, 1.0), disp, sl, dxz);
+  fftAccum(uFFTDisp2, uFFTSlope2, p / uFFTSize.z, fftVar(p, 2.0), disp, sl, dxz);
+  disp *= att; slope = sl.xy * att; jp = vec3(sl.zw, dxz) * att;
 }
 
 vec2 gerstnerBase(vec2 xz, float att){
@@ -195,7 +244,7 @@ float waterSurfaceAt(vec2 xz, out vec2 base){
   vec4 terr = terrainAt(xz);
   float att = waveAtten(terr.x);
   base = gerstnerBase(xz, att);
-  float h = gerstnerDisp(base, 0.0).y * att;
+  float h = (gerstnerDisp(base, 0.0).y + fftDisp(base, 0.3).y) * att;
   float cr; float dh;
   h += shoreWave(xz, terr.y, cr, dh);
   h += rippleHeight(base);
@@ -228,7 +277,13 @@ uniform vec3 uBoatPos;
 uniform mat3 uBoatInv;   // world -> boat local rotation
 uniform vec3 uBoatHalf;  // local half extents of the collision box
 uniform vec3 uBoatVel;
-bool insideBoat(vec3 p){ vec3 l = uBoatInv * (p - uBoatPos); return all(lessThan(abs(l), uBoatHalf)); }
+bool insideBoat(vec3 p){
+  vec3 l = uBoatInv * (p - uBoatPos);
+  float t = clamp(l.x / uBoatHalf.x, -1.0, 1.0);
+  float b = clamp((t - 0.25) / 0.75, 0.0, 1.0);
+  float hw = uBoatHalf.z * sqrt(max(0.0, 1.0 - b * b));
+  return abs(l.x) < uBoatHalf.x && abs(l.y) < uBoatHalf.y && abs(l.z) < hw;
+}
 `;
 
 export const FULLSCREEN_VS = /* glsl */ `

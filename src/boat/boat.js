@@ -238,15 +238,30 @@ export class Boat {
     }
     if (!inWater) return;
 
-    // Bow spray sheets (both sides)
-    if (sp > 2.5) {
-      acc.bow += (sp - 2.5) * 260 * dt;
+    // Bow sheets: water climbing the hull and peeling off the waterline from the stem to midships.
+    // Emitted at several points along each side so the sheet is a continuous, detailed curtain.
+    if (sp > 1.5) {
+      acc.bow += (sp - 1.5) * 520 * dt;
       const n = Math.floor(acc.bow); acc.bow -= n;
-      if (n > 0) for (const s of [-1, 1]) {
-        const p = this.localToWorld(1.6, -0.15, s * 0.7, new THREE.Vector3());
-        p.y = Math.max(p.y, hMean - 0.05);
-        const v = new THREE.Vector3().addScaledVector(side3, s * (0.28 * sp + 0.6)).addScaledVector(up, 0.17 * sp + 1.1).addScaledVector(fwd3, 0.35 * sp);
-        emit.particles({ kind: 0, count: n / 2, pos: p, spread: 0.35, vel: v, velSpread: 0.25 + sp * 0.05, type: 1, life: 3 });
+      if (n > 0) {
+        const pts = [0.0, 0.4, 0.8];
+        for (const s of [-1, 1]) {
+          for (const t of pts) {
+            const lx = 3.0 - t * 2.4;
+            // just outside the tapered hull (matches the particle collider in the advect shader)
+            const tb = Math.min(Math.max(lx / this.collisionHalf.x, -1), 1);
+            const bowT = Math.min(Math.max((tb - 0.25) / 0.75, 0), 1);
+            const lz = s * (this.collisionHalf.z * Math.sqrt(Math.max(0, 1 - bowT * bowT)) + 0.08);
+            const p = this.localToWorld(lx, -0.2, lz, new THREE.Vector3());
+            p.y = Math.max(p.y, hMean - 0.05);
+            const k = 1 - 0.55 * t;
+            const v = new THREE.Vector3()
+              .addScaledVector(side3, s * (0.3 * sp + 0.5) * k)
+              .addScaledVector(up, (0.16 * sp + 0.9) * k)
+              .addScaledVector(fwd3, 0.55 * sp * (1 - t));
+            emit.particles({ kind: 0, count: n / (2 * pts.length), pos: p, spread: 0.12 + 0.1 * t, vel: v, velSpread: 0.18 + sp * 0.03, type: 1, life: 2.5 });
+          }
+        }
       }
     }
     // Stern wash foam + hull side foam (3D particle foam)
@@ -262,12 +277,12 @@ export class Boat {
     }
     // Prop rooster tail
     if (sp > 6 && this.throttle > 0.3) {
-      acc.rooster += sp * 18 * this.throttle * dt;
+      acc.rooster += sp * 9 * this.throttle * dt;
       const n = Math.floor(acc.rooster); acc.rooster -= n;
       if (n > 0) {
         const p = this.localToWorld(-3.9, 0, 0, new THREE.Vector3());
         p.y = hMean;
-        emit.particles({ kind: 0, count: n, pos: p, spread: 0.2, vel: fwd3.clone().multiplyScalar(-0.15 * sp).addScaledVector(up, 1.8 + sp * 0.1), velSpread: 0.6, type: 1, life: 2.5 });
+        emit.particles({ kind: 0, count: n, pos: p, spread: 0.2, vel: fwd3.clone().multiplyScalar(-0.15 * sp).addScaledVector(up, 1.8 + sp * 0.1), velSpread: 1.1, type: 1, life: 2.0 });
       }
     }
   }

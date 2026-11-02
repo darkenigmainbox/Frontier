@@ -41,9 +41,10 @@ All simulation grids are **world-anchored sliding windows** that follow the boat
 
 | Layer | Grid | Contents |
 |---|---|---|
-| Waves | analytic, unbounded | Gerstner spectrum (Calm → Storm), shoreline breakers, wave attenuation with depth |
+| Swell | analytic, unbounded | 12 long Gerstner waves (Calm → Storm), shoreline breakers, wave attenuation with depth. Also used on the CPU for boat buoyancy |
+| Wind sea | **FFT ocean**, 3 cascades (137 m / 31.7 m / 7.3 m tiles, 256²) | Tessendorf IFFT on the GPU with a JONSWAP spectrum, directional spreading that varies with frequency, and choppy displacement. Each cascade carries only its own wavenumber band and the tile sizes don't divide into each other, plus gust-patch amplitude modulation, so the sea never visibly repeats |
 | 2.5D ripples | 2D height field (48–192 m) | **iWave** (dispersive, fitted 13×13 kernel) or the wave equation. Sources: hull displacement, particle impacts, clicks. Land reflects waves and shallows damp them |
-| 2.5D foam | 2D grid, same window | long-lived lacy foam + fresh aerated foam, advected by ripple flow and wind |
+| 2.5D foam | 2D grid, same window | Persistent foam. Whitecaps (from the same Jacobian as the rendered surface), the boat wake, particle impacts and live 3D foam particles all deposit into it. The foam is advected by ripple flow and wind and decays into lace |
 | 3D splash | 3D MAC-style grid (Low/Medium/High) | particle ↔ grid transfer for the solvers below |
 
 ### Three selectable 3D solvers (GPU particles)
@@ -53,16 +54,18 @@ Particle state lives in float textures. Each frame runs P2G (additive point spla
 2. **SPH: weakly compressible.** A clamped Tait equation of state and viscosity on the grid, plus XSPH smoothing. Gives softer, blobby water.
 3. **Whitewater: spray / foam / bubbles.** Ballistic spray in turbulent air, buoyant bubbles, and foam that rides the surface (Ihmsen-style diffuse particles).
 
-Particles that hit the ocean turn into **3D particle foam** or bubbles, depending on impact speed. Their impacts are written back into the 2.5D ripple field. Particles also collide with the terrain and the boat hull.
+Particles that hit the ocean turn into **3D particle foam** or bubbles, depending on impact speed. Their impacts are written back into the 2.5D ripple field, and live foam particles keep feeding the foam grid. Particles also collide with the terrain and with a hull shape tapered to the pointed bow.
+
+By default splashes come **from the boat only**: bow sheets peel off along the waterline from the stem to midships, plus the prop rooster tail and stern wash. Click splashes, whitecap spray and shore-break spray are opt-in toggles under *Splash*. The boat's wake in the 2.5D field comes from a moving pressure patch, so the Kelvin wake stays bounded at any speed.
 
 ### Rendering
 * **Ocean:** a 10-level clipmap, displaced on the GPU by waves plus ripples. Shading includes:
   * GGX sun specular and planar reflections of the boat and island, plus sky cubemap reflections.
   * Screen-space refraction with Beer–Lambert absorption, and subsurface scattering through wave crests.
-  * Whitecaps from the wave Jacobian, shoreline foam bands, and caustics on the sea bed.
-  * Band-limited capillary detail normals, using the pixel footprint so distant water doesn't shimmer or moiré.
-* **Splash:** **screen-space fluid rendering** in four steps: sphere depth, bilateral smoothing (axis plus diagonal passes), thickness, then a composite with refraction, absorption, aeration whitening and backlit forward scattering.
-* **Foam particles:** lit camera-facing quads that ride the surface. **Spray:** motion-streaked sprites.
+  * FFT slopes sampled through mipmaps with anisotropic filtering, so distant water doesn't shimmer or moiré, plus caustics on the sea bed.
+  * **Foam:** a procedural, histogram-equalised bubble-lace texture sampled at two scales. Thin foam shows only the bubble-wall web and dense foam becomes a mat that always keeps pores. Turquoise bubbles glow just below the surface, and thin foam is tinted by the water under it.
+* **Splash:** **screen-space fluid rendering** in four steps: sphere depth, bilateral smoothing (axis plus diagonal passes), thickness, then a composite. The composite renders *clear* water: refraction of the scene with Beer–Lambert absorption, Fresnel reflection of sky and ocean, micro-ripple normals, sun glints and teal transmission when backlit. Only fine mist turns white.
+* **Foam particles:** small translucent bubble rafts riding the surface. **Spray:** motion-streaked sprites, used when SSF is off.
 * **Sky:** Preetham sky with clouds, and an HDR pipeline with bloom, ACES tone mapping and FXAA.
 
 ## Layout
@@ -70,7 +73,7 @@ Particles that hit the ocean turn into **3D particle foam** or bubbles, dependin
 ```
 src/main.js              app wiring, input, camera follow
 src/core/gpu.js          render-target / fullscreen-pass helpers
-src/water/               waves.js (Gerstner), ripples.js (2.5D iWave + foam grid), surface.js (ocean clipmap)
+src/water/               waves.js (Gerstner swell), fft.js (FFT cascades), foamTexture.js (bubble lace), ripples.js (2.5D iWave + foam grid), surface.js (ocean clipmap)
 src/fluid/               particles.js (FLIP / SPH / Whitewater), fluidRenderer.js (SSF, foam, spray)
 src/boat/boat.js         buoyancy-driven boat with hull/wake emitters
 src/world/               terrain.js (island, shadows), sky.js (sky, sun, env maps)

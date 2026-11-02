@@ -19,10 +19,11 @@ export class WaterSurface {
       detailNormals: true,
       detailStrength: 1.0,
       roughness: 0.06,
-      crestFoam: 0.8,
-      crestThreshold: 0.72,
-      shoreFoam: 1.0,
-      foamScale: 1.6,
+      crestFoam: 0.7,
+      crestThreshold: 0.55,
+      shoreFoam: 0.8,
+      foamScale: 1.0,
+      gridFoam: true,
       fogDensity: 0.00022,
     };
     const common = {
@@ -32,8 +33,9 @@ export class WaterSurface {
       uReflMatrix: { value: new THREE.Matrix4() },
       uResolution: { value: new THREE.Vector2(1, 1) },
       uToggles: { value: new THREE.Vector4(1, 1, 1, 1) },
-      uFoamParams: { value: new THREE.Vector4(0.8, 1, 1, 1.6) },
-      uCrestThresh: { value: 0.72 },
+      uFoamParams: { value: new THREE.Vector4(0.7, 1, 0.8, 1.0) },
+      uCrestThresh: { value: 0.55 },
+      uFoamTex: shared.foamTex,
       uWaveHeight: { value: 1 },
       uWindAngle: { value: 0 },
       uFogDensity: shared.fog.uFogDensity,
@@ -95,7 +97,7 @@ export class WaterSurface {
     }
     u.uResolution.value.copy(size);
     u.uToggles.value.set(p.planarReflections ? 1 : 0, p.refraction ? 1 : 0, p.sss ? 1 : 0, p.detailNormals ? 1 : 0);
-    u.uFoamParams.value.set(p.crestFoam, 1, p.shoreFoam, p.foamScale);
+    u.uFoamParams.value.set(p.crestFoam, p.gridFoam ? 1 : 0, p.shoreFoam, p.foamScale);
     u.uCrestThresh.value = p.crestThreshold;
     u.uWaveHeight.value = Math.max(0.2, waves.params.height);
     u.uWindAngle.value = waves.windAngle;

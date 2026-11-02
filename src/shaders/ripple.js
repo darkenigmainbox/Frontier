@@ -1,4 +1,4 @@
-import { HEADER, NOISE, TERRAIN, RIPPLE, FULLSCREEN_VS } from './chunks.js';
+import { HEADER, NOISE, TERRAIN, WAVES, RIPPLE, FULLSCREEN_VS } from './chunks.js';
 
 // Approximate boat hull footprint (pointed bow, square transom) in the XZ plane.
 const HULL = /* glsl */ `
@@ -77,10 +77,11 @@ void main(){
   // Sources: particle impacts, moving hull (volume displacement), user drops
   hn += texelFetch(uImpulse, c, 0).r * uUseImpulse;
   float occ = hullFootprint(xz, uBoatXZ, uBoatDir, uBoatShape);
-  float occPrev = hullFootprint(xz, uBoatPrevXZ, uBoatPrevDir, uBoatShape);
-  hn -= (occ - occPrev) * uBoatShape.z * uBoatStrength;
-  // Tessendorf obstruction: the hull pins the surface under it, so energy can't pile up into a mound
-  hn *= 1.0 - 0.6 * occ;
+  // Moving pressure patch: the hull holds the surface under it at a shallow depression and the
+  // dispersive solver radiates the Kelvin wake (divergent + transverse waves) from it. Relaxing towards
+  // a target (instead of integrating a volume-displacement source) keeps the wake bounded at any speed.
+  float target = -0.28 * uBoatShape.z * uBoatStrength * occ;
+  hn = mix(hn, target, 0.45 * occ);
   for (int i = 0; i < MAX_DROPS; i++){
     if (i >= uDropCount) break;
     vec4 D = uDrops[i];
@@ -119,8 +120,10 @@ void main(){
 
 // --- Foam grid -----------------------------------------------------------------
 // r = foam density (long lived, lacy), g = fresh/aerated foam (short lived, bright)
-export const foamStepFS = HEADER + NOISE + TERRAIN + RIPPLE + HULL + BOAT_WAKE_UNIFORMS + /* glsl */ `
+export const foamStepFS = HEADER + NOISE + TERRAIN + WAVES + RIPPLE + HULL + BOAT_WAKE_UNIFORMS + /* glsl */ `
 uniform sampler2D uFoamPrev;
+uniform float uCrestThresh;
+uniform float uCrestFoam;
 uniform sampler2D uState;
 uniform sampler2D uImpulse;
 uniform float uDt;
@@ -169,7 +172,7 @@ void main(){
   stern *= 1.0 - smoothstep(uBoatShape.y * 0.3, uBoatShape.y * 0.9, abs(l.y));
   float spd = smoothstep(0.5, 6.0, uBoatSpeed);
   float n = vnoise(xz * 3.0 + vec2(uFoamTime * 1.7, 0.0));
-  add += (edge * 2.5 + stern * 4.0 * n) * spd * uBoatFoam * uDt;
+  add += (edge * 0.9 + stern * 1.6 * (0.3 + n)) * spd * uBoatFoam * uDt;
 
   for (int i = 0; i < MAX_DROPS; i++){
     if (i >= uDropCount) break;
@@ -179,9 +182,19 @@ void main(){
   }
 
   vec4 terr = terrainAt(xz);
+  // Whitecaps: the same Jacobian as the rendered surface, accumulated here so foam persists and trails
+  float attW = waveAtten(terr.x);
+  vec3 gd; vec3 gn; vec3 gjp;
+  gerstnerParts(xz, attW, 0.3, gd, gn, gjp);
+  vec3 fd; vec2 fsl; vec3 fjp;
+  fftFull(xz, attW, fd, fsl, fjp);
+  float jxx = 1.0 + gjp.x + fjp.x, jzz = 1.0 + gjp.y + fjp.y, jxz = gjp.z + fjp.z;
+  float J = jxx * jzz - jxz * jxz;
+  add += smoothstep(uCrestThresh + 0.12, uCrestThresh - 0.3, J) * uCrestFoam * 2.2 * uDt;
+
   float wet = smoothstep(0.2, -0.2, terr.x);
-  f.r = min(f.r + add, 3.0) * wet;
-  f.g = min(f.g + add, 3.0) * wet;
+  f.r = min(f.r + add, 1.6) * wet;
+  f.g = min(f.g + add, 1.6) * wet;
   fragColor = vec4(f.r, f.g, 0.0, 1.0);
 }
 `;
@@ -204,8 +217,10 @@ void main(){
   vVal = vec2(0.0);
   float flag = fract(V.w + 0.001);
   vec2 uv = rippleUV(P.xz);
-  if (flag < 0.25 || !rippleInside(uv)){ gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
-  vVal = vec2(-V.y * uImpulseScale, uFoamPerHit);
+  // live 3D foam particles keep depositing into the 2.5D foam grid (rendered with the lace texture)
+  bool foamP = flag < 0.25 && abs(floor(V.w + 0.01) - 2.0) < 0.1 && P.w > 0.0;
+  if ((flag < 0.25 && !foamP) || !rippleInside(uv)){ gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  vVal = foamP ? vec2(0.0, uFoamPerHit * 0.1) : vec2(-V.y * uImpulseScale, uFoamPerHit);
   gl_Position = vec4(uv * 2.0 - 1.0, 0.0, 1.0);
 }
 `;

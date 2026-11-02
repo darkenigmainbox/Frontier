@@ -80,6 +80,13 @@ export function buildGUI(app) {
   wv.add(waves.params, 'speed', 0, 2, 0.01).name('Time scale').onChange(rebuild);
   wv.add(waves.params, 'shoreWaves').name('Shore breakers').onChange(rebuild);
   wv.add(waves.params, 'shoreAmp', 0, 2.5, 0.01).name('Breaker height').onChange(rebuild);
+  const ff = wv.addFolder('FFT wind sea (3 cascades)');
+  const fft = app.fft;
+  ff.add(fft.params, 'enabled').name('FFT ocean');
+  ff.add(fft.params, 'share', 0, 1.5, 0.01).name('Wind-sea height').onFinishChange(() => fft.buildSpectrum());
+  ff.add(fft.params, 'peak', 0.08, 0.8, 0.01).name('Peak wavelength ×').onFinishChange(() => fft.buildSpectrum());
+  ff.add(fft.params, 'choppiness', 0, 2, 0.01).name('Choppiness');
+  ff.add(fft.params, 'variation', 0, 0.6, 0.01).name('Gust patches (anti-tiling)');
 
   // ---------------- Rendering ----------------
   const rn = gui.addFolder('Rendering');
@@ -90,8 +97,8 @@ export function buildGUI(app) {
   rn.add(water.params, 'planarReflections').name('Planar reflections');
   rn.add(water.params, 'refraction').name('Refraction + absorption');
   rn.add(water.params, 'sss').name('Subsurface scattering');
-  rn.add(water.params, 'detailNormals').name('Capillary detail normals');
-  rn.add(water.params, 'detailStrength', 0, 3, 0.01).name('Detail strength');
+  rn.add(water.params, 'detailNormals').name('FFT normal detail');
+  rn.add(water.params, 'detailStrength', 0, 2, 0.01).name('Normal strength');
   rn.add(water.params, 'roughness', 0.01, 0.4, 0.005).name('Surface roughness');
   const clarity = { clarity: 1.0 };
   rn.add(clarity, 'clarity', 0.2, 4, 0.01).name('Water clarity').onChange((v) => shared.water.uAbsorb.value.set(0.42, 0.075, 0.055).multiplyScalar(1 / v));
