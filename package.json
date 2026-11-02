@@ -1,0 +1,31 @@
+{
+  "name": "frontier",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 5173",
+    "validate:shaders": "node scripts/validate-shaders.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/darkenigmainbox/Frontier.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/darkenigmainbox/Frontier/issues"
+  },
+  "homepage": "https://github.com/darkenigmainbox/Frontier#readme",
+  "dependencies": {
+    "lil-gui": "^0.21.0",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "glslang-validator-prebuilt-predownloaded": "^0.0.2",
+    "vite": "^8.3.5"
+  }
+}
