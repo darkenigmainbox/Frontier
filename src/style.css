@@ -1,0 +1,75 @@
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#06121c;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#e8f4f8}
+#app{position:fixed;inset:0}
+#app canvas{display:block}
+#vignette{position:fixed;inset:0;pointer-events:none;z-index:3;background:radial-gradient(ellipse at center,transparent 55%,rgba(2,10,18,.42) 100%)}
+#vignette.off{display:none}
+
+/* ---------- brand ---------- */
+#brand{position:fixed;top:14px;left:16px;z-index:10;pointer-events:none;text-shadow:0 2px 12px rgba(0,0,0,.5)}
+.brand-title{font-size:21px;font-weight:800;letter-spacing:.06em}
+.brand-title span{font-weight:300;opacity:.85;letter-spacing:.22em;font-size:14px;text-transform:uppercase}
+.chips{margin-top:7px;display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:rgba(6,24,38,.62);border:1px solid rgba(120,200,235,.28);backdrop-filter:blur(8px);border-radius:999px;padding:3px 10px;font-size:11px;font-weight:600;letter-spacing:.03em}
+
+/* ---------- panel ---------- */
+#panelToggle{position:fixed;top:14px;right:14px;z-index:12;background:rgba(8,28,44,.78);border:1px solid rgba(120,200,235,.35);color:#e8f4f8;border-radius:10px;padding:8px 13px;font-weight:700;cursor:pointer;backdrop-filter:blur(10px)}
+#panelToggle:hover{background:rgba(14,48,74,.9)}
+#panel{position:fixed;top:56px;right:14px;bottom:52px;width:308px;z-index:11;overflow-y:auto;overflow-x:hidden;padding:6px 14px 18px;border-radius:16px;background:linear-gradient(165deg,rgba(7,24,40,.86),rgba(5,16,28,.82));border:1px solid rgba(120,200,235,.22);backdrop-filter:blur(14px);box-shadow:0 18px 50px rgba(0,0,0,.45);scrollbar-width:thin;scrollbar-color:rgba(90,180,220,.4) transparent;transition:transform .3s ease,opacity .3s ease}
+#panel.hidden{transform:translateX(340px);opacity:0;pointer-events:none}
+#panel section{border-bottom:1px solid rgba(140,210,240,.12);padding:13px 0 15px}
+#panel section:last-child{border-bottom:none}
+#panel h2{font-size:12px;text-transform:uppercase;letter-spacing:.16em;color:#8fd3ef;margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline}
+#panel h2 .hint{letter-spacing:.02em;text-transform:none;font-size:10px;color:#7fa8bc}
+.desc{font-size:11.5px;line-height:1.5;color:#b9d6e2;margin:9px 0 4px}
+.help ul{list-style:none;font-size:11.5px;line-height:1.75;color:#b9d6e2}
+.help b{color:#eaf6fb}
+
+/* segmented solver picker */
+.segmented{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.segmented button{background:rgba(16,44,66,.75);border:1px solid rgba(120,200,235,.22);color:#d5ecf6;border-radius:10px;padding:8px 4px 7px;font-size:11.5px;font-weight:700;cursor:pointer;line-height:1.25}
+.segmented button small{display:block;font-weight:500;font-size:9.5px;color:#8fb8ca;margin-top:2px}
+.segmented button:hover{border-color:rgba(120,220,250,.6)}
+.segmented button.active{background:linear-gradient(160deg,#0f6f9f,#0a4a74);border-color:#47c2f0;box-shadow:0 0 0 1px #47c2f055,0 6px 16px rgba(10,90,140,.45)}
+
+/* controls */
+.ctl{margin-top:9px}
+.ctl label{display:flex;justify-content:space-between;font-size:11.5px;font-weight:600;color:#cfe8f2;margin-bottom:4px}
+.ctl label output{color:#7fd4f7;font-variant-numeric:tabular-nums;font-weight:700}
+.ctl input[type=range]{width:100%;appearance:none;-webkit-appearance:none;height:22px;background:transparent;cursor:pointer}
+.ctl input[type=range]::-webkit-slider-runnable-track{height:5px;border-radius:99px;background:linear-gradient(90deg,#177fae,#2fb9e8)}
+.ctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#eaf8ff;border:2px solid #23a8dd;margin-top:-5.5px;box-shadow:0 2px 8px rgba(0,0,0,.45)}
+.ctl input[type=range]::-moz-range-track{height:5px;border-radius:99px;background:#1d9bd2}
+.ctl input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:#eaf8ff;border:2px solid #23a8dd}
+.ctl select{width:100%;background:rgba(13,38,58,.9);color:#e2f2f9;border:1px solid rgba(120,200,235,.3);border-radius:9px;padding:7px 8px;font-size:12px;font-weight:600;cursor:pointer}
+
+/* toggle switches */
+.toggles{display:grid;grid-template-columns:1fr 1fr;gap:7px 10px}
+.switch{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:600;color:#cfe8f2;cursor:pointer;line-height:1.25}
+.switch input{display:none}
+.switch span{flex:0 0 auto;width:30px;height:17px;border-radius:99px;background:rgba(90,130,155,.45);position:relative;transition:background .18s}
+.switch span::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#dceef6;transition:left .18s}
+.switch input:checked+span{background:#1593c9}
+.switch input:checked+span::after{left:15px;background:#fff}
+.switch small{color:#7fa8bc;font-weight:500}
+
+/* buttons */
+.btnrow{display:flex;flex-wrap:wrap;gap:6px}
+.action{background:rgba(16,44,66,.8);border:1px solid rgba(120,200,235,.28);color:#e2f2f9;border-radius:9px;padding:7px 10px;font-size:11.5px;font-weight:700;cursor:pointer}
+.action:hover{background:rgba(24,72,105,.95);border-color:#47c2f0}
+.action small{color:#8fb8ca;font-weight:600}
+.envrow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}
+.envrow button{background:rgba(16,44,66,.8);border:1px solid rgba(120,200,235,.25);color:#d5ecf6;border-radius:999px;padding:6px 11px;font-size:11px;font-weight:700;cursor:pointer}
+.envrow button.active{background:#0f6f9f;border-color:#47c2f0;color:#fff}
+
+/* footer hint */
+#hint{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:9;display:flex;gap:16px;background:rgba(6,24,38,.62);border:1px solid rgba(120,200,235,.22);backdrop-filter:blur(9px);border-radius:999px;padding:7px 18px;font-size:11.5px;color:#cfe8f2;white-space:nowrap;pointer-events:none}
+#hint b{color:#fff}
+
+@media (max-width:760px){
+  #panel{width:min(308px,88vw);top:56px;bottom:64px}
+  #hint{gap:9px;font-size:10.5px;padding:6px 12px;max-width:94vw;overflow:hidden}
+  .hide-sm{display:none}
+  #particleChip{display:none}
+  .brand-title{font-size:17px}
+}
