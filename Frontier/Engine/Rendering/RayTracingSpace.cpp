@@ -65,18 +65,18 @@ SurfaceMaterialSpecification ConstructAutomotiveFlakePreset(std::array<float, 3>
     MaterialScattering Authored{};
     Authored.Illumination.Configuration[0]          = 2u;
     Authored.Illumination.Strata[0].AlbedoRoughness = {BinderAlbedo[0], BinderAlbedo[1], BinderAlbedo[2], 0.18f};
-    Authored.Illumination.Strata[0].Optics          = {0.35f, 1.52f, 1.0f, 0.0f};
+    Authored.Illumination.Strata[0].Optics          = {0.36f, 1.50f, 1.0f, 0.0f};
     Authored.Illumination.Strata[0].Classification  = {0u, 0u, 0u, 0u};
 
-    Authored.Illumination.Strata[1].AlbedoRoughness     = {1.0f, 1.0f, 1.0f, 0.025f};
-    Authored.Illumination.Strata[1].Optics              = {0.0f, 1.52f, 1.0f, 0.0f};
-    Authored.Illumination.Strata[1].AbsorptionThickness = {CoatAbsorption[0], CoatAbsorption[1], CoatAbsorption[2], 0.12f};
+    Authored.Illumination.Strata[1].AlbedoRoughness     = {1.0f, 1.0f, 1.0f, 0.04f};
+    Authored.Illumination.Strata[1].Optics              = {0.0f, 1.50f, 0.94f, 0.0f};
+    Authored.Illumination.Strata[1].AbsorptionThickness = {CoatAbsorption[0], CoatAbsorption[1], CoatAbsorption[2], 0.10f};
     Authored.Illumination.Strata[1].Classification      = {1u, 0u, 0u, 0u};
 
-    Authored.Paint.Configuration = {1u, 3u, 2u, 1u};
-    Authored.Paint.Distribution  = {FlakeCoverage, 420.0f, 1.0f, 0.65f};
-    Authored.Paint.Finish        = {0.10f, 0.24f, 0.86f, 0.98f};
-    Authored.Paint.Relief        = {0.22f, 0.50f, 0.14f, 24.0f};
+    Authored.Paint.Configuration = {1u, 3u, 0u, 5u};
+    Authored.Paint.Distribution  = {FlakeCoverage, 950.0f, 1.0f, 0.55f};
+    Authored.Paint.Finish        = {0.10f, 0.24f, 0.45f, 0.72f};
+    Authored.Paint.Relief        = {0.20f, 0.55f, 0.18f, 24.0f};
     Authored.Paint.Palette[0]    = {FlakeTint[0], FlakeTint[1], FlakeTint[2], 0.0f};
     Authored.Paint.AverageTint   = {FlakeTint[0], FlakeTint[1], FlakeTint[2], 0.0f};
 
@@ -150,11 +150,11 @@ std::vector<SurfaceMaterialSpecification> ConstructDefaultMaterials()
         Materials[static_cast<size_t>(Family)] = Spec;
     };
 
-    Set(CourseMaterial::BodyCoat,       ConstructAutomotiveFlakePreset({0.58f, 0.012f, 0.018f}, {0.95f, 0.12f, 0.10f}, {0.08f, 1.40f, 1.80f}, 0.72f));
-    Set(CourseMaterial::BodyCoatGreen,  ConstructAutomotiveFlakePreset({0.012f, 0.42f, 0.095f}, {0.14f, 0.88f, 0.30f}, {1.40f, 0.08f, 1.10f}, 0.72f));
-    Set(CourseMaterial::BodyCoatYellow, ConstructAutomotiveFlakePreset({0.68f, 0.46f, 0.012f},  {0.98f, 0.78f, 0.10f}, {0.05f, 0.16f, 1.90f}, 0.72f));
-    Set(CourseMaterial::BodyCoatBlue,   ConstructAutomotiveFlakePreset({0.014f, 0.10f, 0.58f},  {0.14f, 0.42f, 0.96f}, {1.80f, 0.75f, 0.06f}, 0.72f));
-    Set(CourseMaterial::BodyCoatOrange, ConstructAutomotiveFlakePreset({0.68f, 0.14f, 0.010f},  {0.98f, 0.38f, 0.06f}, {0.06f, 0.90f, 2.00f}, 0.72f));
+    Set(CourseMaterial::BodyCoat,       ConstructAutomotiveFlakePreset({0.680f, 0.035f, 0.055f}, {0.950f, 0.180f, 0.200f}, {0.06f, 0.85f, 1.10f}, 0.68f));
+    Set(CourseMaterial::BodyCoatGreen,  ConstructAutomotiveFlakePreset({0.045f, 0.420f, 0.165f}, {0.220f, 0.780f, 0.360f}, {0.85f, 0.06f, 0.65f}, 0.68f));
+    Set(CourseMaterial::BodyCoatYellow, ConstructAutomotiveFlakePreset({0.780f, 0.560f, 0.030f}, {0.980f, 0.820f, 0.180f}, {0.04f, 0.12f, 1.15f}, 0.68f));
+    Set(CourseMaterial::BodyCoatBlue,   ConstructAutomotiveFlakePreset({0.035f, 0.185f, 0.680f}, {0.180f, 0.540f, 0.960f}, {1.10f, 0.45f, 0.05f}, 0.68f));
+    Set(CourseMaterial::BodyCoatOrange, ConstructAutomotiveFlakePreset({0.820f, 0.220f, 0.025f}, {0.980f, 0.460f, 0.120f}, {0.05f, 0.55f, 1.20f}, 0.68f));
     Set(CourseMaterial::BodyTrim,         {{0.045f, 0.047f, 0.052f}, 0.36f, {0, 0, 0},     0.0f,  0.30f, 0.08f, 0.04f, 0.0f});
     Set(CourseMaterial::VehicleGlass,     {{0.026f, 0.028f, 0.030f}, 0.02f, {0, 0, 0},     0.0f,  1.0f,  0.015f,0.04f, 1.00f});
     Set(CourseMaterial::VehiclePlastic,   {{0.012f, 0.014f, 0.018f}, 0.50f, {0, 0, 0},     0.0f,  0.0f,  0.06f, 0.04f, 0.0f});

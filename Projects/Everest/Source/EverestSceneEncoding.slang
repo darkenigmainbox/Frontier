@@ -413,8 +413,285 @@ bool TraceShadowRay(float3 Origin, float3 Direction, float MinT, float MaxT)
 }
 
 //------------------------------------------------------------------------------------------------------------------------
-//                      PLANETARY ATMOSPHERE, 3D VOLUMETRIC CLOUDS (CloudSynthesis), CELESTIALS & FOG
-//                         Ported from arena/5ec53579-frontier (CloudSynthesis.slang / PlanetaryProjection.slang)
+//      MATERIAL WORKSPACE AUTOMOTIVE PAINT WITH FLAKES (Engine/Render/Shader/AutomotivePaint.slang)
+//        Exact 3-layer rotated cellular Voronoi flake evaluator + 5-stop palette per showcase car
+//------------------------------------------------------------------------------------------------------------------------
+
+static const uint BodyCoatFamily       = 6u;
+static const uint BodyCoatGreenFamily  = 73u;
+static const uint BodyCoatYellowFamily = 74u;
+static const uint BodyCoatBlueFamily   = 75u;
+static const uint BodyCoatOrangeFamily = 76u;
+
+struct AutomotivePaint
+{
+    uint4  Configuration;
+    float4 Distribution;
+    float4 Finish;
+    float4 Relief;
+    float4 Palette[5];
+    float4 AverageTint;
+};
+
+struct PaintSurface
+{
+    float3 Albedo;
+    float  Roughness;
+    float  Metallic;
+    float  Coverage;
+    float  Random;
+    float  Resolved;
+    float  PeelHeight;
+};
+
+float HashPaintCell(float3 Position)
+{
+    Position  = frac(Position * 0.1031f);
+    Position += dot(Position, Position.yzx + 33.33f);
+    return frac((Position.x + Position.y) * Position.z);
+}
+
+float EvaluatePaintNoise(float3 Position)
+{
+    float3 Cell  = floor(Position);
+    float3 Blend = frac(Position);
+    Blend        = Blend * Blend * (3.0f - 2.0f * Blend);
+    return lerp(
+        lerp(lerp(HashPaintCell(Cell), HashPaintCell(Cell + float3(1.0f, 0.0f, 0.0f)), Blend.x),
+             lerp(HashPaintCell(Cell + float3(0.0f, 1.0f, 0.0f)), HashPaintCell(Cell + float3(1.0f, 1.0f, 0.0f)), Blend.x), Blend.y),
+        lerp(lerp(HashPaintCell(Cell + float3(0.0f, 0.0f, 1.0f)), HashPaintCell(Cell + float3(1.0f, 0.0f, 1.0f)), Blend.x),
+             lerp(HashPaintCell(Cell + float3(0.0f, 1.0f, 1.0f)), HashPaintCell(Cell + float3(1.0f, 1.0f, 1.0f)), Blend.x), Blend.y),
+        Blend.z);
+}
+
+float4 EvaluatePaintCell(float3 Position, float Seed)
+{
+    float3 Cell    = floor(Position);
+    float3 Local   = frac(Position);
+    float3 Nearest = float3(0.0f);
+    float  First   = 1.0e8f;
+    float  Second  = 1.0e8f;
+    for (int Z = -1; Z <= 1; ++Z)
+    {
+        for (int Y = -1; Y <= 1; ++Y)
+        {
+            for (int X = -1; X <= 1; ++X)
+            {
+                float3 Offset   = float3(float(X), float(Y), float(Z));
+                float3 Id       = Cell + Offset;
+                float3 Site     = 0.08f + 0.84f * float3(
+                    HashPaintCell(Id + Seed),
+                    HashPaintCell(Id + Seed + 17.31f),
+                    HashPaintCell(Id + Seed + 43.97f));
+                float3 Delta    = Offset + Site - Local;
+                float  Distance = dot(Delta, Delta);
+                if (Distance < First)
+                {
+                    Second  = First;
+                    First   = Distance;
+                    Nearest = Id;
+                }
+                else if (Distance < Second)
+                {
+                    Second = Distance;
+                }
+            }
+        }
+    }
+    return float4(
+        max(0.0f, sqrt(Second) - sqrt(First)),
+        HashPaintCell(Nearest + Seed + 61.7f),
+        HashPaintCell(Nearest + Seed + 127.3f),
+        HashPaintCell(Nearest + Seed + 223.1f));
+}
+
+float3 SelectPaintTint(AutomotivePaint Paint, float Position)
+{
+    uint Idx = min(4u, uint(clamp(Position, 0.0f, 0.999f) * 5.0f));
+    return Paint.Palette[Idx].rgb;
+}
+
+PaintSurface EvaluatePaintSurface(AutomotivePaint Paint,
+                                  float3          Position,
+                                  float3          Albedo,
+                                  float           Roughness,
+                                  float           Metallic,
+                                  float           PixelFootprint)
+{
+    PaintSurface Surface;
+    float3 Base      = Albedo * exp(-Paint.Distribution.w * 0.28f);
+    float3 Blended   = Base;
+    float  Mask      = 0.0f;
+    float  Random    = 0.0f;
+    float  Frequency = min(1.0e7f, (52000.0f / max(0.001f, Paint.Distribution.y)) * Paint.Distribution.z);
+    float3 Domain    = Position * Frequency;
+    float  Footprint = PixelFootprint * Frequency * 0.28f;
+    float  Detail    = 1.0f - smoothstep(0.65f, 3.40f, Footprint);
+
+    float3 Warp = float3(
+        EvaluatePaintNoise(Domain * 0.31f),
+        EvaluatePaintNoise(Domain * 0.31f + 11.7f),
+        EvaluatePaintNoise(Domain * 0.31f + 37.4f)) - 0.5f;
+
+    for (uint Layer = 0u; Layer < Paint.Configuration.y; ++Layer)
+    {
+        float  Level = float(Layer);
+        float  Depth = float(Paint.Configuration.y - 1u - Layer) / max(float(Paint.Configuration.y - 1u), 1.0f);
+        float3 Point = Domain * (0.71f + Level * 0.37f) + Warp * 0.7f + float3(Level * 27.17f, Level * 51.73f, Level * 19.43f);
+        Point        = mul(float3x3(0.80f, -0.60f, 0.0f, 0.36f, 0.48f, 0.80f, -0.48f, -0.64f, 0.60f), Point);
+        float4 Cell  = EvaluatePaintCell(Point, Level * 97.3f + 4.1f);
+
+        float  Antialias = clamp(Footprint * 0.45f, 0.009f, 0.12f);
+        float  Inset     = 0.018f + Cell.w * 0.07f;
+        float  Opacity   = smoothstep(Inset - Antialias, Inset + Antialias, Cell.x) * step(1.0f - Paint.Distribution.x * 0.55f, Cell.y);
+        float3 Tint      = lerp(SelectPaintTint(Paint, Cell.z), Base, Depth * Paint.Relief.y * 0.62f);
+        Blended          = lerp(Blended, Tint, Opacity);
+        Random           = lerp(Random, Cell.w, Opacity);
+        Mask             = Opacity + Mask * (1.0f - Opacity);
+    }
+
+    float MeanMask     = 1.0f - pow(1.0f - Paint.Distribution.x * 0.31f, float(Paint.Configuration.y));
+    Surface.Albedo     = lerp(lerp(Base, lerp(Paint.AverageTint.rgb, Base, Paint.Relief.y * 0.26f), MeanMask), Blended, Detail);
+    Surface.Coverage   = lerp(MeanMask, Mask, Detail);
+    Surface.Random     = lerp(0.5f, Random, Detail);
+    Surface.Resolved   = Detail;
+    Surface.Roughness  = clamp(lerp(Roughness, lerp(Paint.Finish.x, Paint.Finish.y, Surface.Random), Surface.Coverage), 0.045f, 1.0f);
+    Surface.Metallic   = lerp(Metallic, lerp(Paint.Finish.z, Paint.Finish.w, Surface.Random), Surface.Coverage);
+    Surface.PeelHeight = (EvaluatePaintNoise(Position * Paint.Relief.w) + 0.35f * EvaluatePaintNoise(Position * Paint.Relief.w * 2.1f))
+                       * Paint.Relief.z * 0.003f;
+    return Surface;
+}
+
+bool IsAutomotivePaintMaterial(uint MaterialId)
+{
+    return (MaterialId == BodyCoatFamily)
+        || (MaterialId == BodyCoatGreenFamily)
+        || (MaterialId == BodyCoatYellowFamily)
+        || (MaterialId == BodyCoatBlueFamily)
+        || (MaterialId == BodyCoatOrangeFamily);
+}
+
+AutomotivePaint BuildMaterialWorkspacePaint(uint MaterialId, out float3 OutBaseAlbedo, out float OutCoatRoughness)
+{
+    AutomotivePaint Paint = (AutomotivePaint)0;
+    Paint.Configuration   = uint4(1u, 3u, 0u, 5u);
+    Paint.Distribution    = float4(0.68f, 950.0f, 1.0f, 0.55f);
+    Paint.Finish          = float4(0.10f, 0.24f, 0.42f, 0.68f);
+    Paint.Relief          = float4(0.22f, 0.45f, 0.18f, 24.0f);
+    OutCoatRoughness      = 0.04f;
+
+    if (MaterialId == BodyCoatGreenFamily)
+    {
+        // Material Workspace Racing Green Metallic Flake (racing-green.material parameterized with emerald/gold/viridian flakes)
+        OutBaseAlbedo    = float3(0.045f, 0.420f, 0.165f);
+        OutCoatRoughness = 0.04f;
+        Paint.Palette[0] = float4(0.56471f, 0.70838f, 0.25016f, 0.00f);
+        Paint.Palette[1] = float4(0.09990f, 0.68492f, 0.36625f, 0.25f);
+        Paint.Palette[2] = float4(0.18000f, 0.82000f, 0.42000f, 0.50f);
+        Paint.Palette[3] = float4(0.32000f, 0.76000f, 0.22000f, 0.75f);
+        Paint.Palette[4] = float4(0.12000f, 0.58000f, 0.48000f, 1.00f);
+        Paint.AverageTint = float4(0.2200f, 0.7200f, 0.3400f, 0.0f);
+    }
+    else if (MaterialId == BodyCoatFamily)
+    {
+        // Material Workspace Candy Crimson Metallic Flake (candy-crimson.material parameterized with ruby/scarlet/gold-crimson flakes)
+        OutBaseAlbedo    = float3(0.680f, 0.035f, 0.055f);
+        OutCoatRoughness = 0.035f;
+        Paint.Palette[0] = float4(0.9600f, 0.1400f, 0.1200f, 0.00f);
+        Paint.Palette[1] = float4(0.9200f, 0.3800f, 0.1400f, 0.25f);
+        Paint.Palette[2] = float4(0.8400f, 0.0800f, 0.1800f, 0.50f);
+        Paint.Palette[3] = float4(0.9800f, 0.2400f, 0.1600f, 0.75f);
+        Paint.Palette[4] = float4(0.7600f, 0.0600f, 0.1200f, 1.00f);
+        Paint.AverageTint = float4(0.8920f, 0.1800f, 0.1440f, 0.0f);
+    }
+    else if (MaterialId == BodyCoatYellowFamily)
+    {
+        // Material Workspace Solar Gold Yellow Metallic Flake
+        OutBaseAlbedo    = float3(0.780f, 0.560f, 0.030f);
+        OutCoatRoughness = 0.04f;
+        Paint.Palette[0] = float4(0.9800f, 0.8400f, 0.1800f, 0.00f);
+        Paint.Palette[1] = float4(0.9600f, 0.6200f, 0.0800f, 0.25f);
+        Paint.Palette[2] = float4(0.8800f, 0.8800f, 0.2200f, 0.50f);
+        Paint.Palette[3] = float4(1.0000f, 0.9000f, 0.3600f, 0.75f);
+        Paint.Palette[4] = float4(0.9200f, 0.7000f, 0.1000f, 1.00f);
+        Paint.AverageTint = float4(0.9480f, 0.7880f, 0.1880f, 0.0f);
+    }
+    else if (MaterialId == BodyCoatBlueFamily)
+    {
+        // Material Workspace Cobalt Sapphire Metallic Flake
+        OutBaseAlbedo    = float3(0.035f, 0.185f, 0.680f);
+        OutCoatRoughness = 0.04f;
+        Paint.Palette[0] = float4(0.1600f, 0.6400f, 0.9800f, 0.00f);
+        Paint.Palette[1] = float4(0.2800f, 0.3600f, 0.9600f, 0.25f);
+        Paint.Palette[2] = float4(0.1000f, 0.7600f, 0.8800f, 0.50f);
+        Paint.Palette[3] = float4(0.3800f, 0.6800f, 1.0000f, 0.75f);
+        Paint.Palette[4] = float4(0.1400f, 0.4400f, 0.9500f, 1.00f);
+        Paint.AverageTint = float4(0.2120f, 0.5760f, 0.9540f, 0.0f);
+    }
+    else
+    {
+        // Material Workspace Tangerine Copper Metallic Flake
+        OutBaseAlbedo    = float3(0.820f, 0.220f, 0.025f);
+        OutCoatRoughness = 0.04f;
+        Paint.Palette[0] = float4(0.9800f, 0.4600f, 0.0800f, 0.00f);
+        Paint.Palette[1] = float4(0.9800f, 0.6800f, 0.1600f, 0.25f);
+        Paint.Palette[2] = float4(0.9200f, 0.2800f, 0.0800f, 0.50f);
+        Paint.Palette[3] = float4(1.0000f, 0.5600f, 0.1400f, 0.75f);
+        Paint.Palette[4] = float4(0.8800f, 0.3400f, 0.1000f, 1.00f);
+        Paint.AverageTint = float4(0.9520f, 0.4640f, 0.1120f, 0.0f);
+    }
+    return Paint;
+}
+
+void ApplyMaterialWorkspaceAutomotivePaint(uint               MaterialId,
+                                           float3             WorldPos,
+                                           float3             EyePos,
+                                           float              TanHalfFov,
+                                           float              ScreenHeight,
+                                           float3             ViewDir,
+                                           inout SurfaceSample Surf,
+                                           out float3         OutFlakeNormal)
+{
+    OutFlakeNormal = float3(0.0f, 0.0f, 1.0f);
+    if (!IsAutomotivePaintMaterial(MaterialId))
+    {
+        return;
+    }
+    float3          BaseAlbedo    = Surf.Albedo;
+    float           CoatRoughness = 0.04f;
+    AutomotivePaint Paint         = BuildMaterialWorkspacePaint(MaterialId, BaseAlbedo, CoatRoughness);
+    float           Dist          = length(WorldPos - EyePos);
+    float           Footprint     = 0.75f * Dist * TanHalfFov / max(ScreenHeight, 64.0f);
+    PaintSurface    Flakes        = EvaluatePaintSurface(Paint, WorldPos, BaseAlbedo, 0.18f, 0.36f, Footprint);
+
+    Surf.Albedo           = lerp(BaseAlbedo, Flakes.Albedo, 0.72f);
+    Surf.Roughness        = Flakes.Roughness;
+    Surf.Metalness        = clamp(Flakes.Metallic, 0.32f, 0.56f);
+    Surf.CoatWeight       = 0.94f;
+    Surf.CoatRoughness    = CoatRoughness;
+    Surf.FlakeTint        = Flakes.Albedo;
+    Surf.FlakeCoverage    = 0.0f;
+    Surf.CoatingThickness = 0.0f;
+
+    float Angle    = Flakes.Random * 6.2831853f;
+    OutFlakeNormal = float3(cos(Angle), sin(Angle), Paint.Relief.x * Flakes.Coverage * Flakes.Resolved);
+}
+
+float3 PerturbNormalByFlake(float3 GeometricNormal, float3 FlakeTiltData)
+{
+    if (FlakeTiltData.z <= 1.0e-5f)
+    {
+        return GeometricNormal;
+    }
+    float3 T = normalize(cross(abs(GeometricNormal.z) < 0.95f ? float3(0.0f, 0.0f, 1.0f) : float3(0.0f, 1.0f, 0.0f), GeometricNormal));
+    float3 B = cross(GeometricNormal, T);
+    return normalize(GeometricNormal + (T * FlakeTiltData.x + B * FlakeTiltData.y) * FlakeTiltData.z);
+}
+
+//------------------------------------------------------------------------------------------------------------------------
+//                      PLANETARY ATMOSPHERE, 3D VOLUMETRIC CLOUDS, SOLAR OPTICS & SELENOGRAPHIC MOON
+//                Exact port from streamlinkinbox/Frontier (arena/5ec53579-frontier, commit 56059b39)
+//            (LightInfluence.slang, SolarOptics.slang, CloudField.h, LunarDiscProjection.h, CelestialModel.h)
 //------------------------------------------------------------------------------------------------------------------------
 
 uint HashU32(uint X)
@@ -433,14 +710,6 @@ float HashFloat3(int3 Cell, uint Seed)
     return float(H & 0x00FFFFFFu) * (1.0f / 16777216.0f);
 }
 
-float3 HashJitter3(int3 Cell, uint Seed)
-{
-    return float3(
-        HashFloat3(Cell, Seed + 11u),
-        HashFloat3(Cell, Seed + 37u),
-        HashFloat3(Cell, Seed + 79u));
-}
-
 float ValueNoise3D(float3 P, uint Seed)
 {
     int3   I = int3(floor(P));
@@ -456,13 +725,10 @@ float ValueNoise3D(float3 P, uint Seed)
     float N011 = HashFloat3(I + int3(0, 1, 1), Seed);
     float N111 = HashFloat3(I + int3(1, 1, 1), Seed);
 
-    float NX00 = lerp(N000, N100, U.x);
-    float NX10 = lerp(N010, N110, U.x);
-    float NX01 = lerp(N001, N101, U.x);
-    float NX11 = lerp(N011, N111, U.x);
-    float NXY0 = lerp(NX00, NX10, U.y);
-    float NXY1 = lerp(NX01, NX11, U.y);
-    return lerp(NXY0, NXY1, U.z);
+    return lerp(
+        lerp(lerp(N000, N100, U.x), lerp(N010, N110, U.x), U.y),
+        lerp(lerp(N001, N101, U.x), lerp(N011, N111, U.x), U.y),
+        U.z);
 }
 
 float3 RotateOctave3D(float3 P)
@@ -489,24 +755,74 @@ float FbmRotated3D(float3 P, int Octaves, uint Seed)
     return (Norm > 0.0f) ? (Sum / Norm) : 0.0f;
 }
 
-float WorleyInverted3D(float3 P, uint Seed)
+// --- Exact 64-bit Emulated Cloud Lattice & CloudField from 56059b39:LightInfluence.slang ---
+
+uint2 CloudAdd64(uint2 A, uint2 B)
 {
-    int3   Base = int3(floor(P));
-    float  MinD = 4.0f;
-    for (int Dz = -1; Dz <= 1; ++Dz)
-    {
-        for (int Dy = -1; Dy <= 1; ++Dy)
-        {
-            for (int Dx = -1; Dx <= 1; ++Dx)
-            {
-                int3   Cell = Base + int3(Dx, Dy, Dz);
-                float3 Pos  = float3(Cell) + HashJitter3(Cell, Seed);
-                float3 Diff = Pos - P;
-                MinD        = min(MinD, dot(Diff, Diff));
-            }
-        }
-    }
-    return saturate(1.0f - sqrt(MinD));
+    uint Low = A.x + B.x;
+    return uint2(Low, A.y + B.y + (Low < A.x ? 1u : 0u));
+}
+
+uint2 CloudProduct32(uint A, uint B)
+{
+    uint Al = A & 0xFFFFu, Ah = A >> 16u;
+    uint Bl = B & 0xFFFFu, Bh = B >> 16u;
+    uint P0 = Al * Bl;
+    uint P1 = Al * Bh;
+    uint P2 = Ah * Bl;
+    uint P3 = Ah * Bh;
+    uint Middle = (P0 >> 16u) + (P1 & 0xFFFFu) + (P2 & 0xFFFFu);
+    return uint2((P0 & 0xFFFFu) | (Middle << 16u), P3 + (P1 >> 16u) + (P2 >> 16u) + (Middle >> 16u));
+}
+
+uint2 CloudMultiply64(uint2 A, uint2 B)
+{
+    uint2 Base = CloudProduct32(A.x, B.x);
+    Base.y += A.x * B.y + A.y * B.x;
+    return Base;
+}
+
+float CloudLattice(int X, int Y, int Z, uint2 Seed)
+{
+    uint2 H = Seed;
+    H = CloudAdd64(H, CloudMultiply64(uint2(uint(X), X < 0 ? 0xFFFFFFFFu : 0u), uint2(0x1B873593u, 0x9E3779B1u)));
+    H = CloudAdd64(H, CloudMultiply64(uint2(uint(Y), Y < 0 ? 0xFFFFFFFFu : 0u), uint2(0x94D049BBu, 0x85EBCA77u)));
+    H = CloudAdd64(H, CloudMultiply64(uint2(uint(Z), Z < 0 ? 0xFFFFFFFFu : 0u), uint2(0x6C50B47Cu, 0xC2B2AE3Du)));
+    H ^= H >> 30u;
+    H = CloudMultiply64(H, uint2(0x1CE4E5B9u, 0xBF58476Du));
+    H ^= uint2((H.x >> 27u) | (H.y << 5u), H.y >> 27u);
+    H = CloudMultiply64(H, uint2(0x133111EBu, 0x94D049BBu));
+    H ^= uint2((H.x >> 31u) | (H.y << 1u), H.y >> 31u);
+    uint2 Top = uint2((H.x >> 11u) | (H.y << 21u), H.y >> 11u);
+    return (float(Top.y) * 4294967296.0f + float(Top.x)) * (1.0f / 9007199254740992.0f);
+}
+
+float CloudSmooth(float T)
+{
+    return T * T * (3.0f - 2.0f * T);
+}
+
+float CloudNoise(float3 P, uint2 Seed)
+{
+    int   X0 = int(floor(P.x)), Y0 = int(floor(P.y)), Z0 = int(floor(P.z));
+    float Fx = CloudSmooth(P.x - floor(P.x));
+    float Fy = CloudSmooth(P.y - floor(P.y));
+    float Fz = CloudSmooth(P.z - floor(P.z));
+    float C000 = CloudLattice(X0,     Y0,     Z0,     Seed);
+    float C100 = CloudLattice(X0 + 1, Y0,     Z0,     Seed);
+    float C010 = CloudLattice(X0,     Y0 + 1, Z0,     Seed);
+    float C110 = CloudLattice(X0 + 1, Y0 + 1, Z0,     Seed);
+    float C001 = CloudLattice(X0,     Y0,     Z0 + 1, Seed);
+    float C101 = CloudLattice(X0 + 1, Y0,     Z0 + 1, Seed);
+    float C011 = CloudLattice(X0,     Y0 + 1, Z0 + 1, Seed);
+    float C111 = CloudLattice(X0 + 1, Y0 + 1, Z0 + 1, Seed);
+    float C00 = lerp(C000, C100, Fx);
+    float C10 = lerp(C010, C110, Fx);
+    float C01 = lerp(C001, C101, Fx);
+    float C11 = lerp(C011, C111, Fx);
+    float C0  = lerp(C00,  C10,  Fy);
+    float C1  = lerp(C01,  C11,  Fy);
+    return lerp(C0, C1, Fz);
 }
 
 float HenyeyGreensteinPhase(float CosTheta, float G)
@@ -516,46 +832,44 @@ float HenyeyGreensteinPhase(float CosTheta, float G)
     return (1.0f - G2) / (4.0f * π * Denom * sqrt(Denom));
 }
 
-float DualLobeCloudPhase(float CosTheta)
+float EvaluateCloudDensity5605(float3 P, float BaseM, float TopM, float Coverage, float2 WindMps, float TimeSec)
 {
-    return lerp(HenyeyGreensteinPhase(CosTheta, 0.76f), HenyeyGreensteinPhase(CosTheta, -0.28f), 0.28f);
-}
-
-float EvaluateCloudDensity3D(float3 WorldPosZUp, float BaseAltM, float TopAltM, float Coverage, float TimeSec)
-{
-    float Thickness = max(TopAltM - BaseAltM, 100.0f);
-    float H         = saturate((WorldPosZUp.z - BaseAltM) / Thickness);
-    float Envelope  = smoothstep(0.0f, 0.14f, H) * smoothstep(1.0f, 0.66f, H);
-    if (Envelope <= 1.0e-4f)
+    if (P.z <= BaseM || P.z >= TopM || Coverage <= 0.0f)
+    {
+        return 0.0f;
+    }
+    float H       = (P.z - BaseM) / max(TopM - BaseM, 1.0f);
+    float Profile = saturate(min(H * 4.0f, 1.0f) * (1.0f - max(H - 0.65f, 0.0f) / 0.35f * 0.85f));
+    if (Profile <= 1.0e-4f)
     {
         return 0.0f;
     }
 
-    float3 WindAdvected = float3(WorldPosZUp.x + TimeSec * 14.0f, WorldPosZUp.z, WorldPosZUp.y + TimeSec * 5.5f);
-    float  SpatialFreq  = 4.2e-4f;
-    float3 SampleCoord  = WindAdvected * float3(SpatialFreq, SpatialFreq * 1.35f, SpatialFreq);
-
-    float MacroFbm    = FbmRotated3D(SampleCoord, 4, 17u);
-    float MacroWorley = WorleyInverted3D(RotateOctave3D(SampleCoord) * 1.75f, 53u);
-    float MacroShape  = 0.58f * MacroFbm + 0.42f * MacroWorley;
-
-    float Threshold = 1.0f - clamp(Coverage * 0.78f + 0.16f, 0.10f, 0.92f);
-    float Remapped  = saturate((MacroShape - Threshold) / max(1.0f - Threshold, 1.0e-3f)) * Envelope;
-    if (Remapped <= 1.0e-4f)
+    float3 Q = float3(
+        (P.x + WindMps.x * TimeSec) / 1400.0f,
+        (P.y + WindMps.y * TimeSec) / 1400.0f,
+        P.z / 700.0f);
+    float Sum       = 0.0f;
+    float Amplitude = 0.5f;
+    float Total     = 0.0f;
+    uint2 Seed      = uint2(0x000C10D5u, 0u);
+    for (uint I = 0u; I < 4u; ++I)
     {
-        return 0.0f;
+        Sum       += Amplitude * CloudNoise(Q, CloudAdd64(Seed, uint2(I * 131u, 0u)));
+        Total     += Amplitude;
+        Q          = Q * 2.03f + float3(11.3f, 7.7f, 5.1f);
+        Amplitude *= 0.5f;
     }
-
-    float3 DetailCoord = RotateOctave3D(SampleCoord * 4.6f);
-    float  DetailField = 0.65f * WorleyInverted3D(DetailCoord, 131u) +
-                         0.35f * FbmRotated3D(DetailCoord * 2.0f, 2, 257u);
-    float  Erosion     = 0.32f * (1.0f - DetailField) * (1.0f - 0.50f * H);
-    return saturate((Remapped - Erosion) / 0.84f);
+    float Base      = Sum / max(Total, 1.0e-5f);
+    float Cov       = saturate(Coverage);
+    float Threshold = 1.0f - Cov;
+    float Shaped    = clamp((Base - Threshold) / max(Cov, 0.001f), 0.0f, 1.5f);
+    return Shaped * Profile;
 }
 
 float SampleCloudGroundShadow(float3 WorldPos, float3 SunDir, uint Flags)
 {
-    if ((Flags & (1u << 3u)) == 0u || SunDir.z <= 0.05f)
+    if ((Flags & (1u << 3u)) == 0u || (Flags & (1u << 15u)) == 0u || SunDir.z <= 0.05f)
     {
         return 1.0f;
     }
@@ -564,11 +878,334 @@ float SampleCloudGroundShadow(float3 WorldPos, float3 SunDir, uint Flags)
     {
         return 1.0f;
     }
+    float  WindSpd = UniformsAndLights[10].z;
+    float  TimeSec = UniformsAndLights[15].x * 0.016f;
+    float2 Wind    = float2(WindSpd * 0.7071f, WindSpd * 0.7071f);
     float  T       = (CloudU.y + 0.35f * (CloudU.z - CloudU.y) - WorldPos.z) / max(SunDir.z, 0.05f);
     float3 CloudPt = WorldPos + SunDir * T;
-    float  TimeSec = UniformsAndLights[11].w;
-    float  Density = EvaluateCloudDensity3D(CloudPt, CloudU.y, CloudU.z, CloudU.x, TimeSec);
-    return lerp(1.0f, exp(-Density * 1.35f), saturate(CloudU.x));
+    float  Density = EvaluateCloudDensity5605(CloudPt, CloudU.y, CloudU.z, CloudU.x, Wind, TimeSec);
+    return exp(-Density * CloudU.w * 110.0f);
+}
+
+// --- Exact Solar Disc & Polygonal Chromatic Lens Flare from 56059b39:SolarOptics.slang ---
+
+float SolarErf(float X)
+{
+    float Sign = X < 0.0f ? -1.0f : 1.0f;
+    float A    = abs(X);
+    float T    = 1.0f / (1.0f + 0.3275911f * A);
+    float Poly = (((((1.061405429f * T - 1.453152027f) * T) + 1.421413741f) * T - 0.284496736f) * T + 0.254829592f) * T;
+    return Sign * (1.0f - Poly * exp(-A * A));
+}
+
+float3 SolarLimbDarkening(float Mu)
+{
+    if (Mu <= 0.0f) return float3(0.0f);
+    float  OneMinusMu = 1.0f - Mu;
+    float  Weight     = max(0.0f, 1.0f - 0.38f * OneMinusMu - 0.24f * OneMinusMu * OneMinusMu);
+    float3 Tint       = float3(
+        pow(Mu, 0.18f),
+        pow(Mu, 0.30f),
+        pow(Mu, 0.48f));
+    return Tint * Weight;
+}
+
+float3 SolarDiscIntensity(float AngleRad, float RadiusRad, float BlurSigmaRad)
+{
+    float Sigma = max(BlurSigmaRad, RadiusRad * 0.01f);
+    float Edge  = 0.5f * (1.0f - SolarErf((AngleRad - RadiusRad) / (1.41421356f * Sigma)));
+    if (Edge <= 1.0e-6f) return float3(0.0f);
+    float ClampedRatio = min(AngleRad / max(RadiusRad, 1.0e-5f), 0.9995f);
+    float Mu           = sqrt(max(0.0f, 1.0f - ClampedRatio * ClampedRatio));
+    float3 Limb        = SolarLimbDarkening(Mu);
+    float  Skirt       = (AngleRad > RadiusRad)
+                       ? exp(-0.5f * pow((AngleRad - RadiusRad) / Sigma, 2.0f)) * 0.15f
+                       : 0.0f;
+    return (Limb + float3(Skirt, Skirt * 0.85f, Skirt * 0.65f)) * Edge;
+}
+
+float3 SolarResolvedRadiance(float3 RayDir, float3 SunDir, float PixelFootprintRad, float AngularRadiusRad, float3 ZenithTransmittance)
+{
+    float CosTheta  = clamp(dot(RayDir, SunDir), -1.0f, 1.0f);
+    float CentreAng = acos(CosTheta);
+    float BlurSigma = max(AngularRadiusRad * 0.035f, PixelFootprintRad * 0.55f);
+    float Cutoff    = AngularRadiusRad + 6.0f * BlurSigma + PixelFootprintRad;
+    if (CentreAng > Cutoff) return float3(0.0f);
+
+    float3 Reference = abs(SunDir.z) < 0.9f ? float3(0.0f, 0.0f, 1.0f) : float3(1.0f, 0.0f, 0.0f);
+    float3 TangentU  = normalize(cross(Reference, SunDir));
+    float3 TangentV  = cross(SunDir, TangentU);
+    float  U0        = dot(RayDir, TangentU);
+    float  V0        = dot(RayDir, TangentV);
+
+    float3 Accum = float3(0.0f);
+    for (int Sy = 0; Sy < 4; ++Sy)
+    {
+        for (int Sx = 0; Sx < 4; ++Sx)
+        {
+            float Ox  = ((float(Sx) + 0.5f) / 4.0f - 0.5f) * PixelFootprintRad;
+            float Oy  = ((float(Sy) + 0.5f) / 4.0f - 0.5f) * PixelFootprintRad;
+            float Ang = sqrt((U0 + Ox) * (U0 + Ox) + (V0 + Oy) * (V0 + Oy));
+            Accum    += SolarDiscIntensity(Ang, AngularRadiusRad, BlurSigma);
+        }
+    }
+    Accum *= (1.0f / 16.0f);
+
+    float EffectiveR = sqrt(AngularRadiusRad * AngularRadiusRad + BlurSigma * BlurSigma);
+    float CellArea   = max(PixelFootprintRad * PixelFootprintRad, 1.0e-8f);
+    float DiscArea   = π * EffectiveR * EffectiveR;
+    float MassWeight = (DiscArea / CellArea) * exp(-0.5f * (U0 * U0 + V0 * V0) / max(EffectiveR * EffectiveR + 0.08f * CellArea, 1.0e-8f));
+    float3 Unresolved = SolarLimbDarkening(0.7f) * MassWeight;
+    float  Blend      = saturate(PixelFootprintRad / max(AngularRadiusRad * 1.5f, 1.0e-6f));
+    float3 Combined   = lerp(Accum, Unresolved, Blend);
+    return ZenithTransmittance * Combined * 28.0f;
+}
+
+float SolarPolygonEdge(float Angle, float Radius, float Blades, float Rotation)
+{
+    float Count  = max(Blades, 3.0f);
+    float Sector = 2.0f * π / Count;
+    float Diff   = Angle - Rotation;
+    float Local  = Diff - Sector * floor(Diff / Sector + 0.5f);
+    return Radius * cos(π / Count) / max(cos(Local), 0.2f);
+}
+
+float3 EvaluateSolarLensFlare5605(float2 PixelUv, float2 SunUv, float Aspect, uint Flags)
+{
+    if ((Flags & (1u << 5u)) == 0u)
+    {
+        return float3(0.0f);
+    }
+    float4 Flare0    = UniformsAndLights[10];
+    float4 Flare1    = UniformsAndLights[11];
+    float4 SunRadDay = UniformsAndLights[5];
+    float  HaloScale = clamp(Flare0.x / 0.42f, 0.25f, 2.5f);
+    float  DispScale = clamp(Flare0.y / 0.18f, 0.0f, 3.0f);
+    float  Intensity = Flare0.w;
+    float  Blades    = max(3.0f, Flare1.z);
+    if (Intensity <= 1.0e-4f)
+    {
+        return float3(0.0f);
+    }
+
+    // Screen and ScreenSun in height-normalised NDC (half frame height = 1), matching 56059b39:SolarOptics.slang
+    float2 Pixel   = float2((2.0f * PixelUv.x - 1.0f) * Aspect, 1.0f - 2.0f * PixelUv.y);
+    float2 Sun     = float2((2.0f * SunUv.x - 1.0f) * Aspect,   1.0f - 2.0f * SunUv.y);
+    float  SunDist = length(Sun);
+    float  EdgeVig = saturate(1.0f - max(0.0f, SunDist - 1.05f) / 0.65f);
+    if (EdgeVig <= 0.0f)
+    {
+        return float3(0.0f);
+    }
+
+    // Disc-integrated solar irradiance at the lens (56059b39:SolarOptics.slang)
+    float3 Flux   = max(SunRadDay.xyz, float3(0.65f, 0.55f, 0.42f)) * (0.14f * Intensity * EdgeVig);
+    float3 Result = float3(0.0f);
+
+    static const float3 GhostGeometry[6] = {
+        float3(0.25f, 0.06f, 0.50f), float3(0.55f, 0.13f, 0.30f), float3(0.90f, 0.04f, 0.65f),
+        float3(1.25f, 0.20f, 0.18f), float3(1.70f, 0.08f, 0.40f), float3(2.30f, 0.30f, 0.10f)
+    };
+    static const float4 GhostAppearance[6] = {
+        float4(1.00f, 0.74f, 0.48f, 0.00f), float4(0.46f, 0.96f, 0.62f, 0.82f), float4(0.56f, 0.66f, 1.00f, 0.00f),
+        float4(1.00f, 0.52f, 0.58f, 0.00f), float4(0.86f, 0.96f, 0.52f, 0.78f), float4(0.52f, 0.90f, 1.00f, 0.00f)
+    };
+
+    float ChromaticShift = 0.012f * DispScale;
+    float3 ChannelScale  = float3(1.0f + ChromaticShift, 1.0f, 1.0f - ChromaticShift);
+
+    for (uint Index = 0u; Index < 6u; ++Index)
+    {
+        float3 Geometry   = GhostGeometry[Index];
+        float4 Appearance = GhostAppearance[Index];
+        float  GhostR     = Geometry.y * HaloScale;
+        float2 Offset     = Pixel + Sun * Geometry.x;
+        float  Radius     = length(Offset);
+        if (Radius > GhostR * 1.15f)
+        {
+            continue;
+        }
+        float  Angle = atan2(Offset.y, Offset.x);
+        float3 Form  = float3(0.0f);
+        for (uint Channel = 0u; Channel < 3u; ++Channel)
+        {
+            float Edge     = SolarPolygonEdge(Angle, GhostR * ChannelScale[Channel], Blades, 0.0f);
+            float Interior = saturate((Edge - Radius) / max(0.10f * GhostR, 1.0e-4f));
+            Interior       = Interior * Interior * (3.0f - 2.0f * Interior);
+            if (Appearance.w > 0.0f)
+            {
+                float D       = (Radius - Appearance.w * Edge) / max(0.10f * GhostR, 1.0e-4f);
+                Form[Channel] = exp(-D * D) + 0.14f * Interior;
+            }
+            else
+            {
+                float Rim     = Radius / max(GhostR, 1.0e-4f);
+                Form[Channel] = Interior * (0.55f + 0.45f * Rim * Rim);
+            }
+        }
+        Result += 0.16f * Geometry.z * Appearance.xyz * Flux * Form;
+    }
+
+    float2 Offset = Pixel - Sun;
+    float  Radius = length(Offset);
+    if ((Flags & (1u << 14u)) != 0u)
+    {
+        uint   BladesU = uint(Blades);
+        uint   Spikes  = (BladesU % 2u == 0u) ? BladesU : (2u * BladesU);
+        float  Angle   = atan2(Offset.y, Offset.x);
+        float  ReachX  = 0.55f;
+        float  Radial  = pow(1.0f / (1.0f + Radius / (0.012f + 0.05f * ReachX)), 1.7f) * exp(-Radius / ReachX);
+        float3 Angular = float3(0.0f);
+        for (uint Spike = 0u; Spike < Spikes; ++Spike)
+        {
+            float D = Angle - 2.0f * π * float(Spike) / float(Spikes);
+            D      -= 2.0f * π * floor(D / (2.0f * π) + 0.5f);
+            float3 Scaled = D / (0.020f * float3(1.10f, 1.0f, 0.92f));
+            Angular      += exp(-Scaled * Scaled);
+        }
+        Result += 0.85f * Flux * Angular * Radial;
+    }
+
+    if ((Flags & (1u << 13u)) != 0u)
+    {
+        float Thick = 0.006f;
+        float Reach = 1.35f;
+        float Wide  = exp(-pow(Offset.y / Thick, 2.0f)) * exp(-abs(Offset.x) / Reach);
+        float Core  = exp(-pow(Offset.y / (0.35f * Thick), 2.0f)) * exp(-abs(Offset.x) / (0.42f * Reach));
+        Result     += Flux * float3(0.34f, 0.54f, 1.0f) * 0.55f * (Wide + 0.85f * Core);
+    }
+
+    float Glow = 0.50f * exp(-pow(Radius / 0.035f, 2.0f)) + 0.025f * exp(-pow(Radius / 0.30f, 2.0f));
+    float Veil = 0.004f + 0.008f * exp(-pow(Radius / 1.2f, 2.0f));
+    Result    += Flux * (Glow + Veil);
+
+    if (SunDist > 1.0e-6f)
+    {
+        float  HaloRadius = length(Pixel + Sun);
+        float3 D          = (HaloRadius - SunDist - float3(0.004f, 0.0f, -0.004f) * DispScale) / 0.030f;
+        Result           += Flux * exp(-D * D) * (0.035f * HaloScale);
+    }
+    return Result;
+}
+
+// --- Exact Selenographic Moon from 56059b39:{LunarDiscProjection,CelestialModel}.h ---
+
+float3 SampleLunarSurfaceAlbedo5605(float2 EquirectUv)
+{
+    float Lon = (EquirectUv.x - 0.5f) * (2.0f * π);
+    float Lat = (0.5f - EquirectUv.y) * π;
+    float3 N  = float3(cos(Lat) * sin(Lon), sin(Lat), cos(Lat) * cos(Lon));
+
+    static const float4 Maria[8] = {
+        float4(-0.32f,  0.52f, 0.36f, 0.50f), // Mare Imbrium
+        float4( 0.30f,  0.46f, 0.28f, 0.46f), // Mare Serenitatis
+        float4( 0.52f,  0.15f, 0.32f, 0.48f), // Mare Tranquillitatis
+        float4( 0.92f,  0.28f, 0.18f, 0.52f), // Mare Crisium
+        float4( 0.82f, -0.10f, 0.26f, 0.40f), // Mare Foecunditatis
+        float4( 0.56f, -0.28f, 0.20f, 0.36f), // Mare Nectaris
+        float4(-0.68f,  0.12f, 0.48f, 0.44f), // Oceanus Procellarum
+        float4(-0.62f, -0.40f, 0.22f, 0.38f)  // Mare Humorum
+    };
+
+    float MareMask = 0.0f;
+    for (int I = 0; I < 8; ++I)
+    {
+        float3 Center = normalize(float3(
+            cos(Maria[I].y) * sin(Maria[I].x),
+            sin(Maria[I].y),
+            cos(Maria[I].y) * cos(Maria[I].x)));
+        float Angle = acos(clamp(dot(N, Center), -1.0f, 1.0f));
+        float T     = max(0.0f, 1.0f - Angle / Maria[I].z);
+        MareMask   += Maria[I].w * T * T * (3.0f - 2.0f * T);
+    }
+    MareMask = min(MareMask, 0.85f);
+
+    static const float3 RayCraters[3] = {
+        float3(-0.19f, -0.75f, 0.22f), // Tycho
+        float3(-0.35f,  0.17f, 0.20f), // Copernicus
+        float3(-0.66f,  0.14f, 0.14f)  // Kepler
+    };
+    float3 Highland = float3(0.142f, 0.136f, 0.126f);
+    float3 Mare     = float3(0.068f, 0.066f, 0.064f);
+    float3 Albedo   = lerp(Highland, Mare, MareMask);
+
+    for (int C = 0; C < 3; ++C)
+    {
+        float3 CDir = normalize(float3(
+            cos(RayCraters[C].y) * sin(RayCraters[C].x),
+            sin(RayCraters[C].y),
+            cos(RayCraters[C].y) * cos(RayCraters[C].x)));
+        float Ang = acos(clamp(dot(N, CDir), -1.0f, 1.0f));
+        if (Ang < RayCraters[C].z)
+        {
+            float Core  = exp(-pow(Ang / (RayCraters[C].z * 0.18f), 2.0f));
+            float Azim  = atan2(N.y - CDir.y, N.x - CDir.x);
+            float Spoke = 0.5f + 0.5f * cos(Azim * 11.0f + float(C) * 2.1f);
+            float Rays  = pow(Spoke, 3.0f) * exp(-Ang / (RayCraters[C].z * 0.55f)) * (1.0f - Core);
+            float Boost = 1.0f + 0.36f * Core + 0.16f * Rays;
+            Albedo     *= Boost;
+        }
+    }
+
+    float Detail = 1.0f + 0.10f * sin(17.0f * N.x + 23.0f * N.y - 19.0f * N.z)
+                        + 0.06f * cos(41.0f * N.y - 37.0f * N.z + 29.0f * N.x);
+    return max(Albedo * Detail, float3(0.02f));
+}
+
+bool EvaluateLunarDisc5605(float3 RayDir, float3 MoonDir, float Phase01, float AlbedoScale, float EarthshineScale, out float3 OutRadiance, out float OutCoverage)
+{
+    OutRadiance = float3(0.0f);
+    OutCoverage = 0.0f;
+    float AngularRadius = 0.0185f;
+    float Feather       = AngularRadius * 0.06f;
+    float CosOuter      = cos(AngularRadius + Feather);
+    if (dot(RayDir, MoonDir) < CosOuter)
+    {
+        return false;
+    }
+
+    float3 WorldUp = abs(MoonDir.z) < 0.99f ? float3(0.0f, 0.0f, 1.0f) : float3(1.0f, 0.0f, 0.0f);
+    float3 Right   = normalize(cross(WorldUp, MoonDir));
+    float3 Up      = cross(MoonDir, Right);
+    float  TanR    = tan(AngularRadius);
+    float  Denom   = max(dot(RayDir, MoonDir), 1.0e-4f);
+    float  U       = dot(RayDir, Right) / (Denom * TanR);
+    float  V       = dot(RayDir, Up)    / (Denom * TanR);
+    float  Rho2    = U * U + V * V;
+    float  Rho     = sqrt(Rho2);
+    float  FeatherNorm = Feather / max(AngularRadius, 1.0e-5f);
+    if (Rho >= 1.0f + FeatherNorm)
+    {
+        return false;
+    }
+
+    float TEdge    = saturate((Rho - (1.0f - FeatherNorm)) / max(2.0f * FeatherNorm, 1.0e-5f));
+    OutCoverage    = 1.0f - TEdge * TEdge * (3.0f - 2.0f * TEdge);
+    float ClampedR = min(Rho, 0.9999f);
+    float Scale    = (Rho > 1.0e-6f) ? (ClampedR / Rho) : 1.0f;
+    float Us       = U * Scale;
+    float Vs       = V * Scale;
+    float Zs       = sqrt(max(0.0f, 1.0f - Us * Us - Vs * Vs));
+
+    float3 NormalWorld = normalize(Right * Us + Up * Vs - MoonDir * Zs);
+    float  Lon         = atan2(Us, Zs);
+    float  Lat         = asin(clamp(Vs, -1.0f, 1.0f));
+    float2 EquirectUv  = float2(0.5f + Lon / (2.0f * π), 0.5f - Lat / π);
+    float3 Albedo      = SampleLunarSurfaceAlbedo5605(EquirectUv) * (AlbedoScale / 0.14f);
+
+    float  PhaseAngle  = (1.0f - saturate(Phase01)) * π;
+    float3 LunarSunDir = normalize(-MoonDir * cos(PhaseAngle) + Right * sin(PhaseAngle));
+    float  Mu0         = max(0.0f, dot(NormalWorld, LunarSunDir));
+    float  Mu          = max(1.0e-3f, Zs);
+    float  Lommel      = (Mu0 > 0.0f) ? (Mu0 / (Mu0 + Mu)) : 0.0f;
+    float  Surge       = 1.0f + 0.45f / (1.0f + PhaseAngle / 0.08f) + 0.25f * exp(-pow(PhaseAngle / 0.35f, 2.0f));
+    float  Retro       = pow(1.0f - Mu, 0.35f) * 0.15f + 0.85f;
+    float  Brdf        = (2.0f / π) * Lommel * Surge * Retro;
+
+    float3 DirectMoon  = Albedo * (Brdf * 18.5f);
+    float3 Earthshine  = Albedo * float3(0.18f, 0.24f, 0.36f) * (EarthshineScale * 1.45f * (0.4f + 0.6f * Mu));
+    OutRadiance        = (DirectMoon + Earthshine) * OutCoverage;
+    return true;
 }
 
 float3 SampleSkyViewLut(float3 RayDir, float3 SunDir)
@@ -631,16 +1268,20 @@ float3 EvaluateFastSkyRadiance(float3 RayDir)
 
 float3 EvaluateFullSkyAndClouds(float3 RayOrigin, float3 RayDir, bool IncludeSunDisc, uint2 PixelCoord)
 {
+    float4 CamEyeTan    = UniformsAndLights[0];
+    float4 CamUpH       = UniformsAndLights[3];
     float4 SunDirRadius = UniformsAndLights[4];
     float4 SunRadDay    = UniformsAndLights[5];
     float4 SkyZenith    = UniformsAndLights[6];
     float4 SkyHorizon   = UniformsAndLights[7];
     float4 CloudU       = UniformsAndLights[8];
+    float4 Flare0       = UniformsAndLights[10];
+    float4 Flare1       = UniformsAndLights[11];
     float4 Moon1        = UniformsAndLights[12];
     float4 Moon2        = UniformsAndLights[13];
     float4 Stars        = UniformsAndLights[14];
     uint   Flags        = uint(UniformsAndLights[15].w + 0.5f);
-    float  TimeSec      = UniformsAndLights[11].w;
+    float  TimeSec      = UniformsAndLights[15].x * 0.016f;
 
     float3 SunDir   = SunDirRadius.xyz;
     float  Daylight = SunRadDay.w;
@@ -687,157 +1328,112 @@ float3 EvaluateFullSkyAndClouds(float3 RayOrigin, float3 RayDir, bool IncludeSun
             }
         }
 
+        // Exact 56059b39 Selenographic Moon (Mare Imbrium/Serenitatis/Tranquillitatis/Crisium + Tycho/Copernicus/Kepler + Lommel-Seeliger)
         if ((Flags & (1u << 6u)) != 0u)
         {
-            float3 MoonDir    = Moon1.xyz;
-            float  MoonRadius = 0.022f;
-            float  CosMoon    = dot(RayDir, MoonDir);
-            float  CosEdge    = cos(MoonRadius);
-            if (CosMoon >= CosEdge)
+            float  PackedMoon = Moon2.w;
+            float  Earthshine = floor(PackedMoon) * 0.01f;
+            float  MoonAlbedo = max(0.02f, PackedMoon - floor(PackedMoon));
+            float3 MoonRad;
+            float  MoonCov;
+            if (EvaluateLunarDisc5605(RayDir, Moon1.xyz, Moon1.w, MoonAlbedo, Earthshine, MoonRad, MoonCov))
             {
-                float3 UpRef     = (abs(MoonDir.z) < 0.9f) ? float3(0.0f, 0.0f, 1.0f) : float3(1.0f, 0.0f, 0.0f);
-                float3 MoonRight = normalize(cross(MoonDir, UpRef));
-                float3 MoonUp    = cross(MoonRight, MoonDir);
-                float  DiscX     = dot(RayDir, MoonRight) / sin(MoonRadius);
-                float  DiscY     = dot(RayDir, MoonUp)    / sin(MoonRadius);
-                float  R2        = DiscX * DiscX + DiscY * DiscY;
-                if (R2 <= 1.0f)
-                {
-                    float  DiscZ      = sqrt(max(0.0f, 1.0f - R2));
-                    float3 SphereNorm = normalize(MoonRight * DiscX + MoonUp * DiscY - MoonDir * DiscZ);
-                    float  Mu         = max(DiscZ, 0.05f);
-                    float  Mu0        = max(0.0f, dot(SphereNorm, SunDir));
-                    float  Lommel     = (Mu0 > 0.0f) ? (2.0f * Mu0 / max(Mu0 + Mu, 1.0e-3f)) : 0.0f;
-                    float  Maria      = FbmRotated3D(SphereNorm * 3.8f, 3, 503u);
-                    float  Albedo     = lerp(0.52f, 0.94f, smoothstep(0.38f, 0.64f, Maria));
-                    float  Lit        = max(Lommel, 0.08f + Moon2.w * 2.5f) * Albedo * max(0.35f, Moon1.w * 4.5f);
-                    float  LimbEdge   = smoothstep(1.0f, 0.88f, sqrt(R2));
-                    Sky               = lerp(Sky, float3(0.94f, 0.95f, 1.0f) * Lit, LimbEdge);
-                }
+                Sky = Sky * (1.0f - MoonCov * 0.82f) + MoonRad;
             }
         }
 
         if ((Flags & (1u << 7u)) != 0u)
         {
-            float3 PlanetDir = Moon2.xyz;
-            float  CosP      = dot(RayDir, PlanetDir);
-            if (CosP > cos(0.032f))
+            float3 SecMoonRad;
+            float  SecMoonCov;
+            if (EvaluateLunarDisc5605(RayDir, Moon2.xyz, 0.45f, 0.12f, 0.15f, SecMoonRad, SecMoonCov))
             {
-                float3 UpRef  = (abs(PlanetDir.z) < 0.9f) ? float3(0.0f, 0.0f, 1.0f) : float3(1.0f, 0.0f, 0.0f);
-                float3 PRight = normalize(cross(PlanetDir, UpRef));
-                float3 PUp    = cross(PRight, PlanetDir);
-                float  Px     = dot(RayDir, PRight) / 0.011f;
-                float  Py     = dot(RayDir, PUp)    / 0.011f;
-                float  PR2    = Px * Px + Py * Py;
-                if (PR2 <= 1.0f)
-                {
-                    float  Pz   = sqrt(max(0.0f, 1.0f - PR2));
-                    float3 PNor = normalize(PRight * Px + PUp * Py - PlanetDir * Pz);
-                    float  PLit = max(0.12f, dot(PNor, SunDir));
-                    Sky         = lerp(Sky, float3(0.68f, 0.84f, 1.0f) * PLit * 1.4f, smoothstep(1.0f, 0.86f, sqrt(PR2)));
-                }
-                else
-                {
-                    float RingR = sqrt(Px * Px + (Py * 2.4f) * (Py * 2.4f));
-                    if (RingR >= 1.35f && RingR <= 2.35f)
-                    {
-                        float Band = 0.55f + 0.45f * sin(RingR * 18.0f);
-                        Sky       += float3(0.72f, 0.82f, 0.96f) * Band * 0.38f;
-                    }
-                }
+                Sky = Sky * (1.0f - SecMoonCov * 0.82f) + SecMoonRad * 0.65f;
             }
         }
     }
 
+    // Exact 56059b39 SolarDiscPixel (Quadratic limb darkening + SolarErf Gaussian limb PSF + 16-sample supersampling)
     if (IncludeSunDisc && (Flags & (1u << 0u)) != 0u && SunDir.z > -0.05f)
     {
-        float CosSun    = dot(RayDir, SunDir);
-        float CosRadius = cos(max(0.00465f, SunDirRadius.w));
-        if (CosSun >= CosRadius)
-        {
-            float Sin2 = max(0.0f, 1.0f - CosSun * CosSun);
-            float SinR = sin(max(0.00465f, SunDirRadius.w));
-            float Mu   = sqrt(max(0.0f, 1.0f - saturate(Sin2 / max(SinR * SinR, 1.0e-6f))));
-            float Limb = 1.0f - 0.52f * (1.0f - pow(Mu, 0.65f));
-            Sky       += SunRadDay.xyz * (24.0f * Limb);
-        }
-        else if (CosSun > 0.996f)
-        {
-            float Halo = pow(saturate((CosSun - 0.996f) / (1.0f - 0.996f)), 3.0f);
-            Sky       += SunRadDay.xyz * (Halo * 2.6f);
-        }
+        float  PixelFootprintRad = (2.0f * CamEyeTan.w) / max(CamUpH.w, 64.0f);
+        float3 ZenithTrans       = max(SunRadDay.xyz, float3(0.45f, 0.32f, 0.20f));
+        Sky += SolarResolvedRadiance(RayDir, SunDir, PixelFootprintRad, max(0.0046524f, SunDirRadius.w), ZenithTrans);
     }
 
-    if ((Flags & (1u << 3u)) != 0u && RayDir.z > 0.015f && CloudU.x > 0.01f)
+    // Exact 56059b39 CloudRay ([BaseM, TopM] slab + 64-bit CloudLattice/CloudNoise 4-octave FBM + 6-step sun optical depth + HG phase)
+    if ((Flags & (1u << 3u)) != 0u && RayDir.z > 0.005f && CloudU.x > 0.005f)
     {
-        float BaseM     = CloudU.y;
-        float TopM      = CloudU.z;
-        float TStart    = max(0.0f, (BaseM - RayOrigin.z) / RayDir.z);
-        float TEnd      = max(TStart, (TopM - RayOrigin.z) / RayDir.z);
-        float MarchSpan = min(TEnd - TStart, 8500.0f);
-        if (MarchSpan > 1.0f && TStart < 34000.0f)
-        {
-            const int kSteps     = 12;
-            float     StepLen    = MarchSpan / float(kSteps);
-            float     Trans      = 1.0f;
-            float3    InScatter  = float3(0.0f);
-            float     CosSunView = dot(RayDir, SunDir);
-            float     Phase      = DualLobeCloudPhase(CosSunView);
-            float3    SunColor   = max(SunRadDay.xyz * 2.4f, float3(1.65f, 1.58f, 1.48f));
-            float3    AmbientTop = float3(0.76f, 0.86f, 1.02f) * max(0.35f, Daylight);
-            float3    AmbientBot = float3(0.32f, 0.38f, 0.48f) * max(0.25f, Daylight);
+        float BaseM          = CloudU.y;
+        float TopM           = CloudU.z;
+        float ExtinctionPerM = CloudU.w;
+        float T0             = (BaseM - RayOrigin.z) / RayDir.z;
+        float T1             = (TopM  - RayOrigin.z) / RayDir.z;
+        float TEnter         = max(0.0f, min(T0, T1));
+        float TExit          = min(30000.0f, max(T0, T1));
 
-            for (int S = 0; S < kSteps; ++S)
+        if (TExit > TEnter && TEnter < 30000.0f)
+        {
+            uint   Steps         = IncludeSunDisc ? 36u : 12u;
+            uint   SunSteps      = IncludeSunDisc ? 6u  : 3u;
+            float  Dt            = (TExit - TEnter) / float(Steps);
+            float  Transmittance = 1.0f;
+            float3 Scattered     = float3(0.0f);
+            float  CosTheta      = clamp(dot(RayDir, SunDir), -1.0f, 1.0f);
+            float  PhaseG        = clamp(Flare1.w, 0.0f, 0.85f);
+            float  Phase         = HenyeyGreensteinPhase(CosTheta, PhaseG);
+            float2 WindMps       = float2(Flare0.z * 0.7071f, Flare0.z * 0.7071f);
+            float3 SunIrradiance = max(SunRadDay.xyz * 2.85f, float3(1.85f, 1.72f, 1.56f) * max(Daylight, 0.15f));
+            float3 AmbientSky    = EvaluateFastSkyRadiance(float3(0.0f, 0.0f, 1.0f)) * 0.45f
+                                 + float3(0.28f, 0.34f, 0.44f) * max(Daylight, 0.15f);
+
+            for (uint I = 0u; I < Steps; ++I)
             {
-                if (Trans < 0.02f)
+                if (Transmittance <= 0.01f)
                 {
                     break;
                 }
-                float  CurT    = TStart + (float(S) + 0.5f) * StepLen;
-                float3 SampleP = RayOrigin + RayDir * CurT;
-                float  Dens    = EvaluateCloudDensity3D(SampleP, BaseM, TopM, CloudU.x, TimeSec);
-                if (Dens > 1.0e-4f)
+                float  T       = TEnter + (float(I) + 0.5f) * Dt;
+                float3 Pos     = RayOrigin + RayDir * T;
+                float  Density = EvaluateCloudDensity5605(Pos, BaseM, TopM, CloudU.x, WindMps, TimeSec);
+                if (Density <= 1.0e-5f)
                 {
-                    float HFrac      = saturate((SampleP.z - BaseM) / max(TopM - BaseM, 100.0f));
-                    float SunDens1   = EvaluateCloudDensity3D(SampleP + SunDir * 160.0f, BaseM, TopM, CloudU.x, TimeSec);
-                    float SunDens2   = EvaluateCloudDensity3D(SampleP + SunDir * 420.0f, BaseM, TopM, CloudU.x, TimeSec);
-                    float OpticalSun = (Dens * 0.35f + SunDens1 * 0.45f + SunDens2 * 0.55f) * 1.85f;
-
-                    float  Beer      = exp(-OpticalSun) + 0.45f * exp(-0.30f * OpticalSun);
-                    float  Powder    = 1.0f - 0.50f * exp(-Dens * 3.8f);
-                    float3 Direct    = SunColor * (Beer * Powder * (0.65f + 1.45f * Phase));
-                    float3 Amb       = lerp(AmbientBot, AmbientTop, HFrac);
-                    float3 Lum       = Direct + Amb;
-
-                    float SigmaE    = Dens * CloudU.w * 0.36f;
-                    float StepTrans = exp(-SigmaE * StepLen);
-                    InScatter      += Trans * (1.0f - StepTrans) * Lum;
-                    Trans          *= StepTrans;
+                    continue;
                 }
+
+                float SunOptical = 0.0f;
+                if (SunDir.z > -0.05f)
+                {
+                    const float SunDt = 220.0f;
+                    for (uint J = 0u; J < SunSteps; ++J)
+                    {
+                        float3 SunPos = Pos + SunDir * ((float(J) + 0.5f) * SunDt);
+                        SunOptical   += EvaluateCloudDensity5605(SunPos, BaseM, TopM, CloudU.x, WindMps, TimeSec)
+                                      * ExtinctionPerM * SunDt;
+                    }
+                }
+                else
+                {
+                    SunOptical = 8.0f;
+                }
+
+                float  SunTrans  = exp(-SunOptical);
+                float  HFrac     = saturate((Pos.z - BaseM) / max(TopM - BaseM, 1.0f));
+                float3 InScatter = SunIrradiance * (SunTrans * Phase * 2.6f)
+                                 + AmbientSky * (0.55f + 0.45f * HFrac);
+                float  StepTrans = exp(-Density * ExtinctionPerM * Dt);
+                float  Weight    = Transmittance * (1.0f - StepTrans);
+                Scattered       += InScatter * Weight;
+                Transmittance   *= StepTrans;
             }
-            float HorizonFade = smoothstep(0.015f, 0.12f, RayDir.z);
-            InScatter         = lerp(Sky * (1.0f - Trans), InScatter, HorizonFade);
-            Sky               = Sky * Trans + InScatter;
+
+            float HorizonFade = exp(-TEnter / 26000.0f);
+            Scattered         = lerp(Sky * (1.0f - Transmittance), Scattered, HorizonFade);
+            Sky               = Sky * Transmittance + Scattered;
         }
     }
 
     return Sky;
-}
-
-float3 EvaluateAutomotiveFlakeGlint(float3 WorldPos, float3 Normal, float3 ViewDir, float3 LightDir, SurfaceSample Surf)
-{
-    if (Surf.FlakeCoverage <= 0.01f)
-    {
-        return float3(0.0f);
-    }
-    float3 HalfVec    = normalize(ViewDir + LightDir);
-    float3 FlakeCoord = RotateOctave3D(WorldPos * 42.0f);
-    float  CellA      = WorleyInverted3D(FlakeCoord, 313u);
-    float  CellB      = WorleyInverted3D(RotateOctave3D(FlakeCoord * 2.15f), 619u);
-    float  Sparkle    = smoothstep(1.0f - Surf.FlakeCoverage * 0.55f, 1.0f, 0.55f * CellA + 0.45f * CellB);
-    float  NdotH      = max(0.0f, dot(Normal, HalfVec));
-    float  SpecLobe   = pow(NdotH, 18.0f);
-    return Surf.FlakeTint * (Sparkle * SpecLobe * 0.85f);
 }
 
 float3 EvaluateSceneLights(float3 WorldPos, float3 Normal, float3 ViewDir, SurfaceSample Surf)
@@ -893,7 +1489,7 @@ float3 ApplyHeightFogAndAerial(float3 Radiance, float3 EyePos, float3 RayDir, fl
         return Radiance;
     }
     float4 Fog0      = UniformsAndLights[9];
-    float4 Fog1      = UniformsAndLights[10];
+    float4 SkyHoriz  = UniformsAndLights[7];
     float4 SunDirRad = UniformsAndLights[4];
     float4 SunRadDay = UniformsAndLights[5];
     float4 Moon1     = UniformsAndLights[12];
@@ -915,59 +1511,22 @@ float3 ApplyHeightFogAndAerial(float3 Radiance, float3 EyePos, float3 RayDir, fl
     float  Trans      = exp(-Tau);
     float  CosSun     = max(0.0f, dot(RayDir, SunDirRad.xyz));
     float  MieForward = pow(CosSun, 6.0f) * 0.28f;
-    float3 FogColor   = Fog1.xyz + SunRadDay.xyz * MieForward * 0.08f + float3(0.04f, 0.06f, 0.10f) * Moon1.w;
+    float3 FogColor   = SkyHoriz.xyz + SunRadDay.xyz * MieForward * 0.08f + float3(0.04f, 0.06f, 0.10f) * Moon1.w;
     return Radiance * Trans + FogColor * (1.0f - Trans);
 }
 
-float3 ApplyOpticalLensFlare(float3 Radiance, float2 Uv, float Aspect, uint Flags)
+float3 ApplyOpticalLensFlare(float3 Radiance, float2 Uv, float Aspect, float3 EyePos, uint Flags)
 {
     if ((Flags & (1u << 5u)) == 0u)
     {
         return Radiance;
     }
-    float4 Flare0    = UniformsAndLights[10];
-    float4 Flare1    = UniformsAndLights[11];
-    float  Intensity = Flare0.w;
-    if (Intensity <= 1.0e-4f)
-    {
-        return Radiance;
-    }
-
-    float2 SunNdc    = Flare1.xy;
-    float  Blades    = max(4.0f, Flare1.z);
-    float2 PixelNdc  = float2(Uv.x * 2.0f - 1.0f, 1.0f - 2.0f * Uv.y);
-    float2 Delta     = float2((PixelNdc.x - SunNdc.x) * Aspect, PixelNdc.y - SunNdc.y);
-    float  Dist      = length(Delta);
-    float  Angle     = atan2(Delta.y, Delta.x);
-    float  Starburst = pow(max(0.0f, cos(Angle * Blades * 0.5f)), 10.0f) * exp(-Dist * 5.0f);
-    float  HaloRing  = exp(-pow((Dist - 0.34f) / 0.045f, 2.0f)) * 0.25f;
-    float  Glare     = (0.045f / (Dist * Dist + 0.020f)) + 0.35f * Starburst + HaloRing;
-
-    static const float  kGhostScales[6] = { -0.35f, -0.78f, -1.22f, 0.48f, -1.68f, 0.22f };
-    static const float  kGhostRadii[6]  = {  0.075f, 0.130f, 0.055f, 0.180f, 0.240f, 0.042f };
-    static const float3 kGhostTints[6]  = {
-        float3(1.00f, 0.52f, 0.28f),
-        float3(0.32f, 0.86f, 1.00f),
-        float3(0.75f, 0.42f, 1.00f),
-        float3(0.38f, 1.00f, 0.62f),
-        float3(1.00f, 0.80f, 0.36f),
-        float3(0.48f, 0.66f, 1.00f)
-    };
-
-    float3 GhostSum = float3(0.0f);
-    for (int G = 0; G < 6; ++G)
-    {
-        float2 GCenter = SunNdc * kGhostScales[G];
-        float2 GDelta  = float2((PixelNdc.x - GCenter.x) * Aspect, PixelNdc.y - GCenter.y);
-        float  GR      = length(GDelta) / kGhostRadii[G];
-        if (GR < 1.0f)
-        {
-            float Ring = smoothstep(1.0f, 0.25f, GR) * (0.45f + 0.55f * smoothstep(0.45f, 0.92f, GR));
-            GhostSum  += kGhostTints[G] * Ring * 0.16f;
-        }
-    }
-
-    return Radiance + (float3(1.0f, 0.86f, 0.64f) * (Glare * 0.12f) + GhostSum) * Intensity;
+    float4 Flare1 = UniformsAndLights[11];
+    float2 SunNdc = Flare1.xy;
+    float2 SunUv  = float2(0.5f + 0.5f * SunNdc.x, 0.5f - 0.5f * SunNdc.y);
+    float3 SunDir = UniformsAndLights[4].xyz;
+    float  CloudVis = SampleCloudGroundShadow(EyePos, SunDir, Flags);
+    return Radiance + EvaluateSolarLensFlare5605(Uv, SunUv, Aspect, Flags) * (0.25f + 0.75f * CloudVis);
 }
 
 float3 AcesFilmic(float3 X)
@@ -1039,6 +1598,10 @@ void ExecutePass0Integrate(uint2 Pixel, uint Width, uint Height)
     float3         Norm = Primary.Normal;
     float3         HitP = Primary.Position + Norm * 2.5e-3f;
 
+    float3 FlakeTiltData = float3(0.0f, 0.0f, 0.0f);
+    ApplyMaterialWorkspaceAutomotivePaint(Primary.MaterialId, Primary.Position, EyePos, CamEyeTan.w, float(Height), View, Surf, FlakeTiltData);
+    float3 ShadingNorm = PerturbNormalByFlake(Norm, FlakeTiltData);
+
     float3 SunDir = SunDirRadius.xyz;
     float3 Direct = float3(0.0f);
     if ((Flags & (1u << 0u)) != 0u && SunDir.z > 0.0f)
@@ -1054,14 +1617,13 @@ void ExecutePass0Integrate(uint2 Pixel, uint Width, uint Height)
             ShadowVis *= SampleCloudGroundShadow(Primary.Position, SunDir, Flags);
             if (ShadowVis > 0.0f)
             {
-                float3 Brdf  = ResolveDirectReflectance(Surf, Norm, View, SunDir);
-                float3 Flake = EvaluateAutomotiveFlakeGlint(Primary.Position, Norm, View, SunDir, Surf);
-                Direct      += SunRadDay.xyz * ShadowVis * (Brdf + Flake * NdotL);
+                float3 Brdf = ResolveDirectReflectance(Surf, ShadingNorm, View, SunDir);
+                Direct     += SunRadDay.xyz * ShadowVis * Brdf;
             }
         }
     }
 
-    Direct += EvaluateSceneLights(Primary.Position, Norm, View, Surf);
+    Direct += EvaluateSceneLights(Primary.Position, ShadingNorm, View, Surf);
 
     float3 Emissive = Surf.Emission;
     if (Primary.MaterialId == HeadlightFamily || Primary.MaterialId == TaillightFamily)
@@ -1126,6 +1688,8 @@ void ExecutePass0Integrate(uint2 Pixel, uint Width, uint Height)
         {
             MaterialRecord RMat  = Materials[ReflHit.MaterialId];
             SurfaceSample  RSurf = ProjectSurfaceSample(RMat);
+            float3         RFlake;
+            ApplyMaterialWorkspaceAutomotivePaint(ReflHit.MaterialId, ReflHit.Position, EyePos, CamEyeTan.w, float(Height), -ReflDir, RSurf, RFlake);
             float3         RRad  = min(RSurf.Emission, float3(8.0f));
             if ((Flags & (1u << 0u)) != 0u && SunDir.z > 0.0f)
             {
@@ -1266,6 +1830,8 @@ void ExecutePass1DenoiseAndPresent(uint2 Pixel, uint Width, uint Height)
         SurfaceSample  Surf        = ProjectSurfaceSample(Mat);
         float3         View        = -RayDir;
         float          NdotV       = max(dot(CentreNorm, View), 1.0e-3f);
+        float3         FlakeDummy;
+        ApplyMaterialWorkspaceAutomotivePaint(MatId, EyePos + RayDir * CentreDepth, EyePos, CamEyeTan.w, float(Height), View, Surf, FlakeDummy);
 
         // SVGF 5x5 Edge-Stopping À-Trous Spatial Wavelet Filter (VarianceWavelet.slang)
         static const float kKernel[5] = { 1.0f / 16.0f, 1.0f / 4.0f, 3.0f / 8.0f, 1.0f / 4.0f, 1.0f / 16.0f };
@@ -1354,17 +1920,24 @@ void ExecutePass1DenoiseAndPresent(uint2 Pixel, uint Width, uint Height)
         }
 
         // DisplayRecombination.slang surface energy-conserving recombination
+        // For clear-coated automotive paint, Snell refraction at the air->clearcoat (n=1.5) interface bounds the
+        // internal cosine above cos(arcsin(1/1.5)) = 0.745, preventing buried metallic flakes from washing out to white at grazing angles.
+        float  InternalNdotV   = (Surf.CoatWeight > 0.0f)
+                               ? sqrt(max(0.55f, 1.0f - (1.0f - NdotV * NdotV) / 2.25f))
+                               : NdotV;
         float3 DiffuseIndirect = ResolveDiffuseAlbedo(Surf) * FilteredIndirect;
-        float2 EnvResp         = ResolveEnvironmentResponse(NdotV, Surf.Roughness);
+        float2 EnvResp         = ResolveEnvironmentResponse(InternalNdotV, Surf.Roughness);
+        float  WhiteGrazing    = (Surf.CoatWeight > 0.0f) ? (EnvResp.y * 0.12f) : EnvResp.y;
         float3 SpecColor       = ResolveSpecularColour(Surf);
-        float3 SpecIndirect    = FilteredSpecular * (SpecColor * EnvResp.x + EnvResp.y);
+        float3 SpecIndirect    = FilteredSpecular * (SpecColor * EnvResp.x + WhiteGrazing);
 
         if (Surf.CoatWeight > 0.0f)
         {
             float2 CoatResp = ResolveEnvironmentResponse(NdotV, Surf.CoatRoughness);
-            float  CoatRefl = (0.04f * CoatResp.x + CoatResp.y) * Surf.CoatWeight;
-            DiffuseIndirect *= (1.0f - CoatRefl);
-            SpecIndirect     = SpecIndirect * (1.0f - CoatRefl) + FilteredSpecular * CoatRefl;
+            float  CoatRefl = (0.04f * CoatResp.x + 0.28f * CoatResp.y) * Surf.CoatWeight;
+            float3 CoatTint = lerp(float3(1.0f), Surf.Albedo / max(max(Surf.Albedo.r, max(Surf.Albedo.g, Surf.Albedo.b)), 0.1f), 0.45f);
+            DiffuseIndirect *= (1.0f - CoatRefl * 0.5f);
+            SpecIndirect     = SpecIndirect * (1.0f - CoatRefl * 0.5f) + FilteredSpecular * CoatTint * (CoatRefl * 0.42f);
         }
 
         if (InspectionMode == 4u)
@@ -1384,7 +1957,7 @@ void ExecutePass1DenoiseAndPresent(uint2 Pixel, uint Width, uint Height)
 
     if (InspectionMode == 0u)
     {
-        FinalHdr = ApplyOpticalLensFlare(FinalHdr, Uv, CamFwdAspect.w, Flags);
+        FinalHdr = ApplyOpticalLensFlare(FinalHdr, Uv, CamFwdAspect.w, EyePos, Flags);
     }
 
     float3 Exposed = FinalHdr * Exposure;

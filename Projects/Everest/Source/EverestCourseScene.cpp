@@ -539,8 +539,8 @@ EverestCourseScene ConstructEverestCourseScene()
         float          YawDeg;
     };
     static constexpr std::array<CarPlacementSpec, 5> ShowcaseSpecs = {{
-        {"Crimson Red Metallic Flake",      CourseMaterial::BodyCoat,       SlotVehicleBodyRed,    4.2f,   0.0f,  -18.0f},
-        {"Emerald Green Metallic Flake",    CourseMaterial::BodyCoatGreen,  SlotVehicleBodyGreen,  0.8f,   5.2f, -158.0f},
+        {"Racing Green Metallic Flake",     CourseMaterial::BodyCoatGreen,  SlotVehicleBodyGreen,  4.2f,   0.0f,  -18.0f},
+        {"Candy Crimson Metallic Flake",    CourseMaterial::BodyCoat,       SlotVehicleBodyRed,    0.8f,   5.2f, -158.0f},
         {"Solar Yellow Metallic Flake",     CourseMaterial::BodyCoatYellow, SlotVehicleBodyYellow, 0.8f,  -5.2f,   18.0f},
         {"Cobalt Blue Metallic Flake",      CourseMaterial::BodyCoatBlue,   SlotVehicleBodyBlue,  -2.8f,  10.4f,  -24.0f},
         {"Tangerine Orange Metallic Flake", CourseMaterial::BodyCoatOrange, SlotVehicleBodyOrange,-2.8f, -10.4f,  156.0f}

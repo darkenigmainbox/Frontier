@@ -141,11 +141,11 @@ constexpr uint32_t GpuRenderHeight = 720u;
 
     const float OrbitRad = MoonCfg.PrimaryOrbitDegrees * Degrees;
     const std::array<float, 3> PrimaryDir = Normalize3({
-        std::cos(OrbitRad) * 0.78f,
-        std::sin(OrbitRad) * 0.78f,
-        0.62f
+        std::cos(OrbitRad) * 0.9588f,
+        std::sin(OrbitRad) * 0.9588f,
+        0.2840f
     });
-    const float PrimRad      = 0.014f;
+    const float PrimRad      = 0.0185f;
     const float CosPrimary   = Dot3(RayDir, PrimaryDir);
     const float AnglePrimary = std::acos(std::clamp(CosPrimary, -1.0f, 1.0f));
     if (AnglePrimary < PrimRad)
@@ -846,7 +846,7 @@ void EverestSceneEncoding::ConfigureLiveGpu(float                             Vi
     const float TanHalf = std::tan(0.5f * Camera.VerticalFovDegrees * Degrees);
 
     const float SunViewDot   = Dot3(Forward, SunDirection);
-    const bool  FlareVisible = FlareCfg.Enabled && SolarCfg.Enabled && SunDirection[2] > 0.0f && SunViewDot > 0.25f;
+    const bool  FlareVisible = FlareCfg.Enabled && SolarCfg.Enabled && SunDirection[2] > -0.04f && SunViewDot > 0.08f;
     float       SunNdcX      = 0.0f;
     float       SunNdcY      = 0.0f;
     if (FlareVisible)
@@ -857,15 +857,15 @@ void EverestSceneEncoding::ConfigureLiveGpu(float                             Vi
 
     const float OrbitRad = MoonCfg.PrimaryOrbitDegrees * Degrees;
     const std::array<float, 3> PrimaryMoonDir = Normalize3({
-        std::cos(OrbitRad) * 0.78f,
-        std::sin(OrbitRad) * 0.78f,
-        0.62f
+        std::cos(OrbitRad) * 0.9588f,
+        std::sin(OrbitRad) * 0.9588f,
+        0.2840f
     });
     const float SecRad = MoonCfg.SecondaryOrbitDegrees * Degrees;
     const std::array<float, 3> SecondaryMoonDir = Normalize3({
-        std::cos(SecRad) * 0.84f,
-        std::sin(SecRad) * 0.84f,
-        0.54f
+        std::cos(SecRad) * 0.92f,
+        std::sin(SecRad) * 0.92f,
+        0.39f
     });
 
     uint32_t Flags = 0u;
@@ -882,6 +882,9 @@ void EverestSceneEncoding::ConfigureLiveGpu(float                             Vi
     if (PipelineCfg.ScreenSpaceReflections) Flags |= (1u << 10u);
     if (PipelineCfg.TemporalAntiAliasing)   Flags |= (1u << 11u);
     if (PipelineCfg.AcesFilmicTonemap)      Flags |= (1u << 12u);
+    if (FlareCfg.AnamorphicStreak)          Flags |= (1u << 13u);
+    if (FlareCfg.DiffractionStarburst)      Flags |= (1u << 14u);
+    if (CloudCfg.CastGroundShadows)         Flags |= (1u << 15u);
 
     if (!HasPrevCamera_)
     {
@@ -899,7 +902,7 @@ void EverestSceneEncoding::ConfigureLiveGpu(float                             Vi
     Ubo[ 1] = {Forward[0], Forward[1], Forward[2], Aspect};
     Ubo[ 2] = {Right[0], Right[1], Right[2], static_cast<float>(GpuRenderWidth)};
     Ubo[ 3] = {Up[0], Up[1], Up[2], static_cast<float>(GpuRenderHeight)};
-    Ubo[ 4] = {SunDirection[0], SunDirection[1], SunDirection[2], std::max(0.00465f, SolarCfg.AngularDiameterDeg * 0.5f * Degrees)};
+    Ubo[ 4] = {SunDirection[0], SunDirection[1], SunDirection[2], std::max(0.0046524f, SolarCfg.AngularDiameterDeg * 0.5f * Degrees)};
     Ubo[ 5] = {SunRadiance[0], SunRadiance[1], SunRadiance[2], DaylightFactor};
     Ubo[ 6] = {0.18f * DaylightFactor + 0.015f, 0.36f * DaylightFactor + 0.025f, 0.72f * DaylightFactor + 0.055f, std::pow(2.0f, PipelineCfg.ExposureCompensationEv)};
     Ubo[ 7] = {0.58f * DaylightFactor + 0.04f,  0.52f * DaylightFactor + 0.04f,  0.48f * DaylightFactor + 0.06f,  0.0f};
@@ -908,7 +911,7 @@ void EverestSceneEncoding::ConfigureLiveGpu(float                             Vi
         std::clamp(CloudCfg.Coverage, 0.0f, 1.0f),
         CloudBase,
         CloudBase + std::max(200.0f, CloudCfg.LayerThicknessMetres),
-        0.025f * std::max(0.1f, CloudCfg.ExtinctionDensity)
+        0.025f * std::max(0.05f, CloudCfg.ExtinctionDensity)
     };
     Ubo[ 9] = {
         0.0025f * std::max(0.0f, FogCfg.BaseDensity),
@@ -917,14 +920,24 @@ void EverestSceneEncoding::ConfigureLiveGpu(float                             Vi
         FogCfg.StartDistanceMetres
     };
     Ubo[10] = {
-        0.58f * DaylightFactor + 0.05f,
-        0.66f * DaylightFactor + 0.06f,
-        0.78f * DaylightFactor + 0.09f,
+        std::clamp(FlareCfg.HaloRadius, 0.05f, 1.0f),
+        std::clamp(FlareCfg.ChromaticDispersion, 0.0f, 1.0f),
+        CloudCfg.WindDriftSpeed,
         FlareCfg.Intensity
     };
-    Ubo[11] = {SunNdcX, SunNdcY, static_cast<float>(std::max(3u, FlareCfg.ApertureBladeCount)), 1.0f};
-    Ubo[12] = {PrimaryMoonDir[0], PrimaryMoonDir[1], PrimaryMoonDir[2], MoonCfg.PrimaryPhase * MoonCfg.PrimaryAlbedo};
-    Ubo[13] = {SecondaryMoonDir[0], SecondaryMoonDir[1], SecondaryMoonDir[2], MoonCfg.EarthshineLuminance};
+    Ubo[11] = {
+        SunNdcX,
+        SunNdcY,
+        static_cast<float>(std::max(3u, FlareCfg.ApertureBladeCount)),
+        std::clamp(CloudCfg.SilverLiningPower, 0.0f, 0.85f)
+    };
+    Ubo[12] = {PrimaryMoonDir[0], PrimaryMoonDir[1], PrimaryMoonDir[2], std::clamp(MoonCfg.PrimaryPhase, 0.0f, 1.0f)};
+    Ubo[13] = {
+        SecondaryMoonDir[0],
+        SecondaryMoonDir[1],
+        SecondaryMoonDir[2],
+        std::clamp(MoonCfg.PrimaryAlbedo, 0.02f, 0.60f) + std::floor(std::clamp(MoonCfg.EarthshineLuminance, 0.0f, 1.0f) * 100.0f)
+    };
     Ubo[14] = {StarCfg.MagnitudeGain, StarCfg.AtmosphericScintillate, StarCfg.MilkyWayLuminance, 0.0f};
     Ubo[15] = {
         static_cast<float>(FrameCounter_),
@@ -1504,11 +1517,15 @@ void EverestSceneEncoding::EncodeFrame(uint32_t                          OutputW
                     }
                 }
                 const float Schlick     = std::pow(std::clamp(1.0f - NdotV, 0.0f, 1.0f), 5.0f);
-                const float CoatFresnel = (0.04f + 0.96f * Schlick) * Surface.CoatWeight;
+                const float InternalCos = (Surface.CoatWeight > 0.0f)
+                                        ? std::sqrt(std::max(0.55f, 1.0f - (1.0f - NdotV * NdotV) / 2.25f))
+                                        : NdotV;
+                const float SubSchlick  = std::pow(std::clamp(1.0f - InternalCos, 0.0f, 1.0f), 5.0f);
+                const float CoatFresnel = (0.04f + 0.30f * Schlick) * Surface.CoatWeight;
                 const std::array<float, 3> FlakeFresnel = {
-                    SpecF0[0] + (1.0f - SpecF0[0]) * Schlick,
-                    SpecF0[1] + (1.0f - SpecF0[1]) * Schlick,
-                    SpecF0[2] + (1.0f - SpecF0[2]) * Schlick
+                    SpecF0[0] + (1.0f - SpecF0[0]) * SubSchlick,
+                    SpecF0[1] + (1.0f - SpecF0[1]) * SubSchlick,
+                    SpecF0[2] + (1.0f - SpecF0[2]) * SubSchlick
                 };
 
                 std::array<float, 3> DiffuseAlbedo = {

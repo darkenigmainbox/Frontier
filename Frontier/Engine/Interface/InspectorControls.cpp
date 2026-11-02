@@ -14,6 +14,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 
 namespace Frontier
 {
@@ -637,56 +638,153 @@ bool InspectorControls::ConstructSliderRow(const InspectorPalette& Palette,
                                            float                   Maximum,
                                            const char*             DisplayFormat)
 {
-    ImDrawList*  DrawList  = ImGui::GetWindowDrawList();
-    const ImVec2 Origin    = ImGui::GetCursorScreenPos();
-    const float  AvailW    = std::max(180.0f, ImGui::GetContentRegionAvail().x);
-    const float  RowHeight = 32.0f;
-    const float  LabelW    = std::min(104.0f, AvailW * 0.34f);
-    const float  ReadoutW  = 64.0f;
-    const float  TrackX    = Origin.x + LabelW + 8.0f;
-    const float  TrackW    = std::max(44.0f, AvailW - LabelW - ReadoutW - 18.0f);
-    const float  MidY      = Origin.y + RowHeight * 0.5f;
+    ImGui::PushID(Id != nullptr ? Id : Label);
+    ImDrawList*     DrawList     = ImGui::GetWindowDrawList();
+    const ImVec2    Origin       = ImGui::GetCursorScreenPos();
+    const float     AvailW       = std::max(180.0f, ImGui::GetContentRegionAvail().x);
+    constexpr float HeaderHeight = 20.0f;
 
-    DrawList->AddText(Faces.Regular, 11.5f, ImVec2(Origin.x, MidY - 6.0f), Palette.TextSecondary, Label);
-
-    ImGui::SetCursorScreenPos(ImVec2(TrackX, Origin.y + 4.0f));
-    ImGui::InvisibleButton(Id, ImVec2(TrackW, RowHeight - 8.0f));
-    bool Changed = false;
-    if (ImGui::IsItemActive())
+    // Split DisplayFormat (e.g. "%.1f deg" or "%.0f m") into numeric format ("%.1f") and unit suffix ("deg")
+    char        NumericFormat[32] = "%.2f";
+    const char* UnitSuffix        = "";
+    if (DisplayFormat != nullptr && DisplayFormat[0] != '\0')
     {
-        const float Ratio     = std::clamp((ImGui::GetIO().MousePos.x - TrackX) / TrackW, 0.0f, 1.0f);
-        const float Candidate = Minimum + Ratio * (Maximum - Minimum);
-        if (std::fabs(Candidate - InOutParameter) > 1.0e-6f)
+        const char* SpacePos = std::strchr(DisplayFormat, ' ');
+        if (SpacePos != nullptr && SpacePos > DisplayFormat)
         {
-            InOutParameter = Candidate;
+            const size_t FmtLen = std::min<size_t>(static_cast<size_t>(SpacePos - DisplayFormat), sizeof(NumericFormat) - 1u);
+            std::memcpy(NumericFormat, DisplayFormat, FmtLen);
+            NumericFormat[FmtLen] = '\0';
+            UnitSuffix            = SpacePos + 1;
+        }
+        else
+        {
+            std::snprintf(NumericFormat, sizeof(NumericFormat), "%s", DisplayFormat);
+        }
+    }
+
+    const ImU32 LabelColour = Palette.DarkMode
+                                  ? IM_COL32(140, 140, 134, 255)
+                                  : Palette.TextSecondary;
+    const ImU32 NumberColour = Palette.DarkMode
+                                   ? IM_COL32(226, 226, 218, 255)
+                                   : Palette.TextPrimary;
+    const ImU32 UnitColour = Palette.DarkMode
+                                 ? IM_COL32(92, 92, 87, 255)
+                                 : Palette.TextMuted;
+
+    DrawList->AddText(Faces.Regular, 11.0f, ImVec2(Origin.x, Origin.y + 4.0f), LabelColour, Label);
+
+    char Formatted[32] = {};
+    std::snprintf(Formatted, sizeof(Formatted), NumericFormat, static_cast<double>(InOutParameter));
+    const float NumberW  = MeasureTextWidth(Faces.Light, 17.0f, Formatted);
+    const bool  HasUnit  = (UnitSuffix != nullptr && UnitSuffix[0] != '\0');
+    const float UnitW    = HasUnit ? MeasureTextWidth(Faces.Regular, 9.0f, UnitSuffix) : 0.0f;
+    const float UnitGap  = HasUnit ? 3.0f : 0.0f;
+    const float ReadoutW = std::max(54.0f, NumberW + UnitGap + UnitW + 8.0f);
+    const float ReadoutX = Origin.x + AvailW - ReadoutW;
+
+    ImGui::SetCursorScreenPos(ImVec2(ReadoutX, Origin.y));
+    ImGui::SetNextItemWidth(ReadoutW);
+    if (Faces.Light)
+    {
+        ImGui::PushFont(Faces.Light);
+    }
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.04f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(18.0f / 255.0f, 18.0f / 255.0f, 18.0f / 255.0f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(62.0f / 255.0f, 62.0f / 255.0f, 60.0f / 255.0f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(226.0f / 255.0f, 226.0f / 255.0f, 218.0f / 255.0f, 1.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 1.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+
+    float      Candidate   = InOutParameter;
+    const bool Edited      = ImGui::InputFloat("##Value", &Candidate, 0.0f, 0.0f, NumericFormat);
+    const bool ActiveInput = ImGui::IsItemActive();
+
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(5);
+    if (Faces.Light)
+    {
+        ImGui::PopFont();
+    }
+
+    bool Changed = false;
+    if (Edited)
+    {
+        InOutParameter = std::clamp(Candidate, Minimum, Maximum);
+        Changed        = true;
+    }
+
+    if (!ActiveInput)
+    {
+        DrawList->AddRectFilled(ImVec2(ReadoutX, Origin.y),
+                                ImVec2(Origin.x + AvailW, Origin.y + HeaderHeight),
+                                Palette.ColumnBg);
+        const float NumberX = Origin.x + AvailW - NumberW - UnitGap - UnitW;
+        DrawList->AddText(Faces.Light, 17.0f, ImVec2(NumberX, Origin.y), NumberColour, Formatted);
+        if (HasUnit)
+        {
+            DrawList->AddText(Faces.Regular, 9.0f,
+                              ImVec2(NumberX + NumberW + UnitGap, Origin.y + 6.0f),
+                              UnitColour, UnitSuffix);
+        }
+    }
+
+    const float TrackTopY = Origin.y + HeaderHeight + 4.0f;
+    const float RailHeight = 24.0f;
+    const float KnobDiameter = 22.0f;
+
+    ImGui::SetCursorScreenPos(ImVec2(Origin.x, TrackTopY));
+    ImGui::InvisibleButton("##Track", ImVec2(AvailW, RailHeight), ImGuiButtonFlags_EnableNav);
+    const ImGuiIO& Io     = ImGui::GetIO();
+    const bool     Active = ImGui::IsItemActive();
+    ControlPointer Pointer{
+        Io.MousePos.x,
+        Io.MousePos.y,
+        Io.MouseDown[0],
+        ImGui::IsItemActivated(),
+        ImGui::IsMouseReleased(0),
+        Active || ImGui::IsItemHovered(),
+        Io.MouseWheel
+    };
+    PixelSpace Surface;
+    (void)Surface.Begin(SurfaceLayer::Window, Io.DisplaySize.x, Io.DisplaySize.y);
+    const auto Saved = ControlKit::Palette();
+    auto KitPalette  = Saved;
+    if (Palette.DarkMode)
+    {
+        KitPalette.SliderTrack = ColorQuad{23.0f / 255.0f, 23.0f / 255.0f, 23.0f / 255.0f, 1.0f};
+        KitPalette.SliderFill  = ColorQuad{69.0f / 255.0f, 69.0f / 255.0f, 69.0f / 255.0f, 1.0f};
+        KitPalette.SliderThumb = ColorQuad{215.0f / 255.0f, 215.0f / 255.0f, 206.0f / 255.0f, 1.0f};
+    }
+    ControlKit::ConfigurePalette(KitPalette);
+    float Replacement = InOutParameter;
+    (void)ControlKit::Slider(Surface,
+                             PlaneExtent{Origin.x, TrackTopY, Origin.x + AvailW, TrackTopY + RailHeight},
+                             Minimum,
+                             Maximum,
+                             InOutParameter,
+                             Active,
+                             Pointer,
+                             Replacement,
+                             ImGui::GetStyle().Alpha,
+                             RailHeight,
+                             KnobDiameter);
+    ControlKit::ConfigurePalette(Saved);
+    if (Active && Io.MouseDown[0])
+    {
+        Replacement = std::clamp(Replacement, Minimum, Maximum);
+        if (std::fabs(Replacement - InOutParameter) > 1e-6f)
+        {
+            InOutParameter = Replacement;
             Changed        = true;
         }
     }
-    const bool Hovered = ImGui::IsItemHovered() || ImGui::IsItemActive();
 
-    const float Norm  = (Maximum > Minimum) ? std::clamp((InOutParameter - Minimum) / (Maximum - Minimum), 0.0f, 1.0f) : 0.0f;
-    const float FillX = TrackX + Norm * TrackW;
-    DrawList->AddRectFilled(ImVec2(TrackX, MidY - 2.0f), ImVec2(TrackX + TrackW, MidY + 2.0f), Palette.SliderTrackBg, 2.0f);
-    if (Norm > 0.002f)
-    {
-        DrawList->AddRectFilled(ImVec2(TrackX, MidY - 2.0f), ImVec2(FillX, MidY + 2.0f), Palette.SliderFillBg, 2.0f);
-    }
-    DrawList->AddCircleFilled(ImVec2(FillX, MidY), Hovered ? 6.5f : 5.5f, Palette.SliderThumbBg, 16);
-
-    const ImVec2 BoxMin(Origin.x + AvailW - ReadoutW, Origin.y + 3.0f);
-    const ImVec2 BoxMax(Origin.x + AvailW, Origin.y + RowHeight - 3.0f);
-    DrawList->AddRectFilled(BoxMin, BoxMax, Palette.InsetFieldBg, 6.0f);
-    DrawList->AddRect(BoxMin, BoxMax, Palette.InsetFieldBorder, 6.0f);
-
-    char Formatted[32] = {};
-    std::snprintf(Formatted, sizeof(Formatted), DisplayFormat, static_cast<double>(InOutParameter));
-    const float TextW = MeasureTextWidth(Faces.Monospace, 11.0f, Formatted);
-    DrawList->AddText(Faces.Monospace, 11.0f,
-                      ImVec2(BoxMax.x - 7.0f - TextW, BoxMin.y + (BoxMax.y - BoxMin.y - 11.0f) * 0.5f),
-                      Palette.TextPrimary, Formatted);
-
-    ImGui::SetCursorScreenPos(ImVec2(Origin.x, Origin.y + RowHeight + 2.0f));
+    ImGui::SetCursorScreenPos(ImVec2(Origin.x, TrackTopY + RailHeight + 10.0f));
     ImGui::Dummy(ImVec2(AvailW, 0.0f));
+    ImGui::PopID();
     return Changed;
 }
 

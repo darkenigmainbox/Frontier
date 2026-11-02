@@ -65,8 +65,8 @@ type = "Solar"
 name = "Primary Directional Sun"
 [records.configuration]
 enabled = true
-elevation_deg = 38.0
-azimuth_deg = 132.0
+elevation_deg = 14.5
+azimuth_deg = 166.0
 illuminance_klx = 98.0
 kelvin = 5778.0
 
@@ -77,8 +77,8 @@ name = "Aperture Optical Flare"
 parent = "rec_solar"
 [records.configuration]
 enabled = true
-intensity = 0.62
-aperture_blades = 7
+intensity = 0.65
+aperture_blades = 6
 
 [[records]]
 identity = "rec_atmosphere"
@@ -98,9 +98,9 @@ parent = "rec_atmosphere"
 [records.configuration]
 enabled = true
 local_volume = false
-coverage = 0.42
-base_altitude_m = 1750.0
-thickness_m = 1350.0
+coverage = 0.55
+base_altitude_m = 800.0
+thickness_m = 1000.0
 
 [[records]]
 identity = "rec_stars"
@@ -119,8 +119,8 @@ name = "Orbital Satellites"
 parent = "rec_atmosphere"
 [records.configuration]
 enabled = true
-primary_phase = 0.68
-secondary_enabled = true
+primary_phase = 0.72
+secondary_enabled = false
 
 [[records]]
 identity = "rec_fog"

@@ -120,8 +120,11 @@ float3 ResolveDirectReflectance(SurfaceSample Surface, float3 Normal, float3 Vie
     float3 Half     = normalize(Light + View);
     float  NdotH    = max(dot(Normal, Half), 0.0f);
     float  VdotH    = max(dot(View, Half), 0.0f);
+    float  SubCos   = (Surface.CoatWeight > 0.0f)
+                    ? sqrt(max(0.55f, 1.0f - (1.0f - VdotH * VdotH) / 2.25f))
+                    : VdotH;
     float3 F0       = ResolveSpecularColour(Surface);
-    float3 Fresnel  = ResolveFresnel(F0, VdotH);
+    float3 Fresnel  = ResolveFresnel(F0, SubCos);
     float3 Specular = Fresnel * ResolveGgxDistribution(NdotH, Surface.Roughness) * ResolveSmithVisibility(NdotL, NdotV, Surface.Roughness);
     if (Surface.FlakeCoverage > 0.0f)
     {

@@ -216,16 +216,22 @@ EverestEnvironmentSettings EverestWorkspace::BuildEnvironmentSettings()
         EnvSettings.Solar = R->QueryConfiguration();
     if (const auto* R = dynamic_cast<const Frontier::AtmosphereRecord*>(WorldRef.FindFirstByType("Atmosphere")))
         EnvSettings.Atmosphere = R->QueryConfiguration();
-    if (const auto* R = dynamic_cast<const Frontier::CloudRecord*>(WorldRef.FindFirstByType("Cloud")))
+    if (const auto* R = dynamic_cast<const Frontier::CloudRecord*>(WorldRef.FindFirstByType("Clouds")))
         EnvSettings.Cloud = R->QueryConfiguration();
+    else if (const auto* R2 = dynamic_cast<const Frontier::CloudRecord*>(WorldRef.FindFirstByType("Cloud")))
+        EnvSettings.Cloud = R2->QueryConfiguration();
     if (const auto* R = dynamic_cast<const Frontier::FogRecord*>(WorldRef.FindFirstByType("Fog")))
         EnvSettings.Fog = R->QueryConfiguration();
     if (const auto* R = dynamic_cast<const Frontier::OpticalFlareRecord*>(WorldRef.FindFirstByType("OpticalFlare")))
         EnvSettings.OpticalFlare = R->QueryConfiguration();
-    if (const auto* R = dynamic_cast<const Frontier::MoonRecord*>(WorldRef.FindFirstByType("Moon")))
+    if (const auto* R = dynamic_cast<const Frontier::MoonRecord*>(WorldRef.FindFirstByType("Moons")))
         EnvSettings.Moon = R->QueryConfiguration();
-    if (const auto* R = dynamic_cast<const Frontier::StarRecord*>(WorldRef.FindFirstByType("Star")))
+    else if (const auto* R2 = dynamic_cast<const Frontier::MoonRecord*>(WorldRef.FindFirstByType("Moon")))
+        EnvSettings.Moon = R2->QueryConfiguration();
+    if (const auto* R = dynamic_cast<const Frontier::StarRecord*>(WorldRef.FindFirstByType("Stars")))
         EnvSettings.Star = R->QueryConfiguration();
+    else if (const auto* R2 = dynamic_cast<const Frontier::StarRecord*>(WorldRef.FindFirstByType("Star")))
+        EnvSettings.Star = R2->QueryConfiguration();
     if (const auto* R = dynamic_cast<const Frontier::RenderPipelineRecord*>(WorldRef.FindFirstByType("RenderPipeline")))
         EnvSettings.Pipeline = R->QueryConfiguration();
     return EnvSettings;
@@ -567,18 +573,6 @@ void EverestWorkspace::ConstructViewportSurface()
     const bool     LmbDrag         = ViewportActive && ImGui::IsMouseDragging(ImGuiMouseButton_Left);
     const bool     MmbDrag         = (ViewportHovered || ViewportActive) && ImGui::IsMouseDragging(ImGuiMouseButton_Middle);
 
-    const float CosPitch = std::cos(CameraPitchRad);
-    const std::array<float, 3> Forward = {
-        CosPitch * std::cos(CameraYawRad),
-        CosPitch * std::sin(CameraYawRad),
-        std::sin(CameraPitchRad)
-    };
-    const std::array<float, 3> Right = {
-        -std::sin(CameraYawRad),
-         std::cos(CameraYawRad),
-         0.0f
-    };
-
     // Unreal Engine Mouse Look (RMB free-look or LMB drag)
     if (RmbHeld || LmbDrag)
     {
@@ -586,6 +580,19 @@ void EverestWorkspace::ConstructViewportSurface()
         CameraYawRad      -= Delta.x * 0.0042f;
         CameraPitchRad     = std::clamp(CameraPitchRad - Delta.y * 0.0038f, -1.42f, 1.42f);
     }
+
+    const float CosPitch = std::cos(CameraPitchRad);
+    const std::array<float, 3> Forward = {
+        CosPitch * std::cos(CameraYawRad),
+        CosPitch * std::sin(CameraYawRad),
+        std::sin(CameraPitchRad)
+    };
+    // Right = Normalize(Forward x WorldUp) = {sin(Yaw), -cos(Yaw), 0}, matching EverestSceneEncoding
+    const std::array<float, 3> Right = {
+        std::sin(CameraYawRad),
+       -std::cos(CameraYawRad),
+        0.0f
+    };
 
     // Middle-Mouse Pan
     if (MmbDrag)

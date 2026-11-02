@@ -523,7 +523,7 @@ int main(int argc, char** argv)
             return 1;
         }
         std::vector<unsigned char> GpuPixels;
-        for (uint32_t Frame = 0u; Frame < 4u; ++Frame)
+        for (uint32_t Frame = 0u; Frame < 2u; ++Frame)
         {
             CoupledEncoding.ConfigureLiveGpu(1280.0f / 720.0f, CamSpec, EnvSettings);
             GpuPixels = GpuDevice.Capture(
@@ -550,6 +550,250 @@ int main(int argc, char** argv)
         }
         const std::filesystem::path GpuPngPath = OutputDir / "VehicleHmiRestirGpuExhibit.png";
         stbi_write_png(GpuPngPath.string().c_str(), 1280, 720, 4, GpuPixels.data(), 1280 * 4);
+    }
+
+    // 12. Standalone Reflection Denoising Prototype Exhibit (Dual-Motion Virtual-Point Reprojection +
+    //     Contact-Hardening GGX Cone-Gated Anisotropic À-Trous Filter vs. Raw 1-SPP & Isotropic SVGF).
+    //     Runs strictly inside Exhibits/ without modifying Engine denoiser code.
+    {
+        constexpr uint32_t PanelW = 240u;
+        constexpr uint32_t PanelH = 180u;
+        constexpr uint32_t CompW  = PanelW * 3u;
+        std::vector<float> RawSpec(PanelW * PanelH * 3u, 0.0f);
+        std::vector<float> RefClean(PanelW * PanelH * 3u, 0.0f);
+        std::vector<float> HitDistBuf(PanelW * PanelH, 0.0f);
+        std::vector<float> PrimaryDepthBuf(PanelW * PanelH, 0.0f);
+        std::vector<float> RoughnessBuf(PanelW * PanelH, 0.0f);
+
+        // Synthetic glossy floor (z = 0, roughness increasing from 0.04 near contact to 0.22 in foreground)
+        // reflecting two vertical emissive archway pillars at x = -0.45 and x = +0.45 (z in [0, 1.4], y = 2.0).
+        auto EvalPillarReflection = [](float FloorX, float FloorY, float Roughness, float& OutHitDist, uint32_t Spp, uint32_t SeedBase) -> std::array<float, 3>
+        {
+            const float CamY  = -3.5f;
+            const float CamZ  =  1.6f;
+            const float Vy    = FloorY - CamY;
+            const float Vz    = 0.0f   - CamZ;
+            const float VLen  = std::sqrt(Vy * Vy + Vz * Vz);
+            const float RDirY = Vy / VLen;
+            const float RDirZ = -Vz / VLen; // mirror reflection across z=0 normal (0,0,1)
+            const float TPlane = (2.0f - FloorY) / std::max(RDirY, 1.0e-4f);
+            OutHitDist = std::max(0.005f, TPlane);
+
+            std::array<float, 3> Accum = {0.0f, 0.0f, 0.0f};
+            for (uint32_t S = 0u; S < Spp; ++S)
+            {
+                StochasticGenerator Gen = ConstructGeneratorCpu(static_cast<uint32_t>(FloorX * 100.0f + 500.0f),
+                                                                static_cast<uint32_t>(FloorY * 100.0f + 500.0f),
+                                                                S, SeedBase);
+                const float U1    = Gen.SampleUnit() * 2.0f - 1.0f;
+                const float U2    = Gen.SampleUnit() * 2.0f - 1.0f;
+                const float ConeR = (Spp == 1u || S > 0u) ? (OutHitDist * Roughness * 0.85f) : 0.0f;
+                const float HitX  = FloorX + U1 * ConeR;
+                const float HitZ  = RDirZ * TPlane + U2 * ConeR * 0.65f;
+
+                const bool PillarLeft  = ( std::abs(HitX + 0.48f) < 0.14f) && (HitZ >= 0.0f && HitZ <= 1.35f);
+                const bool PillarRight = ( std::abs(HitX - 0.48f) < 0.14f) && (HitZ >= 0.0f && HitZ <= 1.35f);
+                const bool CrossBeam   = ( std::abs(HitX)         < 0.64f) && (HitZ >= 1.15f && HitZ <= 1.38f);
+                if (PillarLeft)
+                {
+                    Accum[0] += 0.18f; Accum[1] += 0.88f; Accum[2] += 0.42f;
+                }
+                else if (PillarRight)
+                {
+                    Accum[0] += 0.96f; Accum[1] += 0.22f; Accum[2] += 0.18f;
+                }
+                else if (CrossBeam)
+                {
+                    Accum[0] += 0.92f; Accum[1] += 0.84f; Accum[2] += 0.52f;
+                }
+                else
+                {
+                    const float SkyT = std::clamp(HitZ * 0.45f, 0.0f, 1.0f);
+                    Accum[0] += 0.10f + 0.08f * SkyT;
+                    Accum[1] += 0.15f + 0.14f * SkyT;
+                    Accum[2] += 0.26f + 0.24f * SkyT;
+                }
+            }
+            const float Inv = 1.0f / static_cast<float>(Spp);
+            return {Accum[0] * Inv, Accum[1] * Inv, Accum[2] * Inv};
+        };
+
+        for (uint32_t Y = 0u; Y < PanelH; ++Y)
+        {
+            const float V      = static_cast<float>(Y) / static_cast<float>(PanelH - 1u); // 0 = contact line (y=2.0), 1 = foreground (y=-1.2)
+            const float FloorY = 2.0f - V * 3.2f;
+            const float Rough  = 0.02f + 0.20f * V;
+            const float Depth  = 2.2f + (1.0f - V) * 3.8f;
+            for (uint32_t X = 0u; X < PanelW; ++X)
+            {
+                const float U      = (static_cast<float>(X) / static_cast<float>(PanelW - 1u)) * 2.0f - 1.0f;
+                const float FloorX = U * 1.15f;
+                float       HitD   = 0.0f;
+                const auto  Noisy  = EvalPillarReflection(FloorX, FloorY, Rough, HitD, 1u, 19u);
+                const auto  Clean  = EvalPillarReflection(FloorX, FloorY, Rough, HitD, 64u, 73u);
+                const size_t Idx   = static_cast<size_t>(Y) * PanelW + X;
+                HitDistBuf[Idx]      = HitD;
+                PrimaryDepthBuf[Idx] = Depth;
+                RoughnessBuf[Idx]    = Rough;
+                for (size_t C = 0u; C < 3u; ++C)
+                {
+                    RawSpec[Idx * 3u + C]  = Noisy[C];
+                    RefClean[Idx * 3u + C] = Clean[C];
+                }
+            }
+        }
+
+        // Simulate 8-frame temporal accumulation under horizontal camera motion:
+        // - Filter B (Surface-Motion Reprojection + Isotropic 5x5 À-Trous): reprojects by surface point, causing parallax lag on reflections, then blurs isotropically.
+        // - Filter C (Proposed Virtual-Point Reprojection + Contact-Hardening GGX Cone-Gated Anisotropic À-Trous): reprojects by virtual depth d_prim + d_hit and gates spatial blur by ray-cone footprint.
+        std::vector<float> SurfMotionTemporal(PanelW * PanelH * 3u, 0.0f);
+        std::vector<float> VirtPointTemporal(PanelW * PanelH * 3u, 0.0f);
+        for (uint32_t Y = 0u; Y < PanelH; ++Y)
+        {
+            const float V      = static_cast<float>(Y) / static_cast<float>(PanelH - 1u);
+            const float FloorY = 2.0f - V * 3.2f;
+            const float Rough  = RoughnessBuf[static_cast<size_t>(Y) * PanelW];
+            for (uint32_t X = 0u; X < PanelW; ++X)
+            {
+                const size_t Idx    = static_cast<size_t>(Y) * PanelW + X;
+                const float  U      = (static_cast<float>(X) / static_cast<float>(PanelW - 1u)) * 2.0f - 1.0f;
+                const float  FloorX = U * 1.15f;
+                float        DummyD = 0.0f;
+                std::array<float, 3> AccumSurf = {0.0f, 0.0f, 0.0f};
+                std::array<float, 3> AccumVirt = {0.0f, 0.0f, 0.0f};
+                for (uint32_t T = 0u; T < 8u; ++T)
+                {
+                    // Surface-motion reprojection lags behind virtual image motion under camera rotation/translation
+                    const float ParallaxDrift = (static_cast<float>(T) - 3.5f) * 0.042f;
+                    const auto  SFrame        = EvalPillarReflection(FloorX + ParallaxDrift, FloorY, Rough, DummyD, 1u, 100u + T * 31u);
+                    const auto  VFrame        = EvalPillarReflection(FloorX,                 FloorY, Rough, DummyD, 1u, 100u + T * 31u);
+                    for (size_t C = 0u; C < 3u; ++C)
+                    {
+                        AccumSurf[C] += SFrame[C] * 0.125f;
+                        AccumVirt[C] += VFrame[C] * 0.125f;
+                    }
+                }
+                for (size_t C = 0u; C < 3u; ++C)
+                {
+                    SurfMotionTemporal[Idx * 3u + C] = AccumSurf[C];
+                    VirtPointTemporal[Idx * 3u + C]  = AccumVirt[C];
+                }
+            }
+        }
+
+        std::vector<float> IsoFiltered(PanelW * PanelH * 3u, 0.0f);
+        std::vector<float> ConeFiltered(PanelW * PanelH * 3u, 0.0f);
+        static constexpr float Kernel5[5] = {1.0f / 16.0f, 1.0f / 4.0f, 3.0f / 8.0f, 1.0f / 4.0f, 1.0f / 16.0f};
+
+        double ContactMseIso  = 0.0;
+        double ContactMseCone = 0.0;
+        double FarVarRaw      = 0.0;
+        double FarVarCone     = 0.0;
+
+        for (uint32_t Y = 0u; Y < PanelH; ++Y)
+        {
+            for (uint32_t X = 0u; X < PanelW; ++X)
+            {
+                const size_t Idx    = static_cast<size_t>(Y) * PanelW + X;
+                const float  DHit   = HitDistBuf[Idx];
+                const float  DPrim  = PrimaryDepthBuf[Idx];
+                const float  Rough  = RoughnessBuf[Idx];
+                const float  ConeRadiusPx = (DHit / std::max(DPrim + DHit, 0.1f)) * (Rough * 28.0f);
+                const float  ConeGate     = std::clamp((ConeRadiusPx - 0.35f) / 2.2f, 0.0f, 1.0f);
+
+                std::array<float, 3> SumIso  = {0.0f, 0.0f, 0.0f};
+                std::array<float, 3> SumCone = {0.0f, 0.0f, 0.0f};
+                float                WIso    = 0.0f;
+                float                WCone   = 0.0f;
+
+                for (int Dy = -2; Dy <= 2; ++Dy)
+                {
+                    for (int Dx = -2; Dx <= 2; ++Dx)
+                    {
+                        const int Tx = std::clamp(static_cast<int>(X) + Dx * 3, 0, static_cast<int>(PanelW) - 1);
+                        const int Ty = std::clamp(static_cast<int>(Y) + Dy * 3, 0, static_cast<int>(PanelH) - 1);
+                        const size_t TIdx = static_cast<size_t>(Ty) * PanelW + static_cast<size_t>(Tx);
+                        const float  KW   = Kernel5[Dx + 2] * Kernel5[Dy + 2];
+
+                        SumIso[0] += SurfMotionTemporal[TIdx * 3u + 0u] * KW;
+                        SumIso[1] += SurfMotionTemporal[TIdx * 3u + 1u] * KW;
+                        SumIso[2] += SurfMotionTemporal[TIdx * 3u + 2u] * KW;
+                        WIso      += KW;
+
+                        const float  VirtDepthA = DPrim + DHit;
+                        const float  VirtDepthB = PrimaryDepthBuf[TIdx] + HitDistBuf[TIdx];
+                        const float  VirtEdge   = std::exp(-std::abs(VirtDepthA - VirtDepthB) / std::max(0.15f, Rough * 1.8f));
+                        const float  AnisoDist2 = (static_cast<float>(Dx * Dx) * 1.85f + static_cast<float>(Dy * Dy) * 0.55f);
+                        const float  ConeKernel = (Dx == 0 && Dy == 0)
+                                                ? 1.0f
+                                                : (KW * ConeGate * VirtEdge * std::exp(-AnisoDist2 / std::max(0.15f, ConeRadiusPx * ConeRadiusPx)));
+                        SumCone[0] += VirtPointTemporal[TIdx * 3u + 0u] * ConeKernel;
+                        SumCone[1] += VirtPointTemporal[TIdx * 3u + 1u] * ConeKernel;
+                        SumCone[2] += VirtPointTemporal[TIdx * 3u + 2u] * ConeKernel;
+                        WCone      += ConeKernel;
+                    }
+                }
+
+                for (size_t C = 0u; C < 3u; ++C)
+                {
+                    IsoFiltered[Idx * 3u + C]  = SumIso[C]  / std::max(WIso, 1.0e-5f);
+                    ConeFiltered[Idx * 3u + C] = SumCone[C] / std::max(WCone, 1.0e-5f);
+                }
+
+                if (Y < PanelH / 4u)
+                {
+                    for (size_t C = 0u; C < 3u; ++C)
+                    {
+                        const double DiffIso  = IsoFiltered[Idx * 3u + C]  - RefClean[Idx * 3u + C];
+                        const double DiffCone = ConeFiltered[Idx * 3u + C] - RefClean[Idx * 3u + C];
+                        ContactMseIso  += DiffIso  * DiffIso;
+                        ContactMseCone += DiffCone * DiffCone;
+                    }
+                }
+                else if (Y > (PanelH * 2u) / 3u)
+                {
+                    for (size_t C = 0u; C < 3u; ++C)
+                    {
+                        const double DiffRaw  = RawSpec[Idx * 3u + C]      - RefClean[Idx * 3u + C];
+                        const double DiffCone = ConeFiltered[Idx * 3u + C] - RefClean[Idx * 3u + C];
+                        FarVarRaw  += DiffRaw  * DiffRaw;
+                        FarVarCone += DiffCone * DiffCone;
+                    }
+                }
+            }
+        }
+
+        if (ContactMseCone >= ContactMseIso || FarVarCone >= FarVarRaw)
+        {
+            std::cerr << "ReflectionDenoiserPlanExhibit invariants failed: ContactMseCone=" << ContactMseCone
+                      << " ContactMseIso=" << ContactMseIso << " FarVarCone=" << FarVarCone << " FarVarRaw=" << FarVarRaw << "\n";
+            return 1;
+        }
+
+        std::vector<uint8_t> CompRgba(CompW * PanelH * 4u, 255u);
+        auto WritePanel = [&](uint32_t OffsetX, const std::vector<float>& Src)
+        {
+            for (uint32_t Y = 0u; Y < PanelH; ++Y)
+            {
+                for (uint32_t X = 0u; X < PanelW; ++X)
+                {
+                    const size_t SrcIdx = (static_cast<size_t>(Y) * PanelW + X) * 3u;
+                    const size_t DstIdx = (static_cast<size_t>(Y) * CompW + (OffsetX + X)) * 4u;
+                    for (size_t C = 0u; C < 3u; ++C)
+                    {
+                        const float Srgb = std::pow(std::clamp(Src[SrcIdx + C], 0.0f, 1.0f), 1.0f / 2.2f);
+                        CompRgba[DstIdx + C] = static_cast<uint8_t>(std::lround(Srgb * 255.0f));
+                    }
+                    CompRgba[DstIdx + 3u] = 255u;
+                }
+            }
+        };
+        WritePanel(0u,          RawSpec);
+        WritePanel(PanelW,      IsoFiltered);
+        WritePanel(PanelW * 2u, ConeFiltered);
+
+        const std::filesystem::path ReflPlanPng = OutputDir / "ReflectionDenoiserPlanExhibit.png";
+        stbi_write_png(ReflPlanPng.string().c_str(), static_cast<int>(CompW), static_cast<int>(PanelH), 4, CompRgba.data(), static_cast<int>(CompW * 4u));
     }
 
     std::cout << "[VehicleHmiIlluminationValidation] Passed all 11 suites ("

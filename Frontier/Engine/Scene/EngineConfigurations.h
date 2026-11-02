@@ -114,10 +114,10 @@ struct PolygonClusterConfiguration : RevisionCounter
 struct SolarConfiguration : RevisionCounter
 {
     bool  Enabled              = true;
-    float ElevationDegrees     = 38.0f;
-    float AzimuthDegrees       = 132.0f;
+    float ElevationDegrees     = 14.5f;
+    float AzimuthDegrees       = 166.0f;
     float IlluminanceKilolux   = 98.0f;
-    float AngularDiameterDeg   = 0.53f;
+    float AngularDiameterDeg   = 0.533f;
     float KelvinTemperature    = 5778.0f;
     bool  CastRaytracedShadow  = true;
     bool  VolumetricLightShaft = true;
@@ -128,7 +128,7 @@ struct OpticalFlareConfiguration : RevisionCounter
     bool     Enabled              = true;
     float    Intensity            = 0.65f;
     float    LuminanceThreshold   = 1.80f;
-    uint32_t ApertureBladeCount   = 7;
+    uint32_t ApertureBladeCount   = 6;
     float    HaloRadius           = 0.42f;
     float    ChromaticDispersion  = 0.18f;
     bool     AnamorphicStreak     = true;
@@ -152,12 +152,12 @@ struct CloudConfiguration : RevisionCounter
 {
     bool  Enabled              = true;
     bool  LocalVolume          = false;
-    float Coverage             = 0.44f;
-    float ExtinctionDensity    = 0.85f;
-    float BaseAltitudeMetres   = 1650.0f;
-    float LayerThicknessMetres = 1400.0f;
+    float Coverage             = 0.55f;
+    float ExtinctionDensity    = 0.48f;
+    float BaseAltitudeMetres   = 800.0f;
+    float LayerThicknessMetres = 1000.0f;
     float WindDriftSpeed       = 12.0f;
-    float SilverLiningPower    = 0.72f;
+    float SilverLiningPower    = 0.35f;
     bool  TemporalReprojection = true;
     bool  CastGroundShadows    = true;
 };
@@ -175,12 +175,12 @@ struct StarConfiguration : RevisionCounter
 struct MoonConfiguration : RevisionCounter
 {
     bool  Enabled               = true;
-    float PrimaryPhase          = 0.68f;
-    float PrimaryOrbitDegrees   = 214.0f;
-    float PrimaryAlbedo         = 0.12f;
-    bool  SecondaryMoonEnabled  = true;
+    float PrimaryPhase          = 0.72f;
+    float PrimaryOrbitDegrees   = 198.0f;
+    float PrimaryAlbedo         = 0.14f;
+    bool  SecondaryMoonEnabled  = false;
     float SecondaryOrbitDegrees = 64.0f;
-    float EarthshineLuminance   = 0.22f;
+    float EarthshineLuminance   = 0.18f;
 };
 
 struct FogConfiguration : RevisionCounter
