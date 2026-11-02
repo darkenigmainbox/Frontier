@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Frontier — Realtime Water Lab (2.5D + GPU Foam &amp; Splash)</title>
+<link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+<div id="app"></div>
+<div id="vignette"></div>
+
+<header id="brand">
+  <div class="brand-title">🌊 FRONTIER <span>water lab</span></div>
+  <div class="chips">
+    <span class="chip" id="modeChip">Wave Equation</span>
+    <span class="chip" id="fpsChip">— fps</span>
+    <span class="chip" id="particleChip">GPU particles 16k + 16k</span>
+  </div>
+</header>
+
+<button id="panelToggle" title="Toggle control panel">⚙️ Controls</button>
+
+<aside id="panel">
+  <!-- SOLVER -->
+  <section>
+    <h2>Fluid solver <span class="hint">keys 1 · 2 · 3</span></h2>
+    <div class="segmented" id="solverSeg">
+      <button data-mode="0" class="active">1 · Wave Eq.<small>Fluid-Ninja 2.5D</small></button>
+      <button data-mode="1">2 · Shallow Water<small>Equations (SWE)</small></button>
+      <button data-mode="2">3 · Spectral<small>AAA ocean + ripples</small></button>
+    </div>
+    <p class="desc" id="simDesc"></p>
+    <div class="ctl">
+      <label>Grid resolution <output id="simResOut">256² (global)</output></label>
+      <select id="simRes">
+        <option value="128">128 × 128 — fastest</option>
+        <option value="256" selected>256 × 256 — balanced</option>
+        <option value="512">512 × 512 — ultra detail</option>
+      </select>
+    </div>
+    <div class="ctl"><label>Ripple persistence <output></output></label>
+      <input type="range" data-bind="persistence" min="0" max="1" step="0.01" value="0.62"></div>
+    <div class="ctl"><label>Sim time scale <output></output></label>
+      <input type="range" data-bind="timeScale" min="0.1" max="2" step="0.05" value="1"></div>
+  </section>
+
+  <!-- LAYERS -->
+  <section>
+    <h2>Layers</h2>
+    <div class="toggles">
+      <label class="switch"><input type="checkbox" data-toggle="ripples" checked><span></span>2.5D grid ripples</label>
+      <label class="switch"><input type="checkbox" data-toggle="waves" checked><span></span>Gerstner waves</label>
+      <label class="switch"><input type="checkbox" data-toggle="foamGrid" checked><span></span>Foam grid (advected)</label>
+      <label class="switch"><input type="checkbox" data-toggle="foam3d" checked><span></span>3D particle foam (GPU)</label>
+      <label class="switch"><input type="checkbox" data-toggle="splash" checked><span></span>Splash particles (GPU)</label>
+      <label class="switch"><input type="checkbox" data-toggle="particles" checked><span></span>GPU particles master</label>
+      <label class="switch"><input type="checkbox" data-toggle="shoreFoam" checked><span></span>Shoreline foam bands</label>
+      <label class="switch"><input type="checkbox" data-toggle="wake" checked><span></span>Boat wake → sim</label>
+      <label class="switch"><input type="checkbox" data-toggle="caustics" checked><span></span>Underwater caustics</label>
+      <label class="switch"><input type="checkbox" data-toggle="rain"><span></span>Rain (heavy)</label>
+      <label class="switch"><input type="checkbox" data-toggle="demoDrops" checked><span></span>Ambient demo drops</label>
+      <label class="switch"><input type="checkbox" data-toggle="rockSplash" checked><span></span>Waves break on rocks</label>
+      <label class="switch"><input type="checkbox" data-toggle="simReadback" checked><span></span>Boat reads GPU sim</label>
+      <label class="switch"><input type="checkbox" data-toggle="vignette" checked><span></span>Cinematic vignette</label>
+    </div>
+  </section>
+
+  <!-- OCEAN -->
+  <section>
+    <h2>Ocean &amp; wind</h2>
+    <div class="ctl"><label>Wave height <output></output></label>
+      <input type="range" data-bind="waveHeight" min="0" max="1.8" step="0.02" value="0.55"></div>
+    <div class="ctl"><label>Spectral swell <output></output></label>
+      <input type="range" data-bind="swell" min="0" max="3" step="0.05" value="1.25"></div>
+    <div class="ctl"><label>Choppiness <output></output></label>
+      <input type="range" data-bind="chop" min="0" max="1.4" step="0.02" value="0.65"></div>
+    <div class="ctl"><label>Wind speed <output></output></label>
+      <input type="range" data-bind="windSpeed" min="0" max="16" step="0.2" value="6"></div>
+    <div class="ctl"><label>Wind direction ° <output></output></label>
+      <input type="range" data-bind="windDir" min="0" max="360" step="1" value="35"></div>
+    <div class="ctl"><label>Detail normals <output></output></label>
+      <input type="range" data-bind="detail" min="0" max="1.4" step="0.02" value="0.65"></div>
+    <div class="ctl"><label>Water clarity <output></output></label>
+      <input type="range" data-bind="clarity" min="0" max="1" step="0.02" value="0.55"></div>
+  </section>
+
+  <!-- FOAM & PARTICLES -->
+  <section>
+    <h2>Foam &amp; splash particles</h2>
+    <div class="ctl"><label>Foam amount <output></output></label>
+      <input type="range" data-bind="foamAmount" min="0" max="2.2" step="0.02" value="1"></div>
+    <div class="ctl"><label>Foam persistence <output></output></label>
+      <input type="range" data-bind="foamPersist" min="0" max="1" step="0.01" value="0.6"></div>
+    <div class="ctl"><label>Splash strength <output></output></label>
+      <input type="range" data-bind="splashStrength" min="0.2" max="2.5" step="0.05" value="1"></div>
+    <div class="ctl"><label>Droplet size <output></output></label>
+      <input type="range" data-bind="dropletSize" min="0.05" max="0.5" step="0.01" value="0.13"></div>
+    <div class="ctl"><label>Foam fleck size <output></output></label>
+      <input type="range" data-bind="fleckSize" min="0.3" max="2.2" step="0.05" value="0.62"></div>
+    <div class="ctl">
+      <label>Particles per system</label>
+      <select id="particleCount">
+        <option value="4096">4 096 ×2 — light</option>
+        <option value="8192">8 192 ×2 — medium</option>
+        <option value="16384" selected>16 384 ×2 — full GPU</option>
+      </select>
+    </div>
+    <p class="desc">3D foam flecks spawn in the boat wake, on the shoreline ring and at breaking crests — and are only visible where the <b>foam grid</b> says there is foam (turn the foam grid off to see the flecks vanish).</p>
+  </section>
+
+  <!-- ENVIRONMENT -->
+  <section>
+    <h2>Environment</h2>
+    <div class="envrow" id="envRow">
+      <button data-env="midday" class="active">☀ Midday</button>
+      <button data-env="golden">🌇 Golden</button>
+      <button data-env="dusk">🌆 Dusk</button>
+      <button data-env="storm">⛈ Storm</button>
+      <button data-env="moonlit">🌙 Moonlit</button>
+    </div>
+    <div class="ctl"><label>Exposure <output></output></label>
+      <input type="range" data-bind="exposure" min="0.5" max="1.7" step="0.02" value="1"></div>
+    <div class="btnrow">
+      <button id="btnCalm" class="action">🏝 Calm preset</button>
+      <button id="btnStorm" class="action">🌪 Storm preset</button>
+    </div>
+  </section>
+
+  <!-- ACTIONS -->
+  <section>
+    <h2>Actions</h2>
+    <div class="btnrow">
+      <button id="btnBigSplash" class="action">💥 Big splash <small>X</small></button>
+      <button id="btnBoulder" class="action">🪨 Drop boulder <small>G</small></button>
+      <button id="btnTsunami" class="action">🌊 Tsunami <small>T</small></button>
+      <button id="btnResetWater" class="action">↺ Reset water</button>
+      <button id="btnResetBoat" class="action">⛵ Reset boat</button>
+    </div>
+    <div class="toggles" style="margin-top:8px">
+      <label class="switch"><input type="checkbox" data-toggle="brush"><span></span>💧 Splash brush <small>(B)</small></label>
+      <label class="switch"><input type="checkbox" data-toggle="followCam"><span></span>🎥 Follow boat <small>(C)</small></label>
+      <label class="switch"><input type="checkbox" data-toggle="autoOrbit"><span></span>🔄 Auto-orbit camera</label>
+    </div>
+    <div class="ctl">
+      <label>Debug view</label>
+      <select id="debugView">
+        <option value="0" selected>Final (AAA shader)</option>
+        <option value="1">Height grid</option>
+        <option value="2">Foam: crest / shore / source</option>
+        <option value="3">Velocity grid</option>
+        <option value="4">Grid normals</option>
+      </select>
+    </div>
+  </section>
+
+  <section class="help">
+    <h2>Boat &amp; camera</h2>
+    <ul>
+      <li><b>W A S D</b> / arrows — drive the boat · <b>Space</b> brake</li>
+      <li><b>Drag</b> orbit · <b>wheel</b> zoom · <b>right-drag</b> pan</li>
+      <li><b>Double-click</b> water = splash · <b>Shift+drag</b> = paint splashes</li>
+      <li><b>1/2/3</b> solver · <b>F</b> foam · <b>P</b> particles · <b>R</b> rain</li>
+      <li>Drive through the buoy slalom, surf the sandbar (west), and beach-test the shoreline foam!</li>
+    </ul>
+  </section>
+</aside>
+
+<footer id="hint">
+  <span>⛵ <b>WASD</b> drive</span><span>💧 <b>Double-click / Shift+drag</b> splash</span><span>🌊 <b>1·2·3</b> switch fluid solver</span><span class="hide-sm">All grids are global — sim, foam, particles &amp; boat share one 240 m domain</span>
+</footer>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
