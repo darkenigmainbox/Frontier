@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { citations, source } from "../data";
+import { Portal } from "./Portal";
 
 export function SourceChip({ id }: { id: string }) {
   const [open, setOpen] = useState(false);
@@ -17,7 +18,7 @@ export function SourceChip({ id }: { id: string }) {
         src
       </button>
       {open && (
-        <>
+        <Portal>
           <div className="scrim" onClick={() => setOpen(false)} style={{ zIndex: 120 }} />
           <div
             role="dialog"
@@ -78,7 +79,7 @@ export function SourceChip({ id }: { id: string }) {
               this magazine resolves to one of them.
             </div>
           </div>
-        </>
+        </Portal>
       )}
     </>
   );

@@ -10,7 +10,7 @@
     {
       "id": "quran",
       "label": "Qur'ān text",
-      "detail": "Tanzil.net Uthmani text, Hafs ʿan ʿĀṣim, as distributed in the open-source `quran-json` package (v3.1.2).",
+      "detail": "Tanzil.net Uthmani text, Ḥafṣ ʿan ʿĀṣim, as distributed in the open-source `quran-json` package (v3.1.2).",
       "url": "https://tanzil.net"
     },
     {
@@ -28,7 +28,7 @@
     {
       "id": "lane",
       "label": "Lane's Arabic-English Lexicon",
-      "detail": "E. W. Lane (1863-1893), public domain. Root senses here are condensed from Lane and al-Mufradāt fī Gharīb al-Qurʾān (al-Rāghib al-Iṣfahānī), with a source reference on every root.",
+      "detail": "E. W. Lane (1863–1893), public domain. Root senses here are condensed from Lane and al-Mufradāt fī Gharīb al-Qurʾān (al-Rāghib al-Iṣfahānī), with a source reference on every root.",
       "url": "https://archive.org/details/arabicenglishlex01laneuoft"
     },
     {
@@ -253,6 +253,412 @@
     "ظلم": {
       "ar": "الظُّلْم",
       "en": "to put a thing in the wrong place — including to displace the worship owed to the Creator"
+    }
+  },
+  "particles": {
+    "فِي": {
+      "en": "in, within, among",
+      "kind": "preposition",
+      "note": "Governs the genitive. Often rendered 'in' but covers being within a place, a time or a state."
+    },
+    "مِن": {
+      "en": "from, out of; some of",
+      "kind": "preposition",
+      "note": "Also used partitively — 'some of' — which is how it is read in 'from every fruit'."
+    },
+    "مَا": {
+      "en": "what; that which; not",
+      "kind": "relative / negative",
+      "note": "Has no single English word. It is relative ('that which'), interrogative ('what?') or negating, by position."
+    },
+    "لَا": {
+      "en": "not; no",
+      "kind": "negative particle",
+      "note": "The ordinary negation of the present."
+    },
+    "هُوَ": {
+      "en": "he; it",
+      "kind": "pronoun",
+      "note": "Third person masculine singular; used of Allah throughout without implying a body."
+    },
+    "إِنَّ": {
+      "en": "indeed, verily",
+      "kind": "emphatic particle",
+      "note": "Placed before a sentence to assert it. Often carries the force of 'it is the case that'."
+    },
+    "إِلَّا": {
+      "en": "except, unless",
+      "kind": "particle of exception",
+      "note": "Always marks something excluded from what precedes it."
+    },
+    "أَوْ": {
+      "en": "or",
+      "kind": "conjunction",
+      "note": "Also used for 'or rather', correcting what came before."
+    },
+    "أَمْ": {
+      "en": "or (in a question); rather",
+      "kind": "conjunction",
+      "note": "Used in interrogatives where the second option disputes the first."
+    },
+    "عَلَى": {
+      "en": "on, upon; against",
+      "kind": "preposition",
+      "note": "Governs the genitive. Frequently marks obligation: 'upon you is …'."
+    },
+    "أَن": {
+      "en": "that; to (with a verb)",
+      "kind": "particle",
+      "note": "Introduces a clause; before a verb it gives the infinitive — 'that you …' / 'to …'."
+    },
+    "لَهُ": {
+      "en": "to him; his; belongs to him",
+      "kind": "preposition + pronoun",
+      "note": "The lām of possession or direction fused with 'him/it'."
+    },
+    "لَهُم": {
+      "en": "for them; theirs",
+      "kind": "preposition + pronoun",
+      "note": "Plural of لَهُ."
+    },
+    "لَكُم": {
+      "en": "for you (plural)",
+      "kind": "preposition + pronoun"
+    },
+    "لَكَ": {
+      "en": "for you (singular)",
+      "kind": "preposition + pronoun"
+    },
+    "لَكُمْ": {
+      "en": "for you (plural)",
+      "kind": "preposition + pronoun"
+    },
+    "لَنَا": {
+      "en": "for us",
+      "kind": "preposition + pronoun"
+    },
+    "لَها": {
+      "en": "for her; to it",
+      "kind": "preposition + pronoun"
+    },
+    "بِهِ": {
+      "en": "by him, in him, through him",
+      "kind": "preposition + pronoun",
+      "note": "The bāʾ of instrument, means or association."
+    },
+    "بِهَا": {
+      "en": "by it, in it, through it (feminine)",
+      "kind": "preposition + pronoun"
+    },
+    "بِمَا": {
+      "en": "by what, for what, in that which",
+      "kind": "preposition + relative"
+    },
+    "إِلَيْهِ": {
+      "en": "to him, toward him",
+      "kind": "preposition + pronoun",
+      "note": "Marks the end-point of a motion or a turning."
+    },
+    "إِلَيْكَ": {
+      "en": "to you (singular)",
+      "kind": "preposition + pronoun"
+    },
+    "مَعَهُ": {
+      "en": "with him",
+      "kind": "preposition + pronoun"
+    },
+    "عَلَيْهِ": {
+      "en": "on him, upon him; against him",
+      "kind": "preposition + pronoun"
+    },
+    "عَلَيْكُم": {
+      "en": "upon you, on you (plural)",
+      "kind": "preposition + pronoun"
+    },
+    "عَلَيْكُمُ": {
+      "en": "upon you, on you (plural)",
+      "kind": "preposition + pronoun"
+    },
+    "هُم": {
+      "en": "they; them",
+      "kind": "pronoun"
+    },
+    "هُمْ": {
+      "en": "they; them",
+      "kind": "pronoun"
+    },
+    "وَهُمْ": {
+      "en": "and they",
+      "kind": "conjunction + pronoun"
+    },
+    "أَنتَ": {
+      "en": "you (singular masculine)",
+      "kind": "pronoun"
+    },
+    "الَّذِينَ": {
+      "en": "those who (masculine plural)",
+      "kind": "relative pronoun",
+      "note": "The workhorse relative of the Qur'ān; it opens the sūrah's long description of the righteous in āyāt 20–24."
+    },
+    "الَّذِي": {
+      "en": "the one who; that which (masculine singular)",
+      "kind": "relative pronoun"
+    },
+    "الَّتِي": {
+      "en": "the one who; that which (feminine singular)",
+      "kind": "relative pronoun"
+    },
+    "أُولَٰئِكَ": {
+      "en": "those ones; they are the ones who",
+      "kind": "demonstrative plural",
+      "note": "Always points forward or back to a described group, and often carries judgement."
+    },
+    "ذَٰلِكَ": {
+      "en": "that; that is",
+      "kind": "demonstrative"
+    },
+    "تِلْكَ": {
+      "en": "those (feminine plural); that",
+      "kind": "demonstrative"
+    },
+    "كَذَٰلِكَ": {
+      "en": "like that; that is how",
+      "kind": "comparison",
+      "note": "The sūrah's signature: 'thus does Allah strike the parables'."
+    },
+    "ثُمَّ": {
+      "en": "then, afterwards",
+      "kind": "conjunction",
+      "note": "Marks a sequence, often with a delay built in."
+    },
+    "حَتَّىٰ": {
+      "en": "until, so that",
+      "kind": "particle"
+    },
+    "هَلْ": {
+      "en": "is it? do? (question)",
+      "kind": "interrogative"
+    },
+    "لَوْ": {
+      "en": "if (unfulfilled)",
+      "kind": "conditional particle",
+      "note": "Introduces a condition that is contrary to fact — 'had there been …'."
+    },
+    "لَوْلَا": {
+      "en": "were it not for; why not?",
+      "kind": "particle",
+      "note": "In āyah 7 it is the Quraysh's challenge: 'why has no sign been sent down?'"
+    },
+    "لَقَدْ": {
+      "en": "indeed, surely (with the past)",
+      "kind": "emphatic + perfect"
+    },
+    "قَدْ": {
+      "en": "already, indeed",
+      "kind": "particle",
+      "note": "Before a past verb it means it has already happened; before a present it means it certainly does."
+    },
+    "لَمْ": {
+      "en": "did not (with the jussive)",
+      "kind": "negative particle"
+    },
+    "عَن": {
+      "en": "from, about, away from",
+      "kind": "preposition"
+    },
+    "إِلَى": {
+      "en": "to, toward, until",
+      "kind": "preposition"
+    },
+    "بَيْنَ": {
+      "en": "between; in front of",
+      "kind": "preposition"
+    },
+    "بَعْدَ": {
+      "en": "after",
+      "kind": "preposition"
+    },
+    "كَمَنْ": {
+      "en": "like the one who",
+      "kind": "comparison + relative"
+    },
+    "أَفَمَنْ": {
+      "en": "then is the one who…?",
+      "kind": "interrogative",
+      "note": "An a-question that expects the answer 'no'."
+    },
+    "أَفَمَن": {
+      "en": "then is the one who…?",
+      "kind": "interrogative"
+    },
+    "بَلْ": {
+      "en": "rather, no — rather",
+      "kind": "particle of correction",
+      "note": "Cancels what the opponent just said and substitutes the truth."
+    },
+    "أَوَلَمْ": {
+      "en": "and did they not…?",
+      "kind": "interrogative"
+    },
+    "أَفَلَمْ": {
+      "en": "then did they not…?",
+      "kind": "interrogative"
+    },
+    "إِنَّمَا": {
+      "en": "only, merely",
+      "kind": "restrictive particle",
+      "note": "Confines the statement to exactly what follows: 'upon you is only …'."
+    },
+    "أَنَّمَا": {
+      "en": "that … only",
+      "kind": "particle"
+    },
+    "كَمَا": {
+      "en": "as, just as",
+      "kind": "comparison"
+    },
+    "أَئِذَا": {
+      "en": "when? — is it that when…",
+      "kind": "interrogative",
+      "note": "The disbelievers' incredulous question in āyah 5: 'when we are dust…?'"
+    },
+    "أَئِنَّا": {
+      "en": "are we indeed…?",
+      "kind": "interrogative"
+    },
+    "أَنَا": {
+      "en": "I",
+      "kind": "pronoun"
+    },
+    "أَنَّ": {
+      "en": "that (with emphasis)",
+      "kind": "particle"
+    },
+    "فَمَا": {
+      "en": "so what…?",
+      "kind": "conjunction + interrogative"
+    },
+    "أُولُو": {
+      "en": "possessors of, people of",
+      "kind": "noun",
+      "note": "Always construct: أولو العلم — those possessed of knowledge."
+    },
+    "عَدْن": {
+      "en": "ʿAdn — Eden; a name for the gardens of permanence",
+      "kind": "proper noun",
+      "note": "From the root ع-د-ن, to remain, to settle. In the Qur'ān it is always جنات عدن, gardens of lasting abode."
+    },
+    "جَهَنَّمُ": {
+      "en": "Jahannam — Hell",
+      "kind": "proper noun",
+      "note": "Used in āyah 18 as the destination set against the 'best reward'."
+    },
+    "لَعَلَّكُم": {
+      "en": "so that you (plural) may",
+      "kind": "particle",
+      "note": "Expresses a hoped-for outcome addressed to the listeners."
+    },
+    "وَلَٰكِنَّ": {
+      "en": "but, however",
+      "kind": "conjunction"
+    },
+    "وَلَئِنِ": {
+      "en": "and if, surely if",
+      "kind": "conjunction + oath"
+    },
+    "فِيهَا": {
+      "en": "in it, within it",
+      "kind": "preposition + pronoun"
+    },
+    "أُولُوا": {
+      "en": "possessors of, people of",
+      "kind": "noun",
+      "note": "Construct form: أولو العلم, those possessed of knowledge; أولو الألباب, people of understanding."
+    },
+    "أَلَا": {
+      "en": "surely, indeed — pay attention",
+      "kind": "particle of alerting",
+      "note": "Opens a sentence to demand attention, as in 'Unquestionably, by the remembrance of Allah hearts are assured'."
+    },
+    "أَمَّا": {
+      "en": "as for",
+      "kind": "particle of division",
+      "note": "Opens the first branch of a two-part division; it is answered by فَأَمَّا … وَأَمَّا."
+    },
+    "فَأَمَّا": {
+      "en": "so as for",
+      "kind": "particle of division"
+    },
+    "وَأَمَّا": {
+      "en": "and as for",
+      "kind": "particle of division"
+    },
+    "مِمَّا": {
+      "en": "from what; from that which",
+      "kind": "preposition + relative"
+    },
+    "وَمِمَّا": {
+      "en": "and from what",
+      "kind": "conjunction + preposition + relative"
+    },
+    "عَلَيْهِم": {
+      "en": "on them, upon them; against them",
+      "kind": "preposition + pronoun"
+    },
+    "عَلَيْكَ": {
+      "en": "on you, upon you; your duty",
+      "kind": "preposition + pronoun",
+      "note": "In āyah 40 it marks duty: 'upon you is only the delivering of the message'."
+    },
+    "عَلَيْنَا": {
+      "en": "on us; our responsibility",
+      "kind": "preposition + pronoun"
+    },
+    "لَذُو": {
+      "en": "possessor of, one of",
+      "kind": "possessive",
+      "note": "Construct: لذو علم — possessed of knowledge."
+    },
+    "مِّنكُم": {
+      "en": "from among you",
+      "kind": "preposition + pronoun"
+    },
+    "لَفِي": {
+      "en": "surely in, indeed within",
+      "kind": "emphatic + preposition",
+      "note": "The lām of emphasis before 'in' — 'are in utter error'."
+    },
+    "تَطْمَئِنُّ": {
+      "en": "it becomes still, settles, is reassured",
+      "kind": "verb (Form XII)",
+      "note": "From ط-م-أ-نّ, to be calm and settled. Said of the heart in āyah 28; the same root in 2:260 — 'that my heart may be at rest'."
+    },
+    "وَتَطْمَئِنُّ": {
+      "en": "and it becomes still, and settles",
+      "kind": "conjunction + verb"
+    },
+    "الٓمٓر": {
+      "en": "Alif Lām Mīm Rā — disjoint letters",
+      "kind": "letters",
+      "note": "The sūrah opens with four letters recited by name. Their meaning is not explained in the text; the classical position is that they are among the matters whose knowledge is with Allah, and the sentence that follows carries the message."
+    },
+    "أَءِذَا": {
+      "en": "when? — is it that when…",
+      "kind": "interrogative",
+      "note": "The disbelievers' incredulous question in āyah 5."
+    },
+    "أَءِنَّا": {
+      "en": "are we indeed…?",
+      "kind": "interrogative",
+      "note": "The second half of the same incredulous sentence: 'shall we be created anew?'"
+    },
+    "وَإِذَا": {
+      "en": "and when",
+      "kind": "conjunction + time particle"
+    },
+    "لِلَّذِينَ": {
+      "en": "for those who; to those who",
+      "kind": "preposition + relative pronoun"
     }
   }
 }

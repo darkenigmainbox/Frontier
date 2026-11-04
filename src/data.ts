@@ -5,9 +5,17 @@ import citationsJson from "./data/citations.json";
 export type Word = {
   ar: string;
   root: string;
-  lem: string;
-  pos: string;
+  /** key into citations.particles, for words with no dictionary root */
+  p?: string;
 };
+
+export type Particle = {
+  en: string;
+  kind: string;
+  note?: string;
+};
+
+export const particles: Record<string, Particle> = (citationsJson as any).particles || {};
 
 export type Note = {
   type?: "text" | "report" | "disputed" | "caution";

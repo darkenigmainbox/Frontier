@@ -17,7 +17,9 @@
 
   --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
   --sans: "Inter Variable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --arabic: "Amiri Quran", "Noto Naskh Arabic", "Traditional Arabic", serif;
+  /* Amiri Quran first for the full Quranic orthography; Noto Naskh carries the two
+     marks (U+065E, U+06E5) that Amiri Quran's cmap lacks, via per-glyph fallback. */
+  --arabic: "Amiri Quran", "Noto Naskh Arabic", "Traditional Arabic", "Scheherazade New", serif;
 
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --gut: clamp(1.15rem, 4.4vw, 3.5rem);
@@ -270,7 +272,7 @@ a { color: inherit; text-decoration: none; }
 /* ---------------------------------------------------------------- cover */
 .cover {
   position: relative;
-  min-height: calc(100dvh - 54px);
+  min-height: calc(100svh - 54px);
   display: grid;
   align-content: end;
   padding-bottom: clamp(2rem, 6vw, 4rem);
@@ -282,21 +284,23 @@ a { color: inherit; text-decoration: none; }
   inset: 0;
   z-index: 0;
   pointer-events: none;
+  background: #050507;
 }
 
 .cover-bg img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.66;
-  filter: grayscale(1) contrast(1.12) brightness(0.8);
+  object-position: 50% 50%;
+  opacity: 1;
+  filter: grayscale(1) contrast(1.16) brightness(1.28);
   transform: scale(1.04);
   animation: drift 28s ease-in-out infinite alternate;
 }
 
 @keyframes drift {
-  from { transform: scale(1.04) translateY(0); }
-  to { transform: scale(1.1) translateY(-1.6%); }
+  from { transform: scale(1.02) translateY(0); }
+  to { transform: scale(1.07) translateY(-1.2%); }
 }
 
 .cover-bg::after {
@@ -304,11 +308,19 @@ a { color: inherit; text-decoration: none; }
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(120% 70% at 50% 100%, transparent 0%, rgba(7,7,10,0.42) 45%, var(--ink) 88%),
-    linear-gradient(to bottom, var(--ink) 0%, rgba(7,7,10,0.08) 34%, rgba(7,7,10,0.62) 76%, var(--ink) 100%);
+    radial-gradient(115% 58% at 50% 100%, transparent 0%, rgba(7,7,10,0.22) 52%, var(--ink) 94%),
+    linear-gradient(to bottom, rgba(7,7,10,0.34) 0%, rgba(7,7,10,0) 26%, rgba(7,7,10,0.16) 54%, rgba(7,7,10,0.74) 82%, var(--ink) 100%);
 }
 
-.cover-inner { position: relative; z-index: 1; }
+.cover-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100svh - 54px);
+}
+
+.cover-body { margin-top: auto; }
 
 .cover-top {
   display: flex;
@@ -318,15 +330,16 @@ a { color: inherit; text-decoration: none; }
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--muted);
-  padding-bottom: clamp(6rem, 28vh, 16rem);
+  padding-top: clamp(1.2rem, 3vw, 2rem);
 }
 
 .cover-ar {
-  font-size: clamp(3.6rem, 16vw, 8rem);
+  font-size: clamp(3.2rem, 13vw, 6.4rem);
   color: var(--paper);
-  line-height: 1.1;
-  margin-bottom: 0.1em;
-  text-shadow: 0 2px 60px rgba(0,0,0,0.6);
+  line-height: 1.05;
+  margin-bottom: 0.34em;
+  text-align: right;
+  opacity: 0.96;
 }
 
 .cover-title {
@@ -337,7 +350,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 .cover-sub {
-  margin-top: clamp(1.1rem, 3vw, 1.8rem);
+  margin-top: clamp(0.9rem, 2.4vw, 1.4rem);
   font-family: var(--serif);
   font-size: clamp(1rem, 2.6vw, 1.28rem);
   line-height: 1.5;
@@ -665,6 +678,13 @@ a { color: inherit; text-decoration: none; }
   text-decoration-color: var(--signal);
 }
 
+.w.particle {
+  text-decoration: underline dotted;
+  text-decoration-color: color-mix(in srgb, #8b8a92 42%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.24em;
+}
+
 .w.active {
   background: var(--signal);
   color: #fff;
@@ -814,7 +834,7 @@ a { color: inherit; text-decoration: none; }
   }
 }
 
-.sheet-inner { padding: 1.5rem clamp(1.15rem, 4vw, 1.8rem) 3rem; }
+.sheet-inner { padding: 0.6rem clamp(1.15rem, 4vw, 1.8rem) 3rem; }
 
 .sheet-close {
   position: sticky;
@@ -830,8 +850,9 @@ a { color: inherit; text-decoration: none; }
   font-family: var(--arabic);
   direction: rtl;
   font-size: 2.6rem;
-  line-height: 1.5;
+  line-height: 1.35;
   color: var(--paper);
+  margin-top: 0.2rem;
 }
 
 .sheet-root-letters {
@@ -984,7 +1005,10 @@ a { color: inherit; text-decoration: none; }
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--dim);
+  line-height: 1.7;
 }
+
+.hadith-narr a { white-space: nowrap; }
 
 /* ---------------------------------------------------------------- timeline */
 .timeline {
@@ -1161,13 +1185,13 @@ body.light {
   color-scheme: light;
 }
 
-body.light .cover-title,
-body.light .cover-ar { color: #fff; }
-body.light .cover-bg img { opacity: 0.34; filter: grayscale(1) contrast(1.1) brightness(0.8); }
+body.light .cover-title { color: #14140f; }
+body.light .cover-ar { color: #14140f; }
+body.light .cover-bg img { opacity: 0.42; filter: grayscale(1) contrast(0.9) brightness(1.5); }
 body.light .cover-bg::after {
   background:
-    radial-gradient(120% 70% at 50% 100%, transparent 0%, rgba(244,242,238,0.55) 45%, var(--ink) 88%),
-    linear-gradient(to bottom, var(--ink) 0%, rgba(244,242,238,0.2) 30%, rgba(244,242,238,0.7) 78%, var(--ink) 100%);
+    radial-gradient(115% 58% at 50% 100%, transparent 0%, rgba(244,242,238,0.72) 52%, var(--ink) 94%),
+    linear-gradient(to bottom, rgba(244,242,238,0.88) 0%, rgba(244,242,238,0.1) 26%, rgba(244,242,238,0.45) 56%, rgba(244,242,238,0.86) 84%, var(--ink) 100%);
 }
 body.light .cover-sub { color: #3a3833; }
 body.light .cover-foot { color: #4b4942; border-top-color: rgba(0,0,0,0.12); }
@@ -1182,7 +1206,7 @@ body.light .ayah-en { color: #3a3934; }
 body.light .tafsir-body { color: #4a4943; }
 body.light .note-p { color: #4a4943; }
 body.light .figure img { filter: grayscale(1) contrast(1.05) brightness(0.95); }
-body.light .topbar { background: rgba(244,242,238,0.9); }
+body.light .topbar { background: rgba(246,244,240,0.96); }
 body.light .hadith { background: linear-gradient(160deg, #eae6df 0%, #e3ded6 100%); }
 body.light .hadith-en { color: #3a3934; }
 body.light .sheet { background: #efece6; }

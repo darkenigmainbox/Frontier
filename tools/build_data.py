@@ -123,8 +123,6 @@ def main():
             out_words.append({
                 "ar": surface,
                 "root": root if root in roots else "",
-                "lem": lem,
-                "pos": d["pos"][0] if d["pos"] else "",
             })
         ayat.append({
             "n": a,
@@ -152,6 +150,19 @@ def main():
         n = a["n"]
         a["ibnKathir"] = clean_ik(ik.get(n, "")) if n in ik else ""
         a["mukhtasar"] = re.sub(r"\s+", " ", mk.get(n, "")).strip()
+
+    # keep the editorial notes if tools/ayah_notes.py has already run
+    prev = {}
+    outp = os.path.join(OUT, "surah.json")
+    if os.path.exists(outp):
+        try:
+            for a in json.load(open(outp, encoding="utf-8"))["ayat"]:
+                if a.get("note"):
+                    prev[a["n"]] = a["note"]
+        except Exception:
+            pass
+    for a in ayat:
+        a["note"] = prev.get(a["n"], {})
 
     data = {"surah": 13, "ayat": ayat, "roots": roots}
     os.makedirs(OUT, exist_ok=True)

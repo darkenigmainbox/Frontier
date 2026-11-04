@@ -38,7 +38,7 @@ export function Tafsir({
   showTranslation: boolean;
   setShowTranslation: (b: boolean) => void;
 }) {
-  const { open, element } = useRoots();
+  const { open, openParticle, element } = useRoots();
   const [range, setRange] = useState(0);
   const [reader, setReader] = useState(1);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -125,8 +125,7 @@ export function Tafsir({
             position: "sticky",
             top: 54,
             zIndex: 30,
-            background: "color-mix(in srgb, var(--ink) 92%, transparent)",
-            backdropFilter: "blur(10px)",
+            background: "var(--ink)",
             borderBottom: "1px solid var(--line-soft)",
             padding: ".65rem 0",
             marginBottom: ".5rem",
@@ -175,7 +174,7 @@ export function Tafsir({
                 )}
               </div>
 
-              <ArabicAyah words={a.words} onOpen={open} />
+              <ArabicAyah words={a.words} onOpen={open} onOpenParticle={openParticle} />
 
               {showTranslation && (
                 <>
