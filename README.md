@@ -2,7 +2,11 @@
 
 A dark, minimal, phone-first reading app for **Sūrah 13, al-Raʿd (The Thunder)**.
 Not a textbook. A magazine: index, introduction, context, theme, the full text,
-a story, a root lexicon, and a colophon.
+a story, a root lexicon, a conclusion, and a colophon.
+
+Every one of the 854 words of the sūrah is tappable. Words with a root open that
+root's attested senses; function words, pronouns, proper nouns and the disjoint
+letters open a short lexical gloss instead of being dead text.
 
 ## What is actually in it
 
@@ -12,10 +16,11 @@ a story, a root lexicon, and a colophon.
 | **Introduction** | Short, concise reading of what the sūrah is and how it argues |
 | **Context** | The treaty of Ḥudaybiyyah, 6 AH — the occasion behind 13:30, from Ṣaḥīḥ al-Bukhārī 2731–2732 and 4154 |
 | **Theme** | 13:17 — the flood, the ore, the foam, and the verdict |
-| **Āyah by āyah** | All 43 āyāt. Arabic in the mushaf spelling; tap any word with a root to open its root panel. Per-āyah: a source note (occasion / reading / disputed / caution), plain commentary, Ibn Kathīr (abridged) |
+| **Āyah by āyah** | All 43 āyāt. Arabic in the mushaf spelling; every word is tappable — roots open a root panel, function words open a gloss. Per-āyah: a source note (occasion / reading / disputed / caution), plain commentary, Ibn Kathīr (abridged) |
 | **Story** | Zayd ibn Thābit and the gathering of the Qur'ān (Musnad Aḥmad 76) |
 | **Roots** | All 242 distinct roots of the sūrah, searchable, each opening its attested senses with provenance |
-| **Colophon** | Every source with a link; every hadith with collection, number, narrator and printed grade |
+| **Conclusion** | What the sūrah leaves standing, and what to re-read |
+| **Colophon** | Every source with a link; every hadith collection, number, narrator and printed grade |
 
 ## The sourcing rules this app follows
 

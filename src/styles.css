@@ -1064,6 +1064,11 @@ a { color: inherit; text-decoration: none; }
   gap: 1px;
   background: var(--line-soft);
   border: 1px solid var(--line-soft);
+  align-content: start;
+}
+
+@media (max-width: 420px) {
+  .roots-grid { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); }
 }
 
 .root-cell {

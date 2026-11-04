@@ -9,7 +9,7 @@ export const chapters = [
 ];
 
 export function render(slug: string) {
-  const html = renderToString(createElement(App, { initialSlug: slug }));
+  const html = renderToString(createElement(App as any, { initialSlug: slug }));
   const m = editorial.surahMeta;
   const base = `${m.name} · ${m.arabic}`;
   const titles: Record<string, string> = {
@@ -21,6 +21,7 @@ export function render(slug: string) {
     tafsir: `Āyah by āyah — ${base}`,
     story: `Story: Zayd and the Mountain — ${base}`,
     roots: `Roots — ${base}`,
+    conclusion: `Conclusion — ${base}`,
     colophon: `Sources — ${base}`,
   };
   const descriptions: Record<string, string> = {
@@ -33,6 +34,7 @@ export function render(slug: string) {
     tafsir: `All 43 āyāt of Sūrah Ar-Raʿd with tappable word roots, al-Mukhtaṣar and Ibn Kathīr commentary, and a source note on every āyah.`,
     story: editorial.story.standfirst,
     roots: "Every Arabic root used in Sūrah Ar-Raʿd, with attested senses and provenance.",
+    conclusion: editorial.conclusion.paragraphs[1].text,
     colophon: "Every source, every hadith number, and the method behind the Ar-Raʿd magazine.",
   };
   return {

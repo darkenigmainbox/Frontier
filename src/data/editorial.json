@@ -64,6 +64,13 @@
     },
     {
       "number": "08",
+      "slug": "conclusion",
+      "label": "Conclusion",
+      "title": "What is left in the ground",
+      "quote": "Read as a whole, the sūrah does not argue anyone out of their position. It shows them their own world."
+    },
+    {
+      "number": "09",
       "slug": "colophon",
       "label": "Sources",
       "title": "Colophon",
@@ -101,10 +108,22 @@
       "attribution": "Ar-Raʿd 13:1–4"
     },
     "facts": [
-      {"label": "Āyāt", "value": "43"},
-      {"label": "Juzʾ", "value": "13"},
-      {"label": "Revealed", "value": "Makkah"},
-      {"label": "Order", "value": "96th"}
+      {
+        "label": "Āyāt",
+        "value": "43"
+      },
+      {
+        "label": "Juzʾ",
+        "value": "13"
+      },
+      {
+        "label": "Revealed",
+        "value": "Makkah"
+      },
+      {
+        "label": "Order",
+        "value": "96th"
+      }
     ]
   },
   "context": {
@@ -149,11 +168,26 @@
       }
     ],
     "timeline": [
-      {"date": "610 CE", "text": "The revelation begins."},
-      {"date": "615–622", "text": "The Makkan years. Ar-Raʿd belongs to this period."},
-      {"date": "Dhū al-Qaʿdah, 6 AH", "text": "Ḥudaybiyyah. 1,400 Muslims. The pledge of al-Riḍwān."},
-      {"date": "6 AH", "text": "The treaty is written without the name al-Raḥmān — and without 'Messenger of Allah'."},
-      {"date": "7 AH", "text": "The ʿumrah of recompense. They enter Makkah."}
+      {
+        "date": "610 CE",
+        "text": "The revelation begins."
+      },
+      {
+        "date": "615–622",
+        "text": "The Makkan years. Ar-Raʿd belongs to this period."
+      },
+      {
+        "date": "Dhū al-Qaʿdah, 6 AH",
+        "text": "Ḥudaybiyyah. 1,400 Muslims. The pledge of al-Riḍwān."
+      },
+      {
+        "date": "6 AH",
+        "text": "The treaty is written without the name al-Raḥmān — and without 'Messenger of Allah'."
+      },
+      {
+        "date": "7 AH",
+        "text": "The ʿumrah of recompense. They enter Makkah."
+      }
     ],
     "caveat": {
       "title": "A note on the 'occasions of revelation'",
@@ -191,12 +225,36 @@
       }
     ],
     "structure": [
-      {"range": "1–4", "title": "The world as argument", "text": "The Book's truth, then the sky, the mountains, the rivers, the fruit, the night drawn over the day."},
-      {"range": "5–11", "title": "The resurrection, the guards", "text": "They call it strange that dust should be raised. The sūrah answers with knowledge that misses nothing — including the two angels keeping the record."},
-      {"range": "12–17", "title": "Weather, and the flood", "text": "Lightning, thunder, the cloud. Then the water, the valleys, the scum, and the verdict on it."},
-      {"range": "18–29", "title": "The two groups", "text": "Those who fulfil the covenant, join what Allah commanded to be joined, are patient, spend, and repel evil with good — set against those who break it."},
-      {"range": "30–34", "title": "al-Raḥmān", "text": "The āyah of Ḥudaybiyyah. The one name they would not write."},
-      {"range": "35–43", "title": "Closing", "text": "The garden described, the erasing and the confirming, the Mother of the Book, and the Book's own witness."}
+      {
+        "range": "1–4",
+        "title": "The world as argument",
+        "text": "The Book's truth, then the sky, the mountains, the rivers, the fruit, the night drawn over the day."
+      },
+      {
+        "range": "5–11",
+        "title": "The resurrection, the guards",
+        "text": "They call it strange that dust should be raised. The sūrah answers with knowledge that misses nothing — including the two angels keeping the record."
+      },
+      {
+        "range": "12–17",
+        "title": "Weather, and the flood",
+        "text": "Lightning, thunder, the cloud. Then the water, the valleys, the scum, and the verdict on it."
+      },
+      {
+        "range": "18–29",
+        "title": "The two groups",
+        "text": "Those who fulfil the covenant, join what Allah commanded to be joined, are patient, spend, and repel evil with good — set against those who break it."
+      },
+      {
+        "range": "30–34",
+        "title": "al-Raḥmān",
+        "text": "The āyah of Ḥudaybiyyah. The one name they would not write."
+      },
+      {
+        "range": "35–43",
+        "title": "Closing",
+        "text": "The garden described, the erasing and the confirming, the Mother of the Book, and the Book's own witness."
+      }
     ]
   },
   "story": {
@@ -251,7 +309,12 @@
     "closingTranslation": "And Allah guides whom He wills to a straight path. — 13:27"
   },
   "readingOrder": {
-    "recommended": ["introduction", "context", "theme", "tafsir"],
+    "recommended": [
+      "introduction",
+      "context",
+      "theme",
+      "tafsir"
+    ],
     "note": "If you have fifteen minutes: the introduction, then āyāt 1–4, 11, 17, 31 and 39. If you have an evening, read the text in one pass and open the roots as you go."
   }
 }

@@ -92,14 +92,6 @@
       "narrator": "Ibn ʿUmar",
       "english": "The keys of the Unseen are five which none knows but Allah: none knows what will happen tomorrow but Allah; none knows what is in the wombs but Allah; none knows when it will rain but Allah; none knows at what place one will die; and none knows when the Hour will be established but Allah."
     },
-    "bukhari_4537": {
-      "collection": "Sahih al-Bukhari",
-      "number": "4537",
-      "grade": "Ṣaḥīḥ",
-      "url": "https://sunnah.com/bukhari:4537",
-      "narrator": "Abū Hurayrah",
-      "english": "We have more right to be in doubt than Ibrāhīm, when he said: 'My Lord! Show me how You give life to the dead.' He said: 'Do you not believe?' He said: 'Yes, but to make my heart firm.'"
-    },
     "bukhari_555": {
       "collection": "Sahih al-Bukhari",
       "number": "555",
@@ -107,14 +99,6 @@
       "url": "https://sunnah.com/bukhari:555",
       "narrator": "Abū Hurayrah",
       "english": "Angels come to you in succession by night and day, and they gather at the Fajr and ʿAṣr prayers. Then those who spent the night among you ascend, and Allah asks them — and He knows best — 'In what state did you leave My slaves?' They say: 'We left them while they were praying, and we came to them while they were praying.'"
-    },
-    "muslim_2999": {
-      "collection": "Sahih Muslim",
-      "number": "2999",
-      "grade": "Ṣaḥīḥ",
-      "url": "https://sunnah.com/muslim:2999",
-      "narrator": "Ṣuhayb",
-      "english": "Wondrous is the affair of the believer — all of it is good, and that is for no one but the believer: if ease reaches him he is grateful, and that is good for him; and if hardship reaches him he is patient, and that is good for him."
     },
     "tirmidhi_3117": {
       "collection": "Jamiʿ at-Tirmidhī",
@@ -139,38 +123,6 @@
       "url": "https://sunnah.com/ahmad:76",
       "narrator": "Zayd ibn Thābit",
       "english": "By Allah, if they had ordered me to move a mountain, that would not have been heavier on me than what they ordered me to do of collecting the Qur'ān."
-    },
-    "bukhari_4696": {
-      "collection": "Sahih al-Bukhari",
-      "number": "4696",
-      "grade": "Ṣaḥīḥ",
-      "url": "https://sunnah.com/bukhari:4696",
-      "narrator": "ʿUrwah, from ʿĀ'ishah",
-      "english": "I said to her: '(The verse says) they were betrayed (kudhibū) — with a light letter?' She said: 'Allah forbid!' — and she rejected that reading. [ʿĀ'ishah correcting a misreading of 12:110, the verse immediately before this sūrah.]"
-    },
-    "muslim_2653": {
-      "collection": "Sahih Muslim",
-      "number": "2653",
-      "grade": "Ṣaḥīḥ",
-      "url": "https://sunnah.com/muslim:2653a",
-      "narrator": "Abū Hurayrah",
-      "english": "Ādam and Mūsā disputed. Mūsā said: 'You are Ādam — Allah created you with His Hand, breathed into you of His spirit, and commanded the angels to prostrate to you, and then you brought people down to the earth.' Ādam said: 'O Mūsā, Allah chose you with His speech and wrote for you with His Hand; do you blame me for a matter Allah decreed for me before He created me?' So Ādam overcame Mūsā in the argument."
-    },
-    "muslim_8": {
-      "collection": "Sahih Muslim",
-      "number": "8",
-      "grade": "Ṣaḥīḥ",
-      "url": "https://sunnah.com/muslim:8",
-      "narrator": "ʿUmar ibn al-Khaṭṭāb",
-      "english": "Jibrīl asked the Prophet ﷺ about islām, īmān and iḥsān, then asked about the Hour. He said: 'The one asked knows no more than the one asking.' He said: 'Then tell me about its signs.' He said: 'That the slave-girl gives birth to her mistress...' [the ḥadīth of Jibrīl]"
-    },
-    "tirmidhi_3534": {
-      "collection": "Jamiʿ at-Tirmidhī",
-      "number": "3534",
-      "grade": "Ḥasan (Darussalam)",
-      "url": "https://sunnah.com/tirmidhi:3534",
-      "narrator": "ʿUmārah ibn Shabīb",
-      "english": "Whoever says, at the end of al-Maghrib, 'None has the right to be worshipped but Allah, alone, without partner; His is the dominion and His is the praise; He gives life and causes death, and He is powerful over all things' ten times — Allah sends for him guards who protect him from Shayṭān until morning."
     },
     "bukhari_4154": {
       "collection": "Sahih al-Bukhari",
@@ -659,6 +611,56 @@
     "لِلَّذِينَ": {
       "en": "for those who; to those who",
       "kind": "preposition + relative pronoun"
+    }
+  },
+  "unusedHadith": {
+    "bukhari_4537": {
+      "collection": "Sahih al-Bukhari",
+      "number": "4537",
+      "grade": "Ṣaḥīḥ",
+      "url": "https://sunnah.com/bukhari:4537",
+      "narrator": "Abū Hurayrah",
+      "english": "We have more right to be in doubt than Ibrāhīm, when he said: 'My Lord! Show me how You give life to the dead.' He said: 'Do you not believe?' He said: 'Yes, but to make my heart firm.'"
+    },
+    "muslim_2999": {
+      "collection": "Sahih Muslim",
+      "number": "2999",
+      "grade": "Ṣaḥīḥ",
+      "url": "https://sunnah.com/muslim:2999",
+      "narrator": "Ṣuhayb",
+      "english": "Wondrous is the affair of the believer — all of it is good, and that is for no one but the believer: if ease reaches him he is grateful, and that is good for him; and if hardship reaches him he is patient, and that is good for him."
+    },
+    "muslim_8": {
+      "collection": "Sahih Muslim",
+      "number": "8",
+      "grade": "Ṣaḥīḥ",
+      "url": "https://sunnah.com/muslim:8",
+      "narrator": "ʿUmar ibn al-Khaṭṭāb",
+      "english": "Jibrīl asked the Prophet ﷺ about islām, īmān and iḥsān, then asked about the Hour. He said: 'The one asked knows no more than the one asking.' He said: 'Then tell me about its signs.' He said: 'That the slave-girl gives birth to her mistress...' [the ḥadīth of Jibrīl]"
+    },
+    "tirmidhi_3534": {
+      "collection": "Jamiʿ at-Tirmidhī",
+      "number": "3534",
+      "grade": "Ḥasan (Darussalam)",
+      "url": "https://sunnah.com/tirmidhi:3534",
+      "narrator": "ʿUmārah ibn Shabīb",
+      "english": "Whoever says, at the end of al-Maghrib, 'None has the right to be worshipped but Allah, alone, without partner; His is the dominion and His is the praise; He gives life and causes death, and He is powerful over all things' ten times — Allah sends for him guards who protect him from Shayṭān until morning."
+    },
+    "bukhari_4696": {
+      "collection": "Sahih al-Bukhari",
+      "number": "4696",
+      "grade": "Ṣaḥīḥ",
+      "url": "https://sunnah.com/bukhari:4696",
+      "narrator": "ʿUrwah, from ʿĀ'ishah",
+      "english": "I said to her: '(The verse says) they were betrayed (kudhibū) — with a light letter?' She said: 'Allah forbid!' — and she rejected that reading. [ʿĀ'ishah correcting a misreading of 12:110, the verse immediately before this sūrah.]"
+    },
+    "muslim_2653": {
+      "collection": "Sahih Muslim",
+      "number": "2653",
+      "grade": "Ṣaḥīḥ",
+      "url": "https://sunnah.com/muslim:2653a",
+      "narrator": "Abū Hurayrah",
+      "english": "Ādam and Mūsā disputed. Mūsā said: 'You are Ādam — Allah created you with His Hand, breathed into you of His spirit, and commanded the angels to prostrate to you, and then you brought people down to the earth.' Ādam said: 'O Mūsā, Allah chose you with His speech and wrote for you with His Hand; do you blame me for a matter Allah decreed for me before He created me?' So Ādam overcame Mūsā in the argument."
     }
   }
 }

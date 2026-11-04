@@ -1,60 +1,20 @@
-import { citations, editorial, rootCount, ayat } from "../data";
+import { citations } from "../data";
 import { ChapterHead } from "../components/ChapterHead";
 
 export function Colophon({ go }: { go: (s: string) => void }) {
   const srcs = citations.sources as any[];
   const hadiths = Object.entries(citations.hadith) as [string, any][];
 
-  const reportCount = ayat.filter((a) => a.note?.type === "report").length;
-  const cautionCount = ayat.filter(
-    (a) => a.note?.type === "caution" || a.note?.type === "disputed"
-  ).length;
-
   return (
     <div className="page">
       <div className="wrap">
         <ChapterHead
-          number="08"
-          label="Colophon"
-          title={editorial.conclusion.title}
-          quote={editorial.conclusion.paragraphs[3].text}
-          kicker="Sources · Rights · Method"
+          number="09"
+          label="Sources"
+          title="Colophon"
+          quote="Every source, every hadith number, and the method behind the magazine."
+          kicker="Rights · Method"
         />
-
-        <div className="split split-13" style={{ marginBottom: "clamp(2.5rem,6vw,4rem)" }}>
-          <div>
-            <div className="ar" style={{ fontSize: "clamp(1.3rem,4.4vw,1.7rem)", color: "var(--paper)", lineHeight: 2 }}>
-              {editorial.conclusion.closing}
-            </div>
-            <p className="tiny dim" style={{ marginTop: ".5rem" }}>
-              {editorial.conclusion.closingTranslation}
-            </p>
-          </div>
-          <div className="prose">
-            {editorial.conclusion.paragraphs.map((p: any, i: number) => (
-              <p key={i}>{p.text}</p>
-            ))}
-          </div>
-        </div>
-
-        <div className="facts" style={{ marginBottom: "clamp(2.5rem,6vw,4rem)" }}>
-          <div className="fact">
-            <div className="fact-v">{ayat.length}</div>
-            <div className="fact-k">Āyāt annotated</div>
-          </div>
-          <div className="fact">
-            <div className="fact-v">{rootCount}</div>
-            <div className="fact-k">Roots traced</div>
-          </div>
-          <div className="fact">
-            <div className="fact-v">{reportCount}</div>
-            <div className="fact-k">Named occasions</div>
-          </div>
-          <div className="fact">
-            <div className="fact-v">{cautionCount}</div>
-            <div className="fact-k">Flagged / disputed</div>
-          </div>
-        </div>
 
         <h3
           style={{

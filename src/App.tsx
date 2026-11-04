@@ -9,6 +9,7 @@ import { Tafsir } from "./pages/Tafsir";
 import { Story } from "./pages/Story";
 import { RootsIndex } from "./pages/RootsIndex";
 import { Colophon } from "./pages/Colophon";
+import { Conclusion } from "./pages/Conclusion";
 
 const SLUGS = chapters.map((c) => c.slug);
 
@@ -140,6 +141,8 @@ export default function App({ initialSlug }: { initialSlug?: string } = {}) {
         return <Story go={go} />;
       case "roots":
         return <RootsIndex />;
+      case "conclusion":
+        return <Conclusion go={go} />;
       case "colophon":
         return <Colophon go={go} />;
       default:

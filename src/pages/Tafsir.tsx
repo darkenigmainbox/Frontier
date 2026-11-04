@@ -135,6 +135,30 @@ export function Tafsir({
             scrollbarWidth: "none",
           }}
         >
+          <button
+            className="icon-btn"
+            onClick={() => {
+              const n = Math.max(1, (focus || 1) - 1);
+              setFocus(n);
+              window.history.replaceState({}, "", `/tafsir/${n}`);
+            }}
+            aria-label="Previous āyah"
+            style={{ flex: "0 0 auto" }}
+          >
+            ← āyah
+          </button>
+          <button
+            className="icon-btn"
+            onClick={() => {
+              const n = Math.min(43, (focus || 1) + 1);
+              setFocus(n);
+              window.history.replaceState({}, "", `/tafsir/${n}`);
+            }}
+            aria-label="Next āyah"
+            style={{ flex: "0 0 auto" }}
+          >
+            āyah →
+          </button>
           {RANGES.map((r, i) => (
             <button
               key={r.label}
@@ -259,21 +283,6 @@ export function Tafsir({
           </p>
         </div>
 
-        <div className="pager" style={{ marginBottom: "3rem" }}>
-          <button className="pager-btn" onClick={() => setFocus(Math.max(1, (focus || 1) - 1))}>
-            <span className="pager-dir">← Previous</span>
-            <span className="pager-name">
-              Āyah {Math.max(1, (focus || 1) - 1)}
-            </span>
-          </button>
-          <button
-            className="pager-btn next"
-            onClick={() => setFocus(Math.min(43, (focus || 1) + 1))}
-          >
-            <span className="pager-dir">Next →</span>
-            <span className="pager-name">Āyah {Math.min(43, (focus || 1) + 1)}</span>
-          </button>
-        </div>
       </div>
       {element}
     </div>
