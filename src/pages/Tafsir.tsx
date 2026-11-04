@@ -39,7 +39,14 @@ export function Tafsir({
   setShowTranslation: (b: boolean) => void;
 }) {
   const { open, openParticle, element } = useRoots();
-  const [range, setRange] = useState(0);
+  // A deep link starts in the range that actually holds that āyah. It used to
+  // start on "All" while the focus sat inside a filtered range, so the target
+  // element was not mounted yet and the scroll went nowhere.
+  const [range, setRange] = useState(() => {
+    if (!focus) return 0;
+    const i = RANGES.findIndex((r) => focus >= r.from && focus <= r.to);
+    return i === -1 ? 0 : i;
+  });
   const [reader, setReader] = useState(1);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -56,12 +63,19 @@ export function Tafsir({
   }, [range]);
 
   useEffect(() => {
-    if (focus) {
+    if (!focus) return;
+    // retry briefly: the target is mounted after the range change commits
+    let tries = 0;
+    const go = () => {
       const el = document.getElementById(`ayah-${focus}`);
       if (el) {
-        setTimeout(() => el.scrollIntoView({ block: "start", behavior: "smooth" }), 80);
+        const y = el.getBoundingClientRect().top + window.scrollY - 96;
+        window.scrollTo({ top: y, behavior: "auto" });
+      } else if (tries++ < 12) {
+        setTimeout(go, 60);
       }
-    }
+    };
+    go();
   }, [focus, range]);
 
   return (
@@ -69,7 +83,7 @@ export function Tafsir({
       <div className="wrap">
         <header className="chapter-head" style={{ paddingBottom: "1.4rem" }}>
           <div className="chapter-num" aria-hidden="true">
-            <span>05</span>
+            <span>06</span>
           </div>
           <div className="chapter-meta">
             <span>The Text</span>

@@ -8,7 +8,7 @@ export function Story({ go }: { go: (s: string) => void }) {
   return (
     <div className="page">
       <div className="wrap">
-        <ChapterHead number="06" label="Story" title={s.title} quote={s.standfirst} kicker="Musnad Aḥmad 76 · Ṣaḥīḥ al-Bukhārī 4986" />
+        <ChapterHead number="07" label="Story" title={s.title} quote={s.standfirst} kicker="Musnad Aḥmad 76 · Ṣaḥīḥ al-Bukhārī 4986" />
 
         <div className="split split-13">
           <figure className="figure aspect-4-5" style={{ alignSelf: "start" }}>

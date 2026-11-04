@@ -12,7 +12,7 @@ export function Conclusion({ go }: { go: (s: string) => void }) {
     <div className="page">
       <div className="wrap">
         <ChapterHead
-          number="08"
+          number="09"
           label="Conclusion"
           title={c.title}
           quote="Read as a whole, the sūrah does not argue anyone out of their position. It shows them their own world."

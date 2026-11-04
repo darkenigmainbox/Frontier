@@ -22,55 +22,62 @@
     },
     {
       "number": "02",
+      "slug": "map",
+      "label": "The Sūrah",
+      "title": "How Ar-Raʿd is built",
+      "quote": "A map of the sūrah before you read it."
+    },
+    {
+      "number": "03",
       "slug": "introduction",
       "label": "Introduction",
       "title": "What this sūrah is",
       "quote": "Signs, and the demand for signs."
     },
     {
-      "number": "03",
+      "number": "04",
       "slug": "context",
       "label": "Context",
       "title": "The word they would not write",
       "quote": "Ḥudaybiyyah, 6 AH — one refusal, one name, and a treaty that looked like a defeat."
     },
     {
-      "number": "04",
+      "number": "05",
       "slug": "theme",
       "label": "Theme",
       "title": "Truth and foam",
       "quote": "An image, a verdict, and the whole history of any message decided by it."
     },
     {
-      "number": "05",
+      "number": "06",
       "slug": "tafsir",
       "label": "The Text",
       "title": "Āyah by āyah",
       "quote": "Forty-three āyāt. Tap any underlined word to see the root it grows from."
     },
     {
-      "number": "06",
+      "number": "07",
       "slug": "story",
       "label": "Story",
       "title": "Zayd and the mountain",
       "quote": "How a sūrah gets carried."
     },
     {
-      "number": "07",
+      "number": "08",
       "slug": "roots",
       "label": "Lexicon",
       "title": "Roots",
       "quote": "The vocabulary of the sūrah, traced to its three letters."
     },
     {
-      "number": "08",
+      "number": "09",
       "slug": "conclusion",
       "label": "Conclusion",
       "title": "What is left in the ground",
       "quote": "Read as a whole, the sūrah does not argue anyone out of their position. It shows them their own world."
     },
     {
-      "number": "09",
+      "number": "10",
       "slug": "colophon",
       "label": "Sources",
       "title": "Colophon",
@@ -80,26 +87,26 @@
   "introduction": {
     "kicker": "Introduction",
     "arabicHeading": "وَالَّذِي أُنزِلَ إِلَيْكَ مِن رَّبِّكَ الْحَقُّ",
-    "lede": "Ar-Raʿd refuses to separate the message from the world it lands in. Its opening sentence is a claim of truth; its next twenty āyāt are a tour of everything that is already telling the truth — the raised sky, the anchored mountains, the paired fruit, the light on the horizon, the rain, the thunder.",
+    "lede": "Ar-Raʿd does not split the message off from the world it lands in. It opens with a claim of truth, then spends twenty āyāt pointing at things that are already saying something: the raised sky, the fixed mountains, two kinds of fruit from one rain, the light on the horizon, the thunder.",
     "paragraphs": [
       {
         "text": "It was delivered in Makkah, before the hijrah, to a people who had reduced revelation to a demand: bring us a sign. Not a sign they would read, but a sign that would perform — split the mountain, bring the dead to speak, make the sky fall.",
         "cite": "ibnkathir"
       },
       {
-        "text": "The sūrah answers by pointing out that they were already standing inside a sign. The heavens hold no visible pillars. The mountains hold the ground still. Two opposite kinds of fruit come from one water. The lightning frightens and the rain relieves — the same weather doing both at once. If the world is this legible, the demand for a bigger miracle is not a question. It is a way of not reading.",
+        "text": "The sūrah answers by pointing out that they were already standing inside a sign. The heavens hold no visible pillars. The mountains hold the ground still. Two opposite kinds of fruit come from one water. The lightning frightens and the rain relieves — the same weather doing both at once. If the world already says this much, asking for a bigger miracle is not a question. It is a way of not looking.",
         "cite": "mukhtasar"
       },
       {
-        "text": "Then, in āyah 17, the sūrah gives one image that is meant to be carried away: a flood carrying foam, and ore in a fire throwing off its dross. The foam looks like it is the flood. It is not. The foam is what the flood throws away.",
+        "text": "Then, in āyah 17, the sūrah gives one image to carry away: a flood carrying foam on top of it, and metal in a fire giving off a foam of its own. The foam looks like the flood. It is not. The foam is what the flood throws away.",
         "cite": "ibnkathir"
       },
       {
-        "text": "Read the āyāt as a single argument and the shape is clear. The world is presented as evidence; the evidence is refused; the refusal is answered with a portrait of two kinds of people; and then the sūrah closes by naming its own witness. What it never does is negotiate the terms of the evidence.",
+        "text": "Read the āyāt as a single argument and the shape is clear. The world is presented as evidence; the evidence is refused; the refusal is answered with a portrait of two kinds of people; and then the sūrah closes by naming its own witness. What it never does is accept their terms for what counts as proof.",
         "cite": "mukhtasar"
       },
       {
-        "text": "Between āyah 11 — that Allah does not change a people's condition until they change what is in themselves — and āyah 39, that Allah erases what He wills and confirms what He wills, the sūrah holds two things side by side that are hard to hold at once: real human agency, and a decree that is already written. It does not dissolve the tension. It leaves the reader standing in it, which is where the sūrah has been aiming the whole time.",
+        "text": "Between āyah 11 — that Allah does not change a people's condition until they change what is in themselves — and āyah 39, that Allah erases what He wills and confirms what He wills, the sūrah holds two things side by side that are hard to hold at once: real human agency, and a decree that is already written. It does not make the tension go away. It leaves the reader standing in it, which is where the sūrah has been heading all along.",
         "cite": "ibnkathir"
       }
     ],
@@ -153,12 +160,12 @@
       },
       {
         "heading": "The claim of a specific occasion",
-        "text": "The claim that 13:30 came down on that exact day is recorded in al-Wāḥidī's Asbāb al-Nuzūl, on the authority of 'the commentators of the Qur'ān'. It is reported as an occasion, not as a saying of the Prophet ﷺ, and this magazine presents it that way. What is certain, and what needs no intermediary, is that the scene in Ṣaḥīḥ al-Bukhārī 2731 and the wording of 13:30 are about the same thing.",
+        "text": "The claim that 13:30 came down on that exact day is recorded in al-Wāḥidī's Asbāb al-Nuzūl, on the authority of 'the commentators of the Qur'ān'. It is reported as an occasion, not as a saying of the Prophet ﷺ, and this magazine presents it that way. What is certain, and needs nothing in between, is that the scene in Ṣaḥīḥ al-Bukhārī 2731 and the wording of 13:30 are about the same thing.",
         "cite": "mawsuah"
       },
       {
         "heading": "Abū Jandal",
-        "text": "Before the document was finished, Abū Jandal — Suhayl's own son — arrived, running, his fetters still on, having escaped from Makkah to join the Muslims. Suhayl demanded him back, as the treaty's terms required. The Prophet ﷺ returned him. ʿUmar could not bear it and went to Abū Bakr: 'Are we not on the truth and our enemy on falsehood? Why do we give the abasement in our religion?' Abū Bakr answered: 'He is the Messenger of Allah, and he is not disobeying his Lord, and his Lord is his helper. Hold on to his stirrup.'",
+        "text": "Before the document was finished, Abū Jandal — Suhayl's own son — arrived running, his chains still on, having escaped from Makkah to join the Muslims. Suhayl demanded him back, as the treaty's terms required. The Prophet ﷺ returned him. ʿUmar could not bear it and went to Abū Bakr: 'Are we not on the truth and our enemy on falsehood? Why do we give the abasement in our religion?' Abū Bakr answered: 'He is the Messenger of Allah, and he is not disobeying his Lord, and his Lord is his helper. Hold on to his stirrup.'",
         "cite": "bukhari_2731"
       },
       {
@@ -197,7 +204,7 @@
   "theme": {
     "kicker": "Theme",
     "title": "Truth and foam",
-    "standfirst": "Ar-Raʿd 13:17 is one of the most carefully built images in the Qur'ān. It contains a flood, a fire, a scum on both, and a disappearance.",
+    "standfirst": "Ar-Raʿd 13:17 is one of the most carefully built images in the Qur'ān. It holds a flood, a fire, a foam on both of them, and a disappearance.",
     "blocks": [
       {
         "label": "The image",
@@ -208,19 +215,19 @@
       {
         "label": "The second image",
         "arabic": "وَمِمَّا يُوقِدُونَ عَلَيْهِ فِي النَّارِ ابْتِغَاءَ حِلْيَةٍ أَوْ مَتَاعٍ زَبَدٌ مِّثْلُهُ",
-        "text": "And from what they smelt in the fire, seeking ornament or goods, comes a scum like it. Gold, silver, iron: everything valuable, heated, throws up something ugly and light — and that is what you see first.",
+        "text": "And from what they melt in the fire, wanting jewellery or goods, comes a foam like it. Gold, silver, iron: everything valuable, heated, throws up something ugly and light — and that is what you see first.",
         "cite": "mukhtasar"
       },
       {
         "label": "The verdict",
         "arabic": "فَأَمَّا الزَّبَدُ فَيَذْهَبُ جُفَاءً ۖ وَأَمَّا مَا يَنفَعُ النَّاسَ فَيَمْكُثُ فِي الْأَرْضِ",
-        "text": "As for the foam, it goes as jetsam. As for what benefits people, it remains in the earth. One sentence, and the whole history of any message is decided by it: the visible thing is not always the real thing.",
+        "text": "As for the foam, it is carried off and thrown away. As for what benefits people, it stays in the earth. One sentence, and the whole history of any message is decided by it: the visible thing is not always the real thing.",
         "cite": "ibnkathir"
       },
       {
         "label": "The application",
         "arabic": "كَذَٰلِكَ يَضْرِبُ اللَّهُ الْأَمْثَالَ",
-        "text": "So does Allah strike the parables. The image is not decoration. In the Makkan moment it meant: the Quraysh had the numbers, the pomp, the lineage, the noise — the foam. The message had almost none of that. The sūrah tells you which of the two is going to be left in the ground.",
+        "text": "So does Allah strike the parables. The image is not decoration. In Makkah it meant: the Quraysh had the numbers, the display, the family names, the noise — the foam. The message had almost none of that. The sūrah tells you which of the two is going to be left in the ground.",
         "cite": "mukhtasar"
       }
     ],
@@ -238,7 +245,7 @@
       {
         "range": "12–17",
         "title": "Weather, and the flood",
-        "text": "Lightning, thunder, the cloud. Then the water, the valleys, the scum, and the verdict on it."
+        "text": "Lightning, thunder, the cloud. Then the water, the valleys, the foam, and the verdict on it."
       },
       {
         "range": "18–29",
@@ -275,7 +282,7 @@
         "cite": "ahmad_76"
       },
       {
-        "text": "What makes Zayd's sentence worth a page is the thing he compares it to. He could think of nothing heavier than moving a mountain. And in this sūrah the very demand the Quraysh kept making was that a recitation be produced with which the mountains could be moved. Ibn Kathīr records āyah 31 as Allah's answer to that demand: if there had been any recitation by which the mountains were removed, or the earth cleft, or the dead made to speak, it would have been this one — but the decision is Allah's entirely.",
+        "text": "What makes Zayd's sentence worth a page is the thing he compares it to. He could think of nothing heavier than moving a mountain. And in this sūrah the very demand the Quraysh kept making was that a recitation be produced with which the mountains could be moved. Ibn Kathīr records āyah 31 as Allah's answer to that demand: if there had been any recitation that moved the mountains, or split the earth open, or made the dead speak, it would have been this one — but the decision is Allah's entirely.",
         "cite": "ibnkathir"
       },
       {
@@ -302,7 +309,7 @@
         "text": "Between that and the closing witness there is āyah 39, the one no reader leaves behind: 'Allah erases what He wills and confirms what He wills, and with Him is the Mother of the Book.' It came to ʿUmar when the treaty of Ḥudaybiyyah looked like a defeat. It is a promise that neither the visible loss nor the visible triumph is the final state of the document. There is a mother text. Everything else is a copy of it."
       },
       {
-        "text": "That is the whole apparatus of this magazine, in one line."
+        "text": "That is the whole method of this reading, in one line."
       }
     ],
     "closing": "وَاللَّهُ يَهْدِي مَن يَشَاءُ إِلَىٰ صِرَاطٍ مُّسْتَقِيمٍ",

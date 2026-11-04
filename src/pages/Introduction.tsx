@@ -9,7 +9,7 @@ export function Introduction({ go }: { go: (s: string) => void }) {
     <div className="page">
       <div className="wrap">
         <ChapterHead
-          number="02"
+          number="03"
           label="Introduction"
           title={intro.lede.split(".")[0] + "."}
           quote="Forty-three āyāt, delivered in Makkah, about a world that was already speaking."

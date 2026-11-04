@@ -9,7 +9,7 @@ export function Theme({ go }: { go: (s: string) => void }) {
     <div className="page">
       <div className="wrap">
         <ChapterHead
-          number="04"
+          number="05"
           label="Theme"
           title={t.title}
           quote={t.standfirst}

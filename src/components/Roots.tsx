@@ -56,7 +56,7 @@ function ParticleSheet({
   );
 }
 
-function RootSheet({ root, word, onClose }: { root: Root; word?: string; onClose: () => void }) {
+export function RootSheet({ root, word, onClose }: { root: Root; word?: string; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();

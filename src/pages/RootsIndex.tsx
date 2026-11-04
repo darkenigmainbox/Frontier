@@ -28,7 +28,7 @@ export function RootsIndex() {
     <div className="page">
       <div className="wrap">
         <ChapterHead
-          number="07"
+          number="08"
           label="Lexicon"
           title="Every root, three letters at a time"
           quote={`${all.length} distinct roots carry the whole of Sūrah Ar-Raʿd. Open any of them.`}

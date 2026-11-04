@@ -9,7 +9,7 @@ export function Colophon({ go }: { go: (s: string) => void }) {
     <div className="page">
       <div className="wrap">
         <ChapterHead
-          number="09"
+          number="10"
           label="Sources"
           title="Colophon"
           quote="Every source, every hadith number, and the method behind the magazine."

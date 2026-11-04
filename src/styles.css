@@ -1225,3 +1225,185 @@ body.light .pullquote p { color: #14140f; }
 body.light .fact-v { color: #14140f; }
 body.light .figure figcaption { color: #f2efe9; }
 body.light .pager-name { color: var(--muted); }
+
+/* ================================================================ sūrah map
+   The index inside a sūrah: movements, labelled occasions, vocabulary.
+   Same magazine rules — hairlines, no boxes, numbers doing the work. */
+
+.mv {
+  display: grid;
+  grid-template-columns: 1fr;
+  padding: 1.5rem 0 1.2rem;
+  border-top: 1px solid var(--line);
+}
+
+@media (min-width: 860px) {
+  .mv { grid-template-columns: 13rem 1fr; column-gap: clamp(1.5rem,4vw,3.5rem); }
+  .mv-head { grid-column: 1; }
+  .mv-note { grid-column: 1; }
+  .mv-entries { grid-column: 2; grid-row: 1 / span 3; }
+}
+
+.mv-range {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  color: var(--signal);
+}
+
+.mv-label {
+  font-size: clamp(1.15rem, 3.4vw, 1.5rem);
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  margin: 0.4rem 0 0;
+  line-height: 1.15;
+}
+
+.mv-note {
+  font-size: 0.86rem;
+  line-height: 1.7;
+  color: var(--muted);
+  margin: 0.5rem 0 0;
+  max-width: 32ch;
+}
+
+.mv-entries { margin-top: 1rem; }
+@media (min-width: 860px) { .mv-entries { margin-top: 0; } }
+
+.mv-entry {
+  display: grid;
+  grid-template-columns: 2rem 1fr auto;
+  gap: 0.7rem;
+  align-items: baseline;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  padding: 0.6rem 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: padding-left 0.22s var(--ease);
+}
+.mv-entry:hover { padding-left: 0.35rem; }
+.mv-entry:hover .mv-t { color: var(--paper); }
+.mv-entry:hover .mv-n { color: var(--signal); }
+
+.mv-n {
+  font-size: 0.68rem;
+  color: var(--dim);
+}
+
+.mv-t {
+  font-size: 0.95rem;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.mv-occ {
+  font-size: 0.55rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--signal-dim);
+}
+.mv-occ.disputed { color: #9a7b2a; }
+.mv-occ.caution { color: #8a6a7a; }
+
+/* ---- occasions list */
+.occ-item {
+  display: grid;
+  grid-template-columns: 1.8rem 1fr auto;
+  gap: 0.7rem;
+  align-items: start;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  padding: 0.85rem 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.occ-item:hover .occ-item-t { color: var(--paper); }
+
+.occ-item-n {
+  font-size: 0.68rem;
+  color: var(--signal-dim);
+  padding-top: 0.15rem;
+}
+
+.occ-item-t {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.occ-item-w {
+  display: block;
+  font-size: 0.76rem;
+  line-height: 1.6;
+  color: var(--dim);
+  margin-top: 0.2rem;
+}
+
+.occ-pill {
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  padding: 0.14rem 0.36rem;
+  white-space: nowrap;
+  color: var(--signal-dim);
+}
+.occ-pill.disputed { color: #9a7b2a; border-color: #2a2415; }
+.occ-pill.caution { color: #8a6a7a; border-color: #231a20; }
+
+/* ---- vocabulary */
+.vocab {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--line-soft);
+  border: 1px solid var(--line-soft);
+}
+
+.vocab-item {
+  background: var(--ink);
+  border: 0;
+  padding: 0.85rem 0.8rem;
+  text-align: right;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  display: grid;
+  gap: 0.25rem;
+  transition: background 0.2s var(--ease);
+}
+.vocab-item:hover { background: var(--ink-2); }
+.vocab-item:hover .vocab-ar { color: var(--signal); }
+
+.vocab-ar {
+  font-size: 1.28rem;
+  color: var(--paper);
+  line-height: 1.7;
+  direction: rtl;
+}
+
+.vocab-en {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: left;
+  direction: ltr;
+  line-height: 1.4;
+}
+
+.vocab-n {
+  font-size: 0.56rem;
+  color: var(--ghost);
+  text-align: left;
+  direction: ltr;
+  letter-spacing: 0.06em;
+}

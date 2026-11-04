@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { chapters, editorial } from "./data";
 import { Cover } from "./pages/Cover";
 import { Index } from "./pages/Index";
+import { SurahMap } from "./pages/SurahMap";
 import { Introduction } from "./pages/Introduction";
 import { Context } from "./pages/Context";
 import { Theme } from "./pages/Theme";
@@ -51,16 +52,20 @@ export default function App({ initialSlug }: { initialSlug?: string } = {}) {
     return () => window.removeEventListener("popstate", apply);
   }, []);
 
+  /** go("tafsir/11") keeps the āyah; anything else clears it. */
   const go = (s: string) => {
     setDrawer(false);
-    if (s !== "tafsir") setFocus(undefined);
+    const [head, sub] = s.split("/");
+    const n = sub ? parseInt(sub.replace(/[^0-9]/g, ""), 10) : NaN;
+    setFocus(head === "tafsir" && n >= 1 && n <= 43 ? n : undefined);
+
     const target = s === "home" ? "/" : "/" + s;
     if (window.location.pathname === target) {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
     window.history.pushState({}, "", target);
-    setSlug(s);
+    setSlug(SLUGS.includes(head) ? head : "home");
     window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
   };
 
@@ -122,6 +127,8 @@ export default function App({ initialSlug }: { initialSlug?: string } = {}) {
         return <Cover onEnter={() => go("index")} />;
       case "index":
         return <Index go={go} />;
+      case "map":
+        return <SurahMap go={go} />;
       case "introduction":
         return <Introduction go={go} />;
       case "context":

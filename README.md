@@ -13,6 +13,7 @@ letters open a short lexical gloss instead of being dead text.
 | Chapter | What it does |
 | --- | --- |
 | **Index** | Contents, reading order, and how the sourcing works |
+| **The Sūrah** | The sūrah's own index, inside the magazine's index: its six movements with all 29 named passages, the seven āyāt where an occasion is reported, and the twelve words it turns on — every line a link into the text |
 | **Introduction** | Short, concise reading of what the sūrah is and how it argues |
 | **Context** | The treaty of Ḥudaybiyyah, 6 AH — the occasion behind 13:30, from Ṣaḥīḥ al-Bukhārī 2731–2732 and 4154 |
 | **Theme** | 13:17 — the flood, the ore, the foam, and the verdict |

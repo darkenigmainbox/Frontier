@@ -15,6 +15,7 @@ export function render(slug: string) {
   const titles: Record<string, string> = {
     home: `${base} — A Sūrah Magazine`,
     index: `Index — ${base}`,
+    map: `The sūrah’s index — ${base}`,
     introduction: `Introduction — ${base}`,
     context: `Context: Ḥudaybiyyah — ${base}`,
     theme: `Theme: Truth and Foam — ${base}`,
@@ -27,6 +28,7 @@ export function render(slug: string) {
   const descriptions: Record<string, string> = {
     home: `${m.name} (Sūrah 13) — 43 āyāt, word roots, occasion of revelation per āyah, and only verified hadith. A dark, minimal magazine.`,
     index: "Contents of the Ar-Raʿd magazine.",
+    map: "A map of Sūrah Ar-Raʿd: its six movements, the āyāt with a reported occasion, and the words it turns on.",
     introduction: editorial.introduction.lede,
     context:
       "The treaty of Ḥudaybiyyah, 6 AH — the occasion behind 13:30, from Ṣaḥīḥ al-Bukhārī 2731.",

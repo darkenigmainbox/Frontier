@@ -8,7 +8,7 @@ export function Context() {
   return (
     <div className="page">
       <div className="wrap">
-        <ChapterHead number="03" label="Context" title={c.title} quote={c.standfirst} kicker="6 AH · Al-Ḥudaybiyyah" />
+        <ChapterHead number="04" label="Context" title={c.title} quote={c.standfirst} kicker="6 AH · Al-Ḥudaybiyyah" />
 
         <figure className="figure aspect-16-9" style={{ marginBottom: "clamp(2rem,5vw,3rem)" }}>
           <img src="/img/desert.webp" alt="Desert approach — a caravan road in low light" />

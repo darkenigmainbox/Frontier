@@ -1,0 +1,308 @@
+{
+  "kicker": "Index of the sūrah",
+  "title": "How Ar-Raʿd is built",
+  "standfirst": "A map of the sūrah before you read it: six movements, the āyāt where an occasion is reported, and the words it repeats most. Every line jumps into the text.",
+  "movements": [
+    {
+      "range": [
+        1,
+        4
+      ],
+      "label": "The world as proof",
+      "note": "The Book is true, and then the sūrah points at the sky, the mountains, the rivers, the fruit and the night — things already saying something.",
+      "entries": [
+        {
+          "ayah": 1,
+          "title": "The disjoined letters"
+        },
+        {
+          "ayah": 2,
+          "title": "No pillars you can see"
+        },
+        {
+          "ayah": 3,
+          "title": "Mountains, rivers, two kinds of fruit"
+        },
+        {
+          "ayah": 4,
+          "title": "One water, many tastes"
+        }
+      ]
+    },
+    {
+      "range": [
+        5,
+        11
+      ],
+      "label": "Dust raised, and the record",
+      "note": "They call it strange that dust should be raised. The answer is knowledge that misses nothing, down to the two angels keeping the record.",
+      "entries": [
+        {
+          "ayah": 5,
+          "title": "Dust and bones"
+        },
+        {
+          "ayah": 6,
+          "title": "Why they are not punished at once"
+        },
+        {
+          "ayah": 8,
+          "title": "The keys of the Unseen",
+          "occ": "report"
+        },
+        {
+          "ayah": 11,
+          "title": "The guards who take turns",
+          "occ": "report"
+        },
+        {
+          "ayah": 11,
+          "title": "A people does not change until…"
+        }
+      ]
+    },
+    {
+      "range": [
+        12,
+        17
+      ],
+      "label": "Weather, then the flood",
+      "note": "Lightning and thunder, then rain, valleys, foam — and the verdict on what is left behind.",
+      "entries": [
+        {
+          "ayah": 12,
+          "title": "Lightning to look at"
+        },
+        {
+          "ayah": 13,
+          "title": "What the thunder is",
+          "occ": "report"
+        },
+        {
+          "ayah": 14,
+          "title": "Calling on what cannot answer"
+        },
+        {
+          "ayah": 15,
+          "title": "Everything bows"
+        },
+        {
+          "ayah": 16,
+          "title": "Who holds the sky"
+        },
+        {
+          "ayah": 17,
+          "title": "The flood, the metal, the foam"
+        }
+      ]
+    },
+    {
+      "range": [
+        18,
+        29
+      ],
+      "label": "Two kinds of people",
+      "note": "Those who keep the covenant, join what was ordered joined, are patient, spend, and answer evil with good — set against those who break it.",
+      "entries": [
+        {
+          "ayah": 18,
+          "title": "Who responds, and who does not"
+        },
+        {
+          "ayah": 19,
+          "title": "The one who knows, the one who is blind"
+        },
+        {
+          "ayah": 20,
+          "title": "What the patient do"
+        },
+        {
+          "ayah": 23,
+          "title": "Gardens of lasting stay"
+        },
+        {
+          "ayah": 25,
+          "title": "Those who break the covenant"
+        },
+        {
+          "ayah": 28,
+          "title": "Hearts find rest in Him"
+        }
+      ]
+    },
+    {
+      "range": [
+        30,
+        34
+      ],
+      "label": "The word they would not write",
+      "note": "The āyah tied to Ḥudaybiyyah, and the name Suhayl refused.",
+      "entries": [
+        {
+          "ayah": 30,
+          "title": "The name al-Raḥmān",
+          "occ": "report"
+        },
+        {
+          "ayah": 31,
+          "title": "The recitation that moves mountains",
+          "occ": "disputed"
+        },
+        {
+          "ayah": 33,
+          "title": "Over every soul, a guardian"
+        }
+      ]
+    },
+    {
+      "range": [
+        35,
+        43
+      ],
+      "label": "Closing",
+      "note": "The garden described, the erasing and the confirming, and the Book's own witness.",
+      "entries": [
+        {
+          "ayah": 35,
+          "title": "The promise of the garden"
+        },
+        {
+          "ayah": 38,
+          "title": "He was a man with a family",
+          "occ": "report"
+        },
+        {
+          "ayah": 39,
+          "title": "Erasing and confirming",
+          "occ": "caution"
+        },
+        {
+          "ayah": 41,
+          "title": "The earth shrinking"
+        },
+        {
+          "ayah": 43,
+          "title": "The witness who is sufficient"
+        }
+      ]
+    }
+  ],
+  "occasions": [
+    {
+      "ayah": 8,
+      "kind": "report",
+      "title": "The keys of the Unseen",
+      "who": "Concerning knowledge of the Hour, and the five things in 31:34."
+    },
+    {
+      "ayah": 11,
+      "kind": "report",
+      "title": "The guards who take turns",
+      "who": "Angels who succeed one another, meeting at Fajr and ʿAṣr."
+    },
+    {
+      "ayah": 13,
+      "kind": "report",
+      "title": "What the thunder is",
+      "who": "An angel driving the clouds, with fire in his hand."
+    },
+    {
+      "ayah": 30,
+      "kind": "report",
+      "title": "The name they would not write",
+      "who": "Suhayl ibn ʿAmr at Ḥudaybiyyah, refusing the name al-Raḥmān."
+    },
+    {
+      "ayah": 31,
+      "kind": "disputed",
+      "title": "The recitation that moves mountains",
+      "who": "The famous ʿUmm ʿAṭāʾ report — weak, and not used as proof here."
+    },
+    {
+      "ayah": 38,
+      "kind": "report",
+      "title": "He was a man with a family",
+      "who": "A group who came to ask why the Prophet ﷺ ate food and married."
+    },
+    {
+      "ayah": 39,
+      "kind": "caution",
+      "title": "Erasing and confirming",
+      "who": "A story from the Ḥudaybiyyah period that the sound reports do not carry."
+    }
+  ],
+  "vocabulary": [
+    {
+      "ar": "السَّحَاب",
+      "en": "the clouds",
+      "root": "سحب",
+      "ayah": 12
+    },
+    {
+      "ar": "الْبَرْق",
+      "en": "the lightning",
+      "root": "برق",
+      "ayah": 12
+    },
+    {
+      "ar": "الرَّعْد",
+      "en": "thunder",
+      "root": "رعد",
+      "ayah": 13
+    },
+    {
+      "ar": "السَّيْل",
+      "en": "the flood",
+      "root": "سيل",
+      "ayah": 17
+    },
+    {
+      "ar": "الزَّبَد",
+      "en": "the foam",
+      "root": "زبد",
+      "ayah": 17
+    },
+    {
+      "ar": "جُفَاء",
+      "en": "thrown off, carried away",
+      "root": "جفأ",
+      "ayah": 17
+    },
+    {
+      "ar": "عَمَد",
+      "en": "pillars",
+      "root": "عمد",
+      "ayah": 2
+    },
+    {
+      "ar": "الْأَمْثَال",
+      "en": "the parables",
+      "root": "مثل",
+      "ayah": 17
+    },
+    {
+      "ar": "الْمَآب",
+      "en": "the return",
+      "root": "أوب",
+      "ayah": 29
+    },
+    {
+      "ar": "مِيثَاق",
+      "en": "the binding pledge",
+      "root": "وثق",
+      "ayah": 25
+    },
+    {
+      "ar": "طُوبَى",
+      "en": "good, and a good end",
+      "root": "طيب",
+      "ayah": 29
+    },
+    {
+      "ar": "أَنَاب",
+      "en": "turned back",
+      "root": "نوب",
+      "ayah": 27
+    }
+  ]
+}
