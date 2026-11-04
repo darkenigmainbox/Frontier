@@ -1,0 +1,257 @@
+{
+  "surahMeta": {
+    "name": "Ar-Raʿd",
+    "arabic": "الرَّعْد",
+    "number": 13,
+    "ayahCount": 43,
+    "juz": "13",
+    "revelationOrder": 96,
+    "place": "Makkah",
+    "placeNote": "Before the hijrah, in the years when the Quraysh's challenge to the Prophet ﷺ was open and public.",
+    "kicker": "Sūrah Thirteen",
+    "title": "The Thunder",
+    "subtitle": "A sūrah about a world that was already a message — and a people who kept asking for a better one."
+  },
+  "chapters": [
+    {
+      "number": "01",
+      "slug": "index",
+      "label": "Index",
+      "title": "Contents",
+      "quote": "A magazine of one sūrah, forty-three āyāt, read slowly."
+    },
+    {
+      "number": "02",
+      "slug": "introduction",
+      "label": "Introduction",
+      "title": "What this sūrah is",
+      "quote": "Signs, and the demand for signs."
+    },
+    {
+      "number": "03",
+      "slug": "context",
+      "label": "Context",
+      "title": "The word they would not write",
+      "quote": "Ḥudaybiyyah, 6 AH — one refusal, one name, and a treaty that looked like a defeat."
+    },
+    {
+      "number": "04",
+      "slug": "theme",
+      "label": "Theme",
+      "title": "Truth and foam",
+      "quote": "An image, a verdict, and the whole history of any message decided by it."
+    },
+    {
+      "number": "05",
+      "slug": "tafsir",
+      "label": "The Text",
+      "title": "Āyah by āyah",
+      "quote": "Forty-three āyāt. Tap any underlined word to see the root it grows from."
+    },
+    {
+      "number": "06",
+      "slug": "story",
+      "label": "Story",
+      "title": "Zayd and the mountain",
+      "quote": "How a sūrah gets carried."
+    },
+    {
+      "number": "07",
+      "slug": "roots",
+      "label": "Lexicon",
+      "title": "Roots",
+      "quote": "The vocabulary of the sūrah, traced to its three letters."
+    },
+    {
+      "number": "08",
+      "slug": "colophon",
+      "label": "Sources",
+      "title": "Colophon",
+      "quote": "Every claim in this app has a name and a link behind it."
+    }
+  ],
+  "introduction": {
+    "kicker": "Introduction",
+    "arabicHeading": "وَالَّذِي أُنزِلَ إِلَيْكَ مِن رَّبِّكَ الْحَقُّ",
+    "lede": "Ar-Raʿd refuses to separate the message from the world it lands in. Its opening sentence is a claim of truth; its next twenty āyāt are a tour of everything that is already telling the truth — the raised sky, the anchored mountains, the paired fruit, the light on the horizon, the rain, the thunder.",
+    "paragraphs": [
+      {
+        "text": "It was delivered in Makkah, before the hijrah, to a people who had reduced revelation to a demand: bring us a sign. Not a sign they would read, but a sign that would perform — split the mountain, bring the dead to speak, make the sky fall.",
+        "cite": "ibnkathir"
+      },
+      {
+        "text": "The sūrah answers by pointing out that they were already standing inside a sign. The heavens hold no visible pillars. The mountains hold the ground still. Two opposite kinds of fruit come from one water. The lightning frightens and the rain relieves — the same weather doing both at once. If the world is this legible, the demand for a bigger miracle is not a question. It is a way of not reading.",
+        "cite": "mukhtasar"
+      },
+      {
+        "text": "Then, in āyah 17, the sūrah gives one image that is meant to be carried away: a flood carrying foam, and ore in a fire throwing off its dross. The foam looks like it is the flood. It is not. The foam is what the flood throws away.",
+        "cite": "ibnkathir"
+      },
+      {
+        "text": "Read the āyāt as a single argument and the shape is clear. The world is presented as evidence; the evidence is refused; the refusal is answered with a portrait of two kinds of people; and then the sūrah closes by naming its own witness. What it never does is negotiate the terms of the evidence.",
+        "cite": "mukhtasar"
+      },
+      {
+        "text": "Between āyah 11 — that Allah does not change a people's condition until they change what is in themselves — and āyah 39, that Allah erases what He wills and confirms what He wills, the sūrah holds two things side by side that are hard to hold at once: real human agency, and a decree that is already written. It does not dissolve the tension. It leaves the reader standing in it, which is where the sūrah has been aiming the whole time.",
+        "cite": "ibnkathir"
+      }
+    ],
+    "pullQuote": {
+      "text": "They asked for a sign. They were standing inside one.",
+      "attribution": "Ar-Raʿd 13:1–4"
+    },
+    "facts": [
+      {"label": "Āyāt", "value": "43"},
+      {"label": "Juzʾ", "value": "13"},
+      {"label": "Revealed", "value": "Makkah"},
+      {"label": "Order", "value": "96th"}
+    ]
+  },
+  "context": {
+    "kicker": "Context",
+    "title": "The word they would not write",
+    "standfirst": "One āyah in this sūrah is tied to a scene that survives, in full, in the most rigorous collection of hadith we have. This is what happened.",
+    "narrative": [
+      {
+        "heading": "The road to Ḥudaybiyyah",
+        "text": "In Dhū al-Qaʿdah of the sixth year after the hijrah, the Prophet ﷺ set out from Madīnah intending the ʿumrah, not a war. The number with him is given precisely in the sources: fourteen hundred. The Quraysh sent Khālid ibn al-Walīd with their cavalry to head him off, and the Prophet ﷺ took the rougher road on the right until the caravan came down at the far edge of Ḥudaybiyyah.",
+        "cite": "bukhari_4154"
+      },
+      {
+        "heading": "Water, and the pledge",
+        "text": "The well at Ḥudaybiyyah held almost nothing. The people drew it dry, drank, and could not find more; the Prophet ﷺ took an arrow from his quiver and had it put in the pit, and water came up until everyone drank and filled their waterskins. Then the Companions gave him a pledge under a tree — the pledge of al-Riḍwān — and he said to them: 'You are the best people on the earth.'",
+        "cite": "bukhari_4154"
+      },
+      {
+        "heading": "The negotiation",
+        "text": "Suhayl ibn ʿAmr came out as the Quraysh's negotiator. A treaty was agreed. The document began the way every document in Arabia began, and the Prophet ﷺ dictated: 'In the Name of Allah, al-Raḥmān, al-Raḥīm.' Suhayl stopped him. 'As for al-Raḥmān — by Allah, I do not know what he is. Write it the way you used to: In Your Name, O Allah.' The Muslims refused. The Prophet ﷺ had him write, 'In Your Name, O Allah.'",
+        "cite": "bukhari_2731"
+      },
+      {
+        "heading": "What the refusal meant",
+        "text": "Suhayl's sentence — I do not know al-Raḥmān — is the religious quarrel of the sūrah in one line. Al-Mukhtaṣar, the King Fahd Complex commentary, explains what the āyah is charging them with: the people of the Prophet ﷺ rejected the message because they denied al-Raḥmān and set up partners with Him, and the āyah answers them with the Prophet's own confession: 'He is my Lord; there is none worthy of worship but He; in Him I trust and to Him I turn.'",
+        "cite": "mukhtasar"
+      },
+      {
+        "heading": "The claim of a specific occasion",
+        "text": "The claim that 13:30 came down on that exact day is recorded in al-Wāḥidī's Asbāb al-Nuzūl, on the authority of 'the commentators of the Qur'ān'. It is reported as an occasion, not as a saying of the Prophet ﷺ, and this magazine presents it that way. What is certain, and what needs no intermediary, is that the scene in Ṣaḥīḥ al-Bukhārī 2731 and the wording of 13:30 are about the same thing.",
+        "cite": "mawsuah"
+      },
+      {
+        "heading": "Abū Jandal",
+        "text": "Before the document was finished, Abū Jandal — Suhayl's own son — arrived, running, his fetters still on, having escaped from Makkah to join the Muslims. Suhayl demanded him back, as the treaty's terms required. The Prophet ﷺ returned him. ʿUmar could not bear it and went to Abū Bakr: 'Are we not on the truth and our enemy on falsehood? Why do we give the abasement in our religion?' Abū Bakr answered: 'He is the Messenger of Allah, and he is not disobeying his Lord, and his Lord is his helper. Hold on to his stirrup.'",
+        "cite": "bukhari_2731"
+      },
+      {
+        "heading": "What ʿUmar did not know",
+        "text": "The Prophet ﷺ said to ʿUmar: 'I told you that we would come to it.' ʿUmar answered: 'But you did not tell me we would come to it this year.' The treaty was signed, the Muslims sacrificed and shaved at Ḥudaybiyyah, and they went home without entering Makkah. A year later they entered it. And the sūrah's own sentence sits over the whole episode: 'Allah erases what He wills and confirms what He wills, and with Him is the Mother of the Book.' (13:39)",
+        "cite": "bukhari_2731"
+      }
+    ],
+    "timeline": [
+      {"date": "610 CE", "text": "The revelation begins."},
+      {"date": "615–622", "text": "The Makkan years. Ar-Raʿd belongs to this period."},
+      {"date": "Dhū al-Qaʿdah, 6 AH", "text": "Ḥudaybiyyah. 1,400 Muslims. The pledge of al-Riḍwān."},
+      {"date": "6 AH", "text": "The treaty is written without the name al-Raḥmān — and without 'Messenger of Allah'."},
+      {"date": "7 AH", "text": "The ʿumrah of recompense. They enter Makkah."}
+    ],
+    "caveat": {
+      "title": "A note on the 'occasions of revelation'",
+      "text": "This magazine does not repeat asbāb al-nuzūl reports at random. Each āyah page carries an explicit label: occasion reported where a specific, named occasion exists; reading the text where none does; disputed or handle with care where the famous story is not reliable. Where two reports contradict each other, both are shown and the contradiction is named. One practical warning: the widely circulated English edition of al-Wāḥidī's Asbāb al-Nuzūl has a later mystical commentary interleaved into its text — for several āyāt of this sūrah the printed 'occasion' is in fact that commentary, not al-Wāḥidī. None of it is reproduced here."
+    }
+  },
+  "theme": {
+    "kicker": "Theme",
+    "title": "Truth and foam",
+    "standfirst": "Ar-Raʿd 13:17 is one of the most carefully built images in the Qur'ān. It contains a flood, a fire, a scum on both, and a disappearance.",
+    "blocks": [
+      {
+        "label": "The image",
+        "arabic": "أَنزَلَ مِنَ السَّمَاءِ مَاءً فَسَالَتْ أَوْدِيَةٌ بِقَدَرِهَا فَاحْتَمَلَ السَّيْلُ زَبَدًا رَّابِيًا",
+        "text": "Water comes down from the sky. The valleys carry it, each valley in proportion to its own size. The flood rises and carries a foam on top of it. The foam is not separate from the flood; it is the flood's surface.",
+        "cite": "quran"
+      },
+      {
+        "label": "The second image",
+        "arabic": "وَمِمَّا يُوقِدُونَ عَلَيْهِ فِي النَّارِ ابْتِغَاءَ حِلْيَةٍ أَوْ مَتَاعٍ زَبَدٌ مِّثْلُهُ",
+        "text": "And from what they smelt in the fire, seeking ornament or goods, comes a scum like it. Gold, silver, iron: everything valuable, heated, throws up something ugly and light — and that is what you see first.",
+        "cite": "mukhtasar"
+      },
+      {
+        "label": "The verdict",
+        "arabic": "فَأَمَّا الزَّبَدُ فَيَذْهَبُ جُفَاءً ۖ وَأَمَّا مَا يَنفَعُ النَّاسَ فَيَمْكُثُ فِي الْأَرْضِ",
+        "text": "As for the foam, it goes as jetsam. As for what benefits people, it remains in the earth. One sentence, and the whole history of any message is decided by it: the visible thing is not always the real thing.",
+        "cite": "ibnkathir"
+      },
+      {
+        "label": "The application",
+        "arabic": "كَذَٰلِكَ يَضْرِبُ اللَّهُ الْأَمْثَالَ",
+        "text": "So does Allah strike the parables. The image is not decoration. In the Makkan moment it meant: the Quraysh had the numbers, the pomp, the lineage, the noise — the foam. The message had almost none of that. The sūrah tells you which of the two is going to be left in the ground.",
+        "cite": "mukhtasar"
+      }
+    ],
+    "structure": [
+      {"range": "1–4", "title": "The world as argument", "text": "The Book's truth, then the sky, the mountains, the rivers, the fruit, the night drawn over the day."},
+      {"range": "5–11", "title": "The resurrection, the guards", "text": "They call it strange that dust should be raised. The sūrah answers with knowledge that misses nothing — including the two angels keeping the record."},
+      {"range": "12–17", "title": "Weather, and the flood", "text": "Lightning, thunder, the cloud. Then the water, the valleys, the scum, and the verdict on it."},
+      {"range": "18–29", "title": "The two groups", "text": "Those who fulfil the covenant, join what Allah commanded to be joined, are patient, spend, and repel evil with good — set against those who break it."},
+      {"range": "30–34", "title": "al-Raḥmān", "text": "The āyah of Ḥudaybiyyah. The one name they would not write."},
+      {"range": "35–43", "title": "Closing", "text": "The garden described, the erasing and the confirming, the Mother of the Book, and the Book's own witness."}
+    ]
+  },
+  "story": {
+    "kicker": "Story",
+    "title": "Zayd and the mountain",
+    "standfirst": "In the year the Qur'ān was gathered into one book, a scribe in Madīnah was asked to do something that had never been done.",
+    "paragraphs": [
+      {
+        "text": "The report is in Musnad Aḥmad, and the same material is carried in Ṣaḥīḥ al-Bukhārī. After the battle of al-Yamāmah, where a large number of the Companions who had memorised the Qur'ān were killed, ʿUmar came to Abū Bakr with a problem no one had faced: the Qur'ān existed in the memories of men and on scattered sheets, and the men who carried it were dying.",
+        "cite": "ahmad_76"
+      },
+      {
+        "text": "Abū Bakr hesitated. 'How can I do a thing the Messenger of Allah ﷺ did not do?' ʿUmar kept returning to him until Allah opened his heart to it. Then he called Zayd ibn Thābit — a young man, one of the scribes of the revelation — and said: you are a wise young man whom we do not distrust, and you used to write down the revelation for the Messenger of Allah ﷺ.",
+        "cite": "ahmad_76"
+      },
+      {
+        "text": "Zayd said: 'By Allah, if they had ordered me to move a mountain, that would not have been heavier on me than what they ordered me to do of collecting the Qur'ān.' He gathered it: from the sheets, from the memories, from the palm-stalks and the stones on which men had written.",
+        "cite": "ahmad_76"
+      },
+      {
+        "text": "What makes Zayd's sentence worth a page is the thing he compares it to. He could think of nothing heavier than moving a mountain. And in this sūrah the very demand the Quraysh kept making was that a recitation be produced with which the mountains could be moved. Ibn Kathīr records āyah 31 as Allah's answer to that demand: if there had been any recitation by which the mountains were removed, or the earth cleft, or the dead made to speak, it would have been this one — but the decision is Allah's entirely.",
+        "cite": "ibnkathir"
+      },
+      {
+        "text": "So the mountain was moved. Just not the way they asked. It was moved into a book, by a young man who thought the job would break him.",
+        "cite": "ibnkathir"
+      }
+    ],
+    "pullQuote": {
+      "text": "If they had ordered me to move a mountain, that would not have been heavier on me than this.",
+      "attribution": "Zayd ibn Thābit — Musnad Aḥmad 76"
+    }
+  },
+  "conclusion": {
+    "kicker": "Conclusion",
+    "title": "What is left in the ground",
+    "paragraphs": [
+      {
+        "text": "The sūrah ends where it began: with the Book, and with a witness. 'Those who disbelieved say: you are not a messenger. Say: Allah is sufficient as a witness between me and you, and those who have knowledge of the Book.' (13:43)"
+      },
+      {
+        "text": "Read as a whole, Ar-Raʿd does not argue the Quraysh out of their position. It shows them their own world and asks them to notice what kind of world it is. A world where the sky is held up, the ground is held down, opposites come from the same water, and weather frightens and relieves at once — a world that behaves like a message. And then it says, in the flood: the loud part is temporary. What is useful stays."
+      },
+      {
+        "text": "Between that and the closing witness there is āyah 39, the one no reader leaves behind: 'Allah erases what He wills and confirms what He wills, and with Him is the Mother of the Book.' It came to ʿUmar when the treaty of Ḥudaybiyyah looked like a defeat. It is a promise that neither the visible loss nor the visible triumph is the final state of the document. There is a mother text. Everything else is a copy of it."
+      },
+      {
+        "text": "That is the whole apparatus of this magazine, in one line."
+      }
+    ],
+    "closing": "وَاللَّهُ يَهْدِي مَن يَشَاءُ إِلَىٰ صِرَاطٍ مُّسْتَقِيمٍ",
+    "closingTranslation": "And Allah guides whom He wills to a straight path. — 13:27"
+  },
+  "readingOrder": {
+    "recommended": ["introduction", "context", "theme", "tafsir"],
+    "note": "If you have fifteen minutes: the introduction, then āyāt 1–4, 11, 17, 31 and 39. If you have an evening, read the text in one pass and open the roots as you go."
+  }
+}

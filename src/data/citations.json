@@ -1,0 +1,258 @@
+{
+  "styleGuide": {
+    "feels": "quiet, editorial, low-contrast grey-on-black with a single signal colour",
+    "type": {
+      "arabic": "Amiri Quran (SIL Open Font License)",
+      "latin": "Inter Variable (SIL Open Font License)"
+    }
+  },
+  "sources": [
+    {
+      "id": "quran",
+      "label": "Qur'ān text",
+      "detail": "Tanzil.net Uthmani text, Hafs ʿan ʿĀṣim, as distributed in the open-source `quran-json` package (v3.1.2).",
+      "url": "https://tanzil.net"
+    },
+    {
+      "id": "saheeh",
+      "label": "English translation",
+      "detail": "Saheeh International, via the same `quran-json` distribution.",
+      "url": "https://quran.com"
+    },
+    {
+      "id": "qac",
+      "label": "Word morphology & roots",
+      "detail": "Quranic Arabic Corpus v0.4 (Kais Dukes, University of Leeds), Arabic edition by mustafa0x/quran-morphology.",
+      "url": "http://corpus.quran.com"
+    },
+    {
+      "id": "lane",
+      "label": "Lane's Arabic-English Lexicon",
+      "detail": "E. W. Lane (1863-1893), public domain. Root senses here are condensed from Lane and al-Mufradāt fī Gharīb al-Qurʾān (al-Rāghib al-Iṣfahānī), with a source reference on every root.",
+      "url": "https://archive.org/details/arabicenglishlex01laneuoft"
+    },
+    {
+      "id": "mufradat",
+      "label": "al-Mufradāt fī Gharīb al-Qurʾān",
+      "detail": "al-Rāghib al-Iṣfahānī (d. 502 AH). Cross-checked against Lane for every root shown.",
+      "url": "https://shamela.ws/book/2035"
+    },
+    {
+      "id": "ibnkathir",
+      "label": "Tafsīr al-Qurʾān al-ʿAẓīm",
+      "detail": "Ibn Kathīr (d. 774 AH), abridged English translation, via the open `tafsir_api` dataset. Used for context and for the reports of the Companions that it cites with names.",
+      "url": "https://quran.com/en/tafsirs/169"
+    },
+    {
+      "id": "mukhtasar",
+      "label": "al-Mukhtaṣar fī Tafsīr al-Qurʾān",
+      "detail": "King Fahd Complex for the Printing of the Holy Qurʾān (1436 AH), English edition, via the open `tafsir_api` dataset.",
+      "url": "https://quran.com/en/tafsirs/168"
+    },
+    {
+      "id": "muyassar",
+      "label": "al-Tafsīr al-Muyassar",
+      "detail": "King Fahd Complex, Arabic, used for the gloss of difficult vocabulary (al-Muyassar fī Gharīb al-Qurʾān).",
+      "url": "https://quran.com/en/tafsirs/16"
+    },
+    {
+      "id": "mawsuah",
+      "label": "Mawsūʿat al-Tafsīr al-Maʾthūr",
+      "detail": "Compendium of transmitted reports, used only to show the isnād wording of the occasions-of-revelation reports — and to show explicitly when a report is weak or contradicts a sound hadith.",
+      "url": "https://quran.com"
+    },
+    {
+      "id": "sunnah",
+      "label": "sunnah.com",
+      "detail": "Every hadith number on this site was opened and checked individually on sunnah.com. Grades are quoted as sunnah.com prints them.",
+      "url": "https://sunnah.com"
+    },
+    {
+      "id": "watt",
+      "label": "Muhammad at Mecca / The History of al-Ṭabarī",
+      "detail": "For the historical narrative of the Ḥudaybiyyah expedition (6 AH), cross-checked with the hadith in Ṣaḥīḥ al-Bukhārī 2731–2732.",
+      "url": "https://sunnah.com/bukhari/54"
+    }
+  ],
+  "hadith": {
+    "bukhari_2731": {
+      "collection": "Sahih al-Bukhari",
+      "number": "2731–2732",
+      "grade": "Ṣaḥīḥ (Bukhārī's conditions)",
+      "url": "https://sunnah.com/bukhari:2731",
+      "narrator": "al-Miswar ibn Makhramah and Marwān",
+      "arabicKey": "وَاللَّهِ لَوْ كُنَّا نَعْلَمُ أَنَّكَ رَسُولُ اللَّهِ مَا صَدَدْنَاكَ عَنِ الْبَيْتِ",
+      "english": "By Allah, had we known that you are the Messenger of Allah, we would not have barred you from the House, nor fought you."
+    },
+    "bukhari_4697": {
+      "collection": "Sahih al-Bukhari",
+      "number": "4697",
+      "grade": "Ṣaḥīḥ",
+      "url": "https://sunnah.com/bukhari:4697",
+      "narrator": "Ibn ʿUmar",
+      "english": "The keys of the Unseen are five which none knows but Allah: none knows what will happen tomorrow but Allah; none knows what is in the wombs but Allah; none knows when it will rain but Allah; none knows at what place one will die; and none knows when the Hour will be established but Allah."
+    },
+    "bukhari_4537": {
+      "collection": "Sahih al-Bukhari",
+      "number": "4537",
+      "grade": "Ṣaḥīḥ",
+      "url": "https://sunnah.com/bukhari:4537",
+      "narrator": "Abū Hurayrah",
+      "english": "We have more right to be in doubt than Ibrāhīm, when he said: 'My Lord! Show me how You give life to the dead.' He said: 'Do you not believe?' He said: 'Yes, but to make my heart firm.'"
+    },
+    "bukhari_555": {
+      "collection": "Sahih al-Bukhari",
+      "number": "555",
+      "grade": "Ṣaḥīḥ",
+      "url": "https://sunnah.com/bukhari:555",
+      "narrator": "Abū Hurayrah",
+      "english": "Angels come to you in succession by night and day, and they gather at the Fajr and ʿAṣr prayers. Then those who spent the night among you ascend, and Allah asks them — and He knows best — 'In what state did you leave My slaves?' They say: 'We left them while they were praying, and we came to them while they were praying.'"
+    },
+    "muslim_2999": {
+      "collection": "Sahih Muslim",
+      "number": "2999",
+      "grade": "Ṣaḥīḥ",
+      "url": "https://sunnah.com/muslim:2999",
+      "narrator": "Ṣuhayb",
+      "english": "Wondrous is the affair of the believer — all of it is good, and that is for no one but the believer: if ease reaches him he is grateful, and that is good for him; and if hardship reaches him he is patient, and that is good for him."
+    },
+    "tirmidhi_3117": {
+      "collection": "Jamiʿ at-Tirmidhī",
+      "number": "3117",
+      "grade": "Ḥasan (Darussalam); al-Tirmidhī said: ḥasan ṣaḥīḥ gharīb",
+      "url": "https://sunnah.com/tirmidhi:3117",
+      "narrator": "Ibn ʿAbbās",
+      "english": "The Jews came to the Prophet ﷺ and said: 'O Abū al-Qāsim, tell us about the thunder — what is it?' He said: 'An angel among the angels, placed in charge of the clouds. He has goads of fire with which he drives the clouds wherever Allah wills.' They said: 'Then what is this sound we hear?' He said: 'His driving of the clouds, when he drives them on until they reach where they are commanded.' They said: 'You have spoken the truth.'"
+    },
+    "bukhari_5063": {
+      "collection": "Sahih al-Bukhari",
+      "number": "5063",
+      "grade": "Ṣaḥīḥ",
+      "url": "https://sunnah.com/bukhari:5063",
+      "narrator": "Anas ibn Mālik",
+      "english": "Three men came to the houses of the Prophet's wives asking about his worship... one said: 'I will pray all night forever'; another: 'I will fast continuously and never break it'; another: 'I will keep away from women and never marry.' The Messenger of Allah ﷺ came and said: 'Are you the ones who said such-and-such? By Allah, I am the most fearful of Allah among you and the most conscious of Him — yet I fast and I break the fast, I pray and I sleep, and I marry women. So whoever turns away from my sunnah is not of me.'"
+    },
+    "ahmad_76": {
+      "collection": "Musnad Aḥmad",
+      "number": "76",
+      "grade": "Ṣaḥīḥ (Darussalam; also Bukhārī 4986)",
+      "url": "https://sunnah.com/ahmad:76",
+      "narrator": "Zayd ibn Thābit",
+      "english": "By Allah, if they had ordered me to move a mountain, that would not have been heavier on me than what they ordered me to do of collecting the Qur'ān."
+    },
+    "bukhari_4696": {
+      "collection": "Sahih al-Bukhari",
+      "number": "4696",
+      "grade": "Ṣaḥīḥ",
+      "url": "https://sunnah.com/bukhari:4696",
+      "narrator": "ʿUrwah, from ʿĀ'ishah",
+      "english": "I said to her: '(The verse says) they were betrayed (kudhibū) — with a light letter?' She said: 'Allah forbid!' — and she rejected that reading. [ʿĀ'ishah correcting a misreading of 12:110, the verse immediately before this sūrah.]"
+    },
+    "muslim_2653": {
+      "collection": "Sahih Muslim",
+      "number": "2653",
+      "grade": "Ṣaḥīḥ",
+      "url": "https://sunnah.com/muslim:2653a",
+      "narrator": "Abū Hurayrah",
+      "english": "Ādam and Mūsā disputed. Mūsā said: 'You are Ādam — Allah created you with His Hand, breathed into you of His spirit, and commanded the angels to prostrate to you, and then you brought people down to the earth.' Ādam said: 'O Mūsā, Allah chose you with His speech and wrote for you with His Hand; do you blame me for a matter Allah decreed for me before He created me?' So Ādam overcame Mūsā in the argument."
+    },
+    "muslim_8": {
+      "collection": "Sahih Muslim",
+      "number": "8",
+      "grade": "Ṣaḥīḥ",
+      "url": "https://sunnah.com/muslim:8",
+      "narrator": "ʿUmar ibn al-Khaṭṭāb",
+      "english": "Jibrīl asked the Prophet ﷺ about islām, īmān and iḥsān, then asked about the Hour. He said: 'The one asked knows no more than the one asking.' He said: 'Then tell me about its signs.' He said: 'That the slave-girl gives birth to her mistress...' [the ḥadīth of Jibrīl]"
+    },
+    "tirmidhi_3534": {
+      "collection": "Jamiʿ at-Tirmidhī",
+      "number": "3534",
+      "grade": "Ḥasan (Darussalam)",
+      "url": "https://sunnah.com/tirmidhi:3534",
+      "narrator": "ʿUmārah ibn Shabīb",
+      "english": "Whoever says, at the end of al-Maghrib, 'None has the right to be worshipped but Allah, alone, without partner; His is the dominion and His is the praise; He gives life and causes death, and He is powerful over all things' ten times — Allah sends for him guards who protect him from Shayṭān until morning."
+    },
+    "bukhari_4154": {
+      "collection": "Sahih al-Bukhari",
+      "number": "4154",
+      "grade": "Ṣaḥīḥ",
+      "url": "https://sunnah.com/bukhari:4154",
+      "narrator": "Jābir ibn ʿAbd Allāh",
+      "english": "On the day of al-Ḥudaybiyyah the Messenger of Allah ﷺ said to us: 'You are the best people on the earth.' We were fourteen hundred. If I could see now, I would show you the place of the tree."
+    }
+  },
+  "glosses": {
+    "رعد": {
+      "ar": "الرَّعْد",
+      "en": "thunder — the sound; in the hadith above, the angel charged with driving the clouds"
+    },
+    "برق": {
+      "ar": "البَرْق",
+      "en": "lightning, the flash; related to the root for 'gleam'"
+    },
+    "صعق": {
+      "ar": "الصَّاعِقَة",
+      "en": "a thunderbolt; also the swoon or death-stroke that seizes someone"
+    },
+    "سحاب": {
+      "ar": "السَّحَاب",
+      "en": "cloud; the rain-bearing cloud"
+    },
+    "مثلات": {
+      "ar": "المَثُلَات",
+      "en": "plural of mathulah: a punishment that serves as an example"
+    },
+    "أغلال": {
+      "ar": "الأَغْلَال",
+      "en": "plural of ghull: the iron collar or shackle put round the neck"
+    },
+    "أجل": {
+      "ar": "أَجَل",
+      "en": "a term, a fixed span, a deadline"
+    },
+    "معقبات": {
+      "ar": "مُعَقِّبَات",
+      "en": "those who follow one another in succession"
+    },
+    "طمأنينة": {
+      "ar": "الطُّمَأْنِينَة",
+      "en": "stillness, the settling of a restless heart"
+    },
+    "زبد": {
+      "ar": "الزَّبَد",
+      "en": "scum, foam, the froth carried on top of a flood"
+    },
+    "جفاء": {
+      "ar": "جُفَاء",
+      "en": "that which is cast out and floats away as waste"
+    },
+    "صنوان": {
+      "ar": "صِنْوَان",
+      "en": "palm trees sharing a single root; the opposite is غير صنوان, each on its own root"
+    },
+    "عرش": {
+      "ar": "العَرْش",
+      "en": "the Throne — the seat of divine authority; its reality is not described by us beyond what the texts say"
+    },
+    "استوى": {
+      "ar": "اسْتَوَى",
+      "en": "a verb the salaf affirmed without likening or explaining away"
+    },
+    "سخر": {
+      "ar": "سَخَّرَ",
+      "en": "to subdue and press into service"
+    },
+    "رواسي": {
+      "ar": "رَوَاسِي",
+      "en": "mountains made to stand fast, anchoring the earth"
+    },
+    "أمة": {
+      "ar": "أُمَّة",
+      "en": "a people bound by a shared message"
+    },
+    "ظلم": {
+      "ar": "الظُّلْم",
+      "en": "to put a thing in the wrong place — including to displace the worship owed to the Creator"
+    }
+  }
+}
