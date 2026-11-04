@@ -1,0 +1,148 @@
+{
+  "cover": {
+    "kicker": "A sūrah magazine",
+    "title": ["The", "Qur’ānic", "library"],
+    "arabic": "ٱلْقُرْآن",
+    "standfirst": "One hundred and fourteen sūrahs. This is the shelf they sit on: what the Book is, who received it, how it reached us as a written text, and which sūrahs are already open.",
+    "note": "Arabic from the Tanzil text. Translation: Saheeh International. Commentary quoted from al-Mukhtaṣar. All type self-hosted."
+  },
+
+  "introduction": {
+    "kicker": "Introduction",
+    "number": "02",
+    "title": "A book that names itself",
+    "arabic": "ذَٰلِكَ ٱلْكِتَٰبُ لَا رَيْبَ ۛ فِيهِ ۛ هُدًى لِّلْمُتَّقِينَ",
+    "arabicNote": "al-Baqarah 2:2 — “This is the Book; there is no doubt in it, a guidance for those who are mindful of God.”",
+    "lede": "The Qur’ān is not a book about God written at a distance. It is, in its own words, spoken — sent down, recited, written, and gathered.",
+    "sections": [
+      {
+        "h": "What the word means",
+        "text": "“Qur’ān” comes from a root that means to recite, to read aloud. In the Book’s own usage the word is used for the whole revelation and for a portion of it — the same root covers both. It is also called al-Kitāb, the Book; al-Furqān, the thing that separates true from false; and al-Dhikr, the reminder. Each name describes a job the text claims for itself.",
+        "cite": "mufradat"
+      },
+      {
+        "h": "How it came down",
+        "text": "The Book describes itself as sent down — nazzalnā — over a period, not in one piece. It names the one who brought it: the trustworthy spirit, Jibrīl. And it names the one who received it: Muḥammad ibn ʿAbdillāh, in Makkah first, then in Madīnah, over twenty-three years.",
+        "cite": "mukhtasar"
+      },
+      {
+        "h": "One book, one hundred and fourteen chapters",
+        "text": "The text is divided into 114 sūrahs, and the sūrahs into 6,236 āyāt. A sūrah is not a chapter in the way a modern book has chapters: some are three lines, some are three hundred. They are arranged in the order the Prophet ﷺ gave them, which is not the order in which they were revealed.",
+        "cite": "quran"
+      },
+      {
+        "h": "Makkan and Madinan",
+        "text": "86 sūrahs were revealed before the migration to Madīnah, 28 after it. The shorter, earlier ones argue about the unseen and the resurrection; the later ones carry law, treaties, and the running of a community. The difference is visible if you read them in revelation order — which is why this library lets you sort that way.",
+        "cite": "quran"
+      },
+      {
+        "h": "What this app does with it",
+        "text": "Every āyah in this library will be laid out the same way: the Arabic, word by word and tappable; a plain-English line; the occasion of revelation only where a report exists; and the commentary quoted, with its source named. Sūrah Ar-Raʿd is finished. The rest open to a plate that says they are not yet written, rather than to an empty page pretending to be one.",
+        "cite": "mukhtasar"
+      }
+    ],
+    "pull": {
+      "text": "Sent down, recited, written, gathered — the Book describes its own making at every step.",
+      "attribution": "al-Baqarah 2:2, al-Isrāʾ 17:106, al-Shuʿarāʾ 26:193"
+    }
+  },
+
+  "context": {
+    "kicker": "Context",
+    "number": "03",
+    "title": "How a recitation became a book",
+    "standfirst": "The Qur’ān calls itself a recitation first and a book second. Between those two words lies the lifetime of the Prophet ﷺ, the death of his Companions, and a decision taken in Madīnah that no one had taken before.",
+    "timeline": [
+      {
+        "year": "610 CE",
+        "label": "The first revelation",
+        "text": "Muḥammad ﷺ, forty years old, is in the cave of Ḥirāʾ on the mountain outside Makkah. The first words of the Qur’ān come to him there: “Recite, in the name of your Lord who created.” The report is in Ṣaḥīḥ al-Bukhārī.",
+        "cite": "mukhtasar"
+      },
+      {
+        "year": "610–622",
+        "label": "The Makkan years",
+        "text": "Thirteen years of revelation in Makkah, to a small community under pressure. The sūrahs of this period are short, direct, and mostly concerned with who God is and what happens after death.",
+        "cite": "quran"
+      },
+      {
+        "year": "622 CE",
+        "label": "The migration",
+        "text": "The Prophet ﷺ and the Muslims move to Madīnah. The character of the revelation changes with the situation: law, treaties, the conduct of a community with a city of its own.",
+        "cite": "quran"
+      },
+      {
+        "year": "632 CE",
+        "label": "The Prophet ﷺ dies",
+        "text": "The revelation ends. It has never been collected in one place — it exists in the memories of the Companions, on sheets, on palm-stalks, on stones and shoulder-blades. The men who carried it in their memory are the most exposed part of the chain.",
+        "cite": "ahmad_76"
+      },
+      {
+        "year": "633 CE",
+        "label": "al-Yamāmah",
+        "text": "A large number of the Companions who had memorised the Qur’ān are killed in one battle. ʿUmar ibn al-Khaṭṭāb comes to Abū Bakr with the problem: the carriers of the text are dying.",
+        "cite": "ahmad_76"
+      },
+      {
+        "year": "634 CE",
+        "label": "The gathering",
+        "text": "Abū Bakr orders Zayd ibn Thābit to collect the Qur’ān into one place. Zayd says: “By Allah, if they had ordered me to move a mountain, that would not have been heavier on me than this.” He gathers it from the written pieces and from the memories, and the collected sheets stay with Abū Bakr, then ʿUmar, then Ḥafṣah.",
+        "cite": "ahmad_76"
+      },
+      {
+        "year": "650 CE",
+        "label": "The standard copy",
+        "text": "Under ʿUthmān, the community is spreading and the recitation is being pronounced differently in different garrison cities. A standard written copy is made from Ḥafṣah’s sheets and sent out with readers; the Companions agree on it. The text this app prints is that text, in the spelling tradition of Ḥafṣ ʿan ʿĀṣim.",
+        "cite": "quran"
+      }
+    ],
+    "caveat": {
+      "title": "What this page is not",
+      "text": "This is a timeline of what a source says happened, each line tied to the source. It is not a history of the controversies around the text — those are real, they are studied, and they are not settled by a timeline. Where the sources differ, this app says so on the āyah where it matters (see 13:31 and 13:39)."
+    }
+  },
+
+  "method": {
+    "kicker": "Method",
+    "number": "04",
+    "title": "The rules this library is written by",
+    "standfirst": "Four rules, applied to every page. They are the reason some āyāt say “no occasion is reported” instead of carrying a famous story.",
+    "rules": [
+      {
+        "n": "01",
+        "h": "Nothing without a source",
+        "text": "Every claim on every page is either counted from the text, quoted from a named commentary, or tied to a hadith number. A sentence with no source behind it is a bug, not a style choice."
+      },
+      {
+        "n": "02",
+        "h": "The occasion, only where one is reported",
+        "text": "Of the 6,236 āyāt, a report about when or why an āyah came down exists for a small minority. Of the 43 āyāt of Ar-Raʿd, seven carry one. The other 36 say so plainly. A famous story is not the same thing as a report, and weak reports are labelled weak."
+      },
+      {
+        "n": "03",
+        "h": "Commentary is quoted, not rewritten",
+        "text": "Tafsīr appears in quotation, in Arabic, with the work and the publisher named: al-Mukhtaṣar from the King Fahd Complex, and the abridged Ibn Kathīr. Paraphrasing a scholar into my own words would make the app the authority instead of the source."
+      },
+      {
+        "n": "04",
+        "h": "Every word is tappable, or it is a bug",
+        "text": "All 854 words of Ar-Raʿd open something: a root with its attested senses, or a gloss explaining what kind of word it is and why it has no root. No word in the text is decoration."
+      }
+    ],
+    "not": [
+      "No majority-opinion voting, and no ranking of scholars.",
+      "No chains of “scholars said, and others said”.",
+      "No hadith without a collection, a number, and its printed grade.",
+      "No filling a gap in the record with a story that sounds right."
+    ]
+  },
+
+  "status": {
+    "kicker": "The shelf",
+    "number": "05",
+    "title": "One sūrah written, 113 waiting",
+    "standfirst": "This is an honest contents page. Each sūrah is built as a magazine of its own — index, introduction, context, the text, a story, a lexicon, a conclusion. One of them is finished.",
+    "built": "Sūrah 13, Ar-Raʿd — 43 āyāt, 854 words, 242 roots, seven labelled occasions.",
+    "next": "The rest are open on the shelf but sealed. Opening one shows exactly what will be in it when it is written, so the shape stays identical from sūrah to sūrah."
+  }
+}

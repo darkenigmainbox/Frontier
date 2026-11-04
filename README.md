@@ -1,8 +1,13 @@
-# Ar-Raʿd — a sūrah magazine
+# The Qur'ānic library — Ar-Raʿd, the first sūrah
 
-A dark, minimal, phone-first reading app for **Sūrah 13, al-Raʿd (The Thunder)**.
-Not a textbook. A magazine: index, introduction, context, theme, the full text,
-a story, a root lexicon, a conclusion, and a colophon.
+A dark, minimal, phone-first reading app for the **whole Qur'ān**, built one
+sūrah at a time. The library level holds the shelf of 114 sūrahs and its own
+front matter; each sūrah is a magazine of its own — index, introduction,
+context, theme, the full text, a story, a root lexicon, a conclusion, sources.
+
+**Sūrah 13, al-Raʿd (The Thunder) is written.** The other 113 are on the shelf
+and open to a plate that says what they will contain, rather than to an empty
+page pretending to be one.
 
 Every one of the 854 words of the sūrah is tappable. Words with a root open that
 root's attested senses; function words, pronouns, proper nouns and the disjoint
@@ -73,3 +78,29 @@ reading text is exact.
 Black `#07070a`, one signal red `#ff3b30`, Inter for Latin, Amiri Quran for Arabic,
 hairline rules, no boxes, no shadows except where a panel is meant to lift off the
 page. Light mode included. Type is 100 % self-hosted (OFL).
+
+## The library level
+
+| Route | Page |
+| --- | --- |
+| `/` | The library cover: what the Book is, and how many sūrahs are open |
+| `/index` | **The shelf** — all 114 sūrahs, searchable, sortable by muṣḥaf order, revelation order, or length; juzʾ, āyah count and Makkan/Madinan for each |
+| `/introduction` | What the word “Qur'ān” means, how it came down, and how the 114 are arranged |
+| `/context` | **How a recitation became a book** — a seven-point timeline from the cave of Ḥirāʾ to the standard copy, each line tied to a source |
+| `/method` | The four rules this library is written by, and four things it deliberately does not do |
+| `/status` | What is written and what is sealed, honestly |
+| `/surah/13` | Ar-Raʿd — its own index, then its eight chapters |
+| `/surah/N` | Any other sūrah: the sealed plate |
+
+Counts on the shelf are computed from the text, not asserted: 114 sūrahs,
+6,236 āyāt, 77,429 words, 86 Makkan and 28 Madinan, revelation order 1–114
+each used exactly once (asserted at build time in `tools/build_library.py`).
+
+## Build the data
+
+```bash
+python3 tools/build_library.py     # the 114 sūrah headers  -> src/data/library.json
+```
+
+The sūrah-level data is committed; `tools/build_data.py` is kept for provenance
+and needs the corpus downloads described in its header.

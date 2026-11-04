@@ -101,3 +101,51 @@ export const chapters: {
   title: string;
   quote: string;
 }[] = editorial.chapters;
+
+/* ---------------------------------------------------------------- library
+   The whole Qur'ān, one level above the magazine. Headers only — 15 KB — so
+   the shelf loads instantly and a sūrah's own file is fetched when opened. */
+
+import libraryJson from "./data/library.json";
+import libraryEditorialJson from "./data/library-editorial.json";
+
+export type ShelfSurah = {
+  n: number;
+  name: string;
+  ar: string;
+  meaning: string;
+  type: "meccan" | "medinan";
+  ayat: number;
+  juz: number;
+  rev: number;
+  built: boolean;
+};
+
+export const shelf = libraryJson as {
+  surahs: ShelfSurah[];
+  stats: {
+    surahs: number;
+    ayat: number;
+    words: number;
+    roots: number;
+    meccan: number;
+    medinan: number;
+    occasions: number;
+    built: number;
+  };
+};
+
+export const shelfSurahs = shelf.surahs;
+export const shelfStats = shelf.stats;
+
+export const libraryText = libraryEditorialJson as any;
+
+export const shelfSurah = (n: number) => shelfSurahs.find((s) => s.n === n);
+
+/** juz' number -> the sūrahs that begin in it, for the juz' view */
+export const juzGroups = (() => {
+  const out: Record<number, ShelfSurah[]> = {};
+  for (let j = 1; j <= 30; j++) out[j] = [];
+  for (const s of shelfSurahs) out[s.juz].push(s);
+  return out;
+})();

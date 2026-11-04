@@ -1,47 +1,67 @@
 import { renderToString } from "react-dom/server";
 import { createElement } from "react";
 import App from "./App";
-import { chapters as ch, editorial, ayat } from "./data";
+import { chapters, shelfSurahs } from "./data";
 
-export const chapters = [
-  { slug: "home", label: "Cover" },
-  ...ch.map((c) => ({ slug: c.slug, label: c.label })),
+/**
+ * Routes pre-rendered to real HTML. The shelf is rendered in full (it is the
+ * page that matters for indexing); a sealed sūrah is rendered for all 113 so
+ * that /surah/2 is a real page and not a 404; the magazine's chapters render
+ * their own text.
+ */
+export const chaptersOut = [
+  { path: "/", label: "Cover" },
+  { path: "/index", label: "114 sūrahs" },
+  { path: "/introduction", label: "Introduction" },
+  { path: "/context", label: "Context" },
+  { path: "/method", label: "Method" },
+  { path: "/status", label: "What is written" },
+  { path: "/surah/13", label: "Ar-Raʿd" },
+  ...chapters
+    .filter((c) => c.slug !== "index")
+    .map((c) => ({ path: `/surah/13/${c.slug}`, label: c.label })),
+  ...shelfSurahs.filter((s) => !s.built).map((s) => ({ path: `/surah/${s.n}`, label: s.name })),
 ];
 
-export function render(slug: string) {
-  const html = renderToString(createElement(App as any, { initialSlug: slug }));
-  const m = editorial.surahMeta;
-  const base = `${m.name} · ${m.arabic}`;
-  const titles: Record<string, string> = {
-    home: `${base} — A Sūrah Magazine`,
-    index: `Index — ${base}`,
-    map: `The sūrah’s index — ${base}`,
-    introduction: `Introduction — ${base}`,
-    context: `Context: Ḥudaybiyyah — ${base}`,
-    theme: `Theme: Truth and Foam — ${base}`,
-    tafsir: `Āyah by āyah — ${base}`,
-    story: `Story: Zayd and the Mountain — ${base}`,
-    roots: `Roots — ${base}`,
-    conclusion: `Conclusion — ${base}`,
-    colophon: `Sources — ${base}`,
-  };
-  const descriptions: Record<string, string> = {
-    home: `${m.name} (Sūrah 13) — 43 āyāt, word roots, occasion of revelation per āyah, and only verified hadith. A dark, minimal magazine.`,
-    index: "Contents of the Ar-Raʿd magazine.",
-    map: "A map of Sūrah Ar-Raʿd: its six movements, the āyāt with a reported occasion, and the words it turns on.",
-    introduction: editorial.introduction.lede,
-    context:
-      "The treaty of Ḥudaybiyyah, 6 AH — the occasion behind 13:30, from Ṣaḥīḥ al-Bukhārī 2731.",
-    theme: editorial.theme.standfirst,
-    tafsir: `All 43 āyāt of Sūrah Ar-Raʿd with tappable word roots, al-Mukhtaṣar and Ibn Kathīr commentary, and a source note on every āyah.`,
-    story: editorial.story.standfirst,
-    roots: "Every Arabic root used in Sūrah Ar-Raʿd, with attested senses and provenance.",
-    conclusion: editorial.conclusion.paragraphs[1].text,
-    colophon: "Every source, every hadith number, and the method behind the Ar-Raʿd magazine.",
-  };
+const TITLES: Record<string, string> = {
+  "/": "The Qur’ān — A Sūrah Magazine",
+  "/index": "114 sūrahs — A Sūrah Magazine",
+  "/introduction": "Introduction — A Sūrah Magazine",
+  "/context": "How a recitation became a book — A Sūrah Magazine",
+  "/method": "The rules — A Sūrah Magazine",
+  "/status": "What is written — A Sūrah Magazine",
+};
+
+export function render(path: string) {
+  const html = renderToString(createElement(App as any, { initialPath: path }));
+
+  const sealed = /^\/surah\/(\d+)$/.exec(path);
+  if (sealed) {
+    const s = shelfSurahs.find((x) => x.n === parseInt(sealed[1], 10));
+    if (s) {
+      return {
+        html,
+        title: `${s.name} · Sūrah ${s.n} — A Sūrah Magazine`,
+        description: `Sūrah ${s.n}, ${s.name} (${s.ayat} āyāt, ${s.type}). Not yet written — what this page will contain when it is.`,
+      };
+    }
+  }
+
+  const mag = /^\/surah\/13(?:\/([a-z]+))?/.exec(path);
+  if (mag) {
+    const slug = mag[1] || "map";
+    const c = chapters.find((x) => x.slug === slug);
+    return {
+      html,
+      title: `Ar-Raʿd · ${c?.label ?? "The Text"} — A Sūrah Magazine`,
+      description: `Sūrah 13, Ar-Raʿd — ${c?.label ?? "the text"}. 43 āyāt, every word tappable to its Arabic root.`,
+    };
+  }
+
   return {
     html,
-    title: titles[slug] ?? `${base}`,
-    description: (descriptions[slug] ?? descriptions.home).replace(/"/g, "&quot;"),
+    title: TITLES[path] ?? "The Qur’ān — A Sūrah Magazine",
+    description:
+      "The whole Qur’ān as a library of sūrahs: one written as a magazine, the rest on the shelf with what each will contain. Arabic word by word, roots, and sourced commentary.",
   };
 }
