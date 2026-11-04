@@ -49,6 +49,21 @@ const main = async () => {
     writeFileSync(resolve(outDir, "index.html"), page);
     count++;
   }
+  // Deep links. /tafsir/17 must resolve on a plain static host, so give every
+  // āyah its own directory copy of the reader shell; the client reads the path
+  // and scrolls to the āyah.
+  const tafsirHtml = readFileSync(resolve(root, "dist/tafsir/index.html"), "utf8");
+  let deep = 0;
+  for (let n = 1; n <= 43; n++) {
+    const dir = resolve(root, "dist/tafsir", String(n));
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    writeFileSync(resolve(dir, "index.html"), tafsirHtml);
+    deep++;
+  }
+  // Unknown paths still boot the app from the cover.
+  writeFileSync(resolve(root, "dist/404.html"), readFileSync(resolve(root, "dist/index.html"), "utf8"));
+  console.log(`wrote ${deep} āyah deep links`);
+
   console.log(`pre-rendered ${count} pages`);
 };
 
