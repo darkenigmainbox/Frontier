@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Sugarplum Hollow — a procedural candy village in WebGPU</title>
+<meta name="description" content="A fully procedural gingerbread village: candy forests, jellybean fruit, marshmallow drifts and a chocolate river, rendered with WebGPU and procedural materials." />
+<link rel="stylesheet" href="./styles.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍬</text></svg>" />
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div id="ui">
+  <header class="title">
+    <h1>Sugarplum&nbsp;Hollow</h1>
+    <p>a procedural candy village<span class="dot">·</span>WebGPU</p>
+  </header>
+
+  <section class="panel" id="panel">
+    <div class="row">
+      <label for="hour">Time of day</label>
+      <output id="hourOut">4:36 PM</output>
+    </div>
+    <input type="range" id="hour" min="0" max="24" step="0.05" value="16.6" />
+
+    <div class="row">
+      <label for="snow">Snowfall</label>
+      <output id="snowOut">50%</output>
+    </div>
+    <input type="range" id="snow" min="0" max="1" step="0.01" value="0.5" />
+
+    <div class="row">
+      <label for="quality">Resolution</label>
+      <output id="qualityOut">1.0×</output>
+    </div>
+    <input type="range" id="quality" min="0.5" max="2" step="0.05" value="1" />
+
+    <div class="row">
+      <label for="bloom">Glow</label>
+      <output id="bloomOut">100%</output>
+    </div>
+    <input type="range" id="bloom" min="0" max="2" step="0.01" value="1" />
+
+    <div class="buttons">
+      <button id="rotate" class="toggle on" type="button">Auto-orbit</button>
+      <button id="reset" type="button">Reset view</button>
+    </div>
+
+    <div class="views">
+      <button type="button" data-view="village" class="active">Village</button>
+      <button type="button" data-view="plaza">Plaza</button>
+      <button type="button" data-view="forest">Forest</button>
+      <button type="button" data-view="river">River</button>
+    </div>
+
+    <div class="stats" id="stats">warming the ovens…</div>
+  </section>
+
+  <div class="hint" id="hint">drag <b>orbit</b> · scroll <b>zoom</b> · right-drag <b>pan</b> · <b>H</b> hide UI</div>
+</div>
+
+<div id="loading">
+  <div class="candy-spinner"></div>
+  <p id="loadingText">Rolling out the gingerbread…</p>
+</div>
+
+<div id="error" hidden>
+  <div class="card">
+    <h2>Oh sugar.</h2>
+    <p id="errorText"></p>
+    <pre id="errorDetail"></pre>
+    <p class="small">This scene needs <b>WebGPU</b> (Chrome/Edge 113+, or Safari 18+ on macOS). If you opened this file directly from disk, run <code>npm start</code> and load it over HTTP instead.</p>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
