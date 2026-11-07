@@ -278,6 +278,17 @@ button.on, button.active {
 }
 #error pre:empty { display: none; }
 #error .small { font-size: 11.5px; }
+#errorClose {
+  font: inherit;
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  color: var(--ink);
+  background: rgba(255, 110, 169, 0.16);
+  border: 1px solid rgba(255, 110, 169, 0.4);
+  cursor: pointer;
+}
+#errorClose:hover { background: rgba(255, 110, 169, 0.3); }
 code {
   padding: 1px 5px;
   border-radius: 5px;

@@ -34,7 +34,6 @@ struct ObjU {
 @group(0) @binding(0) var<uniform> G : Globals;
 @group(0) @binding(1) var shadowMap : texture_depth_2d;
 @group(0) @binding(2) var shadowSamp : sampler_comparison;
-@group(0) @binding(3) var<storage, read> insts : array<vec4f>;
 
 @group(1) @binding(0) var<uniform> O : ObjU;
 
@@ -540,7 +539,11 @@ fn vsMain(
   @location(1) nrm : vec3f,
   @location(2) uv  : vec2f,
   @location(3) ext : vec2f,
-  @builtin(instance_index) iid : u32,
+  // per-instance data, laid out as four instanced vec4 attributes
+  @location(4) iA  : vec4f,  // xyz position
+  @location(5) iB  : vec4f,  // xyz scale, w hue
+  @location(6) iC  : vec4f,  // quaternion
+  @location(7) iD  : vec4f,  // rgba tint
 ) -> VSOut {
   var out: VSOut;
   var wpos = pos;
@@ -549,17 +552,12 @@ fn vsMain(
   var hue = 0.0;
 
   if (O.m0.w > 0.5) {
-    let b = iid * 4u;
-    let A = insts[b + 0u];  // xyz position
-    let B = insts[b + 1u];  // xyz scale, w hue
-    let C = insts[b + 2u];  // quaternion
-    let D = insts[b + 3u];  // rgba tint
-    let R = quatToMat3(C);
-    wpos = A.xyz + R * (pos * B.xyz);
+    let R = quatToMat3(iC);
+    wpos = iA.xyz + R * (pos * iB.xyz);
     // Correct normal for non-uniform scale: n' = R * (n / s)
-    wnrm = normalize(R * (nrm / max(B.xyz, vec3f(0.0001))));
-    tint = D;
-    hue = B.w;
+    wnrm = normalize(R * (nrm / max(iB.xyz, vec3f(0.0001))));
+    tint = iD;
+    hue = iB.w;
   } else {
     let m = O.model;
     wpos = (m * vec4f(pos, 1.0)).xyz;
@@ -610,16 +608,18 @@ fn fsMain(in: VSOut) -> @location(0) vec4f {
 @vertex
 fn vsShadow(
   @location(0) pos : vec3f,
-  @builtin(instance_index) iid : u32,
+  @location(1) nrm : vec3f,
+  @location(2) uv  : vec2f,
+  @location(3) ext : vec2f,
+  @location(4) iA  : vec4f,
+  @location(5) iB  : vec4f,
+  @location(6) iC  : vec4f,
+  @location(7) iD  : vec4f,
 ) -> @builtin(position) vec4f {
   var wpos = pos;
   if (O.m0.w > 0.5) {
-    let b = iid * 4u;
-    let A = insts[b + 0u];
-    let B = insts[b + 1u];
-    let C = insts[b + 2u];
-    let R = quatToMat3(C);
-    wpos = A.xyz + R * (pos * B.xyz);
+    let R = quatToMat3(iC);
+    wpos = iA.xyz + R * (pos * iB.xyz);
   } else {
     wpos = (O.model * vec4f(pos, 1.0)).xyz;
   }

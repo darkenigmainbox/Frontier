@@ -128,6 +128,9 @@ src/renderer.js       WebGPU device, pipelines, bind groups, passes
 src/scene.wgsl        scene shader: every material, lighting, sky, snow
 src/post.wgsl         bloom + tonemap
 tools/validate.mjs    compiles both shaders with naga (wgpu's compiler)
+tools/gpu-lint.mjs    offline WebGPU validation harness — runs the real renderer
+                      headlessly against a spec-faithful mock device and checks
+                      bind groups, pipeline layouts, vertex fetch and draw ranges
 tools/check-world.mjs headless geometry checks (winding, NaNs, quaternion maths)
 tools/preview-render.mjs  CPU rasterizer — renders the village without a GPU
 tools/matlib.mjs      JS transcription of the WGSL materials, used by the preview
@@ -139,6 +142,7 @@ tools/matlib.mjs      JS transcription of the WGSL materials, used by the previe
 npm i naga-wasm@30.2.0 --no-save
 npm run validate      # WGSL → naga parse + validate + re-emit
 npm run check         # world sanity checks
+npm run lint          # offline WebGPU validation (pipelines, bind groups, draws)
 node tools/preview-render.mjs village|plaza|forest|river|top|house
 HOUR=21.4 node tools/preview-render.mjs plaza   # night
 ```
@@ -153,5 +157,8 @@ WebGPU renderer adds).
 ## Notes
 
 - The world is deterministic from a seed: `buildWorld(20251224)` in `src/world.js`.
-- ~185 k static triangles + ~6 400 instances, ~26 draw calls, one shadow map.
+- ~185 k static triangles + ~7 400 instances, ~26 draw calls, one shadow map.
+- Instancing uses instanced vertex attributes rather than vertex-stage storage
+  buffers, so it also runs on implementations where
+  `maxStorageBuffersInVertexStage` is 0 (WebGPU compatibility mode).
 - Everything is regenerated at load time in ~200 ms — there are no assets on disk.

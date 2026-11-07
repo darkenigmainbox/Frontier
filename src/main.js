@@ -206,6 +206,10 @@ function showError(title, detail) {
   loading.classList.add('done');
 }
 
+document.getElementById('errorClose').addEventListener('click', () => {
+  errorBox.hidden = true;
+});
+
 async function boot() {
   syncUI();
   resizeCanvas();
@@ -228,15 +232,19 @@ async function boot() {
 
   let renderer;
   let framesRendered = 0;
+  const gpuErrors = [];
   try {
     renderer = await createRenderer({
       canvas,
       world,
       onError: (msg) => {
         console.error('[sugarplum]', msg);
+        gpuErrors.push(String(msg));
         if (framesRendered === 0) {
           // Before the first frame a GPU error is fatal — the scene would be blank.
-          showError('The GPU rejected the scene.', msg);
+          // Keep every message: the last one is usually just "the command buffer
+          // is invalid because of the previous error".
+          showError('The GPU rejected the scene.', gpuErrors.join('\n\n'));
         } else {
           statsEl.dataset.warn = '1';
           statsEl.innerHTML = `<b style="color:#ff9ab5">GPU warning</b> — see console`;
@@ -244,7 +252,9 @@ async function boot() {
       },
     });
   } catch (err) {
-    showError('Could not start the renderer.', String(err && (err.stack || err.message || err)));
+    const msg = String((err && err.message) || err);
+    const detail = err && err.stack ? String(err.stack).split('\n').slice(0, 6).join('\n') : '';
+    showError('Could not start the renderer.', [msg, ...gpuErrors.slice(0, 6), detail].filter(Boolean).join('\n\n'));
     return;
   }
 

@@ -17,6 +17,17 @@ export async function createRenderer({ canvas, world, onError = console.error })
 
   device.addEventListener('uncapturederror', (e) => onError(e.error.message));
 
+  // Anything created while a validation scope is open is checked immediately, so
+  // a bad pipeline / bind group names itself instead of turning every later
+  // command buffer into an anonymous "[Invalid CommandBuffer]".
+  const guard = async (label, fn) => {
+    device.pushErrorScope('validation');
+    const result = fn();
+    const err = await device.popErrorScope();
+    if (err) throw new Error(`${label}: ${err.message}`);
+    return result;
+  };
+
   const context = canvas.getContext('webgpu');
   const format = navigator.gpu.getPreferredCanvasFormat();
   context.configure({ device, format, alphaMode: 'opaque' });
@@ -50,23 +61,27 @@ export async function createRenderer({ canvas, world, onError = console.error })
   const postModule = await checkModule(device.createShaderModule({ code: postSrc, label: 'post' }), 'post.wgsl');
 
   // ----------------------------------------------------------------- buffers
-  const mkBuffer = (data, usage, label) => {
-    const buf = device.createBuffer({
-      label,
-      size: Math.max(4, Math.ceil(data.byteLength / 4) * 4),
-      usage: usage | GPUBufferUsage.COPY_DST,
+  const mkBuffer = (data, usage, label) =>
+    guard(`buffer "${label}" (${data.byteLength} B)`, () => {
+      const buf = device.createBuffer({
+        label,
+        size: Math.max(4, Math.ceil(data.byteLength / 4) * 4),
+        usage: usage | GPUBufferUsage.COPY_DST,
+      });
+      device.queue.writeBuffer(buf, 0, data);
+      return buf;
     });
-    device.queue.writeBuffer(buf, 0, data);
-    return buf;
-  };
   const VB = GPUBufferUsage.VERTEX;
 
-  const posBuf = mkBuffer(world.positions, VB, 'positions');
-  const nrmBuf = mkBuffer(world.normals, VB, 'normals');
-  const uvBuf = mkBuffer(world.uvs, VB, 'uvs');
-  const extBuf = mkBuffer(world.extras, VB, 'extras');
-  const idxBuf = mkBuffer(world.indices, GPUBufferUsage.INDEX, 'indices');
-  const instBuf = mkBuffer(world.instances, GPUBufferUsage.STORAGE, 'instances');
+  const posBuf = await mkBuffer(world.positions, VB, 'positions');
+  const nrmBuf = await mkBuffer(world.normals, VB, 'normals');
+  const uvBuf = await mkBuffer(world.uvs, VB, 'uvs');
+  const extBuf = await mkBuffer(world.extras, VB, 'extras');
+  const idxBuf = await mkBuffer(world.indices, GPUBufferUsage.INDEX, 'indices');
+  // Per-instance data as a vertex buffer (not a storage buffer): vertex-stage
+  // storage buffers are optional on some implementations (maxStorageBuffersInVertexStage
+  // is 0 in WebGPU compatibility mode), instanced vertex attributes work everywhere.
+  const instBuf = await mkBuffer(world.instances, VB, 'instances');
 
   // Global uniforms -----------------------------------------------------------
   const globalsData = new Float32Array(88); // 352 bytes, matches Globals in WGSL
@@ -119,7 +134,6 @@ export async function createRenderer({ canvas, world, onError = console.error })
       { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
       { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'depth' } },
       { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'comparison' } },
-      { binding: 3, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
     ],
   });
   const bgl1 = device.createBindGroupLayout({
@@ -128,19 +142,18 @@ export async function createRenderer({ canvas, world, onError = console.error })
     ],
   });
 
-  const bg0 = device.createBindGroup({
+  const bg0 = await guard('bind group 0', () => device.createBindGroup({
     layout: bgl0,
     entries: [
       { binding: 0, resource: { buffer: globalsBuf } },
       { binding: 1, resource: shadowView },
       { binding: 2, resource: shadowSampler },
-      { binding: 3, resource: { buffer: instBuf } },
     ],
-  });
-  const bg1 = device.createBindGroup({
+  }));
+  const bg1 = await guard('bind group 1', () => device.createBindGroup({
     layout: bgl1,
     entries: [{ binding: 0, resource: { buffer: objBuf, size: 128 } }],
-  });
+  }));
 
   const pipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [bgl0, bgl1] });
 
@@ -150,9 +163,22 @@ export async function createRenderer({ canvas, world, onError = console.error })
     { arrayStride: 12, attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x3' }] },
     { arrayStride: 8, attributes: [{ shaderLocation: 2, offset: 0, format: 'float32x2' }] },
     { arrayStride: 8, attributes: [{ shaderLocation: 3, offset: 0, format: 'float32x2' }] },
+    {
+      // per-instance transforms: position.xyz / scale.xyz+hue / quaternion / rgba
+      arrayStride: 64,
+      stepMode: 'instance',
+      attributes: [
+        { shaderLocation: 4, offset: 0, format: 'float32x4' },
+        { shaderLocation: 5, offset: 16, format: 'float32x4' },
+        { shaderLocation: 6, offset: 32, format: 'float32x4' },
+        { shaderLocation: 7, offset: 48, format: 'float32x4' },
+      ],
+    },
   ];
 
-  const mainPipeline = device.createRenderPipeline({
+  const pipe = async (label, desc) => guard(`render pipeline "${label}"`, () => device.createRenderPipeline(desc));
+
+  const mainPipeline = await pipe('main', {
     label: 'main',
     layout: pipelineLayout,
     vertex: { module: sceneModule, entryPoint: 'vsMain', buffers: vertexBuffers },
@@ -161,7 +187,7 @@ export async function createRenderer({ canvas, world, onError = console.error })
     depthStencil: { format: DEPTH_FORMAT, depthWriteEnabled: true, depthCompare: 'less' },
   });
 
-  const shadowPipeline = device.createRenderPipeline({
+  const shadowPipeline = await pipe('shadow', {
     label: 'shadow',
     layout: pipelineLayout,
     vertex: { module: sceneModule, entryPoint: 'vsShadow', buffers: vertexBuffers },
@@ -175,7 +201,7 @@ export async function createRenderer({ canvas, world, onError = console.error })
     },
   });
 
-  const skyPipeline = device.createRenderPipeline({
+  const skyPipeline = await pipe('sky', {
     label: 'sky',
     layout: device.createPipelineLayout({ bindGroupLayouts: [bgl0] }),
     vertex: { module: sceneModule, entryPoint: 'vsSky' },
@@ -184,7 +210,7 @@ export async function createRenderer({ canvas, world, onError = console.error })
     depthStencil: { format: DEPTH_FORMAT, depthWriteEnabled: false, depthCompare: 'always' },
   });
 
-  const snowPipeline = device.createRenderPipeline({
+  const snowPipeline = await pipe('snow', {
     label: 'snow',
     layout: device.createPipelineLayout({ bindGroupLayouts: [bgl0] }),
     vertex: { module: sceneModule, entryPoint: 'vsSnow' },
@@ -213,19 +239,19 @@ export async function createRenderer({ canvas, world, onError = console.error })
     ],
   });
   const postLayout = device.createPipelineLayout({ bindGroupLayouts: [postBGL] });
-  const brightPipeline = device.createRenderPipeline({
+  const brightPipeline = await pipe('bright', {
     layout: postLayout,
     vertex: { module: postModule, entryPoint: 'vsQuad' },
     fragment: { module: postModule, entryPoint: 'fsBright', targets: [{ format: HDR_FORMAT }] },
     primitive: { topology: 'triangle-list' },
   });
-  const blurPipeline = device.createRenderPipeline({
+  const blurPipeline = await pipe('blur', {
     layout: postLayout,
     vertex: { module: postModule, entryPoint: 'vsQuad' },
     fragment: { module: postModule, entryPoint: 'fsBlur', targets: [{ format: HDR_FORMAT }] },
     primitive: { topology: 'triangle-list' },
   });
-  const compositePipeline = device.createRenderPipeline({
+  const compositePipeline = await pipe('composite', {
     layout: postLayout,
     vertex: { module: postModule, entryPoint: 'vsQuad' },
     fragment: { module: postModule, entryPoint: 'fsComposite', targets: [{ format }] },
@@ -376,17 +402,24 @@ export async function createRenderer({ canvas, world, onError = console.error })
     write(5, [s.bloomThreshold, 0.55, 0, 0], [s.exposure, s.bloomStrength, s.vignette, s.grain], [tx, ty, s.time, 0]);
   };
 
+  const INSTANCE_STRIDE = 64; // four vec4 attributes per instance
+
   const drawScene = (pass) => {
     for (let i = 0; i < draws.length; i++) {
       const d = draws[i];
       pass.setBindGroup(1, bg1, [i * OBJ_STRIDE]);
       if (d.useInstance) {
-        pass.drawIndexed(d.indexCount, d.instanceCount, d.firstIndex, 0, d.instanceOffset);
+        // Bind this draw's slice of the instance buffer rather than relying on a
+        // non-zero firstInstance — instance_index then starts at 0.
+        pass.setVertexBuffer(4, instBuf, (d.instanceOffset || 0) * INSTANCE_STRIDE);
+        pass.drawIndexed(d.indexCount, d.instanceCount, d.firstIndex, 0, 0);
       } else {
         pass.drawIndexed(d.indexCount, 1, d.firstIndex, 0, 0);
       }
     }
   };
+
+  let probed = false;
 
   const render = (s) => {
     const w = Math.max(1, Math.floor(canvas.width));
@@ -409,11 +442,17 @@ export async function createRenderer({ canvas, world, onError = console.error })
     writeGlobals(s);
     writePost(s);
 
-    const encoder = device.createCommandEncoder();
+    // On the very first frame every command is checked, so a failure is reported
+    // with the driver's own wording instead of a bare "[Invalid CommandBuffer]".
+    const probing = !probed;
+    if (probing) device.pushErrorScope('validation');
+
+    const encoder = device.createCommandEncoder({ label: 'frame' });
 
     // 1) Shadow map
     {
       const pass = encoder.beginRenderPass({
+        label: 'shadow-pass',
         colorAttachments: [],
         depthStencilAttachment: {
           view: shadowView,
@@ -428,12 +467,14 @@ export async function createRenderer({ canvas, world, onError = console.error })
       pass.setVertexBuffer(1, nrmBuf);
       pass.setVertexBuffer(2, uvBuf);
       pass.setVertexBuffer(3, extBuf);
+      pass.setVertexBuffer(4, instBuf);
       pass.setIndexBuffer(idxBuf, 'uint32');
       for (let i = 0; i < draws.length; i++) {
         const d = draws[i];
         if (d.castShadow === false) continue;
         pass.setBindGroup(1, bg1, [i * OBJ_STRIDE]);
-        pass.drawIndexed(d.indexCount, d.instanceCount, d.firstIndex, 0, d.useInstance ? d.instanceOffset : 0);
+        if (d.useInstance) pass.setVertexBuffer(4, instBuf, (d.instanceOffset || 0) * INSTANCE_STRIDE);
+        pass.drawIndexed(d.indexCount, d.instanceCount, d.firstIndex, 0, 0);
       }
       pass.end();
     }
@@ -441,6 +482,7 @@ export async function createRenderer({ canvas, world, onError = console.error })
     // 2) Scene (sky + opaque)
     {
       const pass = encoder.beginRenderPass({
+        label: 'scene-pass',
         colorAttachments: [{
           view: targets.hdrView,
           clearValue: { r: 0, g: 0, b: 0, a: 1 },
@@ -464,6 +506,7 @@ export async function createRenderer({ canvas, world, onError = console.error })
       pass.setVertexBuffer(1, nrmBuf);
       pass.setVertexBuffer(2, uvBuf);
       pass.setVertexBuffer(3, extBuf);
+      pass.setVertexBuffer(4, instBuf);
       pass.setIndexBuffer(idxBuf, 'uint32');
       drawScene(pass);
 
@@ -476,8 +519,9 @@ export async function createRenderer({ canvas, world, onError = console.error })
     }
 
     // 3) Bloom chain
-    const postPass = (pipeline, bg, view) => {
+    const postPass = (pipeline, bg, view, label = 'post-pass') => {
       const pass = encoder.beginRenderPass({
+        label,
         colorAttachments: [{ view, clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: 'clear', storeOp: 'store' }],
       });
       pass.setPipeline(pipeline);
@@ -502,9 +546,16 @@ export async function createRenderer({ canvas, world, onError = console.error })
         { binding: 3, resource: { buffer: postUniforms[5] } },
       ],
     });
-    postPass(compositePipeline, compositeBG, canvasView);
+    postPass(compositePipeline, compositeBG, canvasView, 'composite-pass');
 
     device.queue.submit([encoder.finish()]);
+
+    if (probing) {
+      probed = true;
+      device.popErrorScope().then((err) => {
+        if (err) onError(`first frame: ${err.message}`);
+      });
+    }
   };
 
   return {

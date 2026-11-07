@@ -8,8 +8,15 @@
     "start": "node server.mjs",
     "dev": "node server.mjs",
     "validate": "node tools/validate.mjs",
-    "check": "node tools/check-world.mjs"
+    "check": "node tools/check-world.mjs",
+    "lint": "node tools/gpu-lint.mjs"
   },
-  "keywords": ["webgpu", "wgsl", "procedural", "procedural-materials", "gingerbread"],
+  "keywords": [
+    "webgpu",
+    "wgsl",
+    "procedural",
+    "procedural-materials",
+    "gingerbread"
+  ],
   "license": "MIT"
 }
