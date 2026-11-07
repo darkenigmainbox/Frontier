@@ -1,0 +1,15 @@
+{
+  "name": "sugarplum-hollow",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A fully procedural gingerbread-and-candy village rendered in real time with WebGPU.",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs",
+    "validate": "node tools/validate.mjs",
+    "check": "node tools/check-world.mjs"
+  },
+  "keywords": ["webgpu", "wgsl", "procedural", "procedural-materials", "gingerbread"],
+  "license": "MIT"
+}
