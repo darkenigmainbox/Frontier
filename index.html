@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Candy Village — Procedural WebGPU</title>
+<style>
+  :root{--pink:#ff5da2;--choc:#4a2410;--cream:#fff6e9}
+  *{box-sizing:border-box} html,body{margin:0;height:100%;overflow:hidden;background:#1a0b1e;font-family:ui-rounded,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--cream)}
+  #app{position:fixed;inset:0} canvas{width:100%;height:100%;display:block;touch-action:none;cursor:grab} canvas:active{cursor:grabbing}
+  .panel{position:fixed;left:16px;top:16px;max-width:360px;padding:16px 18px;border-radius:20px;background:linear-gradient(160deg,rgba(58,22,8,.82),rgba(90,20,55,.78));backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.22);box-shadow:0 18px 50px rgba(0,0,0,.45)}
+  .panel h1{margin:0;font-size:26px;line-height:1.05;letter-spacing:.2px} .panel h1 span{color:#ffb3d1}
+  .panel p{margin:8px 0 0;font-size:13px;line-height:1.45;color:#ffe3ef}
+  .badge{display:inline-block;margin-top:10px;padding:4px 9px;border-radius:999px;background:#ff5da2;color:white;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+  .badge.alt{background:#7ee08a;color:#12300f}
+  .controls{position:fixed;right:16px;top:16px;width:248px;padding:14px;border-radius:18px;background:rgba(30,10,28,.78);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.18)}
+  .controls h2{margin:0 0 10px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#ffd7e8}
+  .row{margin:10px 0;font-size:13px} .row label{display:flex;justify-content:space-between;margin-bottom:6px;color:#ffeef6}
+  input[type=range]{width:100%;accent-color:#ff5da2}
+  button{width:100%;padding:9px 10px;border:0;border-radius:12px;background:linear-gradient(90deg,#ff5da2,#ffb347);color:#381106;font-weight:800;cursor:pointer;margin-top:6px}
+  button.secondary{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.2)}
+  .checks{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px}.checks label{background:rgba(255,255,255,.08);padding:7px;border-radius:10px}
+  .views{display:grid;grid-template-columns:1fr 1fr;gap:6px}.views button{margin:0;padding:7px;font-size:12px}
+  .help{position:fixed;left:16px;bottom:16px;padding:10px 13px;border-radius:14px;background:rgba(20,8,18,.72);backdrop-filter:blur(10px);font-size:12px;line-height:1.5;color:#ffe9f3;border:1px solid rgba(255,255,255,.14)}
+  .stats{position:fixed;right:16px;bottom:16px;padding:9px 12px;border-radius:12px;background:rgba(20,8,18,.72);font-size:12px;color:#ffd7e8;border:1px solid rgba(255,255,255,.14);text-align:right}
+  #fallback{display:none;position:fixed;inset:0;place-items:center;background:radial-gradient(circle at 50% 30%,#6b2348,#1a0b1e 70%);padding:24px;text-align:center;z-index:10}
+  #fallback .card{max-width:560px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:22px;padding:28px;line-height:1.6}
+  code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px}
+  @media(max-width:760px){.panel{max-width:calc(100vw - 32px)}.controls{display:none}.help{display:none}}
+</style>
+</head>
+<body>
+<div id="app"><canvas id="gpu"></canvas></div>
+
+<div class="panel">
+  <h1>🍭 Candy &amp; Chocolate<br/><span>Village</span></h1>
+  <p>A fully procedural WebGPU village: gingerbread houses, jellybean fruit trees, marshmallow snowmen, gumdrop lanes, candy-cane lamps, a chocolate river &amp; fountain, lollipop forests and sugar-crystal sparkle — no textures, no models, everything generated in code &amp; WGSL.</p>
+  <span class="badge">WebGPU · WGSL procedural materials</span> <span class="badge alt">Zero assets</span>
+</div>
+
+<div class="controls">
+  <h2>🍬 Village Controls</h2>
+  <div class="row"><label><span>☀️ Time of day</span><span id="todVal">morning</span></label><input id="tod" type="range" min="0" max="1000" value="340"/></div>
+  <div class="row"><label><span>🍭 Candy density</span><span id="denVal">100%</span></label><input id="density" type="range" min="40" max="160" value="100"/></div>
+  <div class="checks">
+    <label><input id="spin" type="checkbox" checked/> Auto-orbit</label>
+    <label><input id="snow" type="checkbox" checked/> Sugar snow</label>
+    <label><input id="sway" type="checkbox" checked/> Candy sway</label>
+    <label><input id="shadows" type="checkbox" checked/> Shadows</label>
+  </div>
+  <button id="regen">🎲 Regenerate village (new seed)</button>
+  <div class="row"><label><span>📷 Camera views</span></label>
+    <div class="views">
+      <button class="secondary" data-view="village">🏠 Village</button>
+      <button class="secondary" data-view="fountain">⛲ Fountain</button>
+      <button class="secondary" data-view="forest">🌲 Candy forest</button>
+      <button class="secondary" data-view="aerial">🛩️ Aerial</button>
+    </div>
+  </div>
+</div>
+
+<div class="help"><b>Drag</b> orbit · <b>Wheel</b> zoom · <b>Right-drag / WASD / arrows</b> pan · <b>Q/E</b> up/down<br/>Every material — chocolate swirl, gingerbread speckle, icing, candy-cane stripes, lollipop spirals, gumdrop sugar, rock-candy voronoi, sprinkles — is procedural WGSL.</div>
+<div class="stats" id="stats">starting WebGPU…</div>
+
+<div id="fallback"><div class="card"><h2>WebGPU isn’t available in this browser</h2><p>This demo uses the raw WebGPU API + WGSL. Please open it in a recent Chrome / Edge (or Safari Technology Preview) with WebGPU enabled, served over <code>http://localhost</code> or HTTPS.</p></div></div>
+
+<script type="module">
+// =============================================================================
+// CANDY & CHOCOLATE VILLAGE — 100% procedural, raw WebGPU (no three.js, no assets)
+// Geometry is generated in JS, materials are generated in WGSL.
+// =============================================================================
+const canvas = document.getElementById('gpu');
+const statsEl = document.getElementById('stats');
+if (!navigator.gpu) { document.getElementById('fallback').style.display='grid'; throw new Error('no webgpu'); }
+
+// ---------- seeded RNG ----------
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+let seed = (Math.random()*1e9)|0;
+let rand = mulberry32(seed);
+const rr=(a=1,b)=> b===undefined ? rand()*a : a+rand()*(b-a);
+const pick=a=>a[(rand()*a.length)|0];
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+
+// ---------- tiny mat4 (column-major) ----------
+const M={
+  ident:()=>new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]),
+  mul(a,b){const o=new Float32Array(16);for(let c=0;c<4;c++)for(let r=0;r<4;r++){let s=0;for(let k=0;k<4;k++)s+=a[k*4+r]*b[c*4+k];o[c*4+r]=s}return o},
+  persp(fov,asp,n,f){const t=1/Math.tan(fov/2),d=1/(n-f),o=new Float32Array(16);o[0]=t/asp;o[5]=t;o[10]=f*d;o[11]=-1;o[14]=n*f*d;return o},
+  ortho(l,r,b,t,n,f){const o=M.ident();o[0]=2/(r-l);o[5]=2/(t-b);o[10]=-2/(f-n);o[12]=-(r+l)/(r-l);o[13]=-(t+b)/(t-b);o[14]=-(f+n)/(f-n);return o},
+  lookAt(e,c,up){const z=nrm(sub(e,c)),x=nrm(cross(up,z)),y=cross(z,x),o=M.ident();o[0]=x[0];o[4]=x[1];o[8]=x[2];o[1]=y[0];o[5]=y[1];o[9]=y[2];o[2]=z[0];o[6]=z[1];o[10]=z[2];o[12]=-dot(x,e);o[13]=-dot(y,e);o[14]=-dot(z,e);return o},
+  compose(p,eu,s){const[cx,sx,cy,sy,cz,sz]=[Math.cos(eu[0]),Math.sin(eu[0]),Math.cos(eu[1]),Math.sin(eu[1]),Math.cos(eu[2]),Math.sin(eu[2])];
+    // R = Ry * Rx * Rz (yaw/pitch/roll friendly)
+    const rx=[1,0,0,0, 0,cx,sx,0, 0,-sx,cx,0, 0,0,0,1], ry=[cy,0,-sy,0, 0,1,0,0, sy,0,cy,0, 0,0,0,1], rz=[cz,sz,0,0, -sz,cz,0,0, 0,0,1,0, 0,0,0,1];
+    let m=M.mul(new Float32Array(ry),M.mul(new Float32Array(rx),new Float32Array(rz)));
+    for(let c=0;c<3;c++){m[c*4]*=s[0];m[c*4+1]*=s[1];m[c*4+2]*=s[2]} m[12]=p[0];m[13]=p[1];m[14]=p[2];return m},
+  invert(a){ // general 4x4 inverse (for sky unprojection)
+    const o=new Float32Array(16),a00=a[0],a01=a[1],a02=a[2],a03=a[3],a10=a[4],a11=a[5],a12=a[6],a13=a[7],a20=a[8],a21=a[9],a22=a[10],a23=a[11],a30=a[12],a31=a[13],a32=a[14],a33=a[15];
+    const b00=a00*a11-a01*a10,b01=a00*a12-a02*a10,b02=a00*a13-a03*a10,b03=a01*a12-a02*a11,b04=a01*a13-a03*a11,b05=a02*a13-a03*a12,b06=a20*a31-a21*a30,b07=a20*a32-a22*a30,b08=a20*a33-a23*a30,b09=a21*a32-a22*a31,b10=a21*a33-a23*a31,b11=a22*a33-a23*a32;
+    let det=b00*b11-b01*b10+b02*b09+b03*b08-b04*b07+b05*b06; if(!det) return M.ident(); det=1/det;
+    o[0]=(a11*b11-a12*b10+a13*b09)*det;o[1]=(a02*b10-a01*b11-a03*b09)*det;o[2]=(a31*b05-a32*b04+a33*b03)*det;o[3]=(a22*b04-a21*b05-a23*b03)*det;
+    o[4]=(a12*b08-a10*b11-a13*b07)*det;o[5]=(a00*b11-a02*b08+a03*b07)*det;o[6]=(a32*b02-a30*b05-a33*b01)*det;o[7]=(a20*b05-a22*b02+a23*b01)*det;
+    o[8]=(a10*b10-a11*b08+a13*b06)*det;o[9]=(a01*b08-a00*b10-a03*b06)*det;o[10]=(a30*b04-a31*b02+a33*b00)*det;o[11]=(a21*b02-a20*b04-a23*b00)*det;
+    o[12]=(a11*b07-a10*b09-a12*b06)*det;o[13]=(a00*b09-a01*b07+a02*b06)*det;o[14]=(a31*b01-a30*b03-a32*b00)*det;o[15]=(a20*b03-a21*b01+a22*b00)*det;return o}
+};
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]], cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]], dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2], nrm=a=>{const l=Math.hypot(...a)||1;return[a[0]/l,a[1]/l,a[2]/l]};
+
+// hex sRGB -> linear rgb
+function col(hex){const n=parseInt(hex.slice(1),16);const f=v=>Math.pow(((v>>16&255)/255),2.2);const g=v=>Math.pow(((v>>8&255)/255),2.2);const h=v=>Math.pow(((v&255)/255),2.2);return[f(n),g(n),h(n)]}
+const PAL={pink:'#ff5da2',red:'#e8263a',mint:'#3fd68f',lime:'#9be15d',lemon:'#ffd93b',orange:'#ff8a2a',grape:'#9b5de5',blue:'#35b6ff',cream:'#fff3d6',white:'#ffffff',choc:'#5a2d12',caramel:'#c97b2d'};
+const CANDY=[PAL.pink,PAL.red,PAL.mint,PAL.lemon,PAL.orange,PAL.grape,PAL.blue,PAL.lime];
+
+// ---------- procedural geometry builders ----------
+// each returns {pos,nor,uv,idx}
+function geoFrom(pos,nor,uv,idx){return{pos:new Float32Array(pos),nor:new Float32Array(nor),uv:new Float32Array(uv),idx:new Uint32Array(idx)}}
+function boxGeo(){const p=[],n=[],u=[],i=[];const F=[[0,0,1,0,0],[0,0,-1,0,0],[1,0,0,0,0],[-1,0,0,0,0],[0,1,0,0,0],[0,-1,0,0,0]];
+  // face defs: normal, 4 corners
+  const faces=[
+    [[-.5,-.5,.5],[.5,-.5,.5],[.5,.5,.5],[-.5,.5,.5],[0,0,1]],
+    [[.5,-.5,-.5],[-.5,-.5,-.5],[-.5,.5,-.5],[.5,.5,-.5],[0,0,-1]],
+    [[.5,-.5,.5],[.5,-.5,-.5],[.5,.5,-.5],[.5,.5,.5],[1,0,0]],
+    [[-.5,-.5,-.5],[-.5,-.5,.5],[-.5,.5,.5],[-.5,.5,-.5],[-1,0,0]],
+    [[-.5,.5,.5],[.5,.5,.5],[.5,.5,-.5],[-.5,.5,-.5],[0,1,0]],
+    [[-.5,-.5,-.5],[.5,-.5,-.5],[.5,-.5,.5],[-.5,-.5,.5],[0,-1,0]]];
+  faces.forEach(f=>{const b=p.length/3;f.slice(0,4).forEach((v,k)=>{p.push(...v);n.push(f[4][0],f[4][1],f[4][2]);u.push(k%2,(k/2|0))});i.push(b,b+1,b+2,b,b+2,b+3)});return geoFrom(p,n,u,i)}
+function sphereGeo(w=22,h=16){const p=[],n=[],u=[],i=[];for(let y=0;y<=h;y++){const v=y/h,ph=v*Math.PI;for(let x=0;x<=w;x++){const uu=x/w,th=uu*Math.PI*2;const s=[Math.sin(ph)*Math.cos(th),Math.cos(ph),Math.sin(ph)*Math.sin(th)];p.push(...s);n.push(...s);u.push(uu,v)}}
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const a=y*(w+1)+x,b=a+1,c=a+w+1,d=c+1;i.push(a,c,b,b,c,d)}return geoFrom(p,n,u,i)}
+function cylGeo(rt=1,rb=1,seg=20,cap=true){const p=[],n=[],u=[],i=[];for(let y=0;y<=1;y++){const yy=y-.5,r=y?rt:rb;for(let x=0;x<=seg;x++){const a=x/seg*Math.PI*2,co=Math.cos(a),si=Math.sin(a);p.push(co*r,yy,si*r);const nl=Math.hypot(1,(rb-rt));n.push(co/nl,(rb-rt)/nl,si/nl);u.push(x/seg,y)}}
+  for(let y=0;y<1;y++)for(let x=0;x<seg;x++){const a=y*(seg+1)+x,b=a+1,c=a+seg+1,d=c+1;i.push(a,c,b,b,c,d)}
+  if(cap){for(const top of[1,0]){const yy=top?.5:-.5,r=top?rt:rb,base=p.length/3;p.push(0,yy,0);n.push(0,top?1:-1,0);u.push(.5,.5);for(let x=0;x<seg;x++){const a=x/seg*Math.PI*2,b=p.length/3;p.push(Math.cos(a)*r,yy,Math.sin(a)*r);n.push(0,top?1:-1,0);u.push(.5+Math.cos(a)*.5,.5+Math.sin(a)*.5); if(top)i.push(base,b+1,b);else i.push(base,b,b+1)}}}return geoFrom(p,n,u,i)}
+function prismGeo(){ // gingerbread roof: triangular cross-section in XY, extruded along Z, ridge along Z
+  const p=[],n=[],u=[],i=[];const quad=(a,b,c,d,nn)=>{const s=p.length/3;[a,b,c,d].forEach((v,k)=>{p.push(...v);n.push(...nn);u.push(k%2,(k/2|0))});i.push(s,s+1,s+2,s,s+2,s+3)};
+  const tri=(a,b,c,nn)=>{const s=p.length/3;[a,b,c].forEach(v=>{p.push(...v);n.push(...nn);u.push(.5,.5)});i.push(s,s+1,s+2)};
+  const A=[-.5,-.5,.5],B=[.5,-.5,.5],C=[0,.5,.5],D=[-.5,-.5,-.5],E=[.5,-.5,-.5],F=[0,.5,-.5],s2=Math.SQRT1_2;
+  quad(D,E,B,A,[0,-1,0]); quad(A,B,C,C,[-s2,s2,0].map((v,j)=>j===0?v:v)); // bottom + right slope (normal fixed below)
+  // redo slopes with correct normals by rebuilding: simpler use explicit
+  p.length=0;n.length=0;u.length=0;i.length=0;
+  quad(D,E,B,A,[0,-1,0]); quad(B,E,F,C,[s2,s2,0]); quad(C,F,D,A,[-s2,s2,0]); tri(A,B,C,[0,0,1]); tri(E,D,F,[0,0,-1]); return geoFrom(p,n,u,i)}
+function torusGeo(R=.68,r=.32,seg=26,tub=14,arc=Math.PI*2){const p=[],n=[],u=[],i=[];for(let y=0;y<=tub;y++){const v=y/tub*Math.PI*2,cv=Math.cos(v),sv=Math.sin(v);for(let x=0;x<=seg;x++){const a=x/seg*arc,ca=Math.cos(a),sa=Math.sin(a);const cx=R+ r*cv;const pos=[cx*ca,r*sv,cx*sa];const cen=[R*ca,0,R*sa];p.push(...pos);n.push(...nrm(sub(pos,cen)));u.push(x/seg,y/tub)}}
+  for(let y=0;y<tub;y++)for(let x=0;x<seg;x++){const a=y*(seg+1)+x,b=a+1,c=a+seg+1,d=c+1;i.push(a,c,b,b,c,d)}return geoFrom(p,n,u,i)}
+function latheGeo(profile,seg=22){ // profile: [[r,y],...] bottom->top, surface of revolution, smooth normals via neighbor averaging later
+  const p=[],n=[],u=[],idx=[];profile.forEach((pt,yi)=>{for(let x=0;x<=seg;x++){const a=x/seg*Math.PI*2;p.push(Math.cos(a)*pt[0],pt[1],Math.sin(a)*pt[0]);n.push(1,0,0);u.push(x/seg,yi/(profile.length-1))}});
+  for(let y=0;y<profile.length-1;y++)for(let x=0;x<seg;x++){const a=y*(seg+1)+x,b=a+1,c=a+seg+1,d=c+1;idx.push(a,c,b,b,c,d)}
+  const g=geoFrom(p,n,u,idx);computeNormals(g);return g}
+function computeNormals(g){const n=new Float32Array(g.pos.length);for(let t=0;t<g.idx.length;t+=3){const[a,b,c]=[g.idx[t],g.idx[t+1],g.idx[t+2]];const A=g.pos.slice(a*3,a*3+3),B=g.pos.slice(b*3,b*3+3),C=g.pos.slice(c*3,c*3+3);const nn=cross(sub(B,A),sub(C,A));for(const k of[a,b,c]){n[k*3]+=nn[0];n[k*3+1]+=nn[1];n[k*3+2]+=nn[2]}}
+  for(let k=0;k<n.length;k+=3){const v=nrm([n[k],n[k+1],n[k+2]]);n[k]=v[0];n[k+1]=v[1];n[k+2]=v[2]} g.nor=n}
+function jellybeanGeo(){const g=sphereGeo(20,14);const p=g.pos;for(let k=0;k<p.length;k+=3){let x=p[k],y=p[k+1],z=p[k+2]; // kidney-bend a sphere into a jellybean
+    z += (x*x)*0.42 - 0.10; y*=0.72; x*=1.18; p[k]=x;p[k+1]=y;p[k+2]=z;} computeNormals(g);return g}
+function groundGeo(){const S=170,N=110,p=[],n=[],u=[],idx=[];for(let y=0;y<=N;y++)for(let x=0;x<=N;x++){const xx=(x/N-.5)*S,zz=(y/N-.5)*S;p.push(xx,terrainH(xx,zz),zz);n.push(0,1,0);u.push(x/N,y/N)}
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){const a=y*(N+1)+x,b=a+1,c=a+N+1,d=c+1;idx.push(a,c,b,b,c,d)}const g=geoFrom(p,n,u,idx);computeNormals(g);return g}
+function ribbonGeo(curve,width,y0=0.16){ // curve: array of [x,z]
+  const p=[],n=[],u=[],idx=[];curve.forEach((c,i)=>{const q=curve[Math.min(i+1,curve.length-1)],q0=curve[Math.max(i-1,0)];const d=nrm([q[0]-q0[0],0,q[1]-q0[1]]);const side=[-d[2],0,d[0]];for(const s of[-1,1]){const x=c[0]+side[0]*width/2*s,z=c[1]+side[2]*width/2*s;p.push(x,terrainH(x,z)+y0,z);n.push(0,1,0);u.push(s*.5+.5,i)}});
+  for(let i=0;i<curve.length-1;i++){const a=i*2;idx.push(a,a+2,a+1,a+1,a+2,a+3)}return geoFrom(p,n,u,idx)}
+
+// terrain height: flat village bowl, gentle frosting hills outside, carved chocolate-river channel (river runs along z = riverZ(x))
+const riverZ=x=> 26 + Math.sin(x*0.055)*5 + Math.sin(x*0.013)*3;
+function terrainH(x,z){const d=Math.hypot(x,z);const hills=Math.max(0,(d-34)/40);let h=hills*hills*7 + Math.sin(x*0.08)*Math.cos(z*0.07)*hills*2.2;
+  const rd=Math.abs(z-riverZ(x)); if(rd<7) h-= (1-rd/7)*1.1; // river channel
+  if(d<30) h*= (d/30)*(d/30)*0.35; return h}
+
+// ---------- materials (ids shared JS/WGSL) ----------
+const MAT={CHOC:0,GINGER:1,ICING:2,CANE:3,JELLY:4,MARSH:5,GUMDROP:6,LOLLI:7,PEPPER:8,WAFER:9,LEAF:10,ROCK:11,BARK:12,SPRINKLE:13,WINDOW:14,CARAMEL:15,GROUND:20,RIVER:21,PATH:22,SNOW:99};
+
+// ---------- scene construction ----------
+let groups=new Map(); // name -> {geo, list:[instances], visible}
+function defGroup(name,geo,visible=true){groups.set(name,{geo,list:[],visible,buffer:null,count:0})}
+function add(group,mat,ca,cb,pos,scale=[1,1,1],rot=[0,0,0],sway=0,bob=0){const g=groups.get(group);if(!g)return;g.list.push({mat,ca:col(ca),cb:col(cb||ca),pos,scale,rot,seed:rand(),sway,bob})}
+function local(parentPos,rotY,lx,ly,lz){const c=Math.cos(rotY),s=Math.sin(rotY);return[parentPos[0]+lx*c+lz*s, parentPos[1]+ly, parentPos[2]-lx*s+lz*c]}
+
+let WORLD={houses:[]};
+function buildWorld(density=1){
+  groups.clear(); WORLD={houses:[]};
+  defGroup('ground',groundGeo()); defGroup('box',boxGeo()); defGroup('sphere',sphereGeo()); defGroup('cyl',cylGeo()); defGroup('cone',cylGeo(0.02,1,18));
+  defGroup('prism',prismGeo()); defGroup('torus',torusGeo()); defGroup('hook',torusGeo(0.62,0.30,18,12,Math.PI)); defGroup('jelly',jellybeanGeo());
+  defGroup('gumdrop',latheGeo([[0.001,-0.5],[0.62,-0.48],[0.78,-0.28],[0.72,0.02],[0.52,0.30],[0.26,0.47],[0.001,0.55]]));
+  defGroup('marsh',latheGeo([[0.001,-0.5],[0.36,-0.5],[0.50,-0.34],[0.53,0],[0.50,0.34],[0.36,0.5],[0.001,0.5]]));
+  defGroup('kiss',latheGeo([[0.001,-0.5],[0.55,-0.48],[0.62,-0.25],[0.45,0.08],[0.22,0.34],[0.001,0.62]]));
+  defGroup('snowball',sphereGeo(14,10),true);
+
+  const D=density, at=(x,z)=>terrainH(x,z);
+  // ground + chocolate river + caramel path ribbons
+  add('ground',MAT.GROUND,PAL.mint,PAL.choc,[0,0,0]);
+  const riverCurve=[],pathCurve=[]; for(let x=-84;x<=84;x+=3){riverCurve.push([x,riverZ(x)]); }
+  add('ground',MAT.RIVER,PAL.choc,'#8a4b1d',[0,0,0]); // placeholder replaced below by ribbon group
+  groups.get('ground').list.pop();
+  defGroup('river',ribbonGeo(riverCurve,6.5,0.10)); add('river',MAT.RIVER,PAL.choc,'#9c5a24',[0,0,0]);
+  for(let t=0;t<=1.0001;t+=0.05){const a=t*Math.PI*2;pathCurve.push([Math.cos(a)*14.5,Math.sin(a)*14.5])}
+  defGroup('ringpath',ribbonGeo(pathCurve,3.2,0.14)); add('ringpath',MAT.PATH,PAL.caramel,'#8a4b1d',[0,0,0]);
+
+  // ----- central peppermint plaza + chocolate fountain -----
+  add('cyl',MAT.PEPPER,PAL.red,PAL.white,[0,at(0,0)+0.12,0],[13,0.25,13]);
+  add('cyl',MAT.WAFER,'#d9a066','#a96f35',[0,at(0,0)+0.35,0],[5.6,0.5,5.6]);
+  add('cyl',MAT.CHOC,PAL.choc,'#8a4b1d',[0,at(0,0)+0.75,0],[4.6,0.5,4.6]);
+  add('cyl',MAT.RIVER,PAL.choc,'#9c5a24',[0,at(0,0)+1.05,0],[4.0,0.18,4.0]);
+  add('cyl',MAT.WAFER,'#d9a066','#a96f35',[0,at(0,0)+1.5,0],[0.7,1.8,0.7]);
+  add('cyl',MAT.CHOC,PAL.choc,'#8a4b1d',[0,at(0,0)+2.7,0],[2.5,0.35,2.5]);
+  add('cyl',MAT.RIVER,PAL.choc,'#9c5a24',[0,at(0,0)+3.0,0],[2.0,0.16,2.0]);
+  add('gumdrop',MAT.CHOC,PAL.choc,'#8a4b1d',[0,at(0,0)+3.75,0],[1.1,1.5,1.1]);
+  add('jelly',MAT.JELLY,PAL.red,PAL.white,[0,at(0,0)+4.7,0],[0.65,0.65,0.65],[0,rr(6),0]);
+
+  // ----- gingerbread houses -----
+  const houseSpots=[[-15,-11,0.7],[15,-13,-0.7],[-21,3,1.35],[21,5,-1.35],[-11,15,2.6],[13,16,-2.7],[-27,-17,0.95],[27,-19,-0.95],[1,-23,0.05],[-29,14,1.9],[29,15,-1.9]];
+  for(const [hx,hz,face] of houseSpots){
+    const rotY=face+rr(-0.12,0.12), s=rr(0.9,1.28), base=at(hx,hz), H=[hx,base,hz]; WORLD.houses.push(H);
+    const roofC=pick([PAL.pink,PAL.red,PAL.grape,PAL.blue,PAL.mint,'#ff8a2a']);
+    add('box',MAT.GINGER,'#b06a2e','#7c4214',[hx,base+1.5*s,hz],[4.2*s,3*s,3.6*s],[0,rotY,0]);
+    add('prism',MAT.ICING,roofC,PAL.white,[hx,base+(3+0.95)*s,hz],[4.9*s,1.9*s,4.3*s],[0,rotY,0]);           // frosting roof
+    add('prism',MAT.ICING,PAL.white,PAL.cream,local(H,rotY,0,0,0).map((v,i)=>i===1?base+(3+1.85)*s:v),[4.95*s,0.35*s,4.35*s],[0,rotY,0]); // snow cap ridge
+    const chim=local(H,rotY,1.2*s,0, -0.8*s); add('box',MAT.GINGER,'#a35f28','#7c4214',[chim[0],base+4.6*s,chim[2]],[0.65*s,1.5*s,0.65*s],[0,rotY,0]);
+    add('box',MAT.ICING,PAL.white,PAL.cream,[chim[0],base+5.4*s,chim[2]],[0.85*s,0.3*s,0.85*s],[0,rotY,0]);
+    const door=local(H,rotY,0,0,1.83*s); add('box',MAT.CHOC,PAL.choc,'#8a4b1d',[door[0],base+0.95*s,door[2]],[1.0*s,1.9*s,0.18*s],[0,rotY,0]);
+    add('sphere',MAT.JELLY,PAL.lemon,PAL.white,local(H,rotY,0.32*s,0,1.98*s),[0.16*s,0.16*s,0.16*s]);
+    for(const wx of[-1.35,1.35]){const w=local(H,rotY,wx*s,0,1.83*s); add('box',MAT.ICING,PAL.white,PAL.cream,[w[0],base+1.9*s,w[2]],[0.95*s,0.95*s,0.14*s],[0,rotY,0]); add('box',MAT.WINDOW,'#ffd93b','#ff9f2e',[w[0],base+1.9*s,w[2]],[0.7*s,0.7*s,0.2*s],[0,rotY,0]);}
+    for(const cx of[-2.05,2.05]){const c=local(H,rotY,cx*s,0,1.7*s); add('cyl',MAT.CANE,PAL.red,PAL.white,[c[0],base+1.5*s,c[2]],[0.28*s,3*s,0.28*s],[0,0,0],0.02);} // candy-cane pillars
+    // gumdrop eave trim + jellybean garden path to the plaza
+    for(let k=0;k<7;k++){const t=k/6, lx=(-2.2+4.4*t)*s, e=local(H,rotY,lx,0,2.05*s); add('sphere',MAT.GUMDROP,pick(CANDY),PAL.white,[e[0],base+3.02*s,e[2]],[0.30*s,0.30*s,0.30*s]);}
+    for(let k=1;k<=4;k++){const gp=local(H,rotY,rr(-0.2,0.2),0,(2.6+k*1.15)*s); add('jelly',MAT.JELLY,pick(CANDY),PAL.white,[gp[0],at(gp[0],gp[2])+0.16,gp[2]],[0.42,0.30,0.42],[rr(3),rr(6),rr(3)]);}
+    // chocolate-bar fence
+    for(let k=-3;k<=3;k++){if(k===0)continue;const f=local(H,rotY,k*0.85*s,0,3.1*s);add('box',MAT.CHOC,PAL.choc,'#8a4b1d',[f[0],at(f[0],f[2])+0.42,f[2]],[0.55*s,0.85,0.16],[0,rotY,0]);}
+    // yard lollipop
+    const lp=local(H,rotY,3.1*s,0,2.4*s); add('cyl',MAT.ICING,PAL.white,PAL.cream,[lp[0],at(lp[0],lp[2])+0.9,lp[2]],[0.09,1.8,0.09]); add('sphere',MAT.LOLLI,pick(CANDY),PAL.white,[lp[0],at(lp[0],lp[2])+2.0,lp[2]],[0.62,0.62,0.24],[0,rr(6),0],0.05);
+  }
+
+  // ----- candy forest -----
+  const trees=Math.floor(120*D);
+  for(let i=0;i<trees;i++){
+    const a=rr(Math.PI*2), rad=rr(31,72), x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+    if(Math.abs(z-riverZ(x))<6) continue; const y=at(x,z), s=rr(0.85,1.7), kind=(rand()*6)|0, sway=0.045;
+    add('cyl',MAT.BARK,PAL.choc,'#8a4b1d',[x,y+1.1*s,z],[0.34*s,2.2*s,0.34*s]);
+    if(kind===0){ // lollipop tree
+      add('cyl',MAT.ICING,PAL.white,PAL.cream,[x,y+2.6*s,z],[0.12*s,2.2*s,0.12*s]);
+      add('sphere',MAT.LOLLI,pick(CANDY),PAL.white,[x,y+3.9*s,z],[1.25*s,1.25*s,0.42*s],[rr(-0.2,0.2),rr(6),0],sway);
+    }else if(kind===1){ // frosting pine (stacked cones)
+      for(let k=0;k<3;k++) add('cone',MAT.LEAF,k%2?PAL.mint:'#2bb673',PAL.white,[x,y+(1.8+k*1.05)*s,z],[(2.1-k*0.5)*s,2.0*s,(2.1-k*0.5)*s],[0,rr(6),0],sway);
+      add('jelly',MAT.JELLY,PAL.red,PAL.white,[x,y+5.1*s,z],[0.4*s,0.4*s,0.4*s]);
+    }else if(kind===2){ // gumdrop tree
+      add('gumdrop',MAT.GUMDROP,pick(CANDY),PAL.white,[x,y+3.0*s,z],[2.5*s,3.0*s,2.5*s],[0,rr(6),0],sway);
+      add('sphere',MAT.GUMDROP,pick(CANDY),PAL.white,[x-1.1*s,y+2.0*s,z+0.5*s],[0.8*s,0.8*s,0.8*s],[],sway);
+    }else if(kind===3){ // jellybean fruit tree — canopy + hanging jellybean fruit
+      const cx=x,cz=z,cy=y+3.4*s;
+      add('sphere',MAT.LEAF,PAL.mint,'#2bb673',[cx,cy,cz],[2.3*s,1.9*s,2.3*s],[0,rr(6),0],sway);
+      add('sphere',MAT.LEAF,'#2bb673','#7ee08a',[cx-1.3*s,cy-0.5*s,cz+0.6*s],[1.4*s,1.2*s,1.4*s],[],sway);
+      const fruits=Math.floor(rr(8,14)); for(let f=0;f<fruits;f++){const th=rr(Math.PI*2),ph=rr(0.4,2.4),R=2.05*s;const fx=cx+Math.sin(ph)*Math.cos(th)*R,fz=cz+Math.sin(ph)*Math.sin(th)*R,fy=cy+Math.cos(ph)*R*0.82; add('jelly',MAT.JELLY,pick(CANDY),PAL.white,[fx,fy,fz],[0.34*s,0.30*s,0.34*s],[rr(3),rr(6),rr(3)],sway*1.6);}
+    }else if(kind===4){ // peppermint tree
+      add('cyl',MAT.PEPPER,PAL.red,PAL.white,[x,y+3.6*s,z],[2.4*s,0.35*s,2.4*s],[rr(-0.25,0.25),rr(6),rr(-0.25,0.25)],sway);
+      add('sphere',MAT.GUMDROP,pick(CANDY),PAL.white,[x,y+4.1*s,z],[0.5*s,0.5*s,0.5*s],[],sway);
+    }else{ // chocolate truffle tree
+      add('sphere',MAT.CHOC,PAL.choc,'#8a4b1d',[x,y+3.2*s,z],[2.0*s,1.8*s,2.0*s],[],sway);
+      add('kiss',MAT.CHOC,'#6d3512','#a96f35',[x,y+4.6*s,z],[0.9*s,1.1*s,0.9*s],[],sway);
+      for(let f=0;f<6;f++){const th=rr(Math.PI*2);add('jelly',MAT.JELLY,pick(CANDY),PAL.white,[x+Math.cos(th)*1.7*s,y+rr(2.4,3.8)*s,z+Math.sin(th)*1.7*s],[0.3*s,0.27*s,0.3*s],[rr(3),rr(6),0],sway*1.5);}
+    }
+  }
+
+  // ----- jellybean bushes, marshmallow drifts, flowers, rock candy, sprinkles -----
+  for(let i=0;i<Math.floor(46*D);i++){const a=rr(Math.PI*2),rad=rr(9,30),x=Math.cos(a)*rad,z=Math.sin(a)*rad;if(Math.abs(z-riverZ(x))<5)continue;const y=at(x,z),s=rr(0.7,1.5);
+    const marshBush=rand()<0.4;
+    add('sphere',marshBush?MAT.MARSH:MAT.LEAF, marshBush?PAL.white:PAL.mint, marshBush?PAL.cream:'#2bb673',[x,y+0.55*s,z],[1.35*s,0.95*s,1.35*s],[0,rr(6),0],0.02);
+    const n=Math.floor(rr(5,11)); for(let f=0;f<n;f++){const th=rr(Math.PI*2),ph=rr(0.3,1.9);add('jelly',MAT.JELLY,pick(CANDY),PAL.white,[x+Math.sin(ph)*Math.cos(th)*1.25*s,y+0.55*s+Math.cos(ph)*0.85*s,z+Math.sin(ph)*Math.sin(th)*1.25*s],[0.30,0.26,0.30],[rr(3),rr(6),rr(3)],0.05);}}
+  // marshmallow snowmen
+  for(let i=0;i<6;i++){const a=i/6*Math.PI*2+rr(0.3),x=Math.cos(a)*rr(11,16),z=Math.sin(a)*rr(11,16),y=at(x,z);
+    add('sphere',MAT.MARSH,PAL.white,PAL.cream,[x,y+0.65,z],[1.05,0.95,1.05]); add('sphere',MAT.MARSH,PAL.white,PAL.cream,[x,y+1.85,z],[0.78,0.72,0.78]);
+    add('cone',MAT.JELLY,PAL.orange,PAL.orange,[x,y+1.9,z+0.75],[0.16,0.65,0.16],[Math.PI/2.3,0,0]);
+    for(const bx of[-0.14,0.14]) add('jelly',MAT.JELLY,PAL.red,PAL.white,[x+bx,y+1.15,z+0.82],[0.13,0.13,0.13]);
+    add('cyl',MAT.BARK,PAL.choc,PAL.choc,[x-0.95,y+2.0,z],[0.07,1.2,0.07],[0,0,0.9]); add('cyl',MAT.BARK,PAL.choc,PAL.choc,[x+0.95,y+2.0,z],[0.07,1.2,0.07],[0,0,-0.9]);}
+  // candy-cane lamp posts around plaza
+  for(let i=0;i<10;i++){const a=i/10*Math.PI*2,x=Math.cos(a)*8.2,z=Math.sin(a)*8.2,y=at(x,z);
+    add('cyl',MAT.CANE,PAL.red,PAL.white,[x,y+1.1,z],[0.16,2.2,0.16]); add('hook',MAT.CANE,PAL.red,PAL.white,[x,y+2.45,z],[0.55,0.55,0.55],[0,-a,Math.PI]); add('sphere',MAT.WINDOW,'#ffd93b','#fff3d6',[x+Math.sin(a)*0.0,y+2.35,z],[0.34,0.34,0.34]);}
+  // standalone candy canes, gumdrop lane markers, peppermint stepping discs
+  for(let i=0;i<Math.floor(70*D);i++){const a=rr(Math.PI*2),rad=rr(10.5,29),x=Math.cos(a)*rad,z=Math.sin(a)*rad;if(Math.abs(z-riverZ(x))<4.5)continue;const y=at(x,z),t=rand();
+    if(t<0.3){add('cyl',MAT.CANE,PAL.red,PAL.white,[x,y+0.8,z],[0.17,1.6,0.17],[0,rr(6),0]);add('hook',MAT.CANE,PAL.red,PAL.white,[x,y+1.75,z],[0.5,0.5,0.5],[0,rr(6),Math.PI]);}
+    else if(t<0.65) add('gumdrop',MAT.GUMDROP,pick(CANDY),PAL.white,[x,y+0.35,z],[0.75,0.8,0.75],[0,rr(6),0]);
+    else add('cyl',MAT.PEPPER,pick(CANDY),PAL.white,[x,y+0.1,z],[0.85,0.18,0.85],[0,rr(6),0]);}
+  // rock-candy crystal clusters
+  for(let i=0;i<Math.floor(26*D);i++){const a=rr(Math.PI*2),rad=rr(24,58),x=Math.cos(a)*rad,z=Math.sin(a)*rad,y=at(x,z);const c=pick(CANDY);
+    for(let k=0;k<4;k++) add('cone',MAT.ROCK,c,PAL.white,[x+rr(-0.7,0.7),y+rr(0.3,0.8),z+rr(-0.7,0.7)],[rr(0.25,0.5),rr(0.8,1.9),rr(0.25,0.5)],[rr(-0.4,0.4),rr(6),rr(-0.4,0.4)]);}
+  // candy flowers
+  for(let i=0;i<Math.floor(90*D);i++){const a=rr(Math.PI*2),rad=rr(8,34),x=Math.cos(a)*rad,z=Math.sin(a)*rad;if(Math.abs(z-riverZ(x))<4)continue;const y=at(x,z),c=pick(CANDY);
+    add('cyl',MAT.LEAF,PAL.mint,PAL.mint,[x,y+0.35,z],[0.05,0.7,0.05]);
+    for(let pI=0;pI<5;pI++){const pa=pI/5*Math.PI*2;add('sphere',MAT.GUMDROP,c,PAL.white,[x+Math.cos(pa)*0.28,y+0.78,z+Math.sin(pa)*0.28],[0.20,0.14,0.20]);}
+    add('jelly',MAT.JELLY,PAL.lemon,PAL.white,[x,y+0.85,z],[0.18,0.16,0.18]);}
+  // cupcakes & donuts near the plaza
+  for(let i=0;i<14;i++){const a=rr(Math.PI*2),rad=rr(6.8,8.6),x=Math.cos(a)*rad,z=Math.sin(a)*rad,y=at(x,z);
+    if(i%2){add('gumdrop',MAT.WAFER,'#d9a066','#a96f35',[x,y+0.3,z],[0.8,0.65,0.8]);add('sphere',MAT.ICING,pick([PAL.pink,'#fff3d6',PAL.mint,'#c89bff']),PAL.white,[x,y+0.85,z],[0.62,0.5,0.62]);add('sphere',MAT.JELLY,PAL.red,PAL.white,[x,y+1.25,z],[0.2,0.2,0.2]);}
+    else add('torus',MAT.ICING,pick(CANDY),PAL.white,[x,y+0.28,z],[0.75,0.75,0.75],[Math.PI/2,rr(6),0]);}
+  // scattered jellybeans + sprinkles on the ground (the "any other thing" confetti layer)
+  for(let i=0;i<Math.floor(500*D);i++){const a=rr(Math.PI*2),rad=rr(4,62),x=Math.cos(a)*rad,z=Math.sin(a)*rad;add('jelly',MAT.JELLY,pick(CANDY),PAL.white,[x,at(x,z)+0.14,z],[rr(0.22,0.4),0.2,rr(0.22,0.4)],[rr(3),rr(6),rr(3)]);}
+  for(let i=0;i<Math.floor(900*D);i++){const a=rr(Math.PI*2),rad=rr(3,64),x=Math.cos(a)*rad,z=Math.sin(a)*rad;add('box',MAT.SPRINKLE,pick(CANDY),PAL.white,[x,at(x,z)+0.10,z],[rr(0.22,0.34),0.07,0.07],[rr(0.4),rr(6),rr(0.4)]);}
+  // marshmallow clouds
+  for(let i=0;i<16;i++){const x=rr(-70,70),z=rr(-70,70),y=rr(20,30),s=rr(1.6,3.2);
+    for(let k=0;k<5;k++) add('sphere',MAT.MARSH,PAL.white,PAL.cream,[x+rr(-2,2)*s*0.6,y+rr(-0.5,0.5),z+rr(-1.2,1.2)],[s*rr(0.8,1.3),s*0.52,s*rr(0.7,1.0)],[0,rr(6),0],0,1);}
+  // sugar snow (animated in the vertex shader, material 99)
+  for(let i=0;i<450;i++) add('snowball',MAT.SNOW,PAL.white,PAL.white,[rr(-65,65),rr(2,30),rr(-65,65)],[0.14,0.14,0.14]);
+}
+
+// ---------- WebGPU ----------
+const adapter = await navigator.gpu.requestAdapter();
+if(!adapter){document.getElementById('fallback').style.display='grid';throw new Error('no adapter')}
+const device = await adapter.requestDevice();
+const ctx = canvas.getContext('webgpu');
+const format = navigator.gpu.getPreferredCanvasFormat();
+let canvasW=2,canvasH=2,depthTex=null;
+function resize(){const dpr=Math.min(devicePixelRatio||1,2);canvasW=Math.max(2,(canvas.clientWidth*dpr)|0);canvasH=Math.max(2,(canvas.clientHeight*dpr)|0);if(canvas.width!==canvasW||canvas.height!==canvasH){canvas.width=canvasW;canvas.height=canvasH;if(depthTex)depthTex.destroy();depthTex=device.createTexture({size:[canvasW,canvasH],format:'depth24plus',usage:GPUTextureUsage.RENDER_ATTACHMENT});}}
+new ResizeObserver(resize).observe(canvas); resize();
+ctx.configure({device,format,alphaMode:'opaque'});
+
+const shadowSize=2048;
+const shadowTex=device.createTexture({size:[shadowSize,shadowSize],format:'depth32float',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
+const shadowSampler=device.createSampler({compare:'less',magFilter:'linear',minFilter:'linear'});
+
+const WGSL_COMMON=/* wgsl */`
+struct Uniforms{ viewProj:mat4x4<f32>, lightVP:mat4x4<f32>, invVP:mat4x4<f32>, camPos:vec4<f32>, sunDir:vec4<f32>, sunColor:vec4<f32>, misc:vec4<f32> };
+@group(0) @binding(0) var<uniform> U:Uniforms;
+fn hash31(p:vec3<f32>)->f32{ var q=fract(p*0.3183099+vec3<f32>(0.1,0.2,0.3)); q*=17.0; return fract(q.x*q.y*q.z*(q.x+q.y+q.z)); }
+fn hash21(p:vec2<f32>)->f32{ return fract(sin(dot(p,vec2<f32>(127.1,311.7)))*43758.5453); }
+fn noise3(p:vec3<f32>)->f32{ let i=floor(p); let f=fract(p); let u=f*f*(3.0-2.0*f);
+  return mix(mix(mix(hash31(i),hash31(i+vec3<f32>(1,0,0)),u.x),mix(hash31(i+vec3<f32>(0,1,0)),hash31(i+vec3<f32>(1,1,0)),u.x),u.y),
+             mix(mix(hash31(i+vec3<f32>(0,0,1)),hash31(i+vec3<f32>(1,0,1)),u.x),mix(hash31(i+vec3<f32>(0,1,1)),hash31(i+vec3<f32>(1,1,1)),u.x),u.y),u.z); }
+fn fbm3(p:vec3<f32>)->f32{ var a=0.5; var s=0.0; var q=p; for(var i=0;i<4;i++){ s+=a*noise3(q); q*=2.03; a*=0.5; } return s; }
+fn fbm2(p:vec2<f32>)->f32{ var a=0.5; var s=0.0; var q=p; for(var i=0;i<4;i++){ let i2=floor(q); let f=fract(q); let u=f*f*(3.0-2.0*f);
+  let v=mix(mix(hash21(i2),hash21(i2+vec2<f32>(1,0)),u.x),mix(hash21(i2+vec2<f32>(0,1)),hash21(i2+vec2<f32>(1,1)),u.x),u.y); s+=a*v; q*=2.07; a*=0.5; } return s; }
+fn voro(p:vec3<f32>)->f32{ let i=floor(p); var d=8.0; for(var x=-1;x<=1;x++){for(var y=-1;y<=1;y++){for(var z=-1;z<=1;z++){ let g=vec3<f32>(f32(x),f32(y),f32(z)); let o=vec3<f32>(hash31(i+g),hash31(i+g+19.1),hash31(i+g+47.7)); d=min(d,length(g+o-fract(p))); }}} return d; }
+`;
+const vertWGSL=WGSL_COMMON+/* wgsl */`
+struct In{ @location(0) pos:vec3<f32>, @location(1) nor:vec3<f32>, @location(2) uv:vec2<f32>,
+  @location(3) m0:vec4<f32>, @location(4) m1:vec4<f32>, @location(5) m2:vec4<f32>, @location(6) m3:vec4<f32>,
+  @location(7) ca:vec4<f32>, @location(8) cb:vec4<f32>, @location(9) prm:vec4<f32> };
+struct Out{ @builtin(position) clip:vec4<f32>, @location(0) wp:vec3<f32>, @location(1) wn:vec3<f32>, @location(2) lp:vec3<f32>, @location(3) uv:vec2<f32>,
+  @location(4) @interpolate(flat) ca:vec4<f32>, @location(5) @interpolate(flat) cb:vec4<f32>, @location(6) @interpolate(flat) prm:vec4<f32> };
+@vertex fn vs(i:In)->Out{ var o:Out; let model=mat4x4<f32>(i.m0,i.m1,i.m2,i.m3);
+  var wp=(model*vec4<f32>(i.pos,1.0)).xyz;
+  let time=U.misc.x; let swayAmt=i.prm.z * U.misc.w;
+  if(swayAmt>0.001){ let ph=time*1.3+i.prm.y*37.0; wp.x+=sin(ph)*swayAmt*(wp.y*0.12+0.4); wp.z+=cos(ph*0.83)*swayAmt*0.6; }
+  if(i.prm.w>0.5){ wp.y+=sin(time*0.35+i.prm.y*41.0)*0.8; wp.x+=sin(time*0.07+i.prm.y*13.0)*2.0; } // clouds drift/bob
+  if(i.prm.x>98.5){ wp.y = 2.0 + (wp.y - time*(1.1+i.prm.y*1.4)) % 28.0; if(wp.y<2.0){wp.y+=28.0;} } // sugar snow fall
+  o.wp=wp; o.wn=normalize((model*vec4<f32>(i.nor,0.0)).xyz); o.lp=i.pos; o.uv=i.uv; o.ca=i.ca; o.cb=i.cb; o.prm=i.prm;
+  o.clip=U.viewProj*vec4<f32>(wp,1.0); return o; }
+@vertex fn vsShadow(i:In)->@builtin(position) vec4<f32>{ let model=mat4x4<f32>(i.m0,i.m1,i.m2,i.m3); var wp=(model*vec4<f32>(i.pos,1.0)).xyz;
+  if(i.prm.x>98.5){ return vec4<f32>(2.0,2.0,2.0,1.0); } // snow casts no shadow
+  let swayAmt=i.prm.z*U.misc.w; if(swayAmt>0.001){ let ph=U.misc.x*1.3+i.prm.y*37.0; wp.x+=sin(ph)*swayAmt*(wp.y*0.12+0.4); wp.z+=cos(ph*0.83)*swayAmt*0.6; }
+  return U.lightVP*vec4<f32>(wp,1.0); }
+`;
+const fragWGSL=WGSL_COMMON+/* wgsl */`
+@group(0) @binding(1) var shadowT:texture_depth_2d;
+@group(0) @binding(2) var shadowS:sampler_comparison;
+struct In{ @location(0) wp:vec3<f32>, @location(1) wn:vec3<f32>, @location(2) lp:vec3<f32>, @location(3) uv:vec2<f32>,
+  @location(4) @interpolate(flat) ca:vec4<f32>, @location(5) @interpolate(flat) cb:vec4<f32>, @location(6) @interpolate(flat) prm:vec4<f32> };
+fn shadowFactor(wp:vec3<f32>,n:vec3<f32>)->f32{ // no early-outs: textureSampleCompare requires uniform control flow
+  let p=U.lightVP*vec4<f32>(wp+n*0.06,1.0); let ndc=p.xyz/max(p.w,0.00001);
+  let uvRaw=vec2<f32>(ndc.x*0.5+0.5, 0.5-ndc.y*0.5);
+  let inBounds=(p.w>0.0 && uvRaw.x>=0.0 && uvRaw.x<=1.0 && uvRaw.y>=0.0 && uvRaw.y<=1.0 && ndc.z<=1.0);
+  let uv=clamp(uvRaw,vec2<f32>(0.001),vec2<f32>(0.999));
+  let sRef=clamp(ndc.z-0.0008,0.0,1.0); let texel=1.0/2048.0; var s=0.0;
+  for(var x=-1;x<=1;x++){for(var y=-1;y<=1;y++){ s+=textureSampleCompare(shadowT,shadowS,uv+vec2<f32>(f32(x),f32(y))*texel,sRef); }}
+  return select(1.0, s/9.0, inBounds); }
+@fragment fn fs(i:In)->@location(0) vec4<f32>{
+  let matId=i32(i.prm.x+0.5); let seed=i.prm.y; let time=U.misc.x;
+  let N=normalize(i.wn); let V=normalize(U.camPos.xyz-i.wp); let L=normalize(U.sunDir.xyz);
+  var albedo=i.ca.rgb; var rough=0.55; var emiss=vec3<f32>(0.0); var sparkle=0.0;
+  let nBig=fbm3(i.wp*0.55+seed*13.0); let nMed=fbm3(i.wp*2.2+seed*7.0); let nFine=noise3(i.wp*14.0+seed*3.0);
+  switch(matId){
+    case 0:{ // chocolate: swirled cocoa, glossy pools
+      let swirl=fbm3(vec3<f32>(i.wp.x*0.8+fbm3(i.wp*0.4)*3.0, i.wp.y*1.4, i.wp.z*0.8));
+      albedo=mix(vec3<f32>(0.045,0.016,0.004), vec3<f32>(0.23,0.10,0.03), swirl); albedo=mix(albedo,i.cb.rgb,nMed*0.35); rough=0.28+nFine*0.15; }
+    case 1:{ // gingerbread: baked blotches + dark speckles + flour dust
+      albedo=mix(i.ca.rgb*0.75,i.ca.rgb*1.18,nBig); albedo=mix(albedo,vec3<f32>(0.16,0.06,0.01),smoothstep(0.72,0.95,nFine)*0.7);
+      albedo=mix(albedo,vec3<f32>(0.95,0.88,0.75),smoothstep(0.8,0.97,fbm3(i.wp*5.0+9.0))*0.25); rough=0.85; }
+    case 2:{ // icing / frosting: soft swirls, pastel, sugar glints
+      albedo=mix(i.ca.rgb,i.cb.rgb,fbm3(i.lp*2.5+seed)*0.45); albedo*=0.92+0.16*nMed; rough=0.38; sparkle=smoothstep(0.93,1.0,noise3(i.lp*36.0+seed*9.0)); }
+    case 3:{ // candy cane: diagonal red/white stripes around the local Y axis
+      let ang=atan2(i.lp.z,i.lp.x); let s=sin(ang*3.0+i.lp.y*9.0+seed);
+      let stripe=smoothstep(-0.15,0.15,s); albedo=mix(i.cb.rgb,i.ca.rgb,stripe); albedo*=0.9+0.2*nFine; rough=0.22; }
+    case 4:{ // jellybean: glossy translucent candy shell
+      let grad=0.82+0.36*(i.lp.y+0.5); albedo=i.ca.rgb*grad; albedo=mix(albedo,vec3<f32>(1.0),smoothstep(0.75,0.98,nFine)*0.18); rough=0.12; }
+    case 5:{ // marshmallow: pillowy matte white, faint toast
+      albedo=mix(i.ca.rgb,vec3<f32>(0.98,0.82,0.62),smoothstep(0.62,0.9,fbm3(i.wp*1.4+seed))*0.35); albedo*=0.94+0.10*nMed; rough=0.92; }
+    case 6:{ // gumdrop: sugar-crystal crust (voronoi sparkle + frosted rim)
+      albedo=i.ca.rgb*(0.8+0.4*nMed); let v=voro(i.lp*7.0+seed*5.0); sparkle=smoothstep(0.25,0.0,v)*0.9+smoothstep(0.92,1.0,noise3(i.lp*44.0)); rough=0.34; }
+    case 7:{ // lollipop: spiral swirl in the local XY disc plane
+      let a=atan2(i.lp.y,i.lp.x); let r=length(i.lp.xy); let s=sin(a*4.0+r*11.0-seed*20.0);
+      albedo=mix(i.ca.rgb,i.cb.rgb,smoothstep(-0.25,0.25,s)); albedo*=0.92+0.14*sin(r*22.0); rough=0.15; }
+    case 8:{ // peppermint: radial wedges on the XZ disc + ring
+      let a=atan2(i.lp.z,i.lp.x); let s=sin(a*9.0+seed*8.0); let r=length(i.lp.xz);
+      albedo=mix(i.ca.rgb,i.cb.rgb,smoothstep(-0.1,0.1,s)); albedo=mix(albedo,i.ca.rgb,smoothstep(0.86,0.95,r)*0.8); rough=0.2; }
+    case 9:{ // wafer / biscuit: cross-hatch grid
+      let g=abs(fract(i.lp.xy*vec2<f32>(7.0,7.0)+i.lp.z)-0.5); let line=smoothstep(0.42,0.5,max(g.x,g.y));
+      let g2=abs(fract(vec2<f32>(i.lp.x+i.lp.z,i.lp.y)*7.0)-0.5); let line2=smoothstep(0.42,0.5,max(g2.x,g2.y));
+      albedo=mix(i.ca.rgb,i.cb.rgb,max(line,line2)*0.65)*(0.9+0.2*nMed); rough=0.8; }
+    case 10:{ // mint candy foliage: leafy fbm + lighter veins
+      albedo=mix(i.ca.rgb*0.7,i.cb.rgb,nBig); albedo=mix(albedo,vec3<f32>(0.75,1.0,0.75),smoothstep(0.68,0.92,noise3(i.wp*6.0))*0.3); rough=0.6; }
+    case 11:{ // rock candy: crystalline voronoi facets
+      let v=voro(i.lp*3.2+seed*11.0); albedo=i.ca.rgb*(0.65+0.65*(1.0-v)); sparkle=smoothstep(0.35,0.05,v); rough=0.18; }
+    case 12:{ // chocolate bark: vertical streaks
+      let streak=fbm3(vec3<f32>(atan2(i.lp.z,i.lp.x)*4.0, i.lp.y*1.2, seed*8.0));
+      albedo=mix(vec3<f32>(0.05,0.02,0.005),i.cb.rgb,streak)*(0.8+0.4*nFine); rough=0.9; }
+    case 13:{ albedo=i.ca.rgb; rough=0.25; } // sprinkle: glossy sugar rod
+    case 14:{ albedo=i.ca.rgb; emiss=i.ca.rgb*(1.4+0.5*sin(time*2.0+seed*40.0)); rough=0.3; } // glowing candy window / lamp
+    case 15:{ albedo=mix(i.ca.rgb,i.cb.rgb,nMed); rough=0.5; } // caramel
+    case 20:{ // GROUND — frosting grass, chocolate soil patches, frosting snow, sprinkles
+      let patchN=fbm2(i.wp.xz*0.045); let choc=smoothstep(0.52,0.68,patchN);
+      var g=mix(i.ca.rgb*0.75, i.ca.rgb*1.15, fbm2(i.wp.xz*0.35));
+      g=mix(g, vec3<f32>(0.10,0.045,0.012), choc*(0.65+0.35*fbm2(i.wp.xz*0.8)));            // chocolate soil
+      g=mix(g, vec3<f32>(0.98,0.95,0.92), smoothstep(0.62,0.8,fbm2(i.wp.xz*0.09+31.0))*0.75); // frosting drifts
+      let cell=floor(i.wp.xz*3.0); let h=hash21(cell); // confetti sprinkle specks baked into the ground
+      if(h>0.93){ let cyc=fract(h*17.0); g=mix(g, mix(vec3<f32>(1.0,0.25,0.55),vec3<f32>(0.2,0.7,1.0),cyc), smoothstep(0.35,0.15,length(fract(i.wp.xz*3.0)-0.5))*0.9); }
+      albedo=g; rough=mix(0.75,0.35,choc); }
+    case 21:{ // chocolate river / fountain pools: flowing glossy swirls (time-scrolled)
+      let flow=fbm3(vec3<f32>(i.wp.x*0.5, i.wp.y*0.8 - time*0.05, i.wp.z*0.5 + sin(time*0.2)*0.1));
+      let flow2=fbm3(i.wp*1.7+vec3<f32>(0.0,-time*0.12,0.0));
+      albedo=mix(vec3<f32>(0.05,0.018,0.004), i.cb.rgb, flow*0.8+flow2*0.25); rough=0.1; }
+    case 22:{ // caramel / cookie path
+      albedo=mix(i.ca.rgb,i.cb.rgb,fbm2(i.wp.xz*1.3)); albedo*=0.85+0.3*noise3(i.wp*9.0);
+      let crumb=smoothstep(0.8,0.98,noise3(i.wp*16.0)); albedo=mix(albedo,vec3<f32>(0.2,0.09,0.02),crumb*0.5); rough=0.55; }
+    case 99:{ albedo=vec3<f32>(1.0); rough=0.6; } // sugar snow
+    default:{ albedo=i.ca.rgb; }
+  }
+  // lighting: hemisphere ambient + sun diffuse + Blinn specular + fresnel candy sheen
+  var sh=1.0; if(U.misc.z>0.5){ sh=shadowFactor(i.wp,N); }
+  let diff=max(dot(N,L),0.0);
+  let H=normalize(L+V); let spec=pow(max(dot(N,H),0.0), mix(90.0,10.0,rough))*(1.0-rough)*1.1;
+  let fres=pow(1.0-max(dot(N,V),0.0),3.0);
+  let amb=mix(vec3<f32>(0.16,0.10,0.16), vec3<f32>(0.42,0.46,0.52), N.y*0.5+0.5);
+  var lit=albedo*(amb + U.sunColor.rgb*diff*sh*U.misc.y) + U.sunColor.rgb*spec*sh;
+  lit+= albedo*fres*0.28*(1.0-rough);                       // glossy candy rim
+  lit+= vec3<f32>(1.0)*sparkle*pow(max(dot(N,H),0.0),6.0)*1.6*sh; // sugar-crystal glints
+  lit+= emiss;
+  let dist=length(U.camPos.xyz-i.wp); let fogF=1.0-exp(-dist*0.0038);
+  let fogCol=mix(vec3<f32>(0.98,0.62,0.72), vec3<f32>(0.55,0.72,1.0), clamp(U.sunDir.y*1.4,0.0,1.0));
+  lit=mix(lit,fogCol* (0.35+0.65*U.misc.y),fogF*0.75);
+  return vec4<f32>(lit,1.0);
+}`;
+const skyWGSL=WGSL_COMMON+/* wgsl */`
+struct Out{ @builtin(position) clip:vec4<f32>, @location(0) dir:vec3<f32> };
+@vertex fn vs(@builtin(vertex_index) vi:u32)->Out{ var o:Out; let x=f32((vi<<1u)&2u)*2.0-1.0; let y=f32(vi&2u)*2.0-1.0; o.clip=vec4<f32>(x,y,0.9999,1.0);
+  let wp=U.invVP*vec4<f32>(x,y,0.9999,1.0); o.dir=normalize(wp.xyz/wp.w - U.camPos.xyz); return o; }
+@fragment fn fs(i:Out)->@location(0) vec4<f32>{ let d=normalize(i.dir); let sunU=U.sunDir.xyz; let sd=dot(d,sunU);
+  let day=clamp(sunU.y*1.6+0.25,0.05,1.0);
+  var skyC=mix(vec3<f32>(1.0,0.55,0.62), vec3<f32>(0.35,0.62,1.0), smoothstep(-0.05,0.65,d.y));       // strawberry horizon -> blueberry sky
+  skyC=mix(vec3<f32>(0.13,0.07,0.25), skyC, day);
+  skyC+=vec3<f32>(1.0,0.75,0.45)*pow(max(sd,0.0),220.0)*3.0;                                            // sun disc
+  skyC+=vec3<f32>(1.0,0.55,0.35)*pow(max(sd,0.0),7.0)*0.35*day;                                        // warm glow
+  if(d.y>0.01){ let p=d.xz/(d.y+0.22); let cl=fbm2(p*1.4+vec2<f32>(U.misc.x*0.008,0.0));                 // marshmallow clouds (fbm)
+    let cm=smoothstep(0.52,0.78,cl)*smoothstep(0.0,0.25,d.y);
+    skyC=mix(skyC, vec3<f32>(1.02,0.98,1.0)*(0.35+0.65*day), cm*0.85); }
+  return vec4<f32>(skyC,1.0); }`;
+
+// pipelines
+const vBuffers=[{arrayStride:32,attributes:[{shaderLocation:0,offset:0,format:'float32x3'},{shaderLocation:1,offset:12,format:'float32x3'},{shaderLocation:2,offset:24,format:'float32x2'}]},
+ {arrayStride:112,stepMode:'instance',attributes:[{shaderLocation:3,offset:0,format:'float32x4'},{shaderLocation:4,offset:16,format:'float32x4'},{shaderLocation:5,offset:32,format:'float32x4'},{shaderLocation:6,offset:48,format:'float32x4'},{shaderLocation:7,offset:64,format:'float32x4'},{shaderLocation:8,offset:80,format:'float32x4'},{shaderLocation:9,offset:96,format:'float32x4'}]}];
+const uniformBuf=device.createBuffer({size:256,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+const bindLayout=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT,buffer:{type:'uniform'}},{binding:1,visibility:GPUShaderStage.FRAGMENT,texture:{sampleType:'depth'}},{binding:2,visibility:GPUShaderStage.FRAGMENT,sampler:{type:'comparison'}}]});
+const bindGroup=device.createBindGroup({layout:bindLayout,entries:[{binding:0,resource:{buffer:uniformBuf}},{binding:1,resource:shadowTex.createView()},{binding:2,resource:shadowSampler}]});
+// shadow pass gets its OWN uniform-only bind group: binding the shadow texture while rendering into it is invalid
+const shadowBindLayout=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.VERTEX,buffer:{type:'uniform'}}]});
+const shadowBindGroup=device.createBindGroup({layout:shadowBindLayout,entries:[{binding:0,resource:{buffer:uniformBuf}}]});
+const shadowPipeLayout=device.createPipelineLayout({bindGroupLayouts:[shadowBindLayout]});
+const pipeLayout=device.createPipelineLayout({bindGroupLayouts:[bindLayout]});
+const vModule=device.createShaderModule({code:vertWGSL}), fModule=device.createShaderModule({code:fragWGSL});
+const mainPipe=await device.createRenderPipelineAsync({layout:pipeLayout,vertex:{module:vModule,entryPoint:'vs',buffers:vBuffers},fragment:{module:fModule,entryPoint:'fs',targets:[{format}]},primitive:{topology:'triangle-list',cullMode:'back'},depthStencil:{format:'depth24plus',depthWriteEnabled:true,depthCompare:'less'}});
+const shadowPipe=await device.createRenderPipelineAsync({layout:shadowPipeLayout,vertex:{module:vModule,entryPoint:'vsShadow',buffers:vBuffers},primitive:{topology:'triangle-list',cullMode:'back'},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'less'}});
+const skyPipe=await device.createRenderPipelineAsync({layout:pipeLayout,vertex:{module:device.createShaderModule({code:skyWGSL}),entryPoint:'vs'},fragment:{module:device.createShaderModule({code:skyWGSL}),entryPoint:'fs',targets:[{format}]},primitive:{topology:'triangle-list'},depthStencil:{format:'depth24plus',depthWriteEnabled:false,depthCompare:'always'}});
+
+// GPU buffers per group
+function uploadGroups(){
+  for(const g of groups.values()){
+    if(g.vbuf) {g.vbuf.destroy();g.ibuf.destroy();if(g.instBuf)g.instBuf.destroy();}
+    const geo=g.geo;
+    const interleaved=new Float32Array(geo.pos.length/3*8);
+    for(let k=0;k<geo.pos.length/3;k++){interleaved.set(geo.pos.subarray(k*3,k*3+3),k*8);interleaved.set(geo.nor.subarray(k*3,k*3+3),k*8+3);interleaved.set(geo.uv.subarray(k*2,k*2+2),k*8+6);}
+    g.vbuf=device.createBuffer({size:interleaved.byteLength,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST});
+    device.queue.writeBuffer(g.vbuf,0,interleaved);
+    g.ibuf=device.createBuffer({size:geo.idx.byteLength,usage:GPUBufferUsage.INDEX|GPUBufferUsage.COPY_DST}); device.queue.writeBuffer(g.ibuf,0,geo.idx); g.indexCount=geo.idx.length;
+    const n=g.list.length; g.count=n; if(!n){g.instBuf=null;continue;}
+    const data=new Float32Array(n*28);
+    g.list.forEach((it,k)=>{const m=M.compose(it.pos,it.rot,it.scale);data.set(m,k*28);data.set([...it.ca,1],k*28+16);data.set([...it.cb,1],k*28+20);data.set([it.mat,it.seed,it.sway,it.bob],k*28+24);});
+    g.instBuf=device.createBuffer({size:data.byteLength,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST}); device.queue.writeBuffer(g.instBuf,0,data);
+  }
+}
+
+// camera + input
+const cam={theta:0.7,phi:1.02,radius:42,target:[0,2.5,0]};
+let dragging=0,lx=0,ly=0; const keys={};
+canvas.addEventListener('pointerdown',e=>{dragging=e.button===2?2:1;lx=e.clientX;ly=e.clientY;canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointerup',()=>dragging=0); canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('pointermove',e=>{if(!dragging)return;const dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;
+  if(dragging===1){cam.theta-=dx*0.005;cam.phi=clamp(cam.phi-dy*0.005,0.12,1.5);} else {pan(-dx*0.05,dy*0.05);}});
+canvas.addEventListener('wheel',e=>{e.preventDefault();cam.radius=clamp(cam.radius*(1+Math.sign(e.deltaY)*0.09),7,110)},{passive:false});
+function pan(dx,dy){const f=nrm(sub(camEye(),cam.target));const r=nrm(cross(f,[0,1,0]));const u=cross(r,f);cam.target=cam.target.map((v,i)=>v+r[i]*dx+u[i]*dy)}
+function camEye(){return[cam.target[0]+cam.radius*Math.sin(cam.phi)*Math.sin(cam.theta),cam.target[1]+cam.radius*Math.cos(cam.phi),cam.target[2]+cam.radius*Math.sin(cam.phi)*Math.cos(cam.theta)]}
+addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true); addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{const v=b.dataset.view;
+  if(v==='village'){cam.target=[0,2.5,0];cam.radius=42;cam.theta=0.7;cam.phi=1.02}
+  if(v==='fountain'){cam.target=[0,2,0];cam.radius=15;cam.theta=2.2;cam.phi=1.15}
+  if(v==='forest'){cam.target=[26,3,20];cam.radius=22;cam.theta=-0.6;cam.phi=1.2}
+  if(v==='aerial'){cam.target=[0,0,0];cam.radius=78;cam.theta=0.7;cam.phi=0.45}});
+
+// UI
+let ui={tod:0.34,density:1,spin:true,snow:true,sway:true,shadows:true};
+const todNames=t=>t<0.18?'sunrise':t<0.42?'morning':t<0.62?'midday':t<0.82?'afternoon':'golden hour';
+document.getElementById('tod').oninput=e=>{ui.tod=e.target.value/1000;document.getElementById('todVal').textContent=todNames(ui.tod)};
+document.getElementById('density').oninput=e=>{ui.density=e.target.value/100;document.getElementById('denVal').textContent=e.target.value+'%'};
+document.getElementById('spin').onchange=e=>ui.spin=e.target.checked;
+document.getElementById('snow').onchange=e=>ui.snow=e.target.checked;
+document.getElementById('sway').onchange=e=>ui.sway=e.target.checked;
+document.getElementById('shadows').onchange=e=>ui.shadows=e.target.checked;
+document.getElementById('regen').onclick=()=>{seed=(Math.random()*1e9)|0;rand=mulberry32(seed);buildWorld(ui.density);uploadGroups();};
+
+buildWorld(1); uploadGroups();
+const totalInstances=()=>[...groups.values()].reduce((s,g)=>s+g.count,0);
+
+// render loop
+const uni=new Float32Array(64); let t0=performance.now(),frames=0,fpsT=performance.now();
+function frame(now){
+  requestAnimationFrame(frame); resize();
+  const time=(now-t0)/1000;
+  if(ui.spin&&!dragging) cam.theta+=0.0016;
+  // WASD pan
+  const sp=(keys['shift']?0.9:0.35); let mx=0,mz=0,my=0;
+  if(keys['w']||keys['arrowup'])mz+=sp; if(keys['s']||keys['arrowdown'])mz-=sp; if(keys['a']||keys['arrowleft'])mx-=sp; if(keys['d']||keys['arrowright'])mx+=sp; if(keys['q'])my-=sp; if(keys['e'])my+=sp;
+  if(mx||mz||my){const f=nrm(sub(camEye(),cam.target));const r=nrm(cross(f,[0,1,0]));cam.target=cam.target.map((v,i)=>v+r[i]*mx+f[i]*mz);cam.target[1]+=my;}
+  const eye=camEye();
+  const view=M.lookAt(eye,cam.target,[0,1,0]); const proj=M.persp(1.05,canvasW/canvasH,0.1,400); const vp=M.mul(proj,view);
+  // sun from time-of-day
+  const az=ui.tod*Math.PI*1.15-0.4, el=0.18+Math.sin(ui.tod*Math.PI)*0.95;
+  const sunDir=nrm([Math.cos(az)*Math.cos(el),Math.sin(el),Math.sin(az)*Math.cos(el)]);
+  const warmth=1-Math.sin(ui.tod*Math.PI); const sunCol=[1.0,0.72+0.24*(1-warmth),0.48+0.4*(1-warmth)].map(v=>v);
+  const sunPos=sunDir.map(v=>v*95); const lightVP=M.mul(M.ortho(-62,62,-62,62,10,220),M.lookAt(sunPos,[0,0,0],[0,1,0]));
+  uni.fill(0); uni.set(vp,0); uni.set(lightVP,16); uni.set(M.invert(vp),32);
+  uni.set([...eye,1],48); uni.set([...sunDir,1],52); uni.set([...sunCol,1],56);
+  uni.set([time, ui.shadows?1.05:1.25, ui.shadows?1:0, ui.sway?1:0],60);
+  device.queue.writeBuffer(uniformBuf,0,uni);
+
+  const enc=device.createCommandEncoder();
+  if(ui.shadows){
+    const sp=enc.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:shadowTex.createView(),depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'store'}});
+    sp.setPipeline(shadowPipe); sp.setBindGroup(0,shadowBindGroup);
+    for(const g of groups.values()){if(!g.count||!g.visible)continue; if(g.geo===groups.get('ground')?.geo&&false)continue; sp.setVertexBuffer(0,g.vbuf);sp.setVertexBuffer(1,g.instBuf);sp.setIndexBuffer(g.ibuf,'uint32');sp.drawIndexed(g.indexCount,1);}
+    sp.end();
+  }
+  const pass=enc.beginRenderPass({colorAttachments:[{view:ctx.getCurrentTexture().createView(),clearValue:{r:0.08,g:0.03,b:0.1,a:1},loadOp:'clear',storeOp:'store'}],depthStencilAttachment:{view:depthTex.createView(),depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'store'}});
+  pass.setPipeline(skyPipe); pass.setBindGroup(0,bindGroup); pass.draw(3);
+  pass.setPipeline(mainPipe); pass.setBindGroup(0,bindGroup);
+  for(const [name,g] of groups){if(!g.count||!g.visible)continue; if(name==='snowball'&&!ui.snow)continue; pass.setVertexBuffer(0,g.vbuf);pass.setVertexBuffer(1,g.instBuf);pass.setIndexBuffer(g.ibuf,'uint32');pass.drawIndexed(g.indexCount,g.count);}
+  pass.end(); device.queue.submit([enc.finish()]);
+  frames++; if(now-fpsT>600){statsEl.innerHTML=`seed <b>${seed}</b> · <b>${totalInstances()}</b> procedural instances · ${groups.size} instanced meshes<br/>${Math.round(frames*1000/(now-fpsT))} fps · ${canvasW}×${canvasH} · raw WebGPU/WGSL`;frames=0;fpsT=now;}
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
